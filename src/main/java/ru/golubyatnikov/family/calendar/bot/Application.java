@@ -2,6 +2,8 @@ package ru.golubyatnikov.family.calendar.bot;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.retry.annotation.EnableRetry;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -19,12 +21,21 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *   <li>Авторизация пользователей по Telegram ID</li>
  * </ul>
  * 
+ * <p>Конфигурация:</p>
+ * <ul>
+ *   <li>@EnableScheduling - включает поддержку scheduled задач для уведомлений</li>
+ *   <li>@EnableAsync - включает асинхронную обработку webhook обновлений</li>
+ *   <li>@EnableRetry - включает поддержку retry механизма для отправки сообщений</li>
+ * </ul>
+ * 
  * @author Family Calendar Bot Team
  * @version 1.0.0
  * @since 2025-12-30
  */
 @SpringBootApplication
 @EnableScheduling
+@EnableAsync
+@EnableRetry
 public class Application {
 
     /**

@@ -1,0 +1,112 @@
+# Конфигурация для production окружения
+# Активируется через: --spring.profiles.active=prod или SPRING_PROFILES_ACTIVE=prod
+
+spring:
+  # Конфигурация источника данных для production
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      # Увеличенный пул соединений для production
+      maximum-pool-size: 20
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      # Проверка соединений
+      connection-test-query: SELECT 1
+      leak-detection-threshold: 60000
+  
+  # JPA настройки для production
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        # Оптимизация для production
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+        # Статистика (опционально, можно отключить)
+        generate_statistics: false
+  
+  # Flyway для production
+  flyway:
+    # Запрет на очистку БД в production
+    clean-disabled: true
+    # Валидация миграций
+    validate-on-migrate: true
+    # Не создавать схему автоматически
+    create-schemas: false
+
+# Telegram бот для production
+telegram:
+  bot:
+    token: ${TELEGRAM_BOT_TOKEN}
+    username: ${TELEGRAM_BOT_USERNAME}
+    webhook-url: ${TELEGRAM_BOT_WEBHOOK_URL}
+
+# Логирование для production - минимальный уровень, без DEBUG
+logging:
+  level:
+    root: WARN
+    ru.golubyatnikov.family.calendar.bot: INFO
+    # Отключаем DEBUG для всех библиотек
+    org.springframework: WARN
+    org.springframework.web: WARN
+    org.springframework.data: WARN
+    org.springframework.boot: WARN
+    org.hibernate: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type: WARN
+    org.flywaydb: INFO
+    org.telegram.telegrambots: INFO
+    org.apache: WARN
+    com.zaxxer.hikari: WARN
+  file:
+    name: /app/logs/application.log
+
+# Настройки сервера для production
+server:
+  port: ${SERVER_PORT:8080}
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+    min-response-size: 1024
+  error:
+    # Не показывать детали ошибок в production
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+  # Настройки безопасности
+  shutdown: graceful
+  tomcat:
+    # Таймауты для production
+    connection-timeout: 20s
+    threads:
+      max: 200
+      min-spare: 10
+
+# Actuator endpoints для production - минимальный набор
+management:
+  endpoints:
+    web:
+      exposure:
+        # Только health и metrics для мониторинга
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+      environment: production
+
+# Настройки graceful shutdown
+spring.lifecycle.timeout-per-shutdown-phase: 30s

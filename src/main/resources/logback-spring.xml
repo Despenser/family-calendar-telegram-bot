@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Импорт базовых настроек Spring Boot -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    
+    <!-- Свойства для конфигурации -->
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="family-calendar-bot"/>
+    <springProperty scope="context" name="LOG_FILE" source="logging.file.name" defaultValue="logs/${APP_NAME}.log"/>
+    <springProperty scope="context" name="LOG_LEVEL_ROOT" source="logging.level.root" defaultValue="INFO"/>
+    <springProperty scope="context" name="LOG_LEVEL_APP" source="logging.level.ru.golubyatnikov.family.calendar.bot" defaultValue="DEBUG"/>
+    
+    <!-- Паттерны логирования -->
+    <property name="CONSOLE_LOG_PATTERN" 
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%thread]){magenta} %clr(%-5level){highlight} %clr(%logger{36}){cyan} %clr(-){faint} %msg%n%throwable"/>
+    <property name="FILE_LOG_PATTERN" 
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n%throwable"/>
+    
+    <!-- Консольный аппендер для всех профилей -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+    
+    <!-- Файловый аппендер с ротацией -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- Ротация по дням и размеру -->
+            <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+            <!-- Максимальный размер файла -->
+            <maxFileSize>10MB</maxFileSize>
+            <!-- Хранить логи за 30 дней -->
+            <maxHistory>30</maxHistory>
+            <!-- Максимальный общий размер логов -->
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+    
+    <!-- Асинхронный аппендер для улучшения производительности -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FILE"/>
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+    
+    <!-- Профиль для разработки (dev) -->
+    <springProfile name="dev">
+        <logger name="ru.golubyatnikov.family.calendar.bot" level="DEBUG"/>
+        <logger name="org.springframework.web" level="DEBUG"/>
+        <logger name="org.springframework.data" level="DEBUG"/>
+        <logger name="org.hibernate.SQL" level="DEBUG"/>
+        <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE"/>
+        <logger name="org.flywaydb" level="DEBUG"/>
+        <logger name="org.telegram.telegrambots" level="DEBUG"/>
+        
+        <root level="${LOG_LEVEL_ROOT}">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+        </root>
+    </springProfile>
+    
+    <!-- Профиль для production (prod) - БЕЗ DEBUG логов -->
+    <springProfile name="prod">
+        <!-- Строгое логирование для production - ТОЛЬКО INFO и выше -->
+        <logger name="ru.golubyatnikov.family.calendar.bot" level="INFO"/>
+        
+        <!-- Отключаем DEBUG для всех Spring компонентов -->
+        <logger name="org.springframework" level="WARN"/>
+        <logger name="org.springframework.web" level="WARN"/>
+        <logger name="org.springframework.data" level="WARN"/>
+        <logger name="org.springframework.boot" level="WARN"/>
+        
+        <!-- Отключаем DEBUG для Hibernate -->
+        <logger name="org.hibernate" level="WARN"/>
+        <logger name="org.hibernate.SQL" level="WARN"/>
+        <logger name="org.hibernate.type" level="WARN"/>
+        
+        <!-- Минимальное логирование для других библиотек -->
+        <logger name="org.flywaydb" level="INFO"/>
+        <logger name="org.telegram.telegrambots" level="INFO"/>
+        <logger name="com.zaxxer.hikari" level="WARN"/>
+        <logger name="org.apache" level="WARN"/>
+        
+        <root level="WARN">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+        </root>
+    </springProfile>
+    
+    <!-- Профиль для тестов (test) - минимальное логирование -->
+    <springProfile name="test">
+        <logger name="ru.golubyatnikov.family.calendar.bot" level="INFO"/>
+        <logger name="org.springframework" level="WARN"/>
+        <logger name="org.springframework.web" level="WARN"/>
+        <logger name="org.springframework.data" level="WARN"/>
+        <logger name="org.springframework.boot" level="WARN"/>
+        <logger name="org.springframework.test" level="WARN"/>
+        <logger name="org.hibernate" level="WARN"/>
+        <logger name="org.testcontainers" level="WARN"/>
+        <logger name="com.github.dockerjava" level="WARN"/>
+        
+        <root level="WARN">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+    
+    <!-- Профиль по умолчанию (если не указан профиль) -->
+    <springProfile name="!dev &amp; !prod &amp; !test">
+        <logger name="ru.golubyatnikov.family.calendar.bot" level="INFO"/>
+        <logger name="org.springframework.web" level="INFO"/>
+        <logger name="org.springframework.data" level="INFO"/>
+        <logger name="org.hibernate.SQL" level="INFO"/>
+        <logger name="org.flywaydb" level="INFO"/>
+        
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+        </root>
+    </springProfile>
+    
+    <!-- Специальные логгеры для критичных событий -->
+    <logger name="ru.golubyatnikov.family.calendar.bot.exception" level="ERROR" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+    
+    <!-- Логирование безопасности -->
+    <logger name="org.springframework.security" level="INFO"/>
+    
+    <!-- Отключение избыточного логирования -->
+    <logger name="org.apache.catalina" level="WARN"/>
+    <logger name="org.apache.tomcat" level="WARN"/>
+    <logger name="org.apache.coyote" level="WARN"/>
+    
+</configuration>

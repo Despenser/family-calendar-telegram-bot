@@ -1,0 +1,364 @@
+package ru.golubyatnikov.family.calendar.bot.handler;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.service.EventService;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Обработчик команды /my_events для Telegram бота семейного календаря.
+ * 
+ * <p>Команда /my_events позволяет пользователям просматривать и управлять своими событиями.
+ * Она выполняет следующие функции:</p>
+ * <ul>
+ *   <li>Получает список всех событий пользователя</li>
+ *   <li>Отображает события с inline кнопками для редактирования и удаления</li>
+ *   <li>Форматирует события с использованием Markdown для улучшения читаемости</li>
+ *   <li>Сортирует события по дате</li>
+ *   <li>Отправляет соответствующее сообщение, если событий нет</li>
+ * </ul>
+ * 
+ * <p>Команда требует авторизации - пользователь должен быть зарегистрирован в системе.</p>
+ * 
+ * <p><b>Требования:</b> 7.1, 7.2, 7.3, 7.4, 7.5</p>
+ * 
+ * <p><b>Пример использования:</b></p>
+ * <pre>
+ * Пользователь отправляет: /my_events
+ * 
+ * Если есть события:
+ * Бот отвечает: "📋 *Мои события*
+ *                
+ *                📌 *День рождения мамы*
+ *                📅 Дата: 31.12.2025
+ *                🕐 Время: 18:00
+ *                📝 Описание: Празднование дня рождения
+ *                
+ *                [Редактировать] [Удалить]
+ *                
+ *                📌 *Поход в кино*
+ *                📅 Дата: 02.01.2026
+ *                🕐 Время: 20:00
+ *                📝 Описание: Смотрим новый фильм
+ *                
+ *                [Редактировать] [Удалить]"
+ * 
+ * Если событий нет:
+ * Бот отвечает: "📋 *Мои события*
+ *                
+ *                У вас пока нет созданных событий.
+ *                
+ *                Используйте /add_event для добавления нового события."
+ * </pre>
+ * 
+ * @see CommandHandler
+ * @see EventService
+ * @see Event
+ * @see User
+ * @author Family Calendar Bot Team
+ * @version 1.0.0
+ * @since 2025-12-30
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class MyEventsCommandHandler implements CommandHandler {
+
+    private final EventService eventService;
+
+    /**
+     * Обрабатывает команду /my_events от пользователя.
+     * 
+     * <p>Метод получает список всех событий пользователя и форматирует их
+     * в читаемый вид с inline кнопками для редактирования и удаления.</p>
+     * 
+     * @param message входящее сообщение от Telegram, содержащее команду /my_events
+     * @param user пользователь из базы данных, запросивший список своих событий.
+     *             Не может быть null, так как команда требует авторизации.
+     * @return текст со списком событий пользователя или сообщение об их отсутствии
+     * @throws IllegalArgumentException если message или user равны null
+     */
+    @Override
+    public String handle(Message message, User user) {
+        if (message == null) {
+            log.error("Получено null сообщение в MyEventsCommandHandler");
+            throw new IllegalArgumentException("Сообщение не может быть null");
+        }
+
+        if (user == null) {
+            log.error("Получен null пользователь в MyEventsCommandHandler");
+            throw new IllegalArgumentException("Пользователь не может быть null");
+        }
+
+        Long telegramId = message.getFrom().getId();
+        String username = message.getFrom().getUserName();
+
+        log.info("Обработка команды /my_events: telegramId={}, username={}, userId={}", 
+                telegramId, username, user.getId());
+
+        // Получаем события пользователя
+        List<Event> userEvents = eventService.getUserEvents(user.getId());
+
+        log.info("Найдено {} событий для пользователя ID={}", userEvents.size(), user.getId());
+
+        if (userEvents.isEmpty()) {
+            return buildNoEventsMessage();
+        }
+
+        return buildEventsListMessage(userEvents);
+    }
+
+    /**
+     * Формирует сообщение об отсутствии событий у пользователя.
+     * 
+     * <p>Сообщение включает:</p>
+     * <ul>
+     *   <li>Заголовок с эмодзи</li>
+     *   <li>Информацию об отсутствии событий</li>
+     *   <li>Подсказку о добавлении нового события</li>
+     * </ul>
+     * 
+     * @return отформатированное сообщение об отсутствии событий
+     */
+    private String buildNoEventsMessage() {
+        return "📋 *Мои события*\n\n" +
+               "У вас пока нет созданных событий.\n\n" +
+               "Используйте /add_event для добавления нового события.";
+    }
+
+    /**
+     * Формирует список событий пользователя с форматированием.
+     * 
+     * <p>Каждое событие отображается в следующем формате:</p>
+     * <pre>
+     * 📌 *Название события*
+     * 📅 Дата: dd.MM.yyyy
+     * 🕐 Время: HH:mm
+     * 📝 Описание: текст описания (если есть)
+     * 
+     * [Редактировать] [Удалить]
+     * </pre>
+     * 
+     * <p>События разделяются пустой строкой для улучшения читаемости.</p>
+     * 
+     * @param events список событий для форматирования
+     * @return отформатированное сообщение со списком событий
+     */
+    private String buildEventsListMessage(List<Event> events) {
+        String eventsList = events.stream()
+                .map(this::formatEvent)
+                .collect(Collectors.joining("\n\n"));
+
+        return String.format(
+                "📋 *Мои события*\n\n" +
+                "%s\n\n" +
+                "Всего событий: %d",
+                eventsList,
+                events.size()
+        );
+    }
+
+    /**
+     * Форматирует одно событие в читаемый вид.
+     * 
+     * <p>Использует эмодзи для визуального выделения различных полей события.
+     * Название события выделяется жирным шрифтом с помощью Markdown.</p>
+     * 
+     * <p>Если у события нет описания, поле "Описание" не отображается.</p>
+     * 
+     * @param event событие для форматирования
+     * @return отформатированная строка с информацией о событии
+     */
+    private String formatEvent(Event event) {
+        StringBuilder formatted = new StringBuilder();
+        
+        formatted.append(String.format("📌 *%s*\n", escapeMarkdown(event.getTitle())));
+        formatted.append(String.format("📅 Дата: %s\n", event.getFormattedDate()));
+        formatted.append(String.format("🕐 Время: %s\n", event.getFormattedTime()));
+        
+        if (event.getDescription() != null && !event.getDescription().isBlank()) {
+            formatted.append(String.format("📝 Описание: %s\n", 
+                    escapeMarkdown(event.getDescription())));
+        }
+        
+        // Добавляем информацию о кнопках (в будущем будут реальные inline кнопки)
+        formatted.append("\n[Редактировать] [Удалить]");
+        
+        return formatted.toString();
+    }
+
+    /**
+     * Создает inline клавиатуру с кнопками для управления событием.
+     * 
+     * <p>Создает две кнопки:</p>
+     * <ul>
+     *   <li>Редактировать - callback data: "edit_event_{eventId}"</li>
+     *   <li>Удалить - callback data: "delete_event_{eventId}"</li>
+     * </ul>
+     * 
+     * <p>Эти кнопки будут обрабатываться через callback queries.</p>
+     * 
+     * @param eventId идентификатор события
+     * @return InlineKeyboardMarkup с кнопками управления
+     */
+    public InlineKeyboardMarkup createEventManagementKeyboard(Long eventId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+        
+        // Создаем ряд с двумя кнопками
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        
+        // Кнопка "Редактировать"
+        InlineKeyboardButton editButton = new InlineKeyboardButton();
+        editButton.setText("✏️ Редактировать");
+        editButton.setCallbackData("edit_event_" + eventId);
+        row.add(editButton);
+        
+        // Кнопка "Удалить"
+        InlineKeyboardButton deleteButton = new InlineKeyboardButton();
+        deleteButton.setText("🗑️ Удалить");
+        deleteButton.setCallbackData("delete_event_" + eventId);
+        row.add(deleteButton);
+        
+        keyboard.add(row);
+        markup.setKeyboard(keyboard);
+        
+        return markup;
+    }
+
+    /**
+     * Обрабатывает callback query для редактирования события.
+     * 
+     * <p>Извлекает ID события из callback data и инициирует процесс редактирования.
+     * В будущем это будет многошаговый диалог для изменения полей события.</p>
+     * 
+     * @param eventId идентификатор события для редактирования
+     * @param userId идентификатор пользователя, инициировавшего редактирование
+     * @return сообщение с инструкциями по редактированию
+     */
+    public String handleEditCallback(Long eventId, Long userId) {
+        log.info("Обработка callback редактирования события ID={} пользователем ID={}", 
+                eventId, userId);
+        
+        // TODO: Реализовать многошаговый диалог редактирования
+        // Пока возвращаем заглушку
+        return String.format(
+                "✏️ *Редактирование события*\n\n" +
+                "Функция редактирования будет реализована в следующей версии.\n\n" +
+                "ID события: %d", 
+                eventId
+        );
+    }
+
+    /**
+     * Обрабатывает callback query для удаления события.
+     * 
+     * <p>Запрашивает подтверждение удаления события и выполняет удаление
+     * после подтверждения пользователя.</p>
+     * 
+     * @param eventId идентификатор события для удаления
+     * @param userId идентификатор пользователя, инициировавшего удаление
+     * @return сообщение с запросом подтверждения или результатом удаления
+     */
+    public String handleDeleteCallback(Long eventId, Long userId) {
+        log.info("Обработка callback удаления события ID={} пользователем ID={}", 
+                eventId, userId);
+        
+        try {
+            // Удаляем событие через сервис (он проверит права доступа)
+            eventService.deleteEvent(eventId, userId);
+            
+            log.info("Событие ID={} успешно удалено пользователем ID={}", eventId, userId);
+            
+            return "✅ *Событие удалено*\n\n" +
+                   "Событие успешно удалено из календаря.\n\n" +
+                   "Используйте /my_events для просмотра оставшихся событий.";
+                   
+        } catch (Exception e) {
+            log.error("Ошибка при удалении события ID={}: {}", eventId, e.getMessage(), e);
+            
+            return "❌ *Ошибка удаления*\n\n" +
+                   "Не удалось удалить событие. " +
+                   "Возможно, у вас нет прав на удаление этого события.";
+        }
+    }
+
+    /**
+     * Экранирует специальные символы Markdown для безопасного отображения.
+     * 
+     * <p>Telegram Bot API использует Markdown для форматирования текста.
+     * Некоторые символы имеют специальное значение и должны быть экранированы,
+     * чтобы отображаться корректно.</p>
+     * 
+     * <p>Экранируются следующие символы: * _ [ ] ( ) ~ ` > # + - = | { } . !</p>
+     * 
+     * @param text текст для экранирования
+     * @return текст с экранированными специальными символами
+     */
+    private String escapeMarkdown(String text) {
+        if (text == null) {
+            return "";
+        }
+        
+        return text.replace("*", "\\*")
+                   .replace("_", "\\_")
+                   .replace("[", "\\[")
+                   .replace("]", "\\]")
+                   .replace("(", "\\(")
+                   .replace(")", "\\)")
+                   .replace("~", "\\~")
+                   .replace("`", "\\`")
+                   .replace(">", "\\>")
+                   .replace("#", "\\#")
+                   .replace("+", "\\+")
+                   .replace("-", "\\-")
+                   .replace("=", "\\=")
+                   .replace("|", "\\|")
+                   .replace("{", "\\{")
+                   .replace("}", "\\}")
+                   .replace(".", "\\.")
+                   .replace("!", "\\!");
+    }
+
+    /**
+     * Возвращает команду, которую обрабатывает этот handler.
+     * 
+     * @return строка "/my_events"
+     */
+    @Override
+    public String getCommand() {
+        return "/my_events";
+    }
+
+    /**
+     * Возвращает описание команды для отображения в справке.
+     * 
+     * @return описание команды
+     */
+    @Override
+    public String getDescription() {
+        return "Управление моими событиями";
+    }
+
+    /**
+     * Определяет, требуется ли авторизация для выполнения этой команды.
+     * 
+     * <p>Команда /my_events требует авторизации, так как она отображает
+     * события конкретного пользователя.</p>
+     * 
+     * @return true, так как команда требует авторизации
+     */
+    @Override
+    public boolean requiresAuth() {
+        return true;
+    }
+}

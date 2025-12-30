@@ -21,6 +21,10 @@ WORKDIR /app
 
 # Создаем непривилегированного пользователя для безопасности
 RUN addgroup -S spring && adduser -S spring -G spring
+
+# Создаем директорию для логов и даем права пользователю spring
+RUN mkdir -p /app/logs && chown -R spring:spring /app/logs
+
 USER spring:spring
 
 # Копируем собранный jar из этапа сборки

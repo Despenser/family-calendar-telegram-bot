@@ -1,0 +1,92 @@
+spring:
+  application:
+    name: family-calendar-bot
+  
+  # Конфигурация источника данных PostgreSQL
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/family_calendar}
+    username: ${SPRING_DATASOURCE_USERNAME:botuser}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # Настройки пула соединений
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  
+  # Конфигурация JPA и Hibernate
+  jpa:
+    hibernate:
+      # validate - проверяет схему БД, но не изменяет её (миграции через Flyway)
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        # Оптимизация производительности
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        # Кэширование второго уровня (опционально)
+        cache:
+          use_second_level_cache: false
+  
+  # Конфигурация Flyway для миграций БД
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    # Создать схему, если её нет
+    create-schemas: true
+    # Схема по умолчанию
+    default-schema: public
+
+# Конфигурация Telegram бота
+telegram:
+  bot:
+    token: ${TELEGRAM_BOT_TOKEN}
+    username: ${TELEGRAM_BOT_USERNAME:FamilyCalendarBot}
+    webhook-url: ${TELEGRAM_BOT_WEBHOOK_URL}
+
+# Конфигурация логирования (базовые настройки, переопределяются в logback-spring.xml)
+logging:
+  level:
+    root: INFO
+    ru.golubyatnikov.family.calendar.bot: INFO
+    org.springframework.web: INFO
+    org.springframework.data: INFO
+    org.hibernate.SQL: INFO
+    org.flywaydb: INFO
+  file:
+    name: logs/family-calendar-bot.log
+
+# Настройки сервера
+server:
+  port: ${SERVER_PORT:8080}
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: on_param
+    include-exception: false
+
+# Настройки управления и мониторинга (Spring Boot Actuator)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      simple:
+        enabled: true

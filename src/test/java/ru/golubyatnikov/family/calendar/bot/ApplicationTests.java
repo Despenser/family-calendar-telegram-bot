@@ -3,7 +3,12 @@ package ru.golubyatnikov.family.calendar.bot;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
+import ru.golubyatnikov.family.calendar.bot.repository.FamilyRepository;
+import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 
 /**
  * Базовый тест для проверки загрузки Spring контекста.
@@ -16,16 +21,24 @@ import org.springframework.test.context.TestPropertySource;
  * так как миграции и конфигурация будут добавлены позже.</p>
  */
 @SpringBootTest
+@ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestPropertySource(properties = {
     "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration," +
         "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration," +
         "org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration",
-    "telegram.bot.token=test-token",
-    "telegram.bot.username=TestBot",
-    "telegram.bot.webhook-url=https://test.example.com/webhook"
+    "telegram.bot.webhook.enabled=false"
 })
 class ApplicationTests {
+
+    @MockBean
+    private EventRepository eventRepository;
+
+    @MockBean
+    private UserRepository userRepository;
+
+    @MockBean
+    private FamilyRepository familyRepository;
 
     /**
      * Проверяет, что Spring контекст загружается без ошибок.

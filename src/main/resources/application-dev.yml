@@ -1,0 +1,70 @@
+# Конфигурация для локальной разработки
+# Активируется через: --spring.profiles.active=dev или SPRING_PROFILES_ACTIVE=dev
+
+spring:
+  # Конфигурация источника данных для локальной разработки
+  datasource:
+    url: jdbc:postgresql://localhost:5432/family_calendar_dev
+    username: botuser
+    password: devpassword
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+  
+  # JPA настройки для разработки
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+  
+  # Flyway для dev окружения
+  flyway:
+    # Очистка БД при старте (только для dev!)
+    clean-disabled: false
+    # Можно включить clean-on-validation-error для автоматической пересборки схемы
+    clean-on-validation-error: false
+
+# Telegram бот для разработки
+telegram:
+  bot:
+    # Используйте тестового бота для разработки
+    token: ${TELEGRAM_BOT_TOKEN_DEV:your-dev-bot-token}
+    username: ${TELEGRAM_BOT_USERNAME_DEV:FamilyCalendarDevBot}
+    # Для локальной разработки используйте ngrok или localtunnel
+    # Пример: https://your-ngrok-id.ngrok.io/webhook/your-bot-token
+    webhook-url: ${TELEGRAM_BOT_WEBHOOK_URL_DEV:https://localhost:8080/webhook}
+
+# Логирование для разработки - более подробное
+logging:
+  level:
+    root: INFO
+    ru.golubyatnikov.family.calendar.bot: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.data: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.flywaydb: DEBUG
+    org.telegram.telegrambots: DEBUG
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%thread]){magenta} %clr(%-5level){highlight} %clr(%logger{36}){cyan} %clr(-){faint} %msg%n"
+
+# Настройки сервера для разработки
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: always
+    include-exception: true
+
+# Actuator endpoints для разработки - открыты все
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always

@@ -1,24 +1,60 @@
+# Конфигурация для тестового окружения
+# Автоматически активируется при запуске тестов
+
 spring:
+  # Конфигурация источника данных для тестов (H2 in-memory)
   datasource:
-    url: jdbc:postgresql://localhost:5432/test_db
-    username: test
-    password: test
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
   
+  # JPA настройки для тестов
   jpa:
     hibernate:
-      ddl-auto: validate
-    show-sql: true
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.H2Dialect
   
+  # Flyway для тестов
   flyway:
     enabled: false
 
+# Telegram бот для тестов (моки)
 telegram:
   bot:
     token: test-token
     username: TestBot
     webhook-url: https://test.example.com/webhook
 
+# Минимальное логирование для тестов
 logging:
   level:
-    root: INFO
-    ru.golubyatnikov.familycalendarbot: DEBUG
+    root: WARN
+    ru.golubyatnikov.family.calendar.bot: INFO
+    # Отключаем DEBUG логи в тестах
+    org.springframework: WARN
+    org.springframework.web: WARN
+    org.springframework.data: WARN
+    org.springframework.boot: WARN
+    org.springframework.test: WARN
+    org.hibernate: WARN
+    org.hibernate.SQL: WARN
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n"
+
+# Настройки сервера для тестов
+server:
+  port: 0  # Случайный порт для тестов
+
+# Actuator для тестов
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

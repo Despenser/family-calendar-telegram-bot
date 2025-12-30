@@ -1,0 +1,3 @@
+# Эта директория содержит миграции Flyway
+# Файлы миграций должны следовать формату: V{version}__{description}.sql
+# Например: V1__Initial_schema.sql, V2__Add_user_roles.sql
