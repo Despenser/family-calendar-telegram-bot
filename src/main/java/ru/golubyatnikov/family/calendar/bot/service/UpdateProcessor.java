@@ -59,6 +59,7 @@ public class UpdateProcessor {
     private final CommandDispatcher commandDispatcher;
     private final UserService userService;
     private final MyEventsCommandHandler myEventsCommandHandler;
+    private final TelegramMessageService messageService;
 
     /**
      * Асинхронно обрабатывает входящее обновление от Telegram Bot API.
@@ -139,8 +140,19 @@ public class UpdateProcessor {
                     update.getUpdateId(), 
                     response != null ? response.length() : 0);
             
-            // TODO: Отправить response пользователю через TelegramMessageService
-            // messageService.sendMessage(message.getChatId(), response);
+            // Отправляем ответ пользователю через TelegramMessageService
+            if (response != null && !response.isBlank()) {
+                try {
+                    messageService.sendMessage(message.getChatId(), response);
+                    log.info("Ответ успешно отправлен пользователю: chatId={}, responseLength={}", 
+                            message.getChatId(), response.length());
+                } catch (Exception e) {
+                    log.error("Ошибка при отправке ответа пользователю: chatId={}, error={}", 
+                            message.getChatId(), e.getMessage(), e);
+                }
+            } else {
+                log.warn("Пустой ответ от обработчика команды: updateId={}", update.getUpdateId());
+            }
             
         } catch (Exception e) {
             log.error("Ошибка при обработке обновления: updateId={}, error={}", 
@@ -206,9 +218,25 @@ public class UpdateProcessor {
             log.info("Callback query успешно обработан: data='{}', responseLength={}", 
                     callbackData, response != null ? response.length() : 0);
             
-            // TODO: Отправить response пользователю через TelegramMessageService
-            // messageService.sendMessage(callbackQuery.getMessage().getChatId(), response);
-            // messageService.answerCallbackQuery(callbackQuery.getId(), "Обработано");
+            // Отправляем ответ пользователю через TelegramMessageService
+            if (response != null && !response.isBlank()) {
+                try {
+                    messageService.sendMessage(callbackQuery.getMessage().getChatId(), response);
+                    messageService.answerCallbackQuery(callbackQuery.getId(), "Обработано");
+                    log.info("Ответ на callback query успешно отправлен: chatId={}, responseLength={}", 
+                            callbackQuery.getMessage().getChatId(), response.length());
+                } catch (Exception e) {
+                    log.error("Ошибка при отправке ответа на callback query: chatId={}, error={}", 
+                            callbackQuery.getMessage().getChatId(), e.getMessage(), e);
+                }
+            } else {
+                log.warn("Пустой ответ от обработчика callback: data='{}'", callbackData);
+                try {
+                    messageService.answerCallbackQuery(callbackQuery.getId(), "");
+                } catch (Exception e) {
+                    log.error("Ошибка при ответе на callback query: error={}", e.getMessage(), e);
+                }
+            }
             
         } catch (Exception e) {
             log.error("Ошибка при обработке callback query: data='{}', error={}", 

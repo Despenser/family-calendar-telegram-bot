@@ -138,7 +138,6 @@ public class TelegramMessageService extends DefaultAbsSender {
         SendMessage message = SendMessage.builder()
                 .chatId(telegramId.toString())
                 .text(text)
-                .parseMode("Markdown")
                 .build();
         
         try {
@@ -209,7 +208,6 @@ public class TelegramMessageService extends DefaultAbsSender {
         SendMessage message = SendMessage.builder()
                 .chatId(telegramId.toString())
                 .text(text)
-                .parseMode("Markdown")
                 .replyMarkup(replyMarkup)
                 .build();
         

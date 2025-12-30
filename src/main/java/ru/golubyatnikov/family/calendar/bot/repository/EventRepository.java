@@ -96,10 +96,11 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @return список событий, требующих отправки уведомлений
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
-    @Query("SELECT e FROM Event e " +
+    @Query(value = "SELECT * FROM events e " +
            "WHERE e.notified = false " +
-           "AND FUNCTION('TIMESTAMP', e.eventDate, e.eventTime) BETWEEN :startDateTime AND :endDateTime " +
-           "ORDER BY e.eventDate, e.eventTime")
+           "AND (e.event_date + e.event_time) BETWEEN :startDateTime AND :endDateTime " +
+           "ORDER BY e.event_date, e.event_time", 
+           nativeQuery = true)
     List<Event> findEventsForNotification(
         @Param("startDateTime") LocalDateTime startDateTime,
         @Param("endDateTime") LocalDateTime endDateTime

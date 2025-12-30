@@ -71,8 +71,10 @@ public class WebhookRegistrar {
             String apiUrl = String.format("https://api.telegram.org/bot%s/setWebhook", botConfig.getToken());
 
             // Подготавливаем тело запроса
+            // Добавляем токен бота в путь webhook URL для дополнительной безопасности
+            String webhookUrlWithToken = botConfig.getWebhookUrl() + "/" + botConfig.getToken();
             Map<String, String> requestBody = new HashMap<>();
-            requestBody.put("url", botConfig.getWebhookUrl());
+            requestBody.put("url", webhookUrlWithToken);
 
             // Настраиваем заголовки
             HttpHeaders headers = new HttpHeaders();
@@ -93,7 +95,7 @@ public class WebhookRegistrar {
             Map<String, Object> responseBody = response.getBody();
             if (responseBody != null && Boolean.TRUE.equals(responseBody.get("ok"))) {
                 log.info("✓ Webhook успешно зарегистрирован для бота: {}", botConfig.getUsername());
-                log.info("✓ URL: {}", botConfig.getWebhookUrl());
+                log.info("✓ URL: {}/{}", botConfig.getWebhookUrl(), maskToken(botConfig.getToken()));
                 log.debug("✓ Ответ от Telegram API: {}", responseBody);
             } else {
                 String errorDescription = responseBody != null ? 
@@ -133,5 +135,20 @@ public class WebhookRegistrar {
         // Останавливаем приложение с кодом ошибки
         int exitCode = SpringApplication.exit(applicationContext, () -> 1);
         System.exit(exitCode);
+    }
+
+    /**
+     * Маскирует токен для безопасного логирования.
+     * 
+     * <p>Показывает только первые 10 символов токена, остальное заменяет на звездочки.
+     * 
+     * @param token токен для маскировки
+     * @return замаскированный токен
+     */
+    private String maskToken(String token) {
+        if (token == null || token.length() <= 10) {
+            return "***";
+        }
+        return token.substring(0, 10) + "***";
     }
 }

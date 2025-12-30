@@ -1,15 +1,15 @@
 # Многоэтапная сборка для оптимизации размера образа
 # Этап 1: Сборка приложения
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /build
 
-# Копируем файлы Maven
+# Копируем pom.xml и загружаем зависимости (кэшируется отдельно)
 COPY pom.xml .
-COPY src ./src
+RUN mvn dependency:go-offline -B
 
-# Устанавливаем Maven
-RUN apk add --no-cache maven
+# Копируем исходный код
+COPY src ./src
 
 # Собираем приложение (пропускаем тесты для ускорения сборки)
 RUN mvn clean package -DskipTests
