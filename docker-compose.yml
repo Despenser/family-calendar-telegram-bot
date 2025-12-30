@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:18.1-alpine
+    container_name: family-calendar-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: family_calendar
+      POSTGRES_USER: botuser
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      # Персистентное хранилище данных PostgreSQL
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - family-calendar-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U botuser -d family_calendar"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Spring Boot приложение
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: family-calendar-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Конфигурация базы данных
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/family_calendar
+      SPRING_DATASOURCE_USERNAME: botuser
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-changeme}
+      
+      # Конфигурация Telegram бота
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-FamilyCalendarBot}
+      TELEGRAM_BOT_WEBHOOK_URL: ${TELEGRAM_BOT_WEBHOOK_URL}
+      
+      # Spring профиль
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      
+      # JPA и Flyway настройки
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_FLYWAY_ENABLED: true
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: true
+    ports:
+      - "8080:8080"
+    networks:
+      - family-calendar-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Volumes для персистентности данных
+volumes:
+  postgres_data:
+    driver: local
+    name: family-calendar-postgres-data
+
+# Сеть для изоляции сервисов
+networks:
+  family-calendar-network:
+    driver: bridge
+    name: family-calendar-network

@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/test_db
+    username: test
+    password: test
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+  
+  flyway:
+    enabled: false
+
+telegram:
+  bot:
+    token: test-token
+    username: TestBot
+    webhook-url: https://test.example.com/webhook
+
+logging:
+  level:
+    root: INFO
+    ru.golubyatnikov.familycalendarbot: DEBUG
