@@ -2,8 +2,15 @@
 -- Миграция V1: Начальная схема базы данных
 -- ============================================================================
 -- Описание: Создание таблиц families, users, events с индексами и constraints
--- Требования: 11.1, 11.2, 11.3, 11.4
+-- Требования: 11.1, 11.2, 11.3, 11.4, 11.6
 -- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- ENUM event_status: Статусы событий
+-- ----------------------------------------------------------------------------
+CREATE TYPE event_status AS ENUM ('draft', 'active');
+
+COMMENT ON TYPE event_status IS 'Статус события: draft - черновик в процессе создания, active - активное событие';
 
 -- ----------------------------------------------------------------------------
 -- Таблица families: Хранит информацию о семьях
@@ -62,15 +69,16 @@ CREATE TABLE events (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
     family_id BIGINT NOT NULL,
-    title VARCHAR(255) NOT NULL,
+    title VARCHAR(255),
     description TEXT,
-    event_date DATE NOT NULL,
-    event_time TIME NOT NULL,
+    event_date DATE,
+    event_time TIME,
+    status event_status NOT NULL DEFAULT 'active',
     notified BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
     -- Constraints
-    CONSTRAINT events_title_not_empty CHECK (LENGTH(TRIM(title)) > 0),
+    CONSTRAINT events_title_not_empty CHECK (title IS NULL OR LENGTH(TRIM(title)) > 0),
     CONSTRAINT events_user_fk FOREIGN KEY (user_id) 
         REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT events_family_fk FOREIGN KEY (family_id) 
@@ -82,10 +90,11 @@ COMMENT ON TABLE events IS 'События семейного календаря
 COMMENT ON COLUMN events.id IS 'Уникальный идентификатор события';
 COMMENT ON COLUMN events.user_id IS 'Создатель события';
 COMMENT ON COLUMN events.family_id IS 'Семья, к которой относится событие';
-COMMENT ON COLUMN events.title IS 'Название события';
+COMMENT ON COLUMN events.title IS 'Название события (может быть NULL для черновиков)';
 COMMENT ON COLUMN events.description IS 'Подробное описание события';
-COMMENT ON COLUMN events.event_date IS 'Дата события';
-COMMENT ON COLUMN events.event_time IS 'Время события';
+COMMENT ON COLUMN events.event_date IS 'Дата события (может быть NULL для черновиков)';
+COMMENT ON COLUMN events.event_time IS 'Время события (может быть NULL для черновиков)';
+COMMENT ON COLUMN events.status IS 'Статус события: draft (черновик) или active (активное)';
 COMMENT ON COLUMN events.notified IS 'Флаг отправки уведомления о событии';
 COMMENT ON COLUMN events.created_at IS 'Дата и время создания записи о событии';
 
@@ -99,10 +108,17 @@ CREATE INDEX idx_events_user_id ON events(user_id);
 -- Составной индекс для поиска событий, требующих уведомления
 -- Используется NotificationService для поиска событий через 1 час
 CREATE INDEX idx_events_notification ON events(notified, event_date, event_time) 
-    WHERE notified = FALSE;
+    WHERE notified = FALSE AND status = 'active';
 
 -- Индекс для сортировки событий по дате и времени
 CREATE INDEX idx_events_datetime ON events(event_date, event_time);
+
+-- Индекс для поиска черновиков по статусу
+CREATE INDEX idx_events_status ON events(status);
+
+-- Составной индекс для поиска черновиков конкретного пользователя
+-- Используется ConversationService для управления состоянием диалога
+CREATE INDEX idx_events_user_status ON events(user_id, status);
 
 -- ============================================================================
 -- Конец миграции V1

@@ -9,7 +9,9 @@ import org.telegram.telegrambots.bots.DefaultAbsSender;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
 import ru.golubyatnikov.family.calendar.bot.config.BotConfig;
@@ -228,6 +230,168 @@ public class TelegramMessageService extends DefaultAbsSender {
     }
 
     /**
+     * Отправляет текстовое сообщение с reply клавиатурой пользователю.
+     * 
+     * <p>Метод автоматически повторяет попытки отправки при ошибках
+     * с экспоненциальной задержкой. Максимум 3 попытки.</p>
+     * 
+     * <p>Reply клавиатура заменяет стандартную клавиатуру Telegram и позволяет
+     * пользователю быстро отправлять команды одним нажатием кнопки.</p>
+     * 
+     * <p>Примеры использования reply клавиатуры:</p>
+     * <ul>
+     *   <li>Основные команды бота (Предстоящие события, Добавить событие и т.д.)</li>
+     *   <li>Быстрый доступ к часто используемым функциям</li>
+     *   <li>Упрощение взаимодействия для пользователей</li>
+     * </ul>
+     * 
+     * <p>Retry стратегия:</p>
+     * <ul>
+     *   <li>Попытка 1: немедленно</li>
+     *   <li>Попытка 2: через 1 секунду</li>
+     *   <li>Попытка 3: через 2 секунды</li>
+     * </ul>
+     * 
+     * @param telegramId Telegram ID пользователя-получателя
+     * @param text текст сообщения (поддерживает Markdown)
+     * @param keyboard reply клавиатура с кнопками команд
+     * @throws TelegramApiException если все попытки отправки не удались
+     * @throws IllegalArgumentException если telegramId null, text пустой или keyboard null
+     * @see ReplyKeyboardMarkup
+     * @see #sendMessage(Long, String)
+     */
+    @Retryable(
+        retryFor = TelegramApiException.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 1000, multiplier = 2.0)
+    )
+    public void sendMessage(Long telegramId, String text, ReplyKeyboardMarkup keyboard) 
+            throws TelegramApiException {
+        validateSendMessageParams(telegramId, text);
+        
+        if (keyboard == null) {
+            log.error("Попытка отправить сообщение с null keyboard: telegramId={}", telegramId);
+            throw new IllegalArgumentException("Keyboard не может быть null");
+        }
+        
+        log.debug("Отправка сообщения с reply клавиатурой: telegramId={}, textLength={}, keyboardRows={}", 
+                telegramId, text.length(), keyboard.getKeyboard() != null ? keyboard.getKeyboard().size() : 0);
+        
+        SendMessage message = SendMessage.builder()
+                .chatId(telegramId.toString())
+                .text(text)
+                .replyMarkup(keyboard)
+                .build();
+        
+        try {
+            execute(message);
+            log.info("Сообщение с reply клавиатурой успешно отправлено: telegramId={}, textLength={}, keyboardRows={}", 
+                    telegramId, text.length(), keyboard.getKeyboard() != null ? keyboard.getKeyboard().size() : 0);
+            
+        } catch (TelegramApiRequestException e) {
+            handleTelegramApiError(e, telegramId);
+            throw e;
+            
+        } catch (TelegramApiException e) {
+            log.error("Ошибка при отправке сообщения с reply клавиатурой: telegramId={}, error={}", 
+                    telegramId, e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
+     * Отправляет текстовое сообщение с inline кнопками пользователю.
+     * 
+     * <p>Это удобный метод-обертка для {@link #sendMessage(Long, String, InlineKeyboardMarkup)}
+     * с более явным названием для отправки сообщений с inline клавиатурой.</p>
+     * 
+     * @param chatId ID чата для отправки сообщения
+     * @param text текст сообщения (поддерживает Markdown)
+     * @param keyboard inline клавиатура с кнопками
+     * @throws TelegramApiException если все попытки отправки не удались
+     * @throws IllegalArgumentException если chatId null, text пустой или keyboard null
+     * @see #sendMessage(Long, String, InlineKeyboardMarkup)
+     */
+    public void sendMessageWithInlineKeyboard(Long chatId, String text, InlineKeyboardMarkup keyboard) 
+            throws TelegramApiException {
+        sendMessage(chatId, text, keyboard);
+    }
+
+    /**
+     * Редактирует текст существующего сообщения.
+     * 
+     * <p>Этот метод позволяет изменить текст ранее отправленного сообщения
+     * без отправки нового. Полезно для обновления inline-календарей,
+     * меню выбора и других интерактивных элементов.</p>
+     * 
+     * <p>Метод автоматически повторяет попытки при ошибках
+     * с экспоненциальной задержкой. Максимум 3 попытки.</p>
+     * 
+     * <p>Ограничения:</p>
+     * <ul>
+     *   <li>Можно редактировать только сообщения, отправленные ботом</li>
+     *   <li>Сообщение должно быть не старше 48 часов</li>
+     *   <li>Новый текст должен отличаться от старого</li>
+     * </ul>
+     * 
+     * @param chatId ID чата, где находится сообщение
+     * @param messageId ID сообщения для редактирования
+     * @param newText новый текст сообщения
+     * @param replyMarkup новая inline клавиатура (может быть null для удаления кнопок)
+     * @throws TelegramApiException если все попытки редактирования не удались
+     * @throws IllegalArgumentException если chatId или messageId null, или newText пустой
+     * @see EditMessageText
+     */
+    @Retryable(
+        retryFor = TelegramApiException.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 1000, multiplier = 2.0)
+    )
+    public void editMessageText(Long chatId, Integer messageId, String newText, 
+                               InlineKeyboardMarkup replyMarkup) throws TelegramApiException {
+        if (chatId == null) {
+            log.error("Попытка редактировать сообщение с null chatId");
+            throw new IllegalArgumentException("ChatId не может быть null");
+        }
+        
+        if (messageId == null) {
+            log.error("Попытка редактировать сообщение с null messageId: chatId={}", chatId);
+            throw new IllegalArgumentException("MessageId не может быть null");
+        }
+        
+        if (newText == null || newText.isBlank()) {
+            log.error("Попытка редактировать сообщение с пустым текстом: chatId={}, messageId={}", 
+                    chatId, messageId);
+            throw new IllegalArgumentException("Новый текст не может быть пустым");
+        }
+        
+        log.debug("Редактирование сообщения: chatId={}, messageId={}, newTextLength={}", 
+                chatId, messageId, newText.length());
+        
+        EditMessageText editMessage = EditMessageText.builder()
+                .chatId(chatId.toString())
+                .messageId(messageId)
+                .text(newText)
+                .replyMarkup(replyMarkup)
+                .build();
+        
+        try {
+            execute(editMessage);
+            log.info("Сообщение успешно отредактировано: chatId={}, messageId={}, newTextLength={}", 
+                    chatId, messageId, newText.length());
+            
+        } catch (TelegramApiRequestException e) {
+            handleTelegramApiError(e, chatId);
+            throw e;
+            
+        } catch (TelegramApiException e) {
+            log.error("Ошибка при редактировании сообщения: chatId={}, messageId={}, error={}", 
+                    chatId, messageId, e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
      * Отправляет ответ на callback query от inline кнопки.
      * 
      * <p>Когда пользователь нажимает на inline кнопку, Telegram отправляет
@@ -329,6 +493,39 @@ public class TelegramMessageService extends DefaultAbsSender {
                                             String text, InlineKeyboardMarkup replyMarkup) {
         log.error("Все попытки отправки сообщения с кнопками исчерпаны: telegramId={}, textLength={}, error={}", 
                 telegramId, text != null ? text.length() : 0, e.getMessage());
+    }
+
+    /**
+     * Метод восстановления после неудачных попыток отправки сообщения с reply клавиатурой.
+     * 
+     * @param e исключение, вызвавшее сбой всех попыток
+     * @param telegramId Telegram ID пользователя
+     * @param text текст сообщения
+     * @param keyboard reply клавиатура
+     * @see Recover
+     */
+    @Recover
+    public void recoverSendMessageWithKeyboard(TelegramApiException e, Long telegramId, 
+                                               String text, ReplyKeyboardMarkup keyboard) {
+        log.error("Все попытки отправки сообщения с reply клавиатурой исчерпаны: telegramId={}, textLength={}, error={}", 
+                telegramId, text != null ? text.length() : 0, e.getMessage());
+    }
+
+    /**
+     * Метод восстановления после неудачных попыток редактирования сообщения.
+     * 
+     * @param e исключение, вызвавшее сбой всех попыток
+     * @param chatId ID чата
+     * @param messageId ID сообщения
+     * @param newText новый текст
+     * @param replyMarkup inline клавиатура
+     * @see Recover
+     */
+    @Recover
+    public void recoverEditMessageText(TelegramApiException e, Long chatId, Integer messageId,
+                                       String newText, InlineKeyboardMarkup replyMarkup) {
+        log.error("Все попытки редактирования сообщения исчерпаны: chatId={}, messageId={}, error={}", 
+                chatId, messageId, e.getMessage());
     }
 
     /**

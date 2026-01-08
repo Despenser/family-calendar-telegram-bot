@@ -13,6 +13,8 @@ import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessExceptio
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.service.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
+import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -51,6 +53,12 @@ class MyEventsCommandHandlerTest {
     private EventService eventService;
 
     @Mock
+    private KeyboardService keyboardService;
+
+    @Mock
+    private TelegramMessageService messageService;
+
+    @Mock
     private Message message;
 
     @Mock
@@ -60,7 +68,7 @@ class MyEventsCommandHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new MyEventsCommandHandler(eventService);
+        handler = new MyEventsCommandHandler(eventService, keyboardService, messageService);
     }
 
     @Test

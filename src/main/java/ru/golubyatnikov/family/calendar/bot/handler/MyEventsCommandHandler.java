@@ -9,10 +9,11 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
+import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Обработчик команды /my_events для Telegram бота семейного календаря.
@@ -74,17 +75,19 @@ import java.util.stream.Collectors;
 public class MyEventsCommandHandler implements CommandHandler {
 
     private final EventService eventService;
+    private final KeyboardService keyboardService;
+    private final TelegramMessageService messageService;
 
     /**
      * Обрабатывает команду /my_events от пользователя.
      * 
-     * <p>Метод получает список всех событий пользователя и форматирует их
-     * в читаемый вид с inline кнопками для редактирования и удаления.</p>
+     * <p>Метод получает список всех событий пользователя и отправляет
+     * каждое событие отдельным сообщением с inline кнопками для редактирования и удаления.</p>
      * 
      * @param message входящее сообщение от Telegram, содержащее команду /my_events
      * @param user пользователь из базы данных, запросивший список своих событий.
      *             Не может быть null, так как команда требует авторизации.
-     * @return текст со списком событий пользователя или сообщение об их отсутствии
+     * @return текст заголовка со списком событий пользователя или сообщение об их отсутствии
      * @throws IllegalArgumentException если message или user равны null
      */
     @Override
@@ -101,6 +104,7 @@ public class MyEventsCommandHandler implements CommandHandler {
 
         Long telegramId = message.getFrom().getId();
         String username = message.getFrom().getUserName();
+        Long chatId = message.getChatId();
 
         log.info("Обработка команды /my_events: telegramId={}, username={}, userId={}", 
                 telegramId, username, user.getId());
@@ -114,7 +118,21 @@ public class MyEventsCommandHandler implements CommandHandler {
             return buildNoEventsMessage();
         }
 
-        return buildEventsListMessage(userEvents);
+        // Отправляем заголовок
+        String header = String.format("📋 *Мои события*\n\nВсего событий: %d\n", userEvents.size());
+        
+        // Отправляем каждое событие отдельным сообщением с inline-кнопками
+        for (Event event : userEvents) {
+            try {
+                String eventText = formatEvent(event);
+                InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event.getId());
+                messageService.sendMessageWithInlineKeyboard(chatId, eventText, keyboard);
+            } catch (Exception e) {
+                log.error("Ошибка при отправке события ID={}: {}", event.getId(), e.getMessage(), e);
+            }
+        }
+        
+        return header;
     }
 
     /**
@@ -136,38 +154,6 @@ public class MyEventsCommandHandler implements CommandHandler {
     }
 
     /**
-     * Формирует список событий пользователя с форматированием.
-     * 
-     * <p>Каждое событие отображается в следующем формате:</p>
-     * <pre>
-     * 📌 *Название события*
-     * 📅 Дата: dd.MM.yyyy
-     * 🕐 Время: HH:mm
-     * 📝 Описание: текст описания (если есть)
-     * 
-     * [Редактировать] [Удалить]
-     * </pre>
-     * 
-     * <p>События разделяются пустой строкой для улучшения читаемости.</p>
-     * 
-     * @param events список событий для форматирования
-     * @return отформатированное сообщение со списком событий
-     */
-    private String buildEventsListMessage(List<Event> events) {
-        String eventsList = events.stream()
-                .map(this::formatEvent)
-                .collect(Collectors.joining("\n\n"));
-
-        return String.format(
-                "📋 *Мои события*\n\n" +
-                "%s\n\n" +
-                "Всего событий: %d",
-                eventsList,
-                events.size()
-        );
-    }
-
-    /**
      * Форматирует одно событие в читаемый вид.
      * 
      * <p>Использует эмодзи для визуального выделения различных полей события.
@@ -183,15 +169,12 @@ public class MyEventsCommandHandler implements CommandHandler {
         
         formatted.append(String.format("📌 *%s*\n", escapeMarkdown(event.getTitle())));
         formatted.append(String.format("📅 Дата: %s\n", event.getFormattedDate()));
-        formatted.append(String.format("🕐 Время: %s\n", event.getFormattedTime()));
+        formatted.append(String.format("🕐 Время: %s", event.getFormattedTime()));
         
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            formatted.append(String.format("📝 Описание: %s\n", 
+            formatted.append(String.format("\n📝 Описание: %s", 
                     escapeMarkdown(event.getDescription())));
         }
-        
-        // Добавляем информацию о кнопках (в будущем будут реальные inline кнопки)
-        formatted.append("\n[Редактировать] [Удалить]");
         
         return formatted.toString();
     }

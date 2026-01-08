@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -15,23 +16,6 @@ import java.util.Map;
 /**
  * Глобальный обработчик исключений для всего приложения.
  * 
- * <p>Этот класс перехватывает все исключения, возникающие в контроллерах,
- * логирует их с полным stack trace и возвращает дружественные сообщения
- * пользователям.</p>
- * 
- * <p>Обрабатываемые типы исключений:</p>
- * <ul>
- *   <li>{@link UserNotFoundException} - пользователь не найден</li>
- *   <li>{@link EventNotFoundException} - событие не найдено</li>
- *   <li>{@link UnauthorizedAccessException} - несанкционированный доступ</li>
- *   <li>{@link InvalidDateException} - некорректная дата</li>
- *   <li>{@link DataAccessException} - ошибки базы данных</li>
- *   <li>{@link TelegramApiException} - ошибки Telegram API</li>
- *   <li>{@link Exception} - все остальные исключения</li>
- * </ul>
- * 
- * <p><b>Требования:</b> 9.1, 9.2, 9.3, 9.4</p>
- * 
  * @author Family Calendar Bot Team
  * @version 1.0.0
  * @since 2025-12-30
@@ -42,8 +26,6 @@ public class GlobalExceptionHandler {
     
     /**
      * Обрабатывает исключение UserNotFoundException.
-     * 
-     * <p>Возвращает HTTP 404 NOT FOUND с дружественным сообщением.</p>
      * 
      * @param ex исключение UserNotFoundException
      * @return ResponseEntity с информацией об ошибке
@@ -58,13 +40,12 @@ public class GlobalExceptionHandler {
             ex.getMessage()
         );
         
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(errorResponse);
     }
     
     /**
      * Обрабатывает исключение EventNotFoundException.
-     * 
-     * <p>Возвращает HTTP 404 NOT FOUND с дружественным сообщением.</p>
      * 
      * @param ex исключение EventNotFoundException
      * @return ResponseEntity с информацией об ошибке
@@ -79,13 +60,12 @@ public class GlobalExceptionHandler {
             ex.getMessage()
         );
         
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(errorResponse);
     }
     
     /**
      * Обрабатывает исключение UnauthorizedAccessException.
-     * 
-     * <p>Возвращает HTTP 403 FORBIDDEN с дружественным сообщением.</p>
      * 
      * @param ex исключение UnauthorizedAccessException
      * @return ResponseEntity с информацией об ошибке
@@ -100,13 +80,12 @@ public class GlobalExceptionHandler {
             "У вас нет прав для выполнения этой операции"
         );
         
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorResponse);
     }
     
     /**
      * Обрабатывает исключение InvalidDateException.
-     * 
-     * <p>Возвращает HTTP 400 BAD REQUEST с дружественным сообщением.</p>
      * 
      * @param ex исключение InvalidDateException
      * @return ResponseEntity с информацией об ошибке
@@ -121,14 +100,12 @@ public class GlobalExceptionHandler {
             ex.getMessage()
         );
         
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(errorResponse);
     }
     
     /**
      * Обрабатывает исключения DataAccessException (ошибки базы данных).
-     * 
-     * <p>Логирует полный stack trace и возвращает HTTP 503 SERVICE UNAVAILABLE
-     * с дружественным сообщением о временной недоступности.</p>
      * 
      * @param ex исключение DataAccessException
      * @return ResponseEntity с информацией об ошибке
@@ -143,14 +120,12 @@ public class GlobalExceptionHandler {
             "Произошла ошибка при работе с базой данных. Пожалуйста, попробуйте позже."
         );
         
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(errorResponse);
     }
     
     /**
      * Обрабатывает исключения TelegramApiException.
-     * 
-     * <p>Логирует полный stack trace и возвращает HTTP 502 BAD GATEWAY
-     * с дружественным сообщением об ошибке взаимодействия с Telegram API.</p>
      * 
      * @param ex исключение TelegramApiException
      * @return ResponseEntity с информацией об ошибке
@@ -165,14 +140,12 @@ public class GlobalExceptionHandler {
             "Произошла ошибка при взаимодействии с Telegram. Пожалуйста, попробуйте позже."
         );
         
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(errorResponse);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(errorResponse);
     }
     
     /**
      * Обрабатывает все остальные необработанные исключения.
-     * 
-     * <p>Логирует полный stack trace и возвращает HTTP 500 INTERNAL SERVER ERROR
-     * с общим дружественным сообщением.</p>
      * 
      * @param ex любое исключение
      * @return ResponseEntity с информацией об ошибке
@@ -187,7 +160,8 @@ public class GlobalExceptionHandler {
             "Произошла непредвиденная ошибка. Пожалуйста, попробуйте позже."
         );
         
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(errorResponse);
     }
     
     /**
@@ -198,7 +172,9 @@ public class GlobalExceptionHandler {
      * @param message детальное сообщение для пользователя
      * @return Map с информацией об ошибке
      */
-    private Map<String, Object> createErrorResponse(HttpStatus status, String error, String message) {
+    private @NonNull Map<String, Object> createErrorResponse(@NonNull HttpStatus status,
+                                                                      String error,
+                                                                      String message) {
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now().toString());
         errorResponse.put("status", status.value());
