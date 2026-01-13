@@ -2,6 +2,12 @@ spring:
   application:
     name: family-calendar-bot
   
+  # Конфигурация планировщиков
+  task:
+    scheduling:
+      pool:
+        size: 2
+  
   # Конфигурация источника данных PostgreSQL
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/family_calendar}
@@ -53,6 +59,53 @@ telegram:
     username: ${TELEGRAM_BOT_USERNAME:FamilyCalendarBot}
     webhook-url: ${TELEGRAM_BOT_WEBHOOK_URL}
 
+# Конфигурация сообщений бота
+bot:
+  messages:
+    unauthorized:
+      # Префикс для сообщений об ограничении доступа (эмодзи замка)
+      prefix: "🔒"
+      # Инструкция по получению доступа
+      contact-admin: "Для получения доступа обратитесь к администратору вашей семьи."
+      # Шаблоны сообщений для разных категорий
+      # Поддерживаются параметры: {command}, {feature}
+      templates:
+        event-creation: "Создание событий доступно только зарегистрированным пользователям семейного календаря."
+        event-viewing: "Просмотр событий доступен только членам семейного календаря."
+        event-management: "Управление событиями доступно только зарегистрированным пользователям."
+        search-filter: "Поиск и фильтрация событий доступны только членам семейного календаря."
+        trash-management: "Управление корзиной доступно только зарегистрированным пользователям."
+        statistics: "Просмотр статистики доступен только членам семейного календаря."
+        general: "Эта функция доступна только зарегистрированным пользователям семейного календаря."
+
+# Конфигурация системы напоминаний
+reminder:
+  scheduler:
+    # Включить/выключить планировщик напоминаний
+    enabled: true
+    # Интервал проверки напоминаний в миллисекундах (60000 = 1 минута)
+    fixed-rate: 60000
+  # Максимальное количество напоминаний на одно событие
+  max-per-event: 10
+  # Максимальное количество минут для custom напоминания (43200 = 30 дней)
+  max-custom-minutes: 43200
+
+# Конфигурация очистки черновиков событий
+draft:
+  cleanup:
+    # Включить/выключить автоматическую очистку осиротевших черновиков
+    enabled: true
+    # Пороговое значение для очистки при запуске приложения (в часах)
+    # Черновики старше этого значения будут удалены при старте
+    startup-threshold-hours: 1
+    # Пороговое значение для периодической очистки (в часах)
+    # Черновики старше этого значения будут удалены при периодической очистке
+    periodic-threshold-hours: 24
+    # Расписание периодической очистки в формате cron (по умолчанию каждые 6 часов)
+    # Формат: секунды минуты часы день месяц день_недели
+    # 0 0 */6 * * * = каждые 6 часов в 00 минут 00 секунд
+    schedule-cron: "0 0 */6 * * *"
+
 # Конфигурация логирования (базовые настройки, переопределяются в logback-spring.xml)
 logging:
   level:
@@ -82,11 +135,24 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        # Включаем endpoints для мониторинга
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: when-authorized
+    metrics:
+      enabled: true
   metrics:
+    # Включаем экспорт метрик
     export:
       simple:
         enabled: true
+    # Настройки тегов для метрик
+    tags:
+      application: ${spring.application.name}
+    # Включаем распределение для таймеров (percentiles)
+    distribution:
+      percentiles-histogram:
+        authorization.check.duration.seconds: true
+      percentiles:
+        authorization.check.duration.seconds: 0.5, 0.95, 0.99

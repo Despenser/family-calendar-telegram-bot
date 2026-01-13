@@ -103,7 +103,9 @@
 
 
 
-- [ ] 2.3 Создать Spring Data JPA репозитории
+- [x] 2.3 Создать Spring Data JPA репозитории
+
+
 
 
 
@@ -325,7 +327,9 @@
 
 
 
-- [ ] 8.1 Реализовать AddEventCommandHandler с поддержкой inline-календаря и выбора времени
+- [x] 8.1 Реализовать AddEventCommandHandler с поддержкой inline-календаря и выбора времени
+
+
 
 
 
@@ -501,7 +505,9 @@
   - _Requirements: 9.2, 9.3_
 
 - [ ] 11. Docker и развертывание
-- [ ] 11.1 Протестировать Docker Compose локально
+- [x] 11.1 Протестировать Docker Compose локально
+
+
   - Выполнить docker-compose build
   - Выполнить docker-compose up
   - Проверить, что PostgreSQL запустился и готов
@@ -617,7 +623,10 @@
   - _Requirements: 2.3_
 
 - [ ] 14. Реализация кнопок команд и inline-календаря
-- [ ] 14.1 Обновить KeyboardService с методами для календаря и выбора времени
+- [x] 14.1 Обновить KeyboardService с методами для календаря и выбора времени
+
+
+
 
 
 
@@ -637,7 +646,7 @@
   - Добавить кнопки отмены для календаря и выбора времени
   - _Requirements: 13.1, 13.3, 13.4, 13.5, 4.1, 4.2, 4.7, 4.8_
 
-- [ ] 14.2 Обновить UpdateProcessor для поддержки кнопок и callback queries
+- [x] 14.2 Обновить UpdateProcessor для поддержки кнопок и callback queries
 
 
   - Внедрить KeyboardService и ConversationService через конструктор
@@ -747,135 +756,144 @@
 
 
 - [ ] 16. Расширение базы данных для новых функций
-- [ ] 16.1 Создать миграцию V2__Add_extended_features.sql
+- [x] 16.1 Создать миграцию V3__Add_extended_features.sql
   - Добавить поля в таблицу events: end_time, is_personal, series_id, completion_note, deleted_at, completed_at
-  - Обновить ENUM event_status: добавить значения 'completed' и 'deleted'
-  - Создать индексы: idx_events_series_id, idx_events_is_personal, idx_events_deleted_at
+  - Обновить CHECK constraint для статусов: добавить значения 'COMPLETED' и 'DELETED'
+  - Создать индексы: idx_events_series_id, idx_events_is_personal, idx_events_deleted_at, idx_events_user_status_deleted, idx_events_completed
+  - Добавить constraint для валидации временного интервала
   - _Requirements: 26.2, 32.1, 25.3, 19.2_
 
-- [ ] 16.2 Создать миграцию V3__Add_attachments_table.sql
+- [x] 16.2 Создать миграцию V4__Add_attachments_table.sql
   - Создать таблицу attachments с полями: id, event_id, file_id, file_name, file_type, file_size, uploaded_at
   - Добавить foreign key на events с ON DELETE CASCADE
-  - Создать индекс idx_attachments_event_id
+  - Создать индексы: idx_attachments_event_id, idx_attachments_event_uploaded
+  - Добавить constraints для валидации данных
   - _Requirements: 20.2, 20.3_
 
-- [ ] 16.3 Создать миграцию V4__Add_comments_table.sql
+- [x] 16.3 Создать миграцию V5__Add_comments_table.sql
   - Создать таблицу comments с полями: id, event_id, user_id, text, created_at
-  - Добавить foreign keys на events и users
-  - Создать индексы: idx_comments_event_id, idx_comments_created_at
+  - Добавить foreign keys на events и users с ON DELETE CASCADE
+  - Создать индексы: idx_comments_event_id, idx_comments_event_created, idx_comments_created_at
+  - Добавить constraint для валидации непустого текста
   - _Requirements: 21.3_
 
-- [ ] 16.4 Создать миграцию V5__Add_checklist_items_table.sql
+- [x] 16.4 Создать миграцию V6__Add_checklist_items_table.sql
   - Создать таблицу checklist_items с полями: id, event_id, text, completed, position, completed_at, completed_by
   - Добавить foreign keys на events и users
-  - Создать индексы: idx_checklist_event_id, idx_checklist_position
+  - Создать индексы: idx_checklist_event_id, idx_checklist_event_position, idx_checklist_event_completed
+  - Добавить constraint для валидации логики выполнения
   - _Requirements: 22.3_
 
-- [ ] 16.5 Создать миграцию V6__Add_recurrence_rules_table.sql
+- [x] 16.5 Создать миграцию V7__Add_recurrence_rules_table.sql
   - Создать ENUM frequency_type со значениями 'daily', 'weekly', 'monthly'
   - Создать таблицу recurrence_rules с полями: id, series_id, frequency, interval, days_of_week, end_date, occurrences, exceptions
   - Создать индекс idx_recurrence_series_id
+  - Добавить constraint для валидации условий окончания повторений
   - _Requirements: 27.6_
 
-- [ ] 16.6 Создать миграцию V7__Add_event_history_table.sql
+- [x] 16.6 Создать миграцию V8__Add_event_history_table.sql
   - Создать ENUM action_type со значениями 'created', 'updated', 'deleted', 'restored'
   - Создать таблицу event_history с полями: id, event_id, user_id, action_type, field_name, old_value, new_value, changed_at
-  - Создать индексы: idx_event_history_event_id, idx_event_history_changed_at
+  - Создать индексы: idx_event_history_event_id, idx_event_history_event_changed, idx_event_history_changed_at, idx_event_history_action_changed
+  - Добавить constraint для валидации логики полей
   - _Requirements: 29.1, 29.2_
 
-- [ ] 16.7 Создать миграцию V8__Add_reminders_table.sql
+- [x] 16.7 Создать миграцию V9__Add_reminders_table.sql
   - Создать ENUM reminder_type со значениями 'morning_of_day', 'evening_before', 'one_hour_before', 'ten_minutes_before', 'custom'
   - Создать таблицу reminders с полями: id, event_id, reminder_type, custom_minutes, reminder_time, sent, sent_at
-  - Создать индексы: idx_reminders_event_id, idx_reminders_time_sent
+  - Создать индексы: idx_reminders_event_id, idx_reminders_time_sent, idx_reminders_event_time
+  - Добавить constraints для валидации логики custom напоминаний и отправки
   - _Requirements: 23.3, 23.6_
 
-- [ ] 17. Создание новых Entity классов
-- [ ] 17.1 Создать Attachment entity
+- [x] 17. Создание новых Entity классов
+- [x] 17.1 Создать Attachment entity
   - Добавить поля: id, event, fileId, fileName, fileType, fileSize, uploadedAt
   - Настроить @ManyToOne связь с Event
   - Добавить @PrePersist для uploadedAt
   - _Requirements: 20.3_
 
-- [ ] 17.2 Создать Comment entity
+- [x] 17.2 Создать Comment entity
   - Добавить поля: id, event, user, text, createdAt
   - Настроить @ManyToOne связи с Event и User
   - Добавить @PrePersist для createdAt
   - _Requirements: 21.3_
 
-- [ ] 17.3 Создать ChecklistItem entity
+- [x] 17.3 Создать ChecklistItem entity
   - Добавить поля: id, event, text, completed, position, completedAt, completedBy
   - Настроить @ManyToOne связи с Event и User
   - _Requirements: 22.3_
 
-- [ ] 17.4 Создать RecurrenceRule entity
+- [x] 17.4 Создать RecurrenceRule entity
   - Добавить поля: id, seriesId, frequency, interval, daysOfWeek, endDate, occurrences, exceptions
   - Создать ENUM Frequency с DAILY, WEEKLY, MONTHLY
   - _Requirements: 27.6_
 
-- [ ] 17.5 Создать EventHistory entity
+- [x] 17.5 Создать EventHistory entity
   - Добавить поля: id, eventId, user, actionType, fieldName, oldValue, newValue, changedAt
   - Создать ENUM ActionType с CREATED, UPDATED, DELETED, RESTORED
   - Добавить @PrePersist для changedAt
   - _Requirements: 29.1, 29.2_
 
-- [ ] 17.6 Создать Reminder entity
+- [x] 17.6 Создать Reminder entity
   - Добавить поля: id, event, reminderType, customMinutes, reminderTime, sent, sentAt
   - Создать ENUM ReminderType с всеми типами напоминаний
   - Настроить @ManyToOne связь с Event
   - _Requirements: 23.3_
 
-- [ ] 17.7 Обновить Event entity
+- [x] 17.7 Обновить Event entity
   - Добавить поля: endTime, isPersonal, seriesId, completionNote, deletedAt, completedAt
   - Добавить значения COMPLETED и DELETED в EventStatus enum
   - Добавить @OneToMany связи: attachments, comments, checklistItems, reminders
   - _Requirements: 26.2, 32.1, 25.3, 19.2_
 
-- [ ] 18. Создание новых Repository интерфейсов
-- [ ] 18.1 Создать AttachmentRepository
+- [x] 18. Создание новых Repository интерфейсов
+- [x] 18.1 Создать AttachmentRepository
   - Extends JpaRepository<Attachment, Long>
   - Добавить метод findByEventIdOrderByUploadedAtAsc
   - _Requirements: 20.4_
 
-- [ ] 18.2 Создать CommentRepository
+- [x] 18.2 Создать CommentRepository
   - Extends JpaRepository<Comment, Long>
   - Добавить метод findByEventIdOrderByCreatedAtAsc
   - _Requirements: 21.4_
 
-- [ ] 18.3 Создать ChecklistItemRepository
+- [x] 18.3 Создать ChecklistItemRepository
   - Extends JpaRepository<ChecklistItem, Long>
   - Добавить метод findByEventIdOrderByPositionAsc
   - _Requirements: 22.4_
 
-- [ ] 18.4 Создать RecurrenceRuleRepository
+- [x] 18.4 Создать RecurrenceRuleRepository
   - Extends JpaRepository<RecurrenceRule, Long>
   - Добавить метод findBySeriesId
   - _Requirements: 27.6_
 
-- [ ] 18.5 Создать EventHistoryRepository
+- [x] 18.5 Создать EventHistoryRepository
   - Extends JpaRepository<EventHistory, Long>
   - Добавить метод findByEventIdOrderByChangedAtDesc
   - _Requirements: 29.4_
 
-- [ ] 18.6 Создать ReminderRepository
+- [x] 18.6 Создать ReminderRepository
   - Extends JpaRepository<Reminder, Long>
   - Добавить метод findBySentFalseAndReminderTimeBetween
   - _Requirements: 23.4_
 
-- [ ] 18.7 Обновить EventRepository
+- [x] 18.7 Обновить EventRepository
   - Добавить метод findByUserIdAndStatusOrderByDeletedAtDesc для корзины
   - Добавить метод findByStatusAndDeletedAtBefore для очистки корзины
   - Добавить метод findExpiredActiveEvents для автозавершения
   - Добавить метод searchByTitleOrDescription для поиска
-  - Добавить методы для фильтрации по типу события
+  - Добавить методы для фильтрации по типу события (семейные/персональные)
   - Добавить метод findBySeriesIdAndStatus для повторяющихся событий
-  - _Requirements: 19.4, 28.3, 28.5, 27.7_
+  - Добавить методы count для статистики
+  - _Requirements: 19.4, 28.3, 28.5, 27.7, 31.3_
 
-- [ ] 19. Реализация AttachmentService
-- [ ] 19.1 Создать AttachmentService
+- [x] 19. Реализация AttachmentService
+- [x] 19.1 Создать AttachmentService
   - Реализовать метод saveAttachment с проверкой размера файла (макс 20 МБ)
   - Реализовать метод getEventAttachments
   - Реализовать метод deleteAttachment с проверкой прав доступа
   - Добавить логирование операций
+  - Создать исключения: FileSizeExceededException, AttachmentNotFoundException
   - _Requirements: 20.2, 20.3, 20.4, 20.6_
 
 - [ ]* 19.2 Написать unit тесты для AttachmentService
@@ -887,7 +905,10 @@
   - _Requirements: 20.2, 20.6_
 
 - [ ] 20. Реализация CommentService
-- [ ] 20.1 Создать CommentService
+- [x] 20.1 Создать CommentService
+
+
+
   - Реализовать метод addComment
   - Реализовать метод getEventComments
   - Реализовать notifyFamilyAboutComment для семейных событий
@@ -902,7 +923,9 @@
   - _Requirements: 21.3, 21.5_
 
 - [ ] 21. Реализация ChecklistService
-- [ ] 21.1 Создать ChecklistService
+- [x] 21.1 Создать ChecklistService
+
+
   - Реализовать метод createChecklist
   - Реализовать метод toggleItemCompletion
   - Реализовать метод getEventChecklist
@@ -917,7 +940,9 @@
   - _Requirements: 22.3, 22.5, 22.6_
 
 - [ ] 22. Реализация RecurrenceService
-- [ ] 22.1 Создать RecurrenceService
+- [x] 22.1 Создать RecurrenceService
+
+
   - Реализовать метод createRecurringEvent
   - Реализовать метод updateSeries
   - Реализовать метод deleteSeries
@@ -936,8 +961,10 @@
   - Тест удаления всей серии
   - _Requirements: 27.2, 27.5, 27.7, 27.8, 27.9_
 
-- [ ] 23. Реализация TrashService
-- [ ] 23.1 Создать TrashService
+- [x] 23. Реализация TrashService
+
+
+- [x] 23.1 Создать TrashService
   - Реализовать метод getUserTrash
   - Реализовать метод restoreEvent
   - Реализовать метод permanentlyDelete
@@ -951,8 +978,10 @@
   - Тест автоматической очистки старых событий
   - _Requirements: 19.4, 19.5, 19.6_
 
+
 - [ ] 24. Реализация EventHistoryService
-- [ ] 24.1 Создать EventHistoryService
+- [x] 24.1 Создать EventHistoryService
+
   - Реализовать метод recordChange
   - Реализовать метод getEventHistory
   - Добавить логирование
@@ -965,7 +994,9 @@
   - _Requirements: 29.1, 29.2_
 
 - [ ] 25. Реализация ReminderService
-- [ ] 25.1 Создать ReminderService
+- [x] 25.1 Создать ReminderService
+
+
   - Реализовать метод createReminders
   - Реализовать метод createCustomReminder
   - Реализовать @Scheduled метод sendReminders (каждую минуту)
@@ -982,13 +1013,17 @@
   - _Requirements: 23.3, 23.4, 26.6_
 
 - [ ] 26. Реализация SearchService и StatisticsService
-- [ ] 26.1 Создать SearchService
+- [x] 26.1 Создать SearchService
+
+
   - Реализовать метод searchEvents
   - Реализовать метод filterEvents с ENUM EventFilter
   - Добавить логирование
   - _Requirements: 28.3, 28.4, 28.5_
 
-- [ ] 26.2 Создать StatisticsService
+- [x] 26.2 Создать StatisticsService
+
+
   - Реализовать метод getMonthlyStatistics
   - Создать класс EventStatistics с полями статистики
   - _Requirements: 31.3, 31.4_
@@ -999,8 +1034,11 @@
   - Тест подсчета статистики за месяц
   - _Requirements: 28.3, 28.5, 31.3_
 
-- [ ] 27. Реализация EventCompletionScheduler
-- [ ] 27.1 Создать EventCompletionScheduler
+- [x] 27. Реализация EventCompletionScheduler
+
+
+
+- [x] 27.1 Создать EventCompletionScheduler
   - Аннотировать @Component
   - Реализовать @Scheduled метод completeExpiredEvents (каждые 10 минут)
   - Реализовать sendCompletionNotification
@@ -1013,7 +1051,7 @@
   - _Requirements: 25.1, 25.2_
 
 - [ ] 28. Обновление EventService
-- [ ] 28.1 Обновить EventService для новых функций
+- [x] 28.1 Обновить EventService для новых функций
   - Добавить поддержку is_personal при создании события
   - Добавить поддержку end_time для интервалов
   - Обновить deleteEvent для перемещения в корзину (статус DELETED)
@@ -1029,35 +1067,35 @@
   - _Requirements: 26.2, 32.1, 19.1, 25.3_
 
 - [ ] 29. Создание новых Command Handlers
-- [ ] 29.1 Создать TodayCommandHandler
+- [x] 29.1 Создать TodayCommandHandler
   - Реализовать отображение событий на текущий день
   - Использовать Markdown форматирование
   - _Requirements: 28.1_
 
-- [ ] 29.2 Создать WeekCommandHandler
+- [x] 29.2 Создать WeekCommandHandler
   - Реализовать отображение событий на неделю с группировкой по дням
   - Использовать Markdown форматирование
   - _Requirements: 28.2_
 
-- [ ] 29.3 Создать SearchCommandHandler
+- [x] 29.3 Создать SearchCommandHandler
   - Запросить текст для поиска
   - Вызвать SearchService.searchEvents
   - Отобразить результаты
   - _Requirements: 28.3, 28.4_
 
-- [ ] 29.4 Создать FilterCommandHandler
+- [x] 29.4 Создать FilterCommandHandler
   - Показать inline-меню фильтров
   - Обработать callback queries для фильтрации
   - Вызвать SearchService.filterEvents
   - _Requirements: 28.5_
 
-- [ ] 29.5 Создать TrashCommandHandler
+- [x] 29.5 Создать TrashCommandHandler
   - Вызвать TrashService.getUserTrash
   - Показать список с inline-кнопками "Восстановить" и "Удалить навсегда"
   - Обработать callback queries
   - _Requirements: 19.4_
 
-- [ ] 29.6 Создать StatsCommandHandler
+- [x] 29.6 Создать StatsCommandHandler
   - Вызвать StatisticsService.getMonthlyStatistics
   - Отформатировать и отобразить статистику
   - _Requirements: 31.3_
@@ -1072,7 +1110,7 @@
   - _Requirements: 28.1, 28.2, 28.3, 28.5, 19.4, 31.3_
 
 - [ ] 30. Обновление KeyboardService
-- [ ] 30.1 Добавить методы для новых inline-клавиатур
+- [x] 30.1 Добавить методы для новых inline-клавиатур
   - Реализовать createEventTypeSelectionKeyboard (Семейное/Персональное)
   - Реализовать createEditEventMenuKeyboard (Изменить дату/время/название/описание)
   - Реализовать createReminderSettingsKeyboard (типы напоминаний)
@@ -1084,7 +1122,7 @@
   - Реализовать createCommentKeyboard (Добавить комментарий)
   - _Requirements: 26.1, 18.1, 23.2, 27.2, 27.7, 17.3, 20.1, 22.1, 21.1_
 
-- [ ] 30.2 Обновить createCalendarKeyboard для подсветки текущей даты
+- [x] 30.2 Обновить createCalendarKeyboard для подсветки текущей даты
   - Добавить эмодзи "📍" для текущей даты
   - Добавить счетчик событий к дате (например, "5📌А(3)")
   - _Requirements: 31.1, 31.5_
@@ -1097,8 +1135,8 @@
   - Тест подсветки текущей даты
   - _Requirements: 26.1, 18.1, 23.2, 27.2, 31.1_
 
-- [ ] 31. Обновление CallbackQueryHandler
-- [ ] 31.1 Расширить CallbackQueryHandler для новых callback queries
+- [x] 31. Обновление CallbackQueryHandler
+- [x] 31.1 Расширить UpdateProcessor для новых callback queries
   - Добавить обработку event_type_ (выбор типа события)
   - Добавить обработку edit_field_ (редактирование полей)
   - Добавить обработку reminder_ (настройка напоминаний)
@@ -1110,6 +1148,7 @@
   - Добавить обработку comment_ (комментарии)
   - Добавить обработку trash_ (корзина)
   - Добавить обработку add_completion_note_ (заметка к завершенному)
+  - Добавить интеграцию FilterCommandHandler, TrashCommandHandler, SearchCommandHandler
   - _Requirements: 26.1, 18.1, 23.2, 27.2, 27.7, 17.3, 20.1, 22.1, 21.1, 19.4, 25.2_
 
 - [ ]* 31.2 Написать unit тесты для обновленного CallbackQueryHandler
@@ -1121,13 +1160,17 @@
   - _Requirements: 26.1, 18.1, 23.2, 27.2, 27.7_
 
 - [ ] 32. Реализация быстрого создания из текста
-- [ ] 32.1 Обновить UpdateProcessor для распознавания текстовых сообщений
+- [x] 32.1 Обновить UpdateProcessor для распознавания текстовых сообщений
+
+
   - Добавить метод parseEventFromText
   - Реализовать регулярные выражения для парсинга формата "Событие: [название] Дата: [дата] Время: [время]"
   - Показать inline-кнопку подтверждения с предпросмотром
   - _Requirements: 30.1, 30.2, 30.3_
 
-- [ ] 32.2 Создать TextEventParser утилиту
+- [x] 32.2 Создать TextEventParser утилиту
+
+
   - Реализовать методы парсинга даты и времени
   - Добавить валидацию распознанных параметров
   - _Requirements: 30.1_
@@ -1139,7 +1182,9 @@
   - _Requirements: 30.1, 30.4_
 
 - [ ] 33. Реализация контекстных подсказок
-- [ ] 33.1 Создать ContextualHintsService
+- [x] 33.1 Создать ContextualHintsService
+
+
   - Реализовать метод analyzeEventTitle
   - Добавить словари ключевых слов для разных типов событий
   - Реализовать метод getSuggestedActions
@@ -1151,8 +1196,8 @@
   - Тест распознавания "встреча" -> повестка дня
   - _Requirements: 24.1, 24.2, 24.3_
 
-- [ ] 34. Реализация еженедельной сводки
-- [ ] 34.1 Создать WeeklySummaryScheduler
+- [x] 34. Реализация еженедельной сводки
+- [x] 34.1 Создать WeeklySummaryScheduler
   - Аннотировать @Component
   - Реализовать @Scheduled метод sendWeeklySummary (каждое воскресенье в 20:00)
   - Получить события на следующую неделю для каждой семьи
@@ -1165,7 +1210,9 @@
   - _Requirements: 28.6_
 
 - [ ] 35. Обновление UpdateProcessor для обработки файлов
-- [ ] 35.1 Добавить обработку файлов, документов и изображений
+- [x] 35.1 Добавить обработку файлов, документов и изображений
+
+
   - Проверить наличие активного черновика или контекста редактирования
   - Извлечь file_id, имя файла, тип и размер
   - Вызвать AttachmentService.saveAttachment
@@ -1191,14 +1238,24 @@
   - Тест поиска и фильтрации событий
   - Тест истории изменений
 
-- [ ] 36.2 Обновить документацию
+- [x] 36.2 Обновить документацию
+
+
   - Обновить README.md с описанием новых функций
-  - Обновить SETUP.md с инструкциями по новым таблицам БД
-  - Добавить примеры использования новых команд
-  - Документировать формат быстрого создания из текста
+  - Добавить описание новых команд (/today, /week, /search, /filter, /trash, /stats)
+  - Добавить примеры использования новых функций
+  - Обновить архитектурную диаграмму с новыми сервисами и handlers
+  - Обновить ER-диаграмму с новыми таблицами
+  - Добавить описание всех новых таблиц БД
+  - Документировать расширенные функции (персональные события, вложения, комментарии, чек-листы, повторения, корзина)
   - _Requirements: 12.1, 12.3_
 
-- [ ] 36.3 Checkpoint - Финальная проверка
+- [x] 36.3 Checkpoint - Финальная проверка
+
+
+
+
+
   - Запустить все unit и integration тесты
   - Проверить покрытие кода (цель > 70%)
   - Выполнить полный цикл: docker-compose up, тестирование всех функций, docker-compose down

@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
+
 /**
  * Сервис для маршрутизации команд к соответствующим обработчикам.
  * 
@@ -137,7 +139,7 @@ public class CommandDispatcher {
         if (!message.hasText()) {
             log.warn("Получено сообщение без текста от пользователя: telegramId={}, chatId={}", 
                     message.getFrom().getId(), message.getChatId());
-            return "Пожалуйста, отправьте текстовую команду. Используйте /help для списка доступных команд.";
+            return "Пожалуйста, отправьте текстовую команду. Используйте " + escape("/help") + " для списка доступных команд.";
         }
         
         String messageText = message.getText().trim();
@@ -152,7 +154,7 @@ public class CommandDispatcher {
         if (command == null) {
             log.warn("Не удалось извлечь команду из текста: '{}', telegramId={}", 
                     messageText, telegramId);
-            return "Команда должна начинаться с символа '/'. Используйте /help для списка доступных команд.";
+            return "Команда должна начинаться с символа '/'. Используйте " + escape("/help") + " для списка доступных команд.";
         }
         
         log.debug("Извлечена команда: '{}' из текста: '{}'", command, messageText);
@@ -162,34 +164,40 @@ public class CommandDispatcher {
         
         if (handler == null) {
             log.warn("Обработчик не найден для команды: '{}', telegramId={}", command, telegramId);
-            return String.format("Неизвестная команда: %s\n\nИспользуйте /help для списка доступных команд.", command);
+            return String.format("Неизвестная команда: %s\n\nИспользуйте %s для списка доступных команд.", command, escape("/help"));
         }
         
         log.debug("Найден обработчик для команды '{}': {}, requiresAuth={}", 
                 command, handler.getClass().getSimpleName(), handler.requiresAuth());
         
+        // Загружаем пользователя из БД (всегда, независимо от требования авторизации)
+        log.debug("Загрузка пользователя из БД: telegramId={}", telegramId);
+        Optional<User> userOptional = userService.findByTelegramId(telegramId);
+        User user = userOptional.orElse(null);
+        
         // Проверяем требование авторизации
-        User user = null;
         if (handler.requiresAuth()) {
             log.debug("Команда '{}' требует авторизации. Проверка пользователя: telegramId={}", 
                     command, telegramId);
             
-            Optional<User> userOptional = userService.findByTelegramId(telegramId);
-            
-            if (userOptional.isEmpty()) {
+            if (user == null) {
                 log.warn("Неавторизованная попытка выполнить команду '{}': telegramId={}", 
                         command, telegramId);
                 throw new UnauthorizedAccessException(
                         String.format("Команда %s требует авторизации. " +
-                                "Пожалуйста, используйте /start для регистрации.", command));
+                                "Пожалуйста, используйте %s для регистрации.", command, escape("/start")));
             }
             
-            user = userOptional.get();
             log.info("Пользователь авторизован: telegramId={}, userId={}, username={}, familyId={}", 
                     telegramId, user.getId(), user.getUsername(), 
                     user.getFamily() != null ? user.getFamily().getId() : null);
         } else {
-            log.debug("Команда '{}' не требует авторизации. Выполнение без проверки пользователя.", command);
+            if (user != null) {
+                log.debug("Команда '{}' не требует авторизации, но пользователь найден: telegramId={}, userId={}", 
+                        command, telegramId, user.getId());
+            } else {
+                log.debug("Команда '{}' не требует авторизации. Выполнение без пользователя.", command);
+            }
         }
         
         // Делегируем обработку команды

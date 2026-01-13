@@ -9,12 +9,14 @@ import ru.golubyatnikov.family.calendar.bot.exception.InvalidDateException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 /**
@@ -50,6 +52,8 @@ public class EventService {
     
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
+    private final EventHistoryService eventHistoryService;
+    private final ReminderService reminderService;
     
     /**
      * Создает новое событие в календаре.
@@ -60,9 +64,10 @@ public class EventService {
      *   <li>Валидирует дату и время события (не должно быть в прошлом)</li>
      *   <li>Создает событие с привязкой к пользователю и его семье</li>
      *   <li>Сохраняет событие в базе данных</li>
+     *   <li>Записывает действие в историю изменений</li>
      * </ol>
      * 
-     * <p><b>Требования:</b> 4.1, 4.2, 4.3</p>
+     * <p><b>Требования:</b> 4.1, 4.2, 4.3, 26.2, 32.1, 18.5</p>
      * 
      * @param userId идентификатор пользователя, создающего событие
      * @param title название события (обязательное)
@@ -74,8 +79,39 @@ public class EventService {
      * @throws IllegalArgumentException если title пустой или null
      */
     public Event createEvent(Long userId, String title, String description, LocalDateTime eventDateTime) {
-        log.debug("Создание события для пользователя ID={}: title='{}', dateTime={}", 
-                  userId, title, eventDateTime);
+        return createEvent(userId, title, description, eventDateTime, null, false);
+    }
+    
+    /**
+     * Создает новое событие в календаре с расширенными параметрами.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Проверяет существование пользователя в базе данных</li>
+     *   <li>Валидирует дату и время события (не должно быть в прошлом)</li>
+     *   <li>Валидирует временной интервал (endTime должно быть после eventTime)</li>
+     *   <li>Создает событие с привязкой к пользователю и его семье</li>
+     *   <li>Сохраняет событие в базе данных</li>
+     *   <li>Записывает действие в историю изменений</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 4.1, 4.2, 4.3, 26.2, 32.1, 18.5</p>
+     * 
+     * @param userId идентификатор пользователя, создающего событие
+     * @param title название события (обязательное)
+     * @param description описание события (может быть null)
+     * @param eventDateTime дата и время начала события
+     * @param endTime время окончания события (может быть null)
+     * @param isPersonal флаг персонального события (true - видно только создателю)
+     * @return созданное и сохраненное событие
+     * @throws UserNotFoundException если пользователь с указанным ID не найден
+     * @throws InvalidDateException если дата события находится в прошлом или endTime раньше eventTime
+     * @throws IllegalArgumentException если title пустой или null
+     */
+    public Event createEvent(Long userId, String title, String description, 
+                            LocalDateTime eventDateTime, LocalTime endTime, Boolean isPersonal) {
+        log.debug("Создание события для пользователя ID={}: title='{}', dateTime={}, endTime={}, isPersonal={}", 
+                  userId, title, eventDateTime, endTime, isPersonal);
         
         // Валидация входных параметров
         if (title == null || title.isBlank()) {
@@ -88,6 +124,13 @@ public class EventService {
             log.warn("Попытка создать событие с датой в прошлом: {} для пользователя ID={}", 
                      eventDateTime, userId);
             throw new InvalidDateException("Дата события не может быть в прошлом");
+        }
+        
+        // Валидация временного интервала
+        if (endTime != null && endTime.isBefore(eventDateTime.toLocalTime())) {
+            log.warn("Попытка создать событие с временем окончания раньше времени начала: start={}, end={}", 
+                     eventDateTime.toLocalTime(), endTime);
+            throw new InvalidDateException("Время окончания не может быть раньше времени начала");
         }
         
         // Поиск пользователя
@@ -111,12 +154,24 @@ public class EventService {
             .description(description)
             .eventDate(eventDateTime.toLocalDate())
             .eventTime(eventDateTime.toLocalTime())
+            .endTime(endTime)
+            .isPersonal(isPersonal != null ? isPersonal : false)
             .notified(false)
             .build();
         
         Event savedEvent = eventRepository.save(event);
-        log.info("Событие ID={} успешно создано пользователем ID={} для семьи ID={}", 
-                 savedEvent.getId(), userId, user.getFamily().getId());
+        log.info("Событие ID={} успешно создано пользователем ID={} для семьи ID={} (персональное: {})", 
+                 savedEvent.getId(), userId, user.getFamily().getId(), savedEvent.getIsPersonal());
+        
+        // Запись в историю изменений
+        eventHistoryService.recordChange(
+            savedEvent.getId(),
+            userId,
+            EventHistory.ActionType.CREATED,
+            null,
+            null,
+            String.format("Событие '%s' создано", title)
+        );
         
         return savedEvent;
     }
@@ -175,6 +230,32 @@ public class EventService {
     }
     
     /**
+     * Получает событие по его идентификатору.
+     * 
+     * <p>Метод используется для получения полной информации о событии
+     * для отображения деталей, редактирования или удаления.</p>
+     * 
+     * <p><b>Требования:</b> 8.1</p>
+     * 
+     * @param eventId идентификатор события
+     * @return событие с указанным ID
+     * @throws EventNotFoundException если событие с указанным ID не найдено
+     */
+    @Transactional(readOnly = true)
+    public Event getEventById(Long eventId) {
+        log.debug("Получение события по ID={}", eventId);
+        
+        Event event = eventRepository.findById(eventId)
+            .orElseThrow(() -> {
+                log.error("Событие с ID={} не найдено", eventId);
+                return new EventNotFoundException(eventId);
+            });
+        
+        log.debug("Событие ID={} успешно получено: title='{}'", eventId, event.getTitle());
+        return event;
+    }
+    
+    /**
      * Обновляет существующее событие.
      * 
      * <p>Метод выполняет следующие проверки перед обновлением:</p>
@@ -183,9 +264,10 @@ public class EventService {
      *   <li>Проверяет права доступа (только создатель может редактировать)</li>
      *   <li>Валидирует новую дату (не должна быть в прошлом)</li>
      *   <li>Обновляет поля события</li>
+     *   <li>Записывает изменения в историю</li>
      * </ol>
      * 
-     * <p><b>Требования:</b> 7.2, 7.4, 7.5</p>
+     * <p><b>Требования:</b> 7.2, 7.4, 7.5, 18.5</p>
      * 
      * @param eventId идентификатор события для обновления
      * @param userId идентификатор пользователя, выполняющего обновление
@@ -200,7 +282,39 @@ public class EventService {
      */
     public Event updateEvent(Long eventId, Long userId, String title, 
                             String description, LocalDateTime eventDateTime) {
-        log.debug("Обновление события ID={} пользователем ID={}", eventId, userId);
+        return updateEvent(eventId, userId, title, description, eventDateTime, null);
+    }
+    
+    /**
+     * Обновляет существующее событие с расширенными параметрами.
+     * 
+     * <p>Метод выполняет следующие проверки перед обновлением:</p>
+     * <ol>
+     *   <li>Проверяет существование события</li>
+     *   <li>Проверяет права доступа (только создатель может редактировать)</li>
+     *   <li>Валидирует новую дату (не должна быть в прошлом)</li>
+     *   <li>Валидирует временной интервал (endTime должно быть после eventTime)</li>
+     *   <li>Обновляет поля события</li>
+     *   <li>Записывает изменения в историю</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 7.2, 7.4, 7.5, 26.2, 18.5</p>
+     * 
+     * @param eventId идентификатор события для обновления
+     * @param userId идентификатор пользователя, выполняющего обновление
+     * @param title новое название события (обязательное)
+     * @param description новое описание события (может быть null)
+     * @param eventDateTime новая дата и время начала события
+     * @param endTime новое время окончания события (может быть null)
+     * @return обновленное событие
+     * @throws EventNotFoundException если событие с указанным ID не найдено
+     * @throws UnauthorizedAccessException если пользователь не является создателем события
+     * @throws InvalidDateException если новая дата находится в прошлом или endTime раньше eventTime
+     * @throws IllegalArgumentException если title пустой или null
+     */
+    public Event updateEvent(Long eventId, Long userId, String title, 
+                            String description, LocalDateTime eventDateTime, LocalTime endTime) {
+        log.debug("Обновление события ID={} пользователем ID={}, endTime={}", eventId, userId, endTime);
         
         // Валидация входных параметров
         if (title == null || title.isBlank()) {
@@ -212,6 +326,13 @@ public class EventService {
         if (eventDateTime.isBefore(LocalDateTime.now())) {
             log.warn("Попытка обновить событие ID={} с датой в прошлом: {}", eventId, eventDateTime);
             throw new InvalidDateException("Дата события не может быть в прошлом");
+        }
+        
+        // Валидация временного интервала
+        if (endTime != null && endTime.isBefore(eventDateTime.toLocalTime())) {
+            log.warn("Попытка обновить событие ID={} с временем окончания раньше времени начала: start={}, end={}", 
+                     eventId, eventDateTime.toLocalTime(), endTime);
+            throw new InvalidDateException("Время окончания не может быть раньше времени начала");
         }
         
         // Поиск события
@@ -229,29 +350,65 @@ public class EventService {
                 "Только создатель события может его редактировать");
         }
         
+        // Сохранение старых значений для истории
+        String oldTitle = event.getTitle();
+        String oldDescription = event.getDescription();
+        LocalDate oldDate = event.getEventDate();
+        LocalTime oldTime = event.getEventTime();
+        LocalTime oldEndTime = event.getEndTime();
+        
         // Обновление полей
         event.setTitle(title);
         event.setDescription(description);
         event.setEventDate(eventDateTime.toLocalDate());
         event.setEventTime(eventDateTime.toLocalTime());
+        event.setEndTime(endTime);
         
         Event updatedEvent = eventRepository.save(event);
         log.info("Событие ID={} успешно обновлено пользователем ID={}", eventId, userId);
+        
+        // Запись изменений в историю
+        if (!oldTitle.equals(title)) {
+            eventHistoryService.recordChange(eventId, userId, EventHistory.ActionType.UPDATED, 
+                "title", oldTitle, title);
+        }
+        if ((oldDescription == null && description != null) || 
+            (oldDescription != null && !oldDescription.equals(description))) {
+            eventHistoryService.recordChange(eventId, userId, EventHistory.ActionType.UPDATED, 
+                "description", oldDescription, description);
+        }
+        if (!oldDate.equals(eventDateTime.toLocalDate()) || !oldTime.equals(eventDateTime.toLocalTime())) {
+            eventHistoryService.recordChange(eventId, userId, EventHistory.ActionType.UPDATED, 
+                "datetime", 
+                String.format("%s %s", oldDate, oldTime),
+                String.format("%s %s", eventDateTime.toLocalDate(), eventDateTime.toLocalTime()));
+        }
+        if ((oldEndTime == null && endTime != null) || 
+            (oldEndTime != null && !oldEndTime.equals(endTime))) {
+            eventHistoryService.recordChange(eventId, userId, EventHistory.ActionType.UPDATED, 
+                "end_time", 
+                oldEndTime != null ? oldEndTime.toString() : null, 
+                endTime != null ? endTime.toString() : null);
+        }
         
         return updatedEvent;
     }
     
     /**
-     * Удаляет событие из календаря.
+     * Перемещает событие в корзину (мягкое удаление).
      * 
-     * <p>Метод выполняет следующие проверки перед удалением:</p>
+     * <p>Метод выполняет следующие действия:</p>
      * <ol>
      *   <li>Проверяет существование события</li>
      *   <li>Проверяет права доступа (только создатель может удалять)</li>
-     *   <li>Удаляет событие из базы данных</li>
+     *   <li>Изменяет статус события на DELETED</li>
+     *   <li>Устанавливает дату удаления</li>
+     *   <li>Записывает действие в историю</li>
      * </ol>
      * 
-     * <p><b>Требования:</b> 7.3, 7.5</p>
+     * <p>Событие хранится в корзине 30 дней, после чего автоматически удаляется.</p>
+     * 
+     * <p><b>Требования:</b> 7.3, 7.5, 19.1, 18.5</p>
      * 
      * @param eventId идентификатор события для удаления
      * @param userId идентификатор пользователя, выполняющего удаление
@@ -259,7 +416,7 @@ public class EventService {
      * @throws UnauthorizedAccessException если пользователь не является создателем события
      */
     public void deleteEvent(Long eventId, Long userId) {
-        log.debug("Удаление события ID={} пользователем ID={}", eventId, userId);
+        log.debug("Перемещение события ID={} в корзину пользователем ID={}", eventId, userId);
         
         // Поиск события
         Event event = eventRepository.findById(eventId)
@@ -276,7 +433,122 @@ public class EventService {
                 "Только создатель события может его удалить");
         }
         
-        eventRepository.delete(event);
-        log.info("Событие ID={} успешно удалено пользователем ID={}", eventId, userId);
+        // Перемещение в корзину
+        event.setStatus(Event.EventStatus.DELETED);
+        event.setDeletedAt(LocalDateTime.now());
+        eventRepository.save(event);
+        
+        log.info("Событие ID={} успешно перемещено в корзину пользователем ID={}", eventId, userId);
+        
+        // Запись в историю изменений
+        eventHistoryService.recordDeletion(eventId, userId);
+    }
+    
+    /**
+     * Добавляет заметку к завершенному событию.
+     * 
+     * <p>Метод позволяет пользователю добавить заметку после завершения события,
+     * например, описать как прошло событие или что было сделано.</p>
+     * 
+     * <p><b>Требования:</b> 25.3, 18.5</p>
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя, добавляющего заметку
+     * @param note текст заметки
+     * @return обновленное событие с заметкой
+     * @throws EventNotFoundException если событие с указанным ID не найдено
+     * @throws UnauthorizedAccessException если пользователь не является создателем события
+     * @throws IllegalStateException если событие не завершено
+     * @throws IllegalArgumentException если заметка пустая
+     */
+    public Event addCompletionNote(Long eventId, Long userId, String note) {
+        log.debug("Добавление заметки к завершенному событию ID={} пользователем ID={}", eventId, userId);
+        
+        // Валидация заметки
+        if (note == null || note.isBlank()) {
+            log.warn("Попытка добавить пустую заметку к событию ID={}", eventId);
+            throw new IllegalArgumentException("Заметка не может быть пустой");
+        }
+        
+        // Поиск события
+        Event event = eventRepository.findById(eventId)
+            .orElseThrow(() -> {
+                log.error("Событие с ID={} не найдено при попытке добавления заметки", eventId);
+                return new EventNotFoundException(eventId);
+            });
+        
+        // Проверка прав доступа
+        if (!event.belongsToUser(userId)) {
+            log.warn("Пользователь ID={} попытался добавить заметку к чужому событию ID={}", userId, eventId);
+            throw new UnauthorizedAccessException(
+                "Только создатель события может добавить заметку");
+        }
+        
+        // Проверка статуса события
+        if (!event.isCompleted()) {
+            log.warn("Попытка добавить заметку к незавершенному событию ID={}", eventId);
+            throw new IllegalStateException("Заметку можно добавить только к завершенному событию");
+        }
+        
+        // Сохранение старой заметки для истории
+        String oldNote = event.getCompletionNote();
+        
+        // Добавление заметки
+        event.setCompletionNote(note);
+        Event updatedEvent = eventRepository.save(event);
+        
+        log.info("Заметка успешно добавлена к событию ID={} пользователем ID={}", eventId, userId);
+        
+        // Запись в историю изменений
+        eventHistoryService.recordChange(
+            eventId,
+            userId,
+            EventHistory.ActionType.UPDATED,
+            "completion_note",
+            oldNote,
+            note
+        );
+        
+        return updatedEvent;
+    }
+    
+    /**
+     * Обрабатывает изменение даты или времени события.
+     * Пересчитывает все неотправленные напоминания для нового времени.
+     * 
+     * <p><b>Требования:</b> 9.5</p>
+     * 
+     * @param eventId идентификатор события
+     */
+    public void handleEventDateTimeChange(Long eventId) {
+        log.info("Обработка изменения даты/времени события ID={}", eventId);
+        
+        try {
+            reminderService.recalculateReminders(eventId);
+            log.info("Напоминания пересчитаны для события ID={}", eventId);
+        } catch (Exception e) {
+            log.error("Ошибка при пересчете напоминаний для события ID={}: {}", 
+                     eventId, e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Обрабатывает завершение события.
+     * Отмечает все неотправленные напоминания как отправленные.
+     * 
+     * <p><b>Требования:</b> 11.2</p>
+     * 
+     * @param eventId идентификатор события
+     */
+    public void handleEventCompletion(Long eventId) {
+        log.info("Обработка завершения события ID={}", eventId);
+        
+        try {
+            reminderService.markRemindersAsSent(eventId);
+            log.info("Напоминания отмечены как отправленные для события ID={}", eventId);
+        } catch (Exception e) {
+            log.error("Ошибка при отметке напоминаний для события ID={}: {}", 
+                     eventId, e.getMessage(), e);
+        }
     }
 }

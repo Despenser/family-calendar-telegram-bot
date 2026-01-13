@@ -129,7 +129,8 @@ class WebhookRegistrarTest {
         Map<String, String> requestBody = capturedRequest.getBody();
 
         assertNotNull(requestBody, "Тело запроса не должно быть null");
-        assertEquals("https://example.com/webhook", requestBody.get("url"),
+        // URL webhook должен содержать токен бота для дополнительной безопасности
+        assertEquals("https://example.com/webhook/test-bot-token", requestBody.get("url"),
                 "URL webhook должен совпадать с конфигурацией");
     }
 

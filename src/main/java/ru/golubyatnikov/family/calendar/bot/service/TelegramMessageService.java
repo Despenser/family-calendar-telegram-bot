@@ -75,6 +75,7 @@ import ru.golubyatnikov.family.calendar.bot.config.BotConfig;
 public class TelegramMessageService extends DefaultAbsSender {
 
     private final BotConfig botConfig;
+    private final AuthorizationMetricsService metricsService;
 
     /**
      * Конструктор для инициализации сервиса с конфигурацией бота.
@@ -83,10 +84,12 @@ public class TelegramMessageService extends DefaultAbsSender {
      * для отправки сообщений через Telegram Bot API.</p>
      * 
      * @param botConfig конфигурация бота с токеном и другими параметрами
+     * @param metricsService сервис для сбора метрик (может быть null для тестов)
      */
-    public TelegramMessageService(BotConfig botConfig) {
+    public TelegramMessageService(BotConfig botConfig, AuthorizationMetricsService metricsService) {
         super(new DefaultBotOptions());
         this.botConfig = botConfig;
+        this.metricsService = metricsService;
         log.info("TelegramMessageService инициализирован с токеном: {}...", 
                 maskToken(botConfig.getToken()));
     }
@@ -110,8 +113,10 @@ public class TelegramMessageService extends DefaultAbsSender {
      * <p>Метод автоматически повторяет попытки отправки при ошибках
      * с экспоненциальной задержкой. Максимум 3 попытки.</p>
      * 
-     * <p>Сообщение отправляется с поддержкой Markdown форматирования
-     * для улучшения читаемости (жирный текст, курсив, ссылки и т.д.).</p>
+     * <p>Сообщение отправляется с поддержкой MarkdownV2 форматирования
+     * для улучшения читаемости (жирный текст, курсив, моноширинный текст и т.д.).
+     * Все специальные символы MarkdownV2 должны быть экранированы с помощью
+     * {@link ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter}.</p>
      * 
      * <p>Retry стратегия:</p>
      * <ul>
@@ -121,10 +126,11 @@ public class TelegramMessageService extends DefaultAbsSender {
      * </ul>
      * 
      * @param telegramId Telegram ID пользователя-получателя
-     * @param text текст сообщения (поддерживает Markdown)
+     * @param text текст сообщения (поддерживает MarkdownV2, требует экранирования)
      * @throws TelegramApiException если все попытки отправки не удались
      * @throws IllegalArgumentException если telegramId null или text пустой
      * @see #sendMessage(Long, String, InlineKeyboardMarkup)
+     * @see ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter
      */
     @Retryable(
         retryFor = TelegramApiException.class,
@@ -140,6 +146,7 @@ public class TelegramMessageService extends DefaultAbsSender {
         SendMessage message = SendMessage.builder()
                 .chatId(telegramId.toString())
                 .text(text)
+                .parseMode("MarkdownV2")
                 .build();
         
         try {
@@ -148,10 +155,12 @@ public class TelegramMessageService extends DefaultAbsSender {
                     telegramId, text.length());
             
         } catch (TelegramApiRequestException e) {
-            handleTelegramApiError(e, telegramId);
+            recordMetricForTelegramError(e);
+            handleTelegramApiError(e, telegramId, text);
             throw e;
             
         } catch (TelegramApiException e) {
+            recordMetric("network_error");
             log.error("Ошибка при отправке сообщения: telegramId={}, error={}", 
                     telegramId, e.getMessage());
             throw e;
@@ -166,6 +175,10 @@ public class TelegramMessageService extends DefaultAbsSender {
      * 
      * <p>Inline кнопки позволяют пользователю выполнять действия
      * прямо в чате без отправки дополнительных сообщений.</p>
+     * 
+     * <p>Сообщение отправляется с поддержкой MarkdownV2 форматирования.
+     * Все специальные символы MarkdownV2 должны быть экранированы с помощью
+     * {@link ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter}.</p>
      * 
      * <p>Примеры использования inline кнопок:</p>
      * <ul>
@@ -183,12 +196,13 @@ public class TelegramMessageService extends DefaultAbsSender {
      * </ul>
      * 
      * @param telegramId Telegram ID пользователя-получателя
-     * @param text текст сообщения (поддерживает Markdown)
+     * @param text текст сообщения (поддерживает MarkdownV2, требует экранирования)
      * @param replyMarkup разметка inline кнопок
      * @throws TelegramApiException если все попытки отправки не удались
      * @throws IllegalArgumentException если telegramId null, text пустой или replyMarkup null
      * @see InlineKeyboardMarkup
      * @see #sendMessage(Long, String)
+     * @see ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter
      */
     @Retryable(
         retryFor = TelegramApiException.class,
@@ -210,6 +224,7 @@ public class TelegramMessageService extends DefaultAbsSender {
         SendMessage message = SendMessage.builder()
                 .chatId(telegramId.toString())
                 .text(text)
+                .parseMode("MarkdownV2")
                 .replyMarkup(replyMarkup)
                 .build();
         
@@ -219,10 +234,12 @@ public class TelegramMessageService extends DefaultAbsSender {
                     telegramId, text.length(), countButtons(replyMarkup));
             
         } catch (TelegramApiRequestException e) {
-            handleTelegramApiError(e, telegramId);
+            recordMetricForTelegramError(e);
+            handleTelegramApiError(e, telegramId, text);
             throw e;
             
         } catch (TelegramApiException e) {
+            recordMetric("network_error");
             log.error("Ошибка при отправке сообщения с inline кнопками: telegramId={}, error={}", 
                     telegramId, e.getMessage());
             throw e;
@@ -237,6 +254,10 @@ public class TelegramMessageService extends DefaultAbsSender {
      * 
      * <p>Reply клавиатура заменяет стандартную клавиатуру Telegram и позволяет
      * пользователю быстро отправлять команды одним нажатием кнопки.</p>
+     * 
+     * <p>Сообщение отправляется с поддержкой MarkdownV2 форматирования.
+     * Все специальные символы MarkdownV2 должны быть экранированы с помощью
+     * {@link ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter}.</p>
      * 
      * <p>Примеры использования reply клавиатуры:</p>
      * <ul>
@@ -253,12 +274,13 @@ public class TelegramMessageService extends DefaultAbsSender {
      * </ul>
      * 
      * @param telegramId Telegram ID пользователя-получателя
-     * @param text текст сообщения (поддерживает Markdown)
+     * @param text текст сообщения (поддерживает MarkdownV2, требует экранирования)
      * @param keyboard reply клавиатура с кнопками команд
      * @throws TelegramApiException если все попытки отправки не удались
      * @throws IllegalArgumentException если telegramId null, text пустой или keyboard null
      * @see ReplyKeyboardMarkup
      * @see #sendMessage(Long, String)
+     * @see ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter
      */
     @Retryable(
         retryFor = TelegramApiException.class,
@@ -280,6 +302,7 @@ public class TelegramMessageService extends DefaultAbsSender {
         SendMessage message = SendMessage.builder()
                 .chatId(telegramId.toString())
                 .text(text)
+                .parseMode("MarkdownV2")
                 .replyMarkup(keyboard)
                 .build();
         
@@ -289,10 +312,12 @@ public class TelegramMessageService extends DefaultAbsSender {
                     telegramId, text.length(), keyboard.getKeyboard() != null ? keyboard.getKeyboard().size() : 0);
             
         } catch (TelegramApiRequestException e) {
-            handleTelegramApiError(e, telegramId);
+            recordMetricForTelegramError(e);
+            handleTelegramApiError(e, telegramId, text);
             throw e;
             
         } catch (TelegramApiException e) {
+            recordMetric("network_error");
             log.error("Ошибка при отправке сообщения с reply клавиатурой: telegramId={}, error={}", 
                     telegramId, e.getMessage());
             throw e;
@@ -327,6 +352,10 @@ public class TelegramMessageService extends DefaultAbsSender {
      * <p>Метод автоматически повторяет попытки при ошибках
      * с экспоненциальной задержкой. Максимум 3 попытки.</p>
      * 
+     * <p>Сообщение редактируется с поддержкой MarkdownV2 форматирования.
+     * Все специальные символы MarkdownV2 должны быть экранированы с помощью
+     * {@link ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter}.</p>
+     * 
      * <p>Ограничения:</p>
      * <ul>
      *   <li>Можно редактировать только сообщения, отправленные ботом</li>
@@ -336,11 +365,12 @@ public class TelegramMessageService extends DefaultAbsSender {
      * 
      * @param chatId ID чата, где находится сообщение
      * @param messageId ID сообщения для редактирования
-     * @param newText новый текст сообщения
+     * @param newText новый текст сообщения (поддерживает MarkdownV2, требует экранирования)
      * @param replyMarkup новая inline клавиатура (может быть null для удаления кнопок)
      * @throws TelegramApiException если все попытки редактирования не удались
      * @throws IllegalArgumentException если chatId или messageId null, или newText пустой
      * @see EditMessageText
+     * @see ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter
      */
     @Retryable(
         retryFor = TelegramApiException.class,
@@ -372,6 +402,7 @@ public class TelegramMessageService extends DefaultAbsSender {
                 .chatId(chatId.toString())
                 .messageId(messageId)
                 .text(newText)
+                .parseMode("MarkdownV2")
                 .replyMarkup(replyMarkup)
                 .build();
         
@@ -381,10 +412,12 @@ public class TelegramMessageService extends DefaultAbsSender {
                     chatId, messageId, newText.length());
             
         } catch (TelegramApiRequestException e) {
-            handleTelegramApiError(e, chatId);
+            recordMetricForTelegramError(e);
+            handleTelegramApiError(e, chatId, newText);
             throw e;
             
         } catch (TelegramApiException e) {
+            recordMetric("network_error");
             log.error("Ошибка при редактировании сообщения: chatId={}, messageId={}, error={}", 
                     chatId, messageId, e.getMessage());
             throw e;
@@ -439,10 +472,12 @@ public class TelegramMessageService extends DefaultAbsSender {
                     callbackQueryId);
             
         } catch (TelegramApiRequestException e) {
-            handleTelegramApiError(e, null);
+            recordMetricForTelegramError(e);
+            handleTelegramApiError(e, null, null);
             throw e;
             
         } catch (TelegramApiException e) {
+            recordMetric("network_error");
             log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}", 
                     callbackQueryId, e.getMessage());
             throw e;
@@ -547,7 +582,7 @@ public class TelegramMessageService extends DefaultAbsSender {
      * 
      * <p>Различные коды ошибок требуют разной обработки:</p>
      * <ul>
-     *   <li>400 - некорректные параметры, не требует retry</li>
+     *   <li>400 - некорректные параметры, не требует retry (логирует текст для отладки MarkdownV2)</li>
      *   <li>401 - неверный токен, критическая ошибка</li>
      *   <li>403 - бот заблокирован пользователем</li>
      *   <li>404 - чат не найден</li>
@@ -557,8 +592,9 @@ public class TelegramMessageService extends DefaultAbsSender {
      * 
      * @param e исключение от Telegram API
      * @param telegramId Telegram ID пользователя (может быть null)
+     * @param text текст сообщения для логирования при ошибке парсинга (может быть null)
      */
-    private void handleTelegramApiError(TelegramApiRequestException e, Long telegramId) {
+    private void handleTelegramApiError(TelegramApiRequestException e, Long telegramId, String text) {
         Integer errorCode = e.getErrorCode();
         String apiResponse = e.getApiResponse();
         
@@ -570,8 +606,12 @@ public class TelegramMessageService extends DefaultAbsSender {
         
         switch (errorCode) {
             case 400:
-                log.error("Bad Request (400): Некорректные параметры запроса. telegramId={}, response={}", 
-                        telegramId, apiResponse);
+                String textPreview = text != null 
+                    ? text.substring(0, Math.min(200, text.length())) 
+                    : "null";
+                log.error("Bad Request (400): Ошибка парсинга MarkdownV2. " +
+                         "telegramId={}, textPreview={}, response={}", 
+                         telegramId, textPreview, apiResponse);
                 break;
                 
             case 401:
@@ -660,5 +700,41 @@ public class TelegramMessageService extends DefaultAbsSender {
             return "***";
         }
         return token.substring(0, 10) + "***";
+    }
+    
+    /**
+     * Записывает метрику ошибки на основе кода ошибки Telegram API.
+     * 
+     * @param e исключение от Telegram API
+     */
+    private void recordMetricForTelegramError(TelegramApiRequestException e) {
+        Integer errorCode = e.getErrorCode();
+        
+        if (errorCode == null) {
+            recordMetric("unknown_error");
+            return;
+        }
+        
+        String errorType = switch (errorCode) {
+            case 400 -> "bad_request";
+            case 401 -> "unauthorized";
+            case 403 -> "forbidden";
+            case 404 -> "not_found";
+            case 429 -> "rate_limit_error";
+            default -> errorCode >= 500 ? "server_error" : "telegram_api_error";
+        };
+        
+        recordMetric(errorType);
+    }
+    
+    /**
+     * Записывает метрику ошибки отправки сообщения.
+     * 
+     * @param errorType тип ошибки
+     */
+    private void recordMetric(String errorType) {
+        if (metricsService != null) {
+            metricsService.recordMessageSendError(errorType);
+        }
     }
 }

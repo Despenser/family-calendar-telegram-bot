@@ -258,6 +258,171 @@ SPRING_PROFILES_ACTIVE=dev
 - Используйте сложные пароли для production
 - Храните токены в безопасном месте
 
+### Дополнительные параметры конфигурации
+
+#### Параметры очистки черновиков
+
+Система автоматически очищает "осиротевшие" черновики событий - записи со статусом `DRAFT` и NULL значениями в обязательных полях. Эти параметры настраиваются в файле `application.yml`:
+
+```yaml
+draft:
+  cleanup:
+    # Включить/выключить автоматическую очистку осиротевших черновиков
+    # По умолчанию: true
+    enabled: true
+    
+    # Пороговое значение для очистки при запуске приложения (в часах)
+    # Черновики старше этого значения будут удалены при старте
+    # По умолчанию: 1
+    startup-threshold-hours: 1
+    
+    # Пороговое значение для периодической очистки (в часах)
+    # Черновики старше этого значения будут удалены при периодической очистке
+    # По умолчанию: 24
+    periodic-threshold-hours: 24
+    
+    # Расписание периодической очистки в формате cron
+    # Формат: секунды минуты часы день месяц день_недели
+    # По умолчанию: "0 0 */6 * * *" (каждые 6 часов в 00 минут 00 секунд)
+    schedule-cron: "0 0 */6 * * *"
+```
+
+**Описание параметров:**
+
+- **`enabled`** - включает или отключает автоматическую очистку черновиков. Если установлено в `false`, очистка не будет выполняться ни при запуске, ни периодически.
+
+- **`startup-threshold-hours`** - определяет возраст черновиков (в часах), которые будут удалены при запуске приложения. Значение `1` означает, что при старте будут удалены все осиротевшие черновики старше 1 часа. Это помогает очистить черновики, оставшиеся после предыдущего запуска.
+
+- **`periodic-threshold-hours`** - определяет возраст черновиков (в часах) для периодической очистки. Значение `24` означает, что каждые 6 часов (по умолчанию) будут удаляться черновики старше 24 часов.
+
+- **`schedule-cron`** - расписание периодической очистки в формате cron. По умолчанию очистка выполняется каждые 6 часов. Примеры других расписаний:
+  - `"0 0 */12 * * *"` - каждые 12 часов
+  - `"0 0 0 * * *"` - каждый день в полночь
+  - `"0 0 2 * * *"` - каждый день в 2:00 ночи
+
+**Примеры настройки:**
+
+*Более агрессивная очистка (для систем с высокой нагрузкой):*
+```yaml
+draft:
+  cleanup:
+    enabled: true
+    startup-threshold-hours: 0.5  # 30 минут
+    periodic-threshold-hours: 12   # 12 часов
+    schedule-cron: "0 0 */3 * * *" # каждые 3 часа
+```
+
+*Консервативная очистка (для систем с медленным интернетом):*
+```yaml
+draft:
+  cleanup:
+    enabled: true
+    startup-threshold-hours: 2     # 2 часа
+    periodic-threshold-hours: 48   # 48 часов
+    schedule-cron: "0 0 0 * * *"   # раз в день в полночь
+```
+
+*Отключение автоматической очистки:*
+```yaml
+draft:
+  cleanup:
+    enabled: false
+```
+
+⚠️ **ВАЖНО**: 
+- Не устанавливайте слишком маленькие значения для `startup-threshold-hours` (меньше 0.5 часа), так как это может привести к удалению активных черновиков, если пользователь медленно создает событие.
+- Рекомендуется оставить значения по умолчанию для большинства случаев использования.
+- Изменения в `schedule-cron` требуют перезапуска приложения.
+
+#### Параметры системы напоминаний
+
+```yaml
+reminder:
+  scheduler:
+    # Включить/выключить планировщик напоминаний
+    enabled: true
+    # Интервал проверки напоминаний в миллисекундах (60000 = 1 минута)
+    fixed-rate: 60000
+  # Максимальное количество напоминаний на одно событие
+  max-per-event: 10
+  # Максимальное количество минут для custom напоминания (43200 = 30 дней)
+  max-custom-minutes: 43200
+```
+
+#### Параметры сообщений для неавторизованных пользователей
+
+Система использует конфигурируемые сообщения для различных категорий команд. Эти параметры настраиваются в файле `application.yml`:
+
+```yaml
+bot:
+  messages:
+    unauthorized:
+      # Префикс для всех сообщений об ограничении доступа
+      prefix: "🔒"
+      # Текст с инструкциями по получению доступа
+      contact-admin: "Для получения доступа обратитесь к администратору вашей семьи."
+      # Сообщения для разных категорий команд
+      event-creation: "Создание событий доступно только зарегистрированным пользователям семейного календаря."
+      event-viewing: "Просмотр событий доступен только членам семейного календаря."
+      event-management: "Управление событиями доступно только зарегистрированным пользователям."
+      search-filter: "Поиск и фильтрация событий доступны только членам семейного календаря."
+      trash-management: "Управление корзиной доступно только зарегистрированным пользователям."
+      statistics: "Просмотр статистики доступен только членам семейного календаря."
+      general: "Эта функция доступна только зарегистрированным пользователям семейного календаря."
+```
+
+**Описание параметров:**
+
+- **`prefix`** - эмодзи или текст, который добавляется в начало каждого сообщения об ограничении доступа. По умолчанию используется эмодзи замка 🔒.
+
+- **`contact-admin`** - текст с инструкциями о том, как пользователь может получить доступ к функционалу бота. Этот текст добавляется в конец каждого сообщения.
+
+- **Категории сообщений:**
+  - `event-creation` - используется для команды `/add_event`
+  - `event-viewing` - используется для команд `/my_events`, `/upcoming_events`, `/today`, `/week`
+  - `event-management` - используется для операций редактирования и удаления событий
+  - `search-filter` - используется для команд `/search`, `/filter`
+  - `trash-management` - используется для команды `/trash`
+  - `statistics` - используется для команды `/stats`
+  - `general` - используется для всех остальных команд, требующих авторизации
+
+**Особенности:**
+
+- Все сообщения автоматически форматируются с добавлением префикса и инструкций
+- Если категория не найдена в конфигурации, используется сообщение из категории `general`
+- Тексты можно изменять без перекомпиляции приложения - достаточно обновить `application.yml` и перезапустить
+- Система валидирует тон сообщений, чтобы они были дружелюбными и мотивирующими
+
+**Примеры настройки:**
+
+*Более краткие сообщения:*
+```yaml
+bot:
+  messages:
+    unauthorized:
+      prefix: "🔒"
+      contact-admin: "Обратитесь к администратору для регистрации."
+      event-creation: "Создание событий требует регистрации."
+      event-viewing: "Просмотр событий требует регистрации."
+```
+
+*Сообщения на английском языке:*
+```yaml
+bot:
+  messages:
+    unauthorized:
+      prefix: "🔒"
+      contact-admin: "Please contact your family administrator to get access."
+      event-creation: "Event creation is available only for registered family calendar users."
+      event-viewing: "Event viewing is available only for family calendar members."
+```
+
+⚠️ **ВАЖНО**: 
+- Избегайте негативных формулировок типа "доступ запрещен" или "вы не можете"
+- Используйте конструктивные фразы типа "доступно после регистрации" или "станет доступно"
+- Сообщения должны быть дружелюбными и мотивирующими
+- Изменения в конфигурации требуют перезапуска приложения
+
 ---
 
 ## Добавление пользователей в БД
@@ -494,6 +659,22 @@ Webhook registered successfully: https://your-url/webhook/...
    ```
    
    Если пользователя нет, добавьте его (см. раздел [Добавление пользователей](#добавление-пользователей-в-бд)).
+   
+   **Примечание:** Начиная с версии с поддержкой информативных сообщений, неавторизованные пользователи получают понятные уведомления вместо молчаливого игнорирования команд. Если пользователь видит сообщение с эмодзи 🔒, это означает, что он не зарегистрирован в системе.
+
+4. **Проверка логов попыток доступа**
+   
+   Система логирует все попытки доступа неавторизованных пользователей:
+   ```bash
+   docker-compose logs app | grep -i "Unauthorized access attempt"
+   ```
+   
+   Пример лог-записи:
+   ```
+   INFO  AuthorizationService - Unauthorized access attempt: telegramId=123456789, command=/add_event, timestamp=2026-01-12T10:30:00Z
+   ```
+   
+   Это помогает администраторам отслеживать, кто пытается использовать бота и какие команды запрашивает.
 
 ### Проблема: Ошибка подключения к базе данных
 
@@ -761,6 +942,385 @@ mvn dependency:tree
 
 ---
 
+---
+
+## Обслуживание базы данных
+
+### Очистка осиротевших черновиков
+
+В процессе работы бота могут накапливаться "осиротевшие" черновики событий - записи со статусом `DRAFT` и NULL значениями в обязательных полях. Это происходит, когда процесс создания события прерывается из-за ошибки.
+
+Начиная с версии с автоматической очисткой, система сама удаляет такие черновики:
+- При запуске приложения удаляются черновики старше 1 часа
+- Каждые 6 часов удаляются черновики старше 24 часов
+
+#### Одноразовая ручная очистка
+
+Если вы обновляете систему с более старой версии, рекомендуется выполнить одноразовую очистку существующих осиротевших черновиков.
+
+**Шаг 1: Подключитесь к базе данных**
+
+```bash
+# Если используете Docker
+docker-compose exec postgres psql -U botuser -d family_calendar
+
+# Если используете локальный PostgreSQL
+psql -h localhost -U botuser -d family_calendar
+```
+
+**Шаг 2: Просмотрите осиротевшие черновики**
+
+```sql
+SELECT 
+    id,
+    user_id,
+    family_id,
+    title,
+    event_date,
+    event_time,
+    status,
+    created_at,
+    EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at))/3600 AS age_hours
+FROM events
+WHERE status = 'DRAFT'
+  AND title IS NULL
+  AND event_date IS NULL
+  AND event_time IS NULL
+  AND created_at < CURRENT_TIMESTAMP - INTERVAL '1 hour'
+ORDER BY created_at;
+```
+
+**Шаг 3: Выполните очистку**
+
+⚠️ **ВНИМАНИЕ**: Эта операция необратима! Убедитесь, что вы проверили результаты предыдущего запроса.
+
+```sql
+DELETE FROM events
+WHERE status = 'DRAFT'
+  AND title IS NULL
+  AND event_date IS NULL
+  AND event_time IS NULL
+  AND created_at < CURRENT_TIMESTAMP - INTERVAL '1 hour';
+```
+
+**Шаг 4: Проверьте результаты**
+
+```sql
+-- Проверьте, что осиротевших черновиков больше нет
+SELECT COUNT(*) as remaining_orphaned_drafts
+FROM events
+WHERE status = 'DRAFT'
+  AND title IS NULL
+  AND event_date IS NULL
+  AND event_time IS NULL;
+
+-- Проверьте общее количество черновиков
+SELECT COUNT(*) as total_drafts
+FROM events
+WHERE status = 'DRAFT';
+```
+
+#### Использование готового скрипта
+
+Для удобства предоставлен готовый SQL-скрипт:
+
+```bash
+# Если используете Docker
+docker-compose exec -T postgres psql -U botuser -d family_calendar < src/main/resources/db/scripts/cleanup_orphaned_drafts.sql
+
+# Если используете локальный PostgreSQL
+psql -h localhost -U botuser -d family_calendar -f src/main/resources/db/scripts/cleanup_orphaned_drafts.sql
+```
+
+#### Создание резервной копии перед очисткой
+
+Рекомендуется создать резервную копию черновиков перед удалением:
+
+```sql
+-- Создание таблицы с резервной копией
+CREATE TABLE events_drafts_backup AS 
+SELECT * FROM events WHERE status = 'DRAFT';
+
+-- Проверка количества скопированных записей
+SELECT COUNT(*) FROM events_drafts_backup;
+```
+
+После успешной очистки и проверки работы системы резервную копию можно удалить:
+
+```sql
+DROP TABLE events_drafts_backup;
+```
+
+#### Мониторинг черновиков
+
+Для мониторинга состояния черновиков используйте следующие запросы:
+
+```sql
+-- Общая статистика по черновикам
+SELECT 
+    COUNT(*) as total_drafts,
+    COUNT(*) FILTER (WHERE title IS NULL AND event_date IS NULL AND event_time IS NULL) as orphaned_drafts,
+    MIN(created_at) as oldest_draft,
+    MAX(created_at) as newest_draft
+FROM events
+WHERE status = 'DRAFT';
+
+-- Распределение черновиков по возрасту
+SELECT 
+    CASE 
+        WHEN created_at > CURRENT_TIMESTAMP - INTERVAL '1 hour' THEN '< 1 час'
+        WHEN created_at > CURRENT_TIMESTAMP - INTERVAL '24 hours' THEN '1-24 часа'
+        WHEN created_at > CURRENT_TIMESTAMP - INTERVAL '7 days' THEN '1-7 дней'
+        ELSE '> 7 дней'
+    END as age_group,
+    COUNT(*) as count
+FROM events
+WHERE status = 'DRAFT'
+GROUP BY age_group
+ORDER BY age_group;
+```
+
+---
+
+## Работа с MarkdownV2 форматированием
+
+### Что такое MarkdownV2?
+
+MarkdownV2 - это формат разметки текста, используемый Telegram Bot API для форматирования сообщений. Он позволяет создавать жирный текст, курсив, моноширинный шрифт и другие стили.
+
+### Специальные символы MarkdownV2
+
+MarkdownV2 использует следующие специальные символы, которые **обязательно** должны быть экранированы обратным слешем (`\`):
+
+```
+_ * [ ] ( ) ~ ` > # + - = | { } . !
+```
+
+### Проблема с неэкранированными символами
+
+Если специальные символы не экранированы, Telegram вернет ошибку парсинга:
+
+```
+Bad Request: can't parse entities: Character '.' is reserved and must be escaped with the preceding '\'
+```
+
+**Пример проблемного кода:**
+
+```java
+// ❌ НЕПРАВИЛЬНО - точки в дате не экранированы
+String message = String.format("✅ Дата выбрана: %s", formattedDate);
+// Если formattedDate = "12.01.2026", Telegram вернет ошибку
+```
+
+### Решение: использование MarkdownFormatter
+
+Класс `MarkdownFormatter` предоставляет методы для безопасного форматирования сообщений:
+
+#### 1. Экранирование отдельных строк
+
+```java
+import ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter;
+
+// Экранирование специальных символов
+String date = "12.01.2026";
+String escaped = MarkdownFormatter.escape(date);
+// Результат: "12\\.01\\.2026"
+
+// Использование в сообщении
+String message = "Дата: " + escaped;
+```
+
+#### 2. Форматирование с переменными (рекомендуется)
+
+```java
+// ✅ ПРАВИЛЬНО - автоматическое экранирование всех частей
+String message = MarkdownFormatter.formatMessage(
+    "✅ Дата выбрана: %s\n\nТеперь выберите час:", 
+    formattedDate
+);
+// Результат: "✅ Дата выбрана: 12\\.01\\.2026\n\nТеперь выберите час:"
+```
+
+#### 3. Форматирование с несколькими переменными
+
+```java
+String message = MarkdownFormatter.formatMessage(
+    "Событие: %s\nДата: %s\nВремя: %s",
+    eventTitle,
+    eventDate,
+    eventTime
+);
+// Все переменные и статический текст будут автоматически экранированы
+```
+
+#### 4. Форматирование текста
+
+```java
+// Жирный текст
+String bold = MarkdownFormatter.bold("Важное сообщение!");
+// Результат: "*Важное сообщение\\!*"
+
+// Курсив
+String italic = MarkdownFormatter.italic("Примечание");
+// Результат: "_Примечание_"
+
+// Моноширинный шрифт (для команд)
+String code = MarkdownFormatter.code("/my_events");
+// Результат: "`/my_events`"
+
+// Жирный курсив
+String boldItalic = MarkdownFormatter.boldItalic("Очень важно");
+// Результат: "*_Очень важно_*"
+```
+
+### Правила использования в коде
+
+#### ✅ Правильные практики
+
+1. **Всегда используйте `formatMessage()` для сообщений с переменными:**
+
+```java
+// Хорошо
+String message = MarkdownFormatter.formatMessage(
+    "Создано событие: %s на %s",
+    eventTitle,
+    eventDate
+);
+```
+
+2. **Используйте `escape()` для отдельных строк:**
+
+```java
+// Хорошо
+String escapedTitle = MarkdownFormatter.escape(event.getTitle());
+String message = "Событие: " + escapedTitle;
+```
+
+3. **Используйте методы форматирования для стилизации:**
+
+```java
+// Хорошо
+String header = MarkdownFormatter.bold("Список событий");
+String command = MarkdownFormatter.code("/add_event");
+String message = header + "\n\nИспользуйте команду " + command;
+```
+
+#### ❌ Неправильные практики
+
+1. **НЕ используйте `String.format()` напрямую:**
+
+```java
+// Плохо - специальные символы не экранированы
+String message = String.format("Дата: %s", date);
+```
+
+2. **НЕ забывайте экранировать статический текст:**
+
+```java
+// Плохо - точки и восклицательный знак не экранированы
+String message = "Событие создано! Дата: " + MarkdownFormatter.escape(date);
+
+// Хорошо
+String message = MarkdownFormatter.formatMessage("Событие создано! Дата: %s", date);
+```
+
+3. **НЕ применяйте двойное экранирование:**
+
+```java
+// Плохо - двойное экранирование
+String escaped = MarkdownFormatter.escape(date);
+String message = MarkdownFormatter.formatMessage("Дата: %s", escaped);
+// Результат будет содержать лишние обратные слеши
+
+// Хорошо
+String message = MarkdownFormatter.formatMessage("Дата: %s", date);
+```
+
+### Частые случаи использования
+
+#### Даты
+
+```java
+// Даты содержат точки, которые нужно экранировать
+String date = "12.01.2026";
+String message = MarkdownFormatter.formatMessage("📅 Дата: %s", date);
+```
+
+#### Эмодзи
+
+```java
+// Эмодзи не требуют экранирования
+String message = MarkdownFormatter.formatMessage("✅ Событие создано: %s", title);
+```
+
+#### Списки
+
+```java
+// Дефисы и точки требуют экранирования
+String message = MarkdownFormatter.formatMessage(
+    "События:\n- %s\n- %s\n- %s",
+    event1,
+    event2,
+    event3
+);
+```
+
+#### Команды в тексте
+
+```java
+// Используйте code() для команд
+String command = MarkdownFormatter.code("/add_event");
+String message = "Используйте команду " + command + " для создания события";
+```
+
+### Отладка проблем с форматированием
+
+Если вы получаете ошибку парсинга MarkdownV2:
+
+1. **Проверьте логи:**
+
+```bash
+docker-compose logs app | grep -i "Bad Request"
+docker-compose logs app | grep -i "can't parse entities"
+```
+
+2. **Найдите проблемное сообщение:**
+
+Логи содержат превью текста, который вызвал ошибку:
+
+```
+Bad Request (400): Ошибка парсинга MarkdownV2. 
+telegramId=526536667, textPreview=✅ Дата выбрана: 12.01.2026
+```
+
+3. **Проверьте код:**
+
+Найдите место, где формируется это сообщение, и убедитесь, что используется `MarkdownFormatter.formatMessage()` или `MarkdownFormatter.escape()`.
+
+4. **Тестируйте локально:**
+
+```java
+@Test
+void testMessageFormatting() {
+    String date = "12.01.2026";
+    String message = MarkdownFormatter.formatMessage("Дата: %s", date);
+    
+    // Проверяем, что точки экранированы
+    assertTrue(message.contains("\\."));
+    
+    // Проверяем, что нет неэкранированных точек
+    assertFalse(message.matches(".*[^\\\\]\\..*"));
+}
+```
+
+### Дополнительные ресурсы
+
+- [Telegram Bot API - MarkdownV2 style](https://core.telegram.org/bots/api#markdownv2-style)
+- [Javadoc MarkdownFormatter](src/main/java/ru/golubyatnikov/family/calendar/bot/util/MarkdownFormatter.java)
+- [Тесты MarkdownFormatter](src/test/java/ru/golubyatnikov/family/calendar/bot/util/MarkdownFormatterTest.java)
+
+---
+
 ## Следующие шаги
 
 После успешной настройки:
@@ -769,7 +1329,104 @@ mvn dependency:tree
 2. ✅ Добавьте всех членов семьи в БД
 3. ✅ Создайте тестовые события
 4. ✅ Проверьте работу уведомлений
-5. ✅ Настройте мониторинг и алерты (для production)
-6. ✅ Настройте регулярные бэкапы БД (для production)
+5. ✅ Выполните одноразовую очистку осиротевших черновиков (если обновляете систему)
+6. ✅ Проверьте работу системы авторизации:
+   - Попробуйте использовать команды без регистрации
+   - Убедитесь, что приходят информативные сообщения с эмодзи 🔒
+   - Проверьте логи попыток доступа: `docker-compose logs app | grep "Unauthorized access"`
+7. ✅ Настройте мониторинг и алерты (для production):
+   - Мониторинг метрик `unauthorized_access_attempts_total`
+   - Алерты на высокую частоту попыток доступа (возможная атака)
+   - Мониторинг ошибок отправки сообщений
+8. ✅ Настройте регулярные бэкапы БД (для production)
+9. ✅ Ознакомьтесь с правилами форматирования MarkdownV2 (см. раздел выше)
+
+## Мониторинг попыток доступа неавторизованных пользователей
+
+Система автоматически логирует все попытки доступа неавторизованных пользователей. Это помогает:
+- Отслеживать интерес к боту
+- Выявлять потенциальные проблемы безопасности
+- Понимать, какие пользователи хотят получить доступ
+
+### Просмотр логов попыток доступа
+
+```bash
+# Все попытки доступа
+docker-compose logs app | grep "Unauthorized access attempt"
+
+# Попытки за последний час
+docker-compose logs --since 1h app | grep "Unauthorized access attempt"
+
+# Попытки конкретного пользователя
+docker-compose logs app | grep "Unauthorized access attempt" | grep "telegramId=123456789"
+
+# Статистика по командам
+docker-compose logs app | grep "Unauthorized access attempt" | awk -F'command=' '{print $2}' | awk '{print $1}' | sort | uniq -c | sort -rn
+```
+
+### Пример лог-записи
+
+```
+2026-01-12 10:30:15.123 INFO  [scheduling-1] r.g.f.c.b.s.AuthorizationService : Unauthorized access attempt: telegramId=123456789, command=/add_event, timestamp=2026-01-12T10:30:15.123Z
+```
+
+### Анализ попыток доступа
+
+Для анализа попыток доступа можно использовать SQL-запросы к логам или настроить систему мониторинга (Prometheus + Grafana).
+
+**Метрики для мониторинга:**
+
+1. **unauthorized_access_attempts_total** - общее количество попыток
+   - Теги: `command` (имя команды)
+   - Используйте для отслеживания популярных команд
+
+2. **unauthorized_messages_sent_total** - количество отправленных сообщений
+   - Теги: `category` (категория сообщения)
+   - Используйте для проверки работы системы уведомлений
+
+3. **authorization_check_duration_seconds** - время проверки авторизации
+   - Теги: `result` (authorized/unauthorized)
+   - Используйте для мониторинга производительности
+
+**Рекомендуемые алерты:**
+
+```yaml
+# Пример конфигурации алерта в Prometheus
+- alert: HighUnauthorizedAccessRate
+  expr: rate(unauthorized_access_attempts_total[5m]) > 10
+  for: 5m
+  labels:
+    severity: warning
+  annotations:
+    summary: "Высокая частота попыток доступа неавторизованных пользователей"
+    description: "Более 10 попыток в минуту за последние 5 минут"
+
+- alert: MessageSendErrors
+  expr: rate(message_send_errors_total[5m]) > 0.05
+  for: 5m
+  labels:
+    severity: critical
+  annotations:
+    summary: "Ошибки при отправке сообщений"
+    description: "Более 5% сообщений не доставлены"
+```
+
+### Добавление пользователей на основе логов
+
+Если вы видите частые попытки доступа от конкретного пользователя, вы можете добавить его в систему:
+
+```bash
+# 1. Найдите telegram_id в логах
+docker-compose logs app | grep "Unauthorized access attempt" | grep "telegramId=123456789"
+
+# 2. Добавьте пользователя в БД
+docker-compose exec postgres psql -U botuser -d family_calendar -c "
+INSERT INTO users (telegram_id, username, first_name, family_id, created_at)
+VALUES (123456789, 'username', 'Имя', 1, CURRENT_TIMESTAMP)
+ON CONFLICT (telegram_id) DO NOTHING;
+"
+
+# 3. Уведомите пользователя, что доступ предоставлен
+```
 
 Удачи в использовании Family Calendar Bot! 🎉

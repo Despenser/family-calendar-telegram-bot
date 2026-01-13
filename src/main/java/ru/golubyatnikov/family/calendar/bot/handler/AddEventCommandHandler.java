@@ -3,6 +3,7 @@ package ru.golubyatnikov.family.calendar.bot.handler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import ru.golubyatnikov.family.calendar.bot.model.User;
@@ -10,7 +11,7 @@ import ru.golubyatnikov.family.calendar.bot.service.ConversationService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 
-import java.time.LocalDate;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
  * Обработчик команды /add_event для создания новых событий в семейном календаре.
@@ -78,12 +79,17 @@ public class AddEventCommandHandler implements CommandHandler {
      * inline-календарь для выбора даты. Дальнейшая обработка происходит через
      * callback queries в UpdateProcessor.</p>
      * 
+     * <p>Метод выполняется в транзакции для обеспечения атомарности операций.
+     * При возникновении ошибки транзакция откатывается, и черновик удаляется
+     * из базы данных через вызов {@link ConversationService#cancelEventCreation(Long)}.</p>
+     * 
      * @param message входящее сообщение от Telegram
      * @param user пользователь из базы данных (не может быть null, так как команда требует авторизации)
      * @return текст ответа пользователю (null, так как ответ отправляется через TelegramMessageService)
      * @throws IllegalArgumentException если message или user равны null
      */
     @Override
+    @Transactional
     public String handle(Message message, User user) {
         if (message == null) {
             log.error("Получено null сообщение в AddEventCommandHandler");
@@ -105,35 +111,45 @@ public class AddEventCommandHandler implements CommandHandler {
         if (!user.hasFamily()) {
             log.warn("Пользователь без семьи попытался создать событие: userId={}, telegramId={}", 
                     user.getId(), telegramId);
-            return "❌ Вы не принадлежите ни одной семье.\n\n" +
-                   "Для создания событий необходимо быть членом семьи. " +
-                   "Обратитесь к администратору для добавления в семью.";
+            return "❌ " + escape("Вы не принадлежите ни одной семье.") + "\n\n" +
+                   escape("Для создания событий необходимо быть членом семьи. ") +
+                   escape("Обратитесь к администратору для добавления в семью.");
         }
         
         try {
             // Создаем черновик события
             conversationService.startEventCreation(user.getId());
             
-            // Показываем календарь для текущего месяца с событиями семьи
-            LocalDate now = LocalDate.now();
-            InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(
-                now.getYear(), now.getMonthValue(), user.getFamily().getId());
+            // Показываем выбор типа события (персональное или семейное)
+            InlineKeyboardMarkup typeKeyboard = keyboardService.createEventTypeSelectionKeyboard();
             
             messageService.sendMessageWithInlineKeyboard(chatId, 
-                "📅 *Создание нового события*\n\nВыберите дату события:", 
-                calendar);
+                String.format("📅 %s\n\nВыберите тип события:", bold("Создание нового события")), 
+                typeKeyboard);
             
-            log.info("Inline-календарь отправлен пользователю: userId={}, telegramId={}", 
+            log.info("Клавиатура выбора типа события отправлена пользователю: userId={}, telegramId={}", 
                     user.getId(), telegramId);
             
             // Возвращаем null, так как ответ уже отправлен через TelegramMessageService
             return null;
             
         } catch (Exception e) {
-            log.error("Ошибка при начале создания события: userId={}, telegramId={}, error={}", 
-                    user.getId(), telegramId, e.getMessage(), e);
-            return "❌ Произошла ошибка при создании события: " + e.getMessage() + "\n\n" +
-                   "Попробуйте снова, используя команду /add_event";
+            log.error("Ошибка при начале создания события: userId={}, telegramId={}, errorType={}, errorMessage={}", 
+                    user.getId(), telegramId, e.getClass().getSimpleName(), e.getMessage(), e);
+            
+            // Очищаем черновик при ошибке
+            try {
+                conversationService.cancelEventCreation(user.getId());
+                log.info("Черновик успешно удален после ошибки: userId={}", user.getId());
+            } catch (Exception cleanupError) {
+                log.error("Ошибка при очистке черновика после сбоя: userId={}, cleanupError={}", 
+                        user.getId(), cleanupError.getMessage(), cleanupError);
+            }
+            
+            return String.format("❌ %s: %s\n\n%s", 
+                    bold("Произошла ошибка при создании события"),
+                    escape(e.getMessage()),
+                    escape("Попробуйте снова, используя команду ") + escape("/add_event"));
         }
     }
 

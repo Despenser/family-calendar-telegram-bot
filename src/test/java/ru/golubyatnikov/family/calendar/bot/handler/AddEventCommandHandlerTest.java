@@ -16,8 +16,6 @@ import ru.golubyatnikov.family.calendar.bot.service.ConversationService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 
-import java.time.LocalDate;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -128,9 +126,8 @@ class AddEventCommandHandlerTest {
         Message message = createMessage("/add_event", testUser.getTelegramId(), 123L);
         InlineKeyboardMarkup calendar = mock(InlineKeyboardMarkup.class);
         
-        LocalDate now = LocalDate.now();
         when(conversationService.startEventCreation(testUser.getId())).thenReturn(testDraft);
-        when(keyboardService.createCalendarKeyboard(now.getYear(), now.getMonthValue(), testFamily.getId()))
+        when(keyboardService.createEventTypeSelectionKeyboard())
                 .thenReturn(calendar);
 
         // When
@@ -139,7 +136,7 @@ class AddEventCommandHandlerTest {
         // Then
         assertNull(response); // Ответ отправляется через TelegramMessageService
         verify(conversationService).startEventCreation(testUser.getId());
-        verify(keyboardService).createCalendarKeyboard(now.getYear(), now.getMonthValue(), testFamily.getId());
+        verify(keyboardService).createEventTypeSelectionKeyboard();
         verify(messageService).sendMessageWithInlineKeyboard(eq(123L), 
                 contains("Создание нового события"), eq(calendar));
     }
@@ -183,16 +180,15 @@ class AddEventCommandHandlerTest {
     }
 
     @Test
-    @DisplayName("Должен обработать ошибку при отправке календаря")
+    @DisplayName("Должен обработать ошибку при отправке клавиатуры выбора типа")
     void shouldHandleErrorWhenSendingCalendar() throws TelegramApiException {
         // Given
         Message message = createMessage("/add_event", testUser.getTelegramId(), 123L);
-        InlineKeyboardMarkup calendar = mock(InlineKeyboardMarkup.class);
+        InlineKeyboardMarkup typeKeyboard = mock(InlineKeyboardMarkup.class);
         
-        LocalDate now = LocalDate.now();
         when(conversationService.startEventCreation(testUser.getId())).thenReturn(testDraft);
-        when(keyboardService.createCalendarKeyboard(now.getYear(), now.getMonthValue(), testFamily.getId()))
-                .thenReturn(calendar);
+        when(keyboardService.createEventTypeSelectionKeyboard())
+                .thenReturn(typeKeyboard);
         doThrow(new TelegramApiException("Network error"))
                 .when(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any());
 
@@ -208,21 +204,20 @@ class AddEventCommandHandlerTest {
     }
 
     @Test
-    @DisplayName("Должен использовать текущий месяц для календаря")
+    @DisplayName("Должен показать выбор типа события")
     void shouldUseCurrentMonthForCalendar() throws TelegramApiException {
         // Given
         Message message = createMessage("/add_event", testUser.getTelegramId(), 123L);
-        InlineKeyboardMarkup calendar = mock(InlineKeyboardMarkup.class);
+        InlineKeyboardMarkup typeKeyboard = mock(InlineKeyboardMarkup.class);
         
-        LocalDate now = LocalDate.now();
         when(conversationService.startEventCreation(testUser.getId())).thenReturn(testDraft);
-        when(keyboardService.createCalendarKeyboard(anyInt(), anyInt(), anyLong())).thenReturn(calendar);
+        when(keyboardService.createEventTypeSelectionKeyboard()).thenReturn(typeKeyboard);
 
         // When
         handler.handle(message, testUser);
 
         // Then
-        verify(keyboardService).createCalendarKeyboard(now.getYear(), now.getMonthValue(), testFamily.getId());
+        verify(keyboardService).createEventTypeSelectionKeyboard();
     }
 
     @Test
@@ -230,12 +225,11 @@ class AddEventCommandHandlerTest {
     void shouldSendMessageWithCorrectText() throws TelegramApiException {
         // Given
         Message message = createMessage("/add_event", testUser.getTelegramId(), 123L);
-        InlineKeyboardMarkup calendar = mock(InlineKeyboardMarkup.class);
+        InlineKeyboardMarkup typeKeyboard = mock(InlineKeyboardMarkup.class);
         
-        LocalDate now = LocalDate.now();
         when(conversationService.startEventCreation(testUser.getId())).thenReturn(testDraft);
-        when(keyboardService.createCalendarKeyboard(now.getYear(), now.getMonthValue(), testFamily.getId()))
-                .thenReturn(calendar);
+        when(keyboardService.createEventTypeSelectionKeyboard())
+                .thenReturn(typeKeyboard);
 
         // When
         handler.handle(message, testUser);
@@ -243,8 +237,8 @@ class AddEventCommandHandlerTest {
         // Then
         verify(messageService).sendMessageWithInlineKeyboard(
                 eq(123L),
-                eq("📅 *Создание нового события*\n\nВыберите дату события:"),
-                eq(calendar)
+                eq("📅 *Создание нового события*\n\nВыберите тип события:"),
+                eq(typeKeyboard)
         );
     }
 

@@ -10,11 +10,13 @@ import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
+
 /**
  * Обработчик команды /upcoming_events для Telegram бота семейного календаря.
  * 
  * <p>Команда /upcoming_events позволяет пользователям просматривать все предстоящие
- * события их семьи на ближайшие 7 дней. Она выполняет следующие функции:</p>
+ * события их семьи на ближайшие 30 дней. Она выполняет следующие функции:</p>
  * <ul>
  *   <li>Получает список предстоящих событий семьи пользователя</li>
  *   <li>Форматирует события с использованием Markdown для улучшения читаемости</li>
@@ -67,7 +69,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UpcomingEventsCommandHandler implements CommandHandler {
 
-    private static final int DEFAULT_DAYS = 7;
+    private static final int DEFAULT_DAYS = 30;
     
     private final EventService eventService;
 
@@ -84,7 +86,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      * Обрабатывает команду /upcoming_events от пользователя.
      * 
      * <p>Метод получает список предстоящих событий семьи пользователя
-     * на ближайшие 7 дней и форматирует их в читаемый вид с использованием
+     * на ближайшие 30 дней и форматирует их в читаемый вид с использованием
      * Markdown разметки.</p>
      * 
      * <p>Если у пользователя нет семьи, возвращается сообщение об ошибке.
@@ -127,14 +129,35 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
         // Получаем предстоящие события семьи
         List<Event> upcomingEvents = eventService.getUpcomingEvents(familyId, DEFAULT_DAYS);
 
-        log.info("Найдено {} предстоящих событий для семьи ID={}", 
+        log.debug("Найдено {} событий до фильтрации для семьи ID={}", 
                 upcomingEvents.size(), familyId);
 
-        if (upcomingEvents.isEmpty()) {
+        // ========== ФИЛЬТРАЦИЯ ПЕРСОНАЛЬНЫХ СОБЫТИЙ ==========
+        // Применяется единая логика фильтрации для обеспечения корректного отображения событий:
+        //
+        // Правила видимости:
+        // 1. Семейные события (isPersonal = false) - видны ВСЕМ членам семьи
+        // 2. Персональные события (isPersonal = true) - видны ТОЛЬКО создателю
+        //
+        // Логика фильтра: !event.getIsPersonal() || event.belongsToUser(user.getId())
+        // - Если событие НЕ персональное (!event.getIsPersonal()) -> показываем
+        // - ИЛИ если событие принадлежит текущему пользователю (event.belongsToUser(user.getId())) -> показываем
+        // - В остальных случаях (персональное событие другого пользователя) -> скрываем
+        //
+        // Требования: 1.4, 4.1, 4.2, 5.4
+        // =====================================================
+        List<Event> filteredEvents = upcomingEvents.stream()
+                .filter(event -> !event.getIsPersonal() || event.belongsToUser(user.getId()))
+                .collect(Collectors.toList());
+
+        log.info("После фильтрации осталось {} предстоящих событий для пользователя ID={}, семья ID={}", 
+                filteredEvents.size(), user.getId(), familyId);
+
+        if (filteredEvents.isEmpty()) {
             return buildNoEventsMessage();
         }
 
-        return buildEventsListMessage(upcomingEvents);
+        return buildEventsListMessage(filteredEvents);
     }
 
     /**
@@ -143,10 +166,11 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      * @return сообщение с инструкциями для пользователя без семьи
      */
     private String buildNoFamilyMessage() {
-        return "❌ *Ошибка*\n\n" +
+        return String.format("❌ %s\n\n" +
                "Вы не принадлежите ни одной семье.\n\n" +
                "Для просмотра событий необходимо быть членом семьи. " +
-               "Обратитесь к администратору для добавления в семью.";
+               "Обратитесь к администратору для добавления в семью.",
+               bold("Ошибка"));
     }
 
     /**
@@ -162,12 +186,9 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      * @return отформатированное сообщение об отсутствии событий
      */
     private String buildNoEventsMessage() {
-        return String.format(
-                "📅 *Предстоящие события семьи*\n\n" +
-                "На ближайшие %d дней событий не запланировано.\n\n" +
-                "Используйте /add_event для добавления нового события.",
-                DEFAULT_DAYS
-        );
+        return escape("📅 ") + bold("Предстоящие события семьи (30 дней)") + escape("\n\n") +
+                escape("На ближайшие " + DEFAULT_DAYS + " дней событий не запланировано.\n\n") +
+                escape("Используйте ") + escape("/add_event") + escape(" для добавления нового события.");
     }
 
     /**
@@ -184,30 +205,43 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      * 
      * <p>События разделяются пустой строкой для улучшения читаемости.</p>
      * 
-     * @param events список событий для форматирования
+     * @param filteredEvents список отфильтрованных событий для форматирования
      * @return отформатированное сообщение со списком событий
      */
-    private String buildEventsListMessage(List<Event> events) {
-        String eventsList = events.stream()
+    private String buildEventsListMessage(List<Event> filteredEvents) {
+        String eventsList = filteredEvents.stream()
                 .map(this::formatEvent)
                 .collect(Collectors.joining("\n\n"));
 
         return String.format(
-                "📅 *Предстоящие события семьи*\n\n" +
+                "📅 %s\n\n" +
                 "%s\n\n" +
                 "Всего событий: %d",
+                bold("Предстоящие события семьи (30 дней)"),
                 eventsList,
-                events.size()
+                filteredEvents.size()
         );
     }
 
     /**
-     * Форматирует одно событие в читаемый вид.
+     * Форматирует одно событие в читаемый вид с детальной информацией.
      * 
      * <p>Использует эмодзи для визуального выделения различных полей события.
      * Название события выделяется жирным шрифтом с помощью Markdown.</p>
      * 
+     * <p>Формат вывода включает:</p>
+     * <ul>
+     *   <li>Иконку типа события (🔒 для персональных, 👨‍👩‍👧‍👦 для семейных)</li>
+     *   <li>Название события (жирным шрифтом)</li>
+     *   <li>Дату события в формате dd.MM.yyyy</li>
+     *   <li>Время события (с интервалом, если указано время окончания)</li>
+     *   <li>Описание события (если заполнено)</li>
+     *   <li>Имя создателя события</li>
+     * </ul>
+     * 
      * <p>Если у события нет описания, поле "Описание" не отображается.</p>
+     * 
+     * <p><b>Требования:</b> 2.2, 2.4, 4.3, 4.4</p>
      * 
      * @param event событие для форматирования
      * @return отформатированная строка с информацией о событии
@@ -215,56 +249,35 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
     private String formatEvent(Event event) {
         StringBuilder formatted = new StringBuilder();
         
-        formatted.append(String.format("📌 *%s*\n", escapeMarkdown(event.getTitle())));
-        formatted.append(String.format("📅 Дата: %s\n", event.getFormattedDate()));
-        formatted.append(String.format("🕐 Время: %s\n", event.getFormattedTime()));
+        // Иконка типа события (персональное или семейное)
+        String eventTypeIcon = event.getIsPersonal() ? "🔒" : "👨‍👩‍👧‍👦";
+        formatted.append(String.format("%s 📌 %s\n", 
+                escape(eventTypeIcon), 
+                bold(event.getTitle())));
         
+        // Дата события
+        formatted.append(String.format("📅 Дата: %s\n", escape(event.getFormattedDate())));
+        
+        // Время события (с интервалом, если указано)
+        if (event.hasTimeInterval()) {
+            formatted.append(String.format("🕐 Время: %s\n", 
+                    escape(event.getFormattedTimeInterval())));
+        } else {
+            formatted.append(String.format("🕐 Время: %s\n", 
+                    escape(event.getFormattedTime())));
+        }
+        
+        // Описание события (опционально)
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
             formatted.append(String.format("📝 Описание: %s\n", 
-                    escapeMarkdown(event.getDescription())));
+                    escape(event.getDescription())));
         }
         
+        // Создатель события
         formatted.append(String.format("👤 Создал: %s", 
-                escapeMarkdown(event.getUser().getFullName())));
+                escape(event.getUser().getFullName())));
         
         return formatted.toString();
-    }
-
-    /**
-     * Экранирует специальные символы Markdown для безопасного отображения.
-     * 
-     * <p>Telegram Bot API использует Markdown для форматирования текста.
-     * Некоторые символы имеют специальное значение и должны быть экранированы,
-     * чтобы отображаться корректно.</p>
-     * 
-     * <p>Экранируются следующие символы: * _ [ ] ( ) ~ ` > # + - = | { } . !</p>
-     * 
-     * @param text текст для экранирования
-     * @return текст с экранированными специальными символами
-     */
-    private String escapeMarkdown(String text) {
-        if (text == null) {
-            return "";
-        }
-        
-        return text.replace("*", "\\*")
-                   .replace("_", "\\_")
-                   .replace("[", "\\[")
-                   .replace("]", "\\]")
-                   .replace("(", "\\(")
-                   .replace(")", "\\)")
-                   .replace("~", "\\~")
-                   .replace("`", "\\`")
-                   .replace(">", "\\>")
-                   .replace("#", "\\#")
-                   .replace("+", "\\+")
-                   .replace("-", "\\-")
-                   .replace("=", "\\=")
-                   .replace("|", "\\|")
-                   .replace("{", "\\{")
-                   .replace("}", "\\}")
-                   .replace(".", "\\.")
-                   .replace("!", "\\!");
     }
 
     /**
@@ -284,7 +297,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      */
     @Override
     public String getDescription() {
-        return "Показать предстоящие события семьи";
+        return "Показать все предстоящие события (30 дней)";
     }
 
     /**

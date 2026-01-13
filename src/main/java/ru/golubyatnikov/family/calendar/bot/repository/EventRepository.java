@@ -127,4 +127,201 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     List<Event> findAllByUserIdAndStatus(Long userId, Event.EventStatus status);
+    
+    /**
+     * Находит удаленные события пользователя (корзина), отсортированные по дате удаления.
+     * Используется для отображения корзины пользователя.
+     * 
+     * @param userId идентификатор пользователя
+     * @param status статус события (DELETED)
+     *
+     * @return список удаленных событий, отсортированный по дате удаления (новые первыми)
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    List<Event> findByUserIdAndStatusOrderByDeletedAtDesc(Long userId, Event.EventStatus status);
+    
+    /**
+     * Находит удаленные события старше указанной даты для автоматической очистки корзины.
+     * Используется планировщиком для удаления событий старше 30 дней.
+     * 
+     * @param status статус события (DELETED)
+     * @param deletedBefore дата, до которой события должны быть удалены
+     *
+     * @return список старых удаленных событий для окончательного удаления
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    List<Event> findByStatusAndDeletedAtBefore(Event.EventStatus status, LocalDateTime deletedBefore);
+    
+    /**
+     * Находит активные события, время окончания которых уже прошло.
+     * Используется планировщиком для автоматического завершения событий.
+     * 
+     * @param currentDateTime текущая дата и время
+     *
+     * @return список активных событий, которые должны быть завершены
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    @Query("""
+        SELECT e FROM Event e
+        WHERE e.status = 'ACTIVE'
+        AND e.eventDate IS NOT NULL
+        AND e.eventTime IS NOT NULL
+        AND (
+            (e.endTime IS NOT NULL AND CAST(CONCAT(CAST(e.eventDate AS string), ' ', CAST(e.endTime AS string)) AS timestamp) < :currentDateTime)
+            OR (e.endTime IS NULL AND CAST(CONCAT(CAST(e.eventDate AS string), ' ', CAST(e.eventTime AS string)) AS timestamp) < :currentDateTime)
+        )
+    """)
+    List<Event> findExpiredActiveEvents(@Param("currentDateTime") LocalDateTime currentDateTime);
+    
+    /**
+     * Поиск событий по названию или описанию.
+     * Используется для функции поиска событий пользователя.
+     * 
+     * @param familyId идентификатор семьи
+     * @param userId идентификатор пользователя
+     * @param query поисковый запрос
+     *
+     * @return список событий, содержащих запрос в названии или описании
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    @Query("""
+        SELECT e FROM Event e
+        WHERE e.family.id = :familyId
+        AND e.status = 'ACTIVE'
+        AND (
+            (e.isPersonal = false)
+            OR (e.isPersonal = true AND e.user.id = :userId)
+        )
+        AND (
+            LOWER(e.title) LIKE LOWER(CONCAT('%', :query, '%'))
+            OR LOWER(e.description) LIKE LOWER(CONCAT('%', :query, '%'))
+        )
+        ORDER BY e.eventDate DESC, e.eventTime DESC
+    """)
+    List<Event> searchByTitleOrDescription(
+        @Param("familyId") Long familyId,
+        @Param("userId") Long userId,
+        @Param("query") String query
+    );
+    
+    /**
+     * Находит семейные события (не персональные) с определенным статусом.
+     * 
+     * @param familyId идентификатор семьи
+     * @param status статус события
+     *
+     * @return список семейных событий с указанным статусом
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    List<Event> findByFamilyIdAndIsPersonalFalseAndStatus(Long familyId, Event.EventStatus status);
+    
+    /**
+     * Находит персональные события пользователя с определенным статусом.
+     * 
+     * @param userId идентификатор пользователя
+     * @param status статус события
+     *
+     * @return список персональных событий пользователя с указанным статусом
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    List<Event> findByUserIdAndIsPersonalTrueAndStatus(Long userId, Event.EventStatus status);
+    
+    /**
+     * Находит все события семьи с определенным статусом.
+     * 
+     * @param familyId идентификатор семьи
+     * @param status статус события
+     *
+     * @return список событий семьи с указанным статусом
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    List<Event> findByFamilyIdAndStatus(Long familyId, Event.EventStatus status);
+    
+    /**
+     * Находит предстоящие события семьи и пользователя.
+     * Включает семейные события и персональные события пользователя.
+     * 
+     * @param familyId идентификатор семьи
+     * @param userId идентификатор пользователя
+     * @param currentDate текущая дата
+     *
+     * @return список предстоящих событий
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    @Query("""
+        SELECT e FROM Event e
+        WHERE e.family.id = :familyId
+        AND e.status = 'ACTIVE'
+        AND e.eventDate >= :currentDate
+        AND (
+            (e.isPersonal = false)
+            OR (e.isPersonal = true AND e.user.id = :userId)
+        )
+        ORDER BY e.eventDate ASC, e.eventTime ASC
+    """)
+    List<Event> findUpcomingEvents(
+        @Param("familyId") Long familyId,
+        @Param("userId") Long userId,
+        @Param("currentDate") LocalDate currentDate
+    );
+    
+    /**
+     * Находит все события серии с определенным статусом.
+     * Используется для операций с повторяющимися событиями.
+     * 
+     * @param seriesId UUID серии событий
+     * @param status статус события
+     *
+     * @return список событий серии с указанным статусом
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    List<Event> findBySeriesIdAndStatus(String seriesId, Event.EventStatus status);
+    
+    /**
+     * Подсчитывает количество событий семьи в диапазоне дат.
+     * 
+     * @param familyId идентификатор семьи
+     * @param startDate начальная дата
+     * @param endDate конечная дата
+     *
+     * @return количество событий
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    int countByFamilyIdAndEventDateBetween(Long familyId, LocalDate startDate, LocalDate endDate);
+    
+    /**
+     * Подсчитывает количество событий семьи в диапазоне дат с определенным статусом.
+     * 
+     * @param familyId идентификатор семьи
+     * @param startDate начальная дата
+     * @param endDate конечная дата
+     * @param status статус события
+     *
+     * @return количество событий
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    int countByFamilyIdAndEventDateBetweenAndStatus(
+        Long familyId,
+        LocalDate startDate,
+        LocalDate endDate,
+        Event.EventStatus status
+    );
+    
+    /**
+     * Подсчитывает количество персональных событий пользователя в диапазоне дат.
+     * 
+     * @param userId идентификатор пользователя
+     * @param startDate начальная дата
+     * @param endDate конечная дата
+     * @param isPersonal флаг персонального события
+     *
+     * @return количество персональных событий
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    int countByUserIdAndEventDateBetweenAndIsPersonal(
+        Long userId,
+        LocalDate startDate,
+        LocalDate endDate,
+        Boolean isPersonal
+    );
 }

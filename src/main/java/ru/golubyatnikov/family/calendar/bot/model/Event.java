@@ -10,6 +10,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Entity класс для представления события в семейном календаре.
@@ -51,7 +53,7 @@ public class Event {
 
     /**
      * Статус события в системе.
-     * Определяет, является ли событие черновиком или активным.
+     * Определяет текущее состояние события в жизненном цикле.
      */
     public enum EventStatus {
         /**
@@ -64,7 +66,19 @@ public class Event {
          * Активное событие - полностью заполнено и готово к отображению.
          * Используется для уведомлений и отображения в календаре.
          */
-        ACTIVE
+        ACTIVE,
+        
+        /**
+         * Завершенное событие - время события прошло.
+         * Автоматически устанавливается планировщиком.
+         */
+        COMPLETED,
+        
+        /**
+         * Удаленное событие - находится в корзине.
+         * Может быть восстановлено в течение 30 дней.
+         */
+        DELETED
     }
 
     /**
@@ -122,13 +136,57 @@ public class Event {
     private LocalTime eventTime;
 
     /**
-     * Статус события (черновик или активное).
+     * Время окончания события (для временных интервалов).
+     * Опциональное поле для событий с указанием продолжительности.
+     */
+    @Column(name = "end_time")
+    private LocalTime endTime;
+
+    /**
+     * Статус события (черновик, активное, завершенное или удаленное).
      * По умолчанию ACTIVE. Черновики используются для многошагового создания события.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Builder.Default
     private EventStatus status = EventStatus.ACTIVE;
+
+    /**
+     * Флаг персонального события.
+     * true - событие видно только создателю, false - видно всей семье.
+     * По умолчанию false (семейное событие).
+     */
+    @Column(name = "is_personal", nullable = false)
+    @Builder.Default
+    private Boolean isPersonal = false;
+
+    /**
+     * UUID серии для повторяющихся событий.
+     * NULL для обычных событий, одинаковый для всех событий одной серии.
+     */
+    @Column(name = "series_id")
+    private String seriesId;
+
+    /**
+     * Заметка о завершении события.
+     * Добавляется пользователем после завершения события.
+     */
+    @Column(name = "completion_note", columnDefinition = "TEXT")
+    private String completionNote;
+
+    /**
+     * Дата и время перемещения события в корзину.
+     * NULL для активных событий. События в корзине хранятся 30 дней.
+     */
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    /**
+     * Дата и время завершения события.
+     * Устанавливается автоматически планировщиком или вручную пользователем.
+     */
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
 
     /**
      * Флаг отправки уведомления о событии.
@@ -145,6 +203,38 @@ public class Event {
      */
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /**
+     * Вложения события (файлы, документы, изображения).
+     * Связь один-ко-многим с сущностью Attachment.
+     */
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Attachment> attachments = new ArrayList<>();
+
+    /**
+     * Комментарии к событию от членов семьи.
+     * Связь один-ко-многим с сущностью Comment.
+     */
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Comment> comments = new ArrayList<>();
+
+    /**
+     * Пункты чек-листа события.
+     * Связь один-ко-многим с сущностью ChecklistItem.
+     */
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ChecklistItem> checklistItems = new ArrayList<>();
+
+    /**
+     * Напоминания о событии.
+     * Связь один-ко-многим с сущностью Reminder.
+     */
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Reminder> reminders = new ArrayList<>();
 
     /**
      * Callback метод JPA, вызываемый перед сохранением новой сущности.
@@ -231,5 +321,58 @@ public class Event {
      */
     public boolean isActive() {
         return status == EventStatus.ACTIVE;
+    }
+
+    /**
+     * Проверяет, является ли событие завершенным.
+     * 
+     * @return true, если событие в статусе COMPLETED, иначе false
+     */
+    public boolean isCompleted() {
+        return status == EventStatus.COMPLETED;
+    }
+
+    /**
+     * Проверяет, является ли событие удаленным (в корзине).
+     * 
+     * @return true, если событие в статусе DELETED, иначе false
+     */
+    public boolean isDeleted() {
+        return status == EventStatus.DELETED;
+    }
+
+    /**
+     * Проверяет, является ли событие частью серии повторяющихся событий.
+     * 
+     * @return true, если событие имеет series_id, иначе false
+     */
+    public boolean isRecurring() {
+        return seriesId != null && !seriesId.isEmpty();
+    }
+
+    /**
+     * Проверяет, имеет ли событие временной интервал (время окончания).
+     * 
+     * @return true, если указано время окончания, иначе false
+     */
+    public boolean hasTimeInterval() {
+        return endTime != null;
+    }
+
+    /**
+     * Возвращает форматированный временной интервал события.
+     * 
+     * @return строка в формате "HH:mm - HH:mm", или только время начала если интервал не указан
+     */
+    public String getFormattedTimeInterval() {
+        if (eventTime == null) {
+            return null;
+        }
+        if (endTime == null) {
+            return getFormattedTime();
+        }
+        return String.format("%s - %s", 
+            eventTime.format(DateTimeFormatter.ofPattern("HH:mm")),
+            endTime.format(DateTimeFormatter.ofPattern("HH:mm")));
     }
 }

@@ -71,6 +71,9 @@
         <!-- Строгое логирование для production - ТОЛЬКО INFO и выше -->
         <logger name="ru.golubyatnikov.family.calendar.bot" level="INFO"/>
         
+        <!-- Временно включаем DEBUG для HelpCommandHandler -->
+        <logger name="ru.golubyatnikov.family.calendar.bot.handler.HelpCommandHandler" level="DEBUG"/>
+        
         <!-- Отключаем DEBUG для всех Spring компонентов -->
         <logger name="org.springframework" level="WARN"/>
         <logger name="org.springframework.web" level="WARN"/>

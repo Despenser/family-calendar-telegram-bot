@@ -10,6 +10,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
+import ru.golubyatnikov.family.calendar.bot.util.TextEventParser;
+
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,6 +47,15 @@ class UpdateProcessorTest {
 
     @Mock
     private ru.golubyatnikov.family.calendar.bot.handler.MyEventsCommandHandler myEventsCommandHandler;
+    
+    @Mock
+    private ConversationStateService conversationStateService;
+    
+    @Mock
+    private ConversationService conversationService;
+    
+    @Mock
+    private TextEventParser textEventParser;
 
     @InjectMocks
     private UpdateProcessor updateProcessor;
@@ -77,12 +89,14 @@ class UpdateProcessorTest {
         when(message.getFrom()).thenReturn(user);
         when(user.getId()).thenReturn(123456L);
         when(keyboardService.buttonTextToCommand("/start")).thenReturn("/start");
+        when(commandDispatcher.hasHandler("/start")).thenReturn(true);
         when(commandDispatcher.dispatch(any(Message.class))).thenReturn("Ответ от бота");
 
         // When
         updateProcessor.processUpdate(update);
 
         // Then
+        verify(commandDispatcher, times(1)).hasHandler("/start");
         verify(commandDispatcher, times(1)).dispatch(message);
     }
 
@@ -117,6 +131,7 @@ class UpdateProcessorTest {
         when(message.getFrom()).thenReturn(user);
         when(user.getId()).thenReturn(123456L);
         when(keyboardService.buttonTextToCommand("/start")).thenReturn("/start");
+        when(commandDispatcher.hasHandler("/start")).thenReturn(true);
         when(commandDispatcher.dispatch(any(Message.class)))
                 .thenThrow(new RuntimeException("Ошибка обработки команды"));
 
@@ -126,6 +141,7 @@ class UpdateProcessorTest {
             updateProcessor.processUpdate(update);
         });
 
+        verify(commandDispatcher, times(1)).hasHandler("/start");
         verify(commandDispatcher, times(1)).dispatch(message);
     }
 
@@ -135,7 +151,7 @@ class UpdateProcessorTest {
         // Given
         update = mock(Update.class);
         message = mock(Message.class);
-        user = mock(User.class);
+        user = mock(org.telegram.telegrambots.meta.api.objects.User.class);
         
         when(update.getUpdateId()).thenReturn(12345);
         when(update.hasMessage()).thenReturn(true);
@@ -144,12 +160,16 @@ class UpdateProcessorTest {
         when(message.getChatId()).thenReturn(111222333L);
         when(message.getText()).thenReturn("/start");
         when(message.getFrom()).thenReturn(user);
+        when(user.getId()).thenReturn(111222333L);
+        when(keyboardService.buttonTextToCommand("/start")).thenReturn("/start");
+        when(commandDispatcher.hasHandler("/start")).thenReturn(true);
         when(commandDispatcher.dispatch(any(Message.class))).thenReturn("Ответ");
 
         // When
         updateProcessor.processUpdate(update);
 
         // Then
+        verify(commandDispatcher).hasHandler("/start");
         verify(commandDispatcher).dispatch(argThat(msg ->
                 msg.getMessageId().equals(67890) &&
                 msg.getChatId().equals(111222333L) &&
@@ -171,14 +191,24 @@ class UpdateProcessorTest {
         when(update.getMessage()).thenReturn(message);
         when(message.getMessageId()).thenReturn(67890);
         when(message.getChatId()).thenReturn(111222333L);
-        when(message.getText()).thenReturn("📅 Предстоящие события");
         when(message.getFrom()).thenReturn(user);
         when(user.getId()).thenReturn(123456L);
+        
+        // Настраиваем последовательность вызовов getText():
+        // 1. Первый вызов возвращает оригинальный текст кнопки
+        // 2. После setText() последующие вызовы возвращают команду
+        when(message.getText())
+                .thenReturn("📅 Предстоящие события")  // Первый вызов
+                .thenReturn("/upcoming_events");        // Последующие вызовы после setText()
         
         // Настраиваем KeyboardService для преобразования текста кнопки
         when(keyboardService.buttonTextToCommand("📅 Предстоящие события"))
                 .thenReturn("/upcoming_events");
         
+        // Мокируем userService, conversationStateService и conversationService
+        when(userService.findByTelegramId(123456L)).thenReturn(Optional.empty());
+        
+        when(commandDispatcher.hasHandler("/upcoming_events")).thenReturn(true);
         when(commandDispatcher.dispatch(any(Message.class))).thenReturn("Список событий");
 
         // When
@@ -187,6 +217,7 @@ class UpdateProcessorTest {
         // Then
         verify(keyboardService).buttonTextToCommand("📅 Предстоящие события");
         verify(message).setText("/upcoming_events");
+        verify(commandDispatcher).hasHandler("/upcoming_events");
         verify(commandDispatcher).dispatch(message);
     }
 
@@ -211,6 +242,7 @@ class UpdateProcessorTest {
         // Настраиваем KeyboardService - текст остается без изменений
         when(keyboardService.buttonTextToCommand("/start")).thenReturn("/start");
         
+        when(commandDispatcher.hasHandler("/start")).thenReturn(true);
         when(commandDispatcher.dispatch(any(Message.class))).thenReturn("Приветствие");
 
         // When
@@ -218,6 +250,7 @@ class UpdateProcessorTest {
 
         // Then
         verify(keyboardService).buttonTextToCommand("/start");
+        verify(commandDispatcher).hasHandler("/start");
         verify(commandDispatcher).dispatch(argThat(msg ->
                 msg.getText().equals("/start")
         ));

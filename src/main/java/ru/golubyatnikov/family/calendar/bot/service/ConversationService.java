@@ -59,7 +59,11 @@ public class ConversationService {
             .orElseThrow(() -> new UserNotFoundException(userId));
         
         // Удаляем предыдущие незавершенные черновики пользователя
-        cancelPendingDrafts(userId);
+        int deletedCount = cancelPendingDrafts(userId);
+        if (deletedCount > 0) {
+            log.debug("Cleaned up {} existing draft(s) before starting new event creation for user {}", 
+                deletedCount, userId);
+        }
         
         // Создаем новый черновик
         Event draft = Event.builder()
@@ -73,6 +77,24 @@ public class ConversationService {
         log.info("Created draft event {} for user {}", savedDraft.getId(), userId);
         
         return savedDraft;
+    }
+    
+    /**
+     * Обновляет тип события в черновике (персональное или семейное).
+     * 
+     * @param userId идентификатор пользователя
+     * @param isPersonal true для персонального события, false для семейного
+     * @return обновленный черновик
+     * @throws IllegalStateException если активный черновик не найден
+     */
+    public Event updateEventType(Long userId, boolean isPersonal) {
+        Event draft = getActiveDraft(userId);
+        draft.setIsPersonal(isPersonal);
+        
+        Event updated = eventRepository.save(draft);
+        log.info("Updated draft {} with type: {}", draft.getId(), isPersonal ? "personal" : "family");
+        
+        return updated;
     }
     
     /**
@@ -150,13 +172,35 @@ public class ConversationService {
     }
     
     /**
-     * Отменяет создание события, удаляя черновик из базы данных.
+     * Отменяет создание события, удаляя все черновики пользователя из базы данных.
+     * Метод безопасен и не выбрасывает исключений, если черновиков нет.
+     * 
+     * <p>Используется в следующих сценариях:</p>
+     * <ul>
+     *   <li>Пользователь явно отменяет создание события</li>
+     *   <li>Возникает ошибка в процессе создания события</li>
+     *   <li>Начинается создание нового события (очистка предыдущих черновиков)</li>
+     * </ul>
      * 
      * @param userId идентификатор пользователя
      */
     public void cancelEventCreation(Long userId) {
-        cancelPendingDrafts(userId);
-        log.info("Cancelled event creation for user {}", userId);
+        log.debug("Attempting to cancel event creation for user {}", userId);
+        
+        try {
+            int deletedCount = cancelPendingDrafts(userId);
+            
+            if (deletedCount > 0) {
+                log.info("Successfully cancelled event creation for user {}: deleted {} draft(s)", 
+                    userId, deletedCount);
+            } else {
+                log.debug("No drafts found to cancel for user {}", userId);
+            }
+        } catch (Exception e) {
+            log.error("Error while cancelling event creation for user {}: {}", 
+                userId, e.getMessage(), e);
+            // Не пробрасываем исключение - метод должен быть безопасным
+        }
     }
     
     /**
@@ -190,6 +234,9 @@ public class ConversationService {
      * @return текущий шаг диалога
      */
     public ConversationStep getCurrentStep(Event draft) {
+        if (draft.getIsPersonal() == null) {
+            return ConversationStep.WAITING_FOR_TYPE;
+        }
         if (draft.getEventDate() == null) {
             return ConversationStep.WAITING_FOR_DATE;
         }
@@ -207,15 +254,34 @@ public class ConversationService {
      * Вызывается перед созданием нового черновика или при отмене диалога.
      * 
      * @param userId идентификатор пользователя
+     * @return количество удаленных черновиков
      */
-    private void cancelPendingDrafts(Long userId) {
+    private int cancelPendingDrafts(Long userId) {
         List<Event> drafts = eventRepository.findAllByUserIdAndStatus(
             userId, Event.EventStatus.DRAFT);
         
         if (!drafts.isEmpty()) {
+            log.debug("Found {} pending draft(s) for user {}", drafts.size(), userId);
+            
+            // Логируем ID удаляемых черновиков для отладки
+            if (log.isDebugEnabled()) {
+                drafts.forEach(draft -> 
+                    log.debug("Deleting draft {}: created at {}, title={}, date={}, time={}", 
+                        draft.getId(), 
+                        draft.getCreatedAt(),
+                        draft.getTitle(),
+                        draft.getEventDate(),
+                        draft.getEventTime()));
+            }
+            
             eventRepository.deleteAll(drafts);
-            log.info("Deleted {} pending drafts for user {}", drafts.size(), userId);
+            log.info("Deleted {} pending draft(s) for user {}", drafts.size(), userId);
+            
+            return drafts.size();
         }
+        
+        log.debug("No pending drafts found for user {}", userId);
+        return 0;
     }
     
     /**
@@ -223,6 +289,9 @@ public class ConversationService {
      * Определяют текущее состояние процесса создания события.
      */
     public enum ConversationStep {
+        /** Ожидание выбора типа события (персональное или семейное) */
+        WAITING_FOR_TYPE,
+        
         /** Ожидание выбора даты через inline-календарь */
         WAITING_FOR_DATE,
         

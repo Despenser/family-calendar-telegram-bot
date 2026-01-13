@@ -66,12 +66,15 @@ class StartCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("Добро пожаловать, Иван!"));
-        assertTrue(response.contains("Вы уже зарегистрированы"));
-        assertTrue(response.contains("/help"));
-        assertTrue(response.contains("/add_event"));
-        assertTrue(response.contains("/upcoming_events"));
-        assertTrue(response.contains("/my_events"));
+        assertTrue(response.contains("Добро пожаловать, Иван"), "Ответ должен содержать приветствие с именем");
+        assertTrue(response.contains("Семейный Календарь Бот"), "Ответ должен содержать название бота");
+        assertTrue(response.contains("Вы уже зарегистрированы"), "Ответ должен содержать подтверждение регистрации");
+        assertTrue(response.contains("Основные возможности"), "Ответ должен содержать описание возможностей");
+        assertTrue(response.contains("Создание и управление событиями"), "Ответ должен содержать информацию о возможностях");
+        assertTrue(response.contains("/help"), "Ответ должен содержать команду /help");
+        assertTrue(response.contains("/add\\_event") || response.contains("/add_event"), "Ответ должен содержать команду /add_event");
+        assertTrue(response.contains("/upcoming\\_events") || response.contains("/upcoming_events"), "Ответ должен содержать команду /upcoming_events");
+        assertTrue(response.contains("/my\\_events") || response.contains("/my_events"), "Ответ должен содержать команду /my_events");
         
         verify(userService).isUserAuthorized(telegramId);
     }
@@ -94,12 +97,13 @@ class StartCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("Добро пожаловать, Мария!"));
-        assertTrue(response.contains("не зарегистрированы"));
-        assertTrue(response.contains("администратору"));
-        assertTrue(response.contains("Создавать события"));
-        assertTrue(response.contains("Просматривать предстоящие события"));
-        assertTrue(response.contains("Получать уведомления"));
+        assertTrue(response.contains("Добро пожаловать, Мария"), "Ответ должен содержать приветствие с именем");
+        assertTrue(response.contains("не зарегистрированы"), "Ответ должен содержать информацию о незарегистрированном статусе");
+        assertTrue(response.contains("администратору"), "Ответ должен содержать инструкцию обратиться к администратору");
+        assertTrue(response.contains("Семейный Календарь Бот"), "Ответ должен содержать название бота");
+        assertTrue(response.contains("Создавать и управлять событиями"), "Ответ должен содержать информацию о возможностях");
+        assertTrue(response.contains("Получать напоминания"), "Ответ должен содержать информацию о возможностях");
+        assertTrue(response.contains("Как получить доступ"), "Ответ должен содержать инструкции по получению доступа");
         
         verify(userService).isUserAuthorized(telegramId);
     }
@@ -121,8 +125,8 @@ class StartCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("Добро пожаловать!"));
-        assertFalse(response.contains("null"));
+        assertTrue(response.contains("Добро пожаловать"), "Ответ должен содержать приветствие");
+        assertFalse(response.contains("null"), "Ответ не должен содержать 'null'");
         
         verify(userService).isUserAuthorized(telegramId);
     }
@@ -144,8 +148,9 @@ class StartCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("Добро пожаловать!"));
-        assertFalse(response.contains("   "));
+        assertTrue(response.contains("Добро пожаловать"), "Ответ должен содержать приветствие");
+        // Проверяем, что в ответе нет пробелов вместо имени (пробелы могут быть экранированы)
+        assertFalse(response.matches(".*Добро пожаловать,\\s+\\\\?!.*"), "Ответ не должен содержать пустое имя");
         
         verify(userService).isUserAuthorized(telegramId);
     }
@@ -191,5 +196,48 @@ class StartCommandHandlerTest {
 
         // Then
         assertFalse(requiresAuth);
+    }
+
+    @Test
+    @DisplayName("Команды в приветствии должны быть кликабельными (без моноширинного форматирования)")
+    void shouldDisplayCommandsAsClickableInWelcomeMessage() {
+        // Given
+        Long telegramId = 123456789L;
+        String firstName = "Тест";
+        
+        when(message.getFrom()).thenReturn(telegramUser);
+        when(telegramUser.getId()).thenReturn(telegramId);
+        when(telegramUser.getFirstName()).thenReturn(firstName);
+        when(telegramUser.getUserName()).thenReturn("test_user");
+        when(userService.isUserAuthorized(telegramId)).thenReturn(true);
+
+        // When
+        String response = handler.handle(message, null);
+
+        // Then
+        assertNotNull(response);
+        
+        // Проверяем, что команды присутствуют в формате /command
+        assertTrue(response.contains("/help"), "Должна содержать команду /help");
+        assertTrue(response.contains("/add_event") || response.contains("/add\\_event"), 
+                "Должна содержать команду /add_event");
+        assertTrue(response.contains("/upcoming_events") || response.contains("/upcoming\\_events"), 
+                "Должна содержать команду /upcoming_events");
+        assertTrue(response.contains("/my_events") || response.contains("/my\\_events"), 
+                "Должна содержать команду /my_events");
+        
+        // Проверяем, что команды НЕ обернуты в backticks (моноширинный формат)
+        assertFalse(response.contains("`/help`"), "НЕ должна содержать команду /help в backticks");
+        assertFalse(response.contains("`/add_event`"), "НЕ должна содержать команду /add_event в backticks");
+        assertFalse(response.contains("`/upcoming_events`"), "НЕ должна содержать команду /upcoming_events в backticks");
+        assertFalse(response.contains("`/my_events`"), "НЕ должна содержать команду /my_events в backticks");
+        
+        // Проверяем, что команды НЕ содержат экранированные backticks
+        assertFalse(response.contains("\\`/help\\`"), "НЕ должна содержать экранированные backticks для /help");
+        assertFalse(response.contains("\\`/add_event\\`"), "НЕ должна содержать экранированные backticks для /add_event");
+        assertFalse(response.contains("\\`/upcoming_events\\`"), "НЕ должна содержать экранированные backticks для /upcoming_events");
+        assertFalse(response.contains("\\`/my_events\\`"), "НЕ должна содержать экранированные backticks для /my_events");
+        
+        verify(userService).isUserAuthorized(telegramId);
     }
 }

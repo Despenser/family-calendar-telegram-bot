@@ -80,7 +80,7 @@ class UpcomingEventsCommandHandlerTest {
         String description = handler.getDescription();
 
         // Then
-        assertEquals("Показать предстоящие события семьи", description);
+        assertEquals("Показать все предстоящие события (30 дней)", description);
     }
 
     @Test
@@ -105,21 +105,21 @@ class UpcomingEventsCommandHandlerTest {
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
-        when(eventService.getUpcomingEvents(familyId, 7)).thenReturn(events);
+        when(eventService.getUpcomingEvents(familyId, 30)).thenReturn(events);
 
         // When
         String response = handler.handle(message, user);
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("Предстоящие события семьи"));
+        assertTrue(response.contains("Предстоящие события семьи \\(30 дней\\)"));
         assertTrue(response.contains("День рождения"));
         assertTrue(response.contains("Поход в кино"));
-        assertTrue(response.contains("31.12.2025"));
+        assertTrue(response.contains("31\\.12\\.2025")); // Точки экранируются
         assertTrue(response.contains("18:00"));
         assertTrue(response.contains("Всего событий: 2"));
         
-        verify(eventService).getUpcomingEvents(familyId, 7);
+        verify(eventService).getUpcomingEvents(familyId, 30);
     }
 
     @Test
@@ -132,18 +132,18 @@ class UpcomingEventsCommandHandlerTest {
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
-        when(eventService.getUpcomingEvents(familyId, 7)).thenReturn(Collections.emptyList());
+        when(eventService.getUpcomingEvents(familyId, 30)).thenReturn(Collections.emptyList());
 
         // When
         String response = handler.handle(message, user);
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("Предстоящие события семьи"));
-        assertTrue(response.contains("На ближайшие 7 дней событий не запланировано"));
-        assertTrue(response.contains("/add_event"));
+        assertTrue(response.contains("Предстоящие события семьи \\(30 дней\\)"), "Ответ должен содержать заголовок с указанием 30 дней");
+        assertTrue(response.contains("На ближайшие 30 дней событий не запланировано"), "Ответ должен содержать сообщение об отсутствии событий на 30 дней");
+        assertTrue(response.contains("/add\\_event") || response.contains("/add_event"), "Ответ должен содержать подсказку о команде /add_event");
         
-        verify(eventService).getUpcomingEvents(familyId, 7);
+        verify(eventService).getUpcomingEvents(familyId, 30);
     }
 
     @Test
@@ -207,7 +207,7 @@ class UpcomingEventsCommandHandlerTest {
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
-        when(eventService.getUpcomingEvents(familyId, 7)).thenReturn(events);
+        when(eventService.getUpcomingEvents(familyId, 30)).thenReturn(events);
 
         // When
         String response = handler.handle(message, user);
@@ -230,7 +230,7 @@ class UpcomingEventsCommandHandlerTest {
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
-        when(eventService.getUpcomingEvents(familyId, 7)).thenReturn(events);
+        when(eventService.getUpcomingEvents(familyId, 30)).thenReturn(events);
 
         // When
         String response = handler.handle(message, user);

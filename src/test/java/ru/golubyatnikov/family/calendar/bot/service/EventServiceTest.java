@@ -12,6 +12,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.InvalidDateException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
@@ -26,6 +27,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 /**
@@ -55,6 +58,9 @@ class EventServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private EventHistoryService eventHistoryService;
 
     @InjectMocks
     private EventService eventService;
@@ -516,14 +522,15 @@ class EventServiceTest {
 
         when(eventRepository.findById(eventId))
                 .thenReturn(Optional.of(testEvent));
-        doNothing().when(eventRepository).delete(testEvent);
+        when(eventRepository.save(any(Event.class))).thenReturn(testEvent);
 
         // When
         eventService.deleteEvent(eventId, userId);
 
         // Then
         verify(eventRepository).findById(eventId);
-        verify(eventRepository).delete(testEvent);
+        verify(eventRepository).save(any(Event.class));
+        verify(eventHistoryService).recordDeletion(eq(eventId), eq(userId));
     }
 
     @Test

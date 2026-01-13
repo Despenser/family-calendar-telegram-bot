@@ -62,7 +62,14 @@ class GlobalExceptionHandlerTest {
         Map<String, Object> body = response.getBody();
         assertNotNull(body, "Body не должен быть null");
         assertEquals(404, body.get("status"));
-        assertEquals("Пользователь не найден", body.get("error"));
+        
+        // Проверяем, что заголовок ошибки отформатирован жирным шрифтом
+        String error = (String) body.get("error");
+        assertTrue(error.startsWith("*") && error.endsWith("*"), 
+            "Заголовок ошибки должен быть отформатирован жирным шрифтом");
+        assertTrue(error.contains("Пользователь не найден"), 
+            "Заголовок должен содержать текст 'Пользователь не найден'");
+        
         assertNotNull(body.get("message"));
         assertNotNull(body.get("timestamp"));
     }
@@ -106,7 +113,14 @@ class GlobalExceptionHandlerTest {
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
         assertEquals(404, body.get("status"));
-        assertEquals("Событие не найдено", body.get("error"));
+        
+        // Проверяем, что заголовок ошибки отформатирован жирным шрифтом
+        String error = (String) body.get("error");
+        assertTrue(error.startsWith("*") && error.endsWith("*"), 
+            "Заголовок ошибки должен быть отформатирован жирным шрифтом");
+        assertTrue(error.contains("Событие не найдено"), 
+            "Заголовок должен содержать текст 'Событие не найдено'");
+        
         assertNotNull(body.get("message"));
         assertNotNull(body.get("timestamp"));
     }
@@ -131,7 +145,14 @@ class GlobalExceptionHandlerTest {
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
         assertEquals(403, body.get("status"));
-        assertEquals("Доступ запрещен", body.get("error"));
+        
+        // Проверяем, что заголовок ошибки отформатирован жирным шрифтом
+        String error = (String) body.get("error");
+        assertTrue(error.startsWith("*") && error.endsWith("*"), 
+            "Заголовок ошибки должен быть отформатирован жирным шрифтом");
+        assertTrue(error.contains("Доступ запрещен"), 
+            "Заголовок должен содержать текст 'Доступ запрещен'");
+        
         assertNotNull(body.get("message"));
         assertNotNull(body.get("timestamp"));
     }
@@ -151,7 +172,11 @@ class GlobalExceptionHandlerTest {
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
         String message = (String) body.get("message");
-        assertEquals("У вас нет прав для выполнения этой операции", message,
+        
+        // Проверяем, что сообщение отформатировано курсивом
+        assertTrue(message.startsWith("_") && message.endsWith("_"), 
+            "Сообщение должно быть отформатировано курсивом");
+        assertTrue(message.contains("У вас нет прав для выполнения этой операции"),
             "Должно быть дружественное сообщение вместо технического");
     }
 
@@ -175,7 +200,14 @@ class GlobalExceptionHandlerTest {
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
         assertEquals(400, body.get("status"));
-        assertEquals("Некорректная дата", body.get("error"));
+        
+        // Проверяем, что заголовок ошибки отформатирован жирным шрифтом
+        String error = (String) body.get("error");
+        assertTrue(error.startsWith("*") && error.endsWith("*"), 
+            "Заголовок ошибки должен быть отформатирован жирным шрифтом");
+        assertTrue(error.contains("Некорректная дата"), 
+            "Заголовок должен содержать текст 'Некорректная дата'");
+        
         assertEquals(errorMessage, body.get("message"));
         assertNotNull(body.get("timestamp"));
     }
@@ -199,7 +231,14 @@ class GlobalExceptionHandlerTest {
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
         assertEquals(503, body.get("status"));
-        assertEquals("Временная ошибка сервиса", body.get("error"));
+        
+        // Проверяем, что заголовок ошибки отформатирован жирным шрифтом
+        String error = (String) body.get("error");
+        assertTrue(error.startsWith("*") && error.endsWith("*"), 
+            "Заголовок ошибки должен быть отформатирован жирным шрифтом");
+        assertTrue(error.contains("Временная ошибка сервиса"), 
+            "Заголовок должен содержать текст 'Временная ошибка сервиса'");
+        
         assertNotNull(body.get("message"));
         assertNotNull(body.get("timestamp"));
     }
@@ -218,6 +257,10 @@ class GlobalExceptionHandlerTest {
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
         String message = (String) body.get("message");
+        
+        // Проверяем, что сообщение отформатировано курсивом
+        assertTrue(message.startsWith("_") && message.endsWith("_"), 
+            "Сообщение должно быть отформатировано курсивом");
         assertTrue(message.contains("базой данных") && message.contains("попробуйте позже"),
             "Сообщение должно быть дружественным и не содержать технических деталей");
     }
@@ -241,7 +284,14 @@ class GlobalExceptionHandlerTest {
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
         assertEquals(502, body.get("status"));
-        assertEquals("Ошибка связи с Telegram", body.get("error"));
+        
+        // Проверяем, что заголовок ошибки отформатирован жирным шрифтом
+        String error = (String) body.get("error");
+        assertTrue(error.startsWith("*") && error.endsWith("*"), 
+            "Заголовок ошибки должен быть отформатирован жирным шрифтом");
+        assertTrue(error.contains("Ошибка связи с Telegram"), 
+            "Заголовок должен содержать текст 'Ошибка связи с Telegram'");
+        
         assertNotNull(body.get("message"));
         assertNotNull(body.get("timestamp"));
     }
@@ -260,6 +310,10 @@ class GlobalExceptionHandlerTest {
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
         String message = (String) body.get("message");
+        
+        // Проверяем, что сообщение отформатировано курсивом
+        assertTrue(message.startsWith("_") && message.endsWith("_"), 
+            "Сообщение должно быть отформатировано курсивом");
         assertTrue(message.contains("Telegram") && message.contains("попробуйте позже"),
             "Сообщение должно быть дружественным");
     }
@@ -283,7 +337,14 @@ class GlobalExceptionHandlerTest {
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
         assertEquals(500, body.get("status"));
-        assertEquals("Внутренняя ошибка сервера", body.get("error"));
+        
+        // Проверяем, что заголовок ошибки отформатирован жирным шрифтом
+        String error = (String) body.get("error");
+        assertTrue(error.startsWith("*") && error.endsWith("*"), 
+            "Заголовок ошибки должен быть отформатирован жирным шрифтом");
+        assertTrue(error.contains("Внутренняя ошибка сервера"), 
+            "Заголовок должен содержать текст 'Внутренняя ошибка сервера'");
+        
         assertNotNull(body.get("message"));
         assertNotNull(body.get("timestamp"));
     }
@@ -302,7 +363,12 @@ class GlobalExceptionHandlerTest {
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
         String message = (String) body.get("message");
-        assertEquals("Произошла непредвиденная ошибка. Пожалуйста, попробуйте позже.", message,
+        
+        // Проверяем, что сообщение отформатировано курсивом
+        assertTrue(message.startsWith("_") && message.endsWith("_"), 
+            "Сообщение должно быть отформатировано курсивом");
+        assertTrue(message.contains("Произошла непредвиденная ошибка") && 
+                   message.contains("попробуйте позже"),
             "Должно быть общее дружественное сообщение");
     }
 

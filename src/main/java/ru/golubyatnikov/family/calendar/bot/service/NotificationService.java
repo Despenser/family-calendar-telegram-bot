@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
+
 /**
  * Сервис для отправки уведомлений о предстоящих событиях.
  * 
@@ -284,57 +286,20 @@ public class NotificationService {
         }
         
         StringBuilder message = new StringBuilder();
-        message.append("🔔 *Напоминание о событии*\n\n");
-        message.append("📅 *Дата:* ").append(event.getFormattedDate()).append("\n");
-        message.append("🕐 *Время:* ").append(event.getFormattedTime()).append("\n");
-        message.append("📝 *Название:* ").append(escapeMarkdown(event.getTitle())).append("\n");
+        message.append("🔔 ").append(bold("Напоминание о событии")).append("\n\n");
+        message.append("📅 ").append(bold("Дата:")).append(" ").append(escape(event.getFormattedDate())).append("\n");
+        message.append("🕐 ").append(bold("Время:")).append(" ").append(escape(event.getFormattedTime())).append("\n");
+        message.append("📝 ").append(bold("Название:")).append(" ").append(escape(event.getTitle())).append("\n");
         
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            message.append("📄 *Описание:* ").append(escapeMarkdown(event.getDescription())).append("\n");
+            message.append("📄 ").append(bold("Описание:")).append(" ").append(italic(event.getDescription())).append("\n");
         }
         
         if (event.getUser() != null) {
-            message.append("👤 *Создал:* ").append(escapeMarkdown(event.getUser().getFullName()));
+            message.append("👤 ").append(bold("Создал:")).append(" ").append(escape(event.getUser().getFullName()));
         }
         
         return message.toString();
-    }
-
-    /**
-     * Экранирует специальные символы Markdown в тексте.
-     * 
-     * <p>Telegram Bot API использует Markdown для форматирования сообщений.
-     * Некоторые символы имеют специальное значение и должны быть экранированы,
-     * чтобы отображаться корректно.</p>
-     * 
-     * <p>Экранируемые символы: _ * [ ] ( ) ~ ` > # + - = | { } . !</p>
-     * 
-     * @param text текст для экранирования
-     * @return текст с экранированными специальными символами
-     */
-    private String escapeMarkdown(String text) {
-        if (text == null) {
-            return "";
-        }
-        
-        return text.replace("_", "\\_")
-                   .replace("*", "\\*")
-                   .replace("[", "\\[")
-                   .replace("]", "\\]")
-                   .replace("(", "\\(")
-                   .replace(")", "\\)")
-                   .replace("~", "\\~")
-                   .replace("`", "\\`")
-                   .replace(">", "\\>")
-                   .replace("#", "\\#")
-                   .replace("+", "\\+")
-                   .replace("-", "\\-")
-                   .replace("=", "\\=")
-                   .replace("|", "\\|")
-                   .replace("{", "\\{")
-                   .replace("}", "\\}")
-                   .replace(".", "\\.")
-                   .replace("!", "\\!");
     }
 
     /**

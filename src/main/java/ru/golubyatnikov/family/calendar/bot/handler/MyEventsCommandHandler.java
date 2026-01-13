@@ -15,6 +15,8 @@ import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 import java.util.ArrayList;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
+
 /**
  * Обработчик команды /my_events для Telegram бота семейного календаря.
  * 
@@ -119,7 +121,8 @@ public class MyEventsCommandHandler implements CommandHandler {
         }
 
         // Отправляем заголовок
-        String header = String.format("📋 *Мои события*\n\nВсего событий: %d\n", userEvents.size());
+        String header = formatMessage("📋 %s\n\nВсего событий: %s\n", 
+                bold("Мои события"), userEvents.size());
         
         // Отправляем каждое событие отдельным сообщением с inline-кнопками
         for (Event event : userEvents) {
@@ -148,9 +151,7 @@ public class MyEventsCommandHandler implements CommandHandler {
      * @return отформатированное сообщение об отсутствии событий
      */
     private String buildNoEventsMessage() {
-        return "📋 *Мои события*\n\n" +
-               "У вас пока нет созданных событий.\n\n" +
-               "Используйте /add_event для добавления нового события.";
+        return escape("📋 ") + bold("Мои события") + escape("\n\nУ вас пока нет созданных событий.\n\nИспользуйте ") + code("/add_event") + escape(" для добавления нового события.");
     }
 
     /**
@@ -167,13 +168,13 @@ public class MyEventsCommandHandler implements CommandHandler {
     private String formatEvent(Event event) {
         StringBuilder formatted = new StringBuilder();
         
-        formatted.append(String.format("📌 *%s*\n", escapeMarkdown(event.getTitle())));
-        formatted.append(String.format("📅 Дата: %s\n", event.getFormattedDate()));
-        formatted.append(String.format("🕐 Время: %s", event.getFormattedTime()));
+        formatted.append(formatMessage("📌 %s\n", bold(event.getTitle())));
+        formatted.append(formatMessage("📅 Дата: %s\n", escape(event.getFormattedDate())));
+        formatted.append(formatMessage("🕐 Время: %s", escape(event.getFormattedTime())));
         
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            formatted.append(String.format("\n📝 Описание: %s", 
-                    escapeMarkdown(event.getDescription())));
+            formatted.append(formatMessage("\n📝 Описание: %s", 
+                    escape(event.getDescription())));
         }
         
         return formatted.toString();
@@ -219,6 +220,89 @@ public class MyEventsCommandHandler implements CommandHandler {
     }
 
     /**
+     * Обрабатывает callback query для просмотра деталей события.
+     * 
+     * <p>Извлекает ID события из callback data и отображает полную информацию о событии.
+     * Используется при нажатии на кнопку "📋 Посмотреть детали" в уведомлениях о напоминаниях.</p>
+     * 
+     * <p><b>Требования:</b> 8.1</p>
+     * 
+     * @param eventId идентификатор события для просмотра
+     * @param userId идентификатор пользователя, запросившего просмотр
+     * @return сообщение с полной информацией о событии
+     */
+    public String handleViewEventDetails(Long eventId, Long userId) {
+        log.info("Обработка callback просмотра деталей события ID={} пользователем ID={}", 
+                eventId, userId);
+        
+        try {
+            Event event = eventService.getEventById(eventId);
+            
+            // Проверяем права доступа
+            if (event.getIsPersonal() && !event.getUser().getId().equals(userId)) {
+                log.warn("Пользователь ID={} попытался просмотреть чужое персональное событие ID={}", 
+                        userId, eventId);
+                return formatMessage("❌ %s\n\n%s",
+                       bold("Доступ запрещен"),
+                       "У вас нет прав для просмотра этого события\\.");
+            }
+            
+            // Формируем детальное описание события
+            StringBuilder details = new StringBuilder();
+            details.append(formatMessage("📋 %s\n\n", bold("Детали события")));
+            
+            // Название
+            details.append(formatMessage("📌 %s\n\n", bold(event.getTitle())));
+            
+            // Дата
+            details.append(formatMessage("📅 Дата: %s\n", escape(event.getFormattedDate())));
+            
+            // Время
+            if (event.getEventTime() != null) {
+                if (event.getEndTime() != null) {
+                    details.append(formatMessage("🕐 Время: %s - %s\n", 
+                        escape(event.getFormattedTime()), 
+                        escape(event.getEndTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")))));
+                } else {
+                    details.append(formatMessage("🕐 Время: %s\n", escape(event.getFormattedTime())));
+                }
+            }
+            
+            // Описание
+            if (event.getDescription() != null && !event.getDescription().isBlank()) {
+                details.append(formatMessage("📝 Описание: %s\n", escape(event.getDescription())));
+            }
+            
+            // Тип события
+            details.append("\n");
+            if (event.getIsPersonal()) {
+                details.append(formatMessage("🔒 %s\n", bold("Персональное событие")));
+            } else {
+                details.append(formatMessage("👨‍👩‍👧‍👦 Семейное событие (создал: %s)\n", 
+                    escape(event.getUser().getFirstName())));
+            }
+            
+            // Статус
+            if (event.getStatus() == Event.EventStatus.COMPLETED) {
+                details.append(escape("✅ Статус: Завершено\n"));
+            } else if (event.getStatus() == Event.EventStatus.DELETED) {
+                details.append(escape("🗑️ Статус: Удалено\n"));
+            }
+            
+            log.info("Детали события ID={} успешно отображены пользователю ID={}", eventId, userId);
+            
+            return details.toString();
+            
+        } catch (Exception e) {
+            log.error("Ошибка при просмотре деталей события ID={}: {}", eventId, e.getMessage(), e);
+            
+            return formatMessage("❌ %s\n\n%s",
+                   bold("Ошибка"),
+                   "Не удалось загрузить детали события\\. Возможно, событие было удалено\\.");
+        }
+    }
+
+    /**
      * Обрабатывает callback query для редактирования события.
      * 
      * <p>Извлекает ID события из callback data и инициирует процесс редактирования.
@@ -234,10 +318,9 @@ public class MyEventsCommandHandler implements CommandHandler {
         
         // TODO: Реализовать многошаговый диалог редактирования
         // Пока возвращаем заглушку
-        return String.format(
-                "✏️ *Редактирование события*\n\n" +
-                "Функция редактирования будет реализована в следующей версии.\n\n" +
-                "ID события: %d", 
+        return formatMessage(
+                "✏️ %s\n\nФункция редактирования будет реализована в следующей версии\\.\n\nID события: %s", 
+                bold("Редактирование события"),
                 eventId
         );
     }
@@ -262,54 +345,28 @@ public class MyEventsCommandHandler implements CommandHandler {
             
             log.info("Событие ID={} успешно удалено пользователем ID={}", eventId, userId);
             
-            return "✅ *Событие удалено*\n\n" +
-                   "Событие успешно удалено из календаря.\n\n" +
-                   "Используйте /my_events для просмотра оставшихся событий.";
+            return formatMessage("✅ %s\n\nСобытие успешно удалено из календаря\\.\n\nИспользуйте %s для просмотра оставшихся событий\\.",
+                   bold("Событие удалено"), code("/my_events"));
                    
         } catch (Exception e) {
             log.error("Ошибка при удалении события ID={}: {}", eventId, e.getMessage(), e);
             
-            return "❌ *Ошибка удаления*\n\n" +
-                   "Не удалось удалить событие. " +
-                   "Возможно, у вас нет прав на удаление этого события.";
+            return formatMessage("❌ %s\n\nНе удалось удалить событие\\. Возможно, у вас нет прав на удаление этого события\\.",
+                   bold("Ошибка удаления"));
         }
     }
 
     /**
-     * Экранирует специальные символы Markdown для безопасного отображения.
+     * Определяет, требуется ли авторизация для выполнения этой команды.
      * 
-     * <p>Telegram Bot API использует Markdown для форматирования текста.
-     * Некоторые символы имеют специальное значение и должны быть экранированы,
-     * чтобы отображаться корректно.</p>
+     * <p>Команда /my_events требует авторизации, так как она отображает
+     * события конкретного пользователя.</p>
      * 
-     * <p>Экранируются следующие символы: * _ [ ] ( ) ~ ` > # + - = | { } . !</p>
-     * 
-     * @param text текст для экранирования
-     * @return текст с экранированными специальными символами
+     * @return true, так как команда требует авторизации
      */
-    private String escapeMarkdown(String text) {
-        if (text == null) {
-            return "";
-        }
-        
-        return text.replace("*", "\\*")
-                   .replace("_", "\\_")
-                   .replace("[", "\\[")
-                   .replace("]", "\\]")
-                   .replace("(", "\\(")
-                   .replace(")", "\\)")
-                   .replace("~", "\\~")
-                   .replace("`", "\\`")
-                   .replace(">", "\\>")
-                   .replace("#", "\\#")
-                   .replace("+", "\\+")
-                   .replace("-", "\\-")
-                   .replace("=", "\\=")
-                   .replace("|", "\\|")
-                   .replace("{", "\\{")
-                   .replace("}", "\\}")
-                   .replace(".", "\\.")
-                   .replace("!", "\\!");
+    @Override
+    public boolean requiresAuth() {
+        return true;
     }
 
     /**
@@ -330,18 +387,5 @@ public class MyEventsCommandHandler implements CommandHandler {
     @Override
     public String getDescription() {
         return "Управление моими событиями";
-    }
-
-    /**
-     * Определяет, требуется ли авторизация для выполнения этой команды.
-     * 
-     * <p>Команда /my_events требует авторизации, так как она отображает
-     * события конкретного пользователя.</p>
-     * 
-     * @return true, так как команда требует авторизации
-     */
-    @Override
-    public boolean requiresAuth() {
-        return true;
     }
 }

@@ -45,10 +45,38 @@ public class UserService {
         Optional<User> user = userRepository.findByTelegramId(telegramId);
         
         if (user.isPresent()) {
-            log.info("Пользователь найден: telegramId={}, userId={}, username={}", 
-                    telegramId, user.get().getId(), user.get().getUsername());
+            User foundUser = user.get();
+            // Явно проверяем наличие семьи для отладки
+            boolean hasFamily = foundUser.hasFamily();
+            Family family = foundUser.getFamily();
+            log.info("Пользователь найден: telegramId={}, userId={}, username={}, hasFamily={}, familyId={}", 
+                    telegramId, foundUser.getId(), foundUser.getUsername(), hasFamily, 
+                    family != null ? family.getId() : null);
         } else {
             log.info("Пользователь не найден: telegramId={}", telegramId);
+        }
+        
+        return user;
+    }
+
+    /**
+     * Находит пользователя по его внутреннему ID.
+     * 
+     * @param userId внутренний идентификатор пользователя
+     *
+     * @return Optional содержащий пользователя, если найден, иначе пустой Optional
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    public Optional<User> findById(Long userId) {
+        log.debug("Поиск пользователя по ID: {}", userId);
+        
+        Optional<User> user = userRepository.findById(userId);
+        
+        if (user.isPresent()) {
+            log.info("Пользователь найден: userId={}, telegramId={}, username={}", 
+                    userId, user.get().getTelegramId(), user.get().getUsername());
+        } else {
+            log.info("Пользователь не найден: userId={}", userId);
         }
         
         return user;

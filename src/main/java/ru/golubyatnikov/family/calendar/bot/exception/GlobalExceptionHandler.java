@@ -13,6 +13,9 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.italic;
+
 /**
  * Глобальный обработчик исключений для всего приложения.
  * 
@@ -36,7 +39,7 @@ public class GlobalExceptionHandler {
         
         Map<String, Object> errorResponse = createErrorResponse(
             HttpStatus.NOT_FOUND,
-            "Пользователь не найден",
+            bold("Пользователь не найден"),
             ex.getMessage()
         );
         
@@ -56,7 +59,7 @@ public class GlobalExceptionHandler {
         
         Map<String, Object> errorResponse = createErrorResponse(
             HttpStatus.NOT_FOUND,
-            "Событие не найдено",
+            bold("Событие не найдено"),
             ex.getMessage()
         );
         
@@ -76,8 +79,8 @@ public class GlobalExceptionHandler {
         
         Map<String, Object> errorResponse = createErrorResponse(
             HttpStatus.FORBIDDEN,
-            "Доступ запрещен",
-            "У вас нет прав для выполнения этой операции"
+            bold("Доступ запрещен"),
+            italic("У вас нет прав для выполнения этой операции")
         );
         
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -96,7 +99,7 @@ public class GlobalExceptionHandler {
         
         Map<String, Object> errorResponse = createErrorResponse(
             HttpStatus.BAD_REQUEST,
-            "Некорректная дата",
+            bold("Некорректная дата"),
             ex.getMessage()
         );
         
@@ -116,8 +119,8 @@ public class GlobalExceptionHandler {
         
         Map<String, Object> errorResponse = createErrorResponse(
             HttpStatus.SERVICE_UNAVAILABLE,
-            "Временная ошибка сервиса",
-            "Произошла ошибка при работе с базой данных. Пожалуйста, попробуйте позже."
+            bold("Временная ошибка сервиса"),
+            italic("Произошла ошибка при работе с базой данных. Пожалуйста, попробуйте позже.")
         );
         
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
@@ -136,8 +139,8 @@ public class GlobalExceptionHandler {
         
         Map<String, Object> errorResponse = createErrorResponse(
             HttpStatus.BAD_GATEWAY,
-            "Ошибка связи с Telegram",
-            "Произошла ошибка при взаимодействии с Telegram. Пожалуйста, попробуйте позже."
+            bold("Ошибка связи с Telegram"),
+            italic("Произошла ошибка при взаимодействии с Telegram. Пожалуйста, попробуйте позже.")
         );
         
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
@@ -156,8 +159,8 @@ public class GlobalExceptionHandler {
         
         Map<String, Object> errorResponse = createErrorResponse(
             HttpStatus.INTERNAL_SERVER_ERROR,
-            "Внутренняя ошибка сервера",
-            "Произошла непредвиденная ошибка. Пожалуйста, попробуйте позже."
+            bold("Внутренняя ошибка сервера"),
+            italic("Произошла непредвиденная ошибка. Пожалуйста, попробуйте позже.")
         );
         
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

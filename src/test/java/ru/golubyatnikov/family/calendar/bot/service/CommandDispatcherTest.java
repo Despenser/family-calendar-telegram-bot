@@ -316,6 +316,8 @@ class CommandDispatcherTest {
         // Given
         when(message.hasText()).thenReturn(true);
         when(message.getText()).thenReturn("/start");
+        when(userService.findByTelegramId(testTelegramId))
+                .thenReturn(Optional.empty());
         when(startHandler.handle(any(Message.class), any()))
                 .thenReturn("Добро пожаловать!");
 
@@ -324,7 +326,8 @@ class CommandDispatcherTest {
 
         // Then
         assertEquals("Добро пожаловать!", response);
-        verify(userService, never()).findByTelegramId(any());
+        // Пользователь загружается всегда, но для публичных команд отсутствие пользователя не вызывает ошибку
+        verify(userService).findByTelegramId(testTelegramId);
         verify(startHandler).handle(message, null);
     }
 

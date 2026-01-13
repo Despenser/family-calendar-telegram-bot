@@ -1,0 +1,111 @@
+package ru.golubyatnikov.family.calendar.bot.model;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+/**
+ * Entity класс для истории изменений событий.
+ * Отслеживает все действия пользователей с событиями для аудита и отображения истории.
+ * 
+ * @author Family Calendar Bot
+ * @version 1.0
+ * @see Event
+ * @see User
+ */
+@Entity
+@Table(name = "event_history")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class EventHistory {
+    
+    /**
+     * Уникальный идентификатор записи истории
+     */
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    /**
+     * Идентификатор события (может быть удалено, поэтому без FK)
+     */
+    @Column(name = "event_id", nullable = false)
+    private Long eventId;
+    
+    /**
+     * Пользователь, выполнивший действие
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+    
+    /**
+     * Тип действия: CREATED, UPDATED, DELETED, RESTORED
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "action_type", nullable = false, length = 20)
+    private ActionType actionType;
+    
+    /**
+     * Название измененного поля (только для action_type = UPDATED)
+     */
+    @Column(name = "field_name")
+    private String fieldName;
+    
+    /**
+     * Старое значение поля (для UPDATED)
+     */
+    @Column(name = "old_value", columnDefinition = "TEXT")
+    private String oldValue;
+    
+    /**
+     * Новое значение поля (для UPDATED)
+     */
+    @Column(name = "new_value", columnDefinition = "TEXT")
+    private String newValue;
+    
+    /**
+     * Дата и время выполнения действия
+     */
+    @Column(name = "changed_at", nullable = false)
+    private LocalDateTime changedAt;
+    
+    /**
+     * Автоматически устанавливает дату изменения при создании записи
+     */
+    @PrePersist
+    protected void onCreate() {
+        changedAt = LocalDateTime.now();
+    }
+    
+    /**
+     * ENUM для типов действий с событиями
+     */
+    public enum ActionType {
+        /**
+         * Событие создано
+         */
+        CREATED,
+        
+        /**
+         * Событие обновлено
+         */
+        UPDATED,
+        
+        /**
+         * Событие удалено
+         */
+        DELETED,
+        
+        /**
+         * Событие восстановлено из корзины
+         */
+        RESTORED
+    }
+}

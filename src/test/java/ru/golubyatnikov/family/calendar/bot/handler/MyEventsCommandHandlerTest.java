@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.User;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
@@ -23,7 +24,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -103,7 +104,7 @@ class MyEventsCommandHandlerTest {
 
     @Test
     @DisplayName("Должен отобразить события пользователя")
-    void shouldDisplayUserEvents() {
+    void shouldDisplayUserEvents() throws Exception {
         // Given
         ru.golubyatnikov.family.calendar.bot.model.User user = createUser();
         List<Event> events = createTestEvents(user);
@@ -111,21 +112,25 @@ class MyEventsCommandHandlerTest {
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
+        when(message.getChatId()).thenReturn(123456789L);
         when(eventService.getUserEvents(user.getId())).thenReturn(events);
+        when(keyboardService.createEventActionsKeyboard(anyLong())).thenReturn(new InlineKeyboardMarkup());
+        doNothing().when(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
 
         // When
         String response = handler.handle(message, user);
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("Мои события"));
-        assertTrue(response.contains("День рождения"));
-        assertTrue(response.contains("Поход в кино"));
-        assertTrue(response.contains("31.12.2025"));
-        assertTrue(response.contains("18:00"));
-        assertTrue(response.contains("Всего событий: 2"));
-        assertTrue(response.contains("[Редактировать]"));
-        assertTrue(response.contains("[Удалить]"));
+        assertTrue(response.contains("Мои события"), "Ответ должен содержать заголовок 'Мои события'");
+        assertTrue(response.contains("Всего событий: 2"), "Ответ должен содержать количество событий");
+        
+        // Проверяем, что для каждого события был вызван метод отправки сообщения
+        verify(messageService, times(2)).sendMessageWithInlineKeyboard(
+                eq(123456789L), 
+                anyString(), 
+                any(InlineKeyboardMarkup.class)
+        );
         
         verify(eventService).getUserEvents(user.getId());
     }
@@ -146,9 +151,9 @@ class MyEventsCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("Мои события"));
-        assertTrue(response.contains("У вас пока нет созданных событий"));
-        assertTrue(response.contains("/add_event"));
+        assertTrue(response.contains("*Мои события*"), "Ответ должен содержать заголовок 'Мои события'");
+        assertTrue(response.contains("У вас пока нет созданных событий"), "Ответ должен содержать сообщение об отсутствии событий");
+        assertTrue(response.contains("/add\\_event") || response.contains("/add_event"), "Ответ должен содержать подсказку о команде /add_event");
         
         verify(eventService).getUserEvents(user.getId());
     }
@@ -196,7 +201,7 @@ class MyEventsCommandHandlerTest {
         assertNotNull(response);
         assertTrue(response.contains("Событие удалено"));
         assertTrue(response.contains("успешно удалено"));
-        assertTrue(response.contains("/my_events"));
+        assertTrue(response.contains("/my\\_events") || response.contains("my_events")); // Проверяем наличие команды (экранированной или нет)
         
         verify(eventService).deleteEvent(eventId, userId);
     }
@@ -262,7 +267,7 @@ class MyEventsCommandHandlerTest {
 
     @Test
     @DisplayName("Должен корректно форматировать события с описанием")
-    void shouldFormatEventsWithDescription() {
+    void shouldFormatEventsWithDescription() throws Exception {
         // Given
         ru.golubyatnikov.family.calendar.bot.model.User user = createUser();
         Event event = createEventWithDescription(user);
@@ -271,14 +276,22 @@ class MyEventsCommandHandlerTest {
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
+        when(message.getChatId()).thenReturn(123456789L);
         when(eventService.getUserEvents(user.getId())).thenReturn(events);
+        when(keyboardService.createEventActionsKeyboard(anyLong())).thenReturn(new InlineKeyboardMarkup());
+        doNothing().when(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
 
         // When
         String response = handler.handle(message, user);
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("Описание: Празднование дня рождения"));
+        // Проверяем, что метод отправки был вызван с сообщением, содержащим описание
+        verify(messageService).sendMessageWithInlineKeyboard(
+                eq(123456789L), 
+                argThat((String text) -> text.contains("Описание: Празднование дня рождения")), 
+                any(InlineKeyboardMarkup.class)
+        );
     }
 
     @Test

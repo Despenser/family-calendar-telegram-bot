@@ -245,11 +245,11 @@ public class KeyboardService {
         List<InlineKeyboardButton> row1 = new ArrayList<>();
         
         InlineKeyboardButton editBtn = new InlineKeyboardButton("✏️ Редактировать");
-        editBtn.setCallbackData("edit_" + eventId);
+        editBtn.setCallbackData("edit_event_" + eventId);
         row1.add(editBtn);
         
         InlineKeyboardButton deleteBtn = new InlineKeyboardButton("🗑️ Удалить");
-        deleteBtn.setCallbackData("delete_" + eventId);
+        deleteBtn.setCallbackData("delete_event_" + eventId);
         row1.add(deleteBtn);
         
         rows.add(row1);
@@ -453,6 +453,11 @@ public class KeyboardService {
         
         // Дни месяца
         LocalDate today = LocalDate.now();
+        
+        // Подсчитываем количество событий для каждой даты
+        Map<LocalDate, Long> eventCountByDate = monthEvents.stream()
+            .collect(Collectors.groupingBy(Event::getEventDate, Collectors.counting()));
+        
         for (int day = 1; day <= daysInMonth; day++) {
             LocalDate date = LocalDate.of(year, month, day);
             InlineKeyboardButton dayBtn;
@@ -465,13 +470,30 @@ public class KeyboardService {
                 // Добавляем визуальный индикатор для дней с событиями
                 String dayText = String.valueOf(day);
                 
-                // Если на этот день есть событие, добавляем инициал создателя в надстрочном формате
+                // Добавляем эмодзи 📍 для текущей даты
+                if (date.equals(today)) {
+                    dayText = "📍" + day;
+                }
+                
+                // Если на этот день есть событие, добавляем инициал создателя и счетчик
                 if (firstEventByDate.containsKey(date)) {
                     Event event = firstEventByDate.get(date);
                     String creatorInitial = event.getUser().getFirstName()
                         .substring(0, 1).toUpperCase();
                     String superscriptInitial = toSuperscript(creatorInitial);
-                    dayText = day + superscriptInitial;
+                    
+                    // Добавляем счетчик событий если их больше одного
+                    long eventCount = eventCountByDate.getOrDefault(date, 0L);
+                    if (eventCount > 1) {
+                        dayText = day + superscriptInitial + "(" + eventCount + ")";
+                    } else {
+                        dayText = day + superscriptInitial;
+                    }
+                    
+                    // Если это текущая дата с событиями, добавляем эмодзи в начало
+                    if (date.equals(today)) {
+                        dayText = "📍" + dayText;
+                    }
                 }
                 
                 dayBtn = new InlineKeyboardButton(dayText);
@@ -725,5 +747,411 @@ public class KeyboardService {
         return rows.stream()
                 .mapToInt(row -> row != null ? row.size() : 0)
                 .sum();
+    }
+    
+    /**
+     * Создает inline-клавиатуру для выбора типа события (семейное/персональное).
+     * 
+     * <p>Позволяет пользователю выбрать, будет ли событие видно всей семье
+     * или только ему самому.</p>
+     * 
+     * <p><b>Требования:</b> 26.1</p>
+     * 
+     * @return настроенная InlineKeyboardMarkup с кнопками выбора типа
+     */
+    public InlineKeyboardMarkup createEventTypeSelectionKeyboard() {
+        log.debug("Создание inline-клавиатуры для выбора типа события");
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопка "Семейное событие"
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton familyBtn = new InlineKeyboardButton("👨‍👩‍👧‍👦 Семейное событие");
+        familyBtn.setCallbackData("event_type_family");
+        row1.add(familyBtn);
+        rows.add(row1);
+        
+        // Кнопка "Персональное событие"
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton personalBtn = new InlineKeyboardButton("🔒 Персональное событие");
+        personalBtn.setCallbackData("event_type_personal");
+        row2.add(personalBtn);
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура выбора типа события создана");
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру меню редактирования события.
+     * 
+     * <p>Позволяет выбрать, какое поле события нужно изменить.</p>
+     * 
+     * <p><b>Требования:</b> 18.1</p>
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup с опциями редактирования
+     */
+    public InlineKeyboardMarkup createEditEventMenuKeyboard(Long eventId) {
+        log.debug("Создание inline-клавиатуры меню редактирования для события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопка "Изменить дату"
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton dateBtn = new InlineKeyboardButton("📅 Изменить дату");
+        dateBtn.setCallbackData("edit_field_date_" + eventId);
+        row1.add(dateBtn);
+        rows.add(row1);
+        
+        // Кнопка "Изменить время"
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton timeBtn = new InlineKeyboardButton("🕐 Изменить время");
+        timeBtn.setCallbackData("edit_field_time_" + eventId);
+        row2.add(timeBtn);
+        rows.add(row2);
+        
+        // Кнопка "Изменить название"
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton titleBtn = new InlineKeyboardButton("✏️ Изменить название");
+        titleBtn.setCallbackData("edit_field_title_" + eventId);
+        row3.add(titleBtn);
+        rows.add(row3);
+        
+        // Кнопка "Изменить описание"
+        List<InlineKeyboardButton> row4 = new ArrayList<>();
+        InlineKeyboardButton descBtn = new InlineKeyboardButton("📝 Изменить описание");
+        descBtn.setCallbackData("edit_field_description_" + eventId);
+        row4.add(descBtn);
+        rows.add(row4);
+        
+        // Кнопка "Отмена"
+        List<InlineKeyboardButton> row5 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("edit_cancel_" + eventId);
+        row5.add(cancelBtn);
+        rows.add(row5);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура меню редактирования создана");
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру для настройки напоминаний.
+     * 
+     * <p>Позволяет выбрать тип напоминания для события.</p>
+     * 
+     * <p><b>Требования:</b> 23.2</p>
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup с типами напоминаний
+     */
+    public InlineKeyboardMarkup createReminderSettingsKeyboard(Long eventId) {
+        log.debug("Создание inline-клавиатуры настройки напоминаний для события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопка "Утром в день события"
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton morningBtn = new InlineKeyboardButton("🌅 Утром в день события");
+        morningBtn.setCallbackData("reminder_morning_" + eventId);
+        row1.add(morningBtn);
+        rows.add(row1);
+        
+        // Кнопка "Вечером накануне"
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton eveningBtn = new InlineKeyboardButton("🌆 Вечером накануне");
+        eveningBtn.setCallbackData("reminder_evening_" + eventId);
+        row2.add(eveningBtn);
+        rows.add(row2);
+        
+        // Кнопка "За час до события"
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton hourBtn = new InlineKeyboardButton("⏰ За час до события");
+        hourBtn.setCallbackData("reminder_hour_" + eventId);
+        row3.add(hourBtn);
+        rows.add(row3);
+        
+        // Кнопка "За 10 минут"
+        List<InlineKeyboardButton> row4 = new ArrayList<>();
+        InlineKeyboardButton tenMinBtn = new InlineKeyboardButton("⏱️ За 10 минут");
+        tenMinBtn.setCallbackData("reminder_ten_min_" + eventId);
+        row4.add(tenMinBtn);
+        rows.add(row4);
+        
+        // Кнопка "Свое время"
+        List<InlineKeyboardButton> row5 = new ArrayList<>();
+        InlineKeyboardButton customBtn = new InlineKeyboardButton("⚙️ Свое время");
+        customBtn.setCallbackData("reminder_custom_" + eventId);
+        row5.add(customBtn);
+        rows.add(row5);
+        
+        // Кнопка "Отмена"
+        List<InlineKeyboardButton> row6 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("reminder_cancel_" + eventId);
+        row6.add(cancelBtn);
+        rows.add(row6);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура настройки напоминаний создана");
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру меню настройки повторения события.
+     * 
+     * <p>Позволяет настроить параметры повторяющегося события.</p>
+     * 
+     * <p><b>Требования:</b> 27.2</p>
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup с опциями повторения
+     */
+    public InlineKeyboardMarkup createRecurrenceMenuKeyboard(Long eventId) {
+        log.debug("Создание inline-клавиатуры меню повторения для события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопка "Ежедневно"
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton dailyBtn = new InlineKeyboardButton("📆 Ежедневно");
+        dailyBtn.setCallbackData("recurrence_daily_" + eventId);
+        row1.add(dailyBtn);
+        rows.add(row1);
+        
+        // Кнопка "Еженедельно"
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton weeklyBtn = new InlineKeyboardButton("📅 Еженедельно");
+        weeklyBtn.setCallbackData("recurrence_weekly_" + eventId);
+        row2.add(weeklyBtn);
+        rows.add(row2);
+        
+        // Кнопка "Ежемесячно"
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton monthlyBtn = new InlineKeyboardButton("🗓️ Ежемесячно");
+        monthlyBtn.setCallbackData("recurrence_monthly_" + eventId);
+        row3.add(monthlyBtn);
+        rows.add(row3);
+        
+        // Кнопка "Отмена"
+        List<InlineKeyboardButton> row4 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("recurrence_cancel_" + eventId);
+        row4.add(cancelBtn);
+        rows.add(row4);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура меню повторения создана");
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру для выбора действия с серией событий.
+     * 
+     * <p>Позволяет выбрать, применить ли изменения только к текущему событию
+     * или ко всей серии повторяющихся событий.</p>
+     * 
+     * <p><b>Требования:</b> 27.7</p>
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup с опциями действия
+     */
+    public InlineKeyboardMarkup createSeriesActionKeyboard(Long eventId) {
+        log.debug("Создание inline-клавиатуры действия с серией для события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопка "Только это событие"
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton singleBtn = new InlineKeyboardButton("📌 Только это событие");
+        singleBtn.setCallbackData("series_action_single_" + eventId);
+        row1.add(singleBtn);
+        rows.add(row1);
+        
+        // Кнопка "Всю серию"
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton seriesBtn = new InlineKeyboardButton("📚 Всю серию");
+        seriesBtn.setCallbackData("series_action_all_" + eventId);
+        row2.add(seriesBtn);
+        rows.add(row2);
+        
+        // Кнопка "Отмена"
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("series_action_cancel_" + eventId);
+        row3.add(cancelBtn);
+        rows.add(row3);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура действия с серией создана");
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру с действиями для выбранной даты в календаре.
+     * 
+     * <p>Позволяет посмотреть события на выбранную дату или создать новое.</p>
+     * 
+     * <p><b>Требования:</b> 17.3</p>
+     * 
+     * @param date выбранная дата
+     * @return настроенная InlineKeyboardMarkup с действиями
+     */
+    public InlineKeyboardMarkup createDateActionsKeyboard(LocalDate date) {
+        log.debug("Создание inline-клавиатуры действий для даты {}", date);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        String dateStr = date.toString();
+        
+        // Кнопка "Посмотреть события"
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton viewBtn = new InlineKeyboardButton("👀 Посмотреть события");
+        viewBtn.setCallbackData("date_actions_view_" + dateStr);
+        row1.add(viewBtn);
+        rows.add(row1);
+        
+        // Кнопка "Создать новое"
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton createBtn = new InlineKeyboardButton("➕ Создать новое");
+        createBtn.setCallbackData("date_actions_create_" + dateStr);
+        row2.add(createBtn);
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура действий для даты создана");
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру для прикрепления файла к событию.
+     * 
+     * <p>Позволяет прикрепить файл или отменить действие.</p>
+     * 
+     * <p><b>Требования:</b> 20.1</p>
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup с опциями вложения
+     */
+    public InlineKeyboardMarkup createAttachmentKeyboard(Long eventId) {
+        log.debug("Создание inline-клавиатуры для вложений события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопка "Прикрепить файл"
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton attachBtn = new InlineKeyboardButton("📎 Прикрепить файл");
+        attachBtn.setCallbackData("attach_file_" + eventId);
+        row1.add(attachBtn);
+        rows.add(row1);
+        
+        // Кнопка "Отмена"
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("attach_cancel_" + eventId);
+        row2.add(cancelBtn);
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура для вложений создана");
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру для добавления чек-листа к событию.
+     * 
+     * <p>Позволяет добавить чек-лист или отменить действие.</p>
+     * 
+     * <p><b>Требования:</b> 22.1</p>
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup с опциями чек-листа
+     */
+    public InlineKeyboardMarkup createChecklistKeyboard(Long eventId) {
+        log.debug("Создание inline-клавиатуры для чек-листа события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопка "Добавить чек-лист"
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton addBtn = new InlineKeyboardButton("✅ Добавить чек-лист");
+        addBtn.setCallbackData("checklist_add_" + eventId);
+        row1.add(addBtn);
+        rows.add(row1);
+        
+        // Кнопка "Отмена"
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("checklist_cancel_" + eventId);
+        row2.add(cancelBtn);
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура для чек-листа создана");
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру для добавления комментария к событию.
+     * 
+     * <p>Позволяет добавить комментарий или отменить действие.</p>
+     * 
+     * <p><b>Требования:</b> 21.1</p>
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup с опциями комментария
+     */
+    public InlineKeyboardMarkup createCommentKeyboard(Long eventId) {
+        log.debug("Создание inline-клавиатуры для комментария события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопка "Добавить комментарий"
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton addBtn = new InlineKeyboardButton("💬 Добавить комментарий");
+        addBtn.setCallbackData("comment_add_" + eventId);
+        row1.add(addBtn);
+        rows.add(row1);
+        
+        // Кнопка "Отмена"
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("comment_cancel_" + eventId);
+        row2.add(cancelBtn);
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура для комментария создана");
+        
+        return keyboard;
     }
 }

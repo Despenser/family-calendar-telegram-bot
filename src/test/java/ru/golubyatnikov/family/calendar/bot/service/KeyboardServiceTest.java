@@ -118,12 +118,12 @@ class KeyboardServiceTest {
         // Проверяем кнопку редактирования
         InlineKeyboardButton editBtn = row.get(0);
         assertEquals("✏️ Редактировать", editBtn.getText());
-        assertEquals("edit_123", editBtn.getCallbackData());
+        assertEquals("edit_event_123", editBtn.getCallbackData());
         
         // Проверяем кнопку удаления
         InlineKeyboardButton deleteBtn = row.get(1);
         assertEquals("🗑️ Удалить", deleteBtn.getText());
-        assertEquals("delete_123", deleteBtn.getCallbackData());
+        assertEquals("delete_event_123", deleteBtn.getCallbackData());
     }
 
     @Test
@@ -571,12 +571,16 @@ class KeyboardServiceTest {
             List<InlineKeyboardButton> row = rows.get(i);
             for (InlineKeyboardButton button : row) {
                 String text = button.getText();
-                if (text.matches("\\d+ᴬ")) {
+                // Проверяем наличие инициала ᴬ (может быть с счетчиком событий)
+                if (text.contains("ᴬ")) {
                     foundEventDay = true;
                     assertTrue(text.contains("ᴬ"), 
                         "Должен отображаться инициал первого события по времени (Анна - 10:00)");
                     assertFalse(text.contains("ᴮ"), 
                         "Не должен отображаться инициал второго события");
+                    // Проверяем наличие счетчика событий (2)
+                    assertTrue(text.contains("(2)"), 
+                        "Должен отображаться счетчик событий");
                 }
             }
         }
