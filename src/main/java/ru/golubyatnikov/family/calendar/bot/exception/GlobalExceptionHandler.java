@@ -1,5 +1,7 @@
 package ru.golubyatnikov.family.calendar.bot.exception;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -12,6 +14,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.italic;
@@ -102,6 +105,46 @@ public class GlobalExceptionHandler {
             bold("Некорректная дата"),
             ex.getMessage()
         );
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(errorResponse);
+    }
+    
+    /**
+     * Обрабатывает исключение ConstraintViolationException (ошибки Bean Validation).
+     * 
+     * <p>Возвращает понятное сообщение об ошибке валидации с перечислением
+     * всех нарушенных ограничений.</p>
+     * 
+     * <p><b>Требования:</b> 8.3</p>
+     * 
+     * @param ex исключение ConstraintViolationException
+     * @return ResponseEntity с информацией об ошибке валидации
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleConstraintViolationException(ConstraintViolationException ex) {
+        // Собираем все сообщения об ошибках валидации
+        String validationErrors = ex.getConstraintViolations().stream()
+            .map(ConstraintViolation::getMessage)
+            .collect(Collectors.joining(", "));
+        
+        log.warn("Ошибка валидации: {}", validationErrors);
+        
+        Map<String, Object> errorResponse = createErrorResponse(
+            HttpStatus.BAD_REQUEST,
+            bold("Ошибка валидации"),
+            validationErrors
+        );
+        
+        // Добавляем детальную информацию о нарушениях
+        errorResponse.put("violations", ex.getConstraintViolations().stream()
+            .map(violation -> Map.of(
+                "field", violation.getPropertyPath().toString(),
+                "message", violation.getMessage(),
+                "invalidValue", violation.getInvalidValue() != null ? 
+                    violation.getInvalidValue().toString() : "null"
+            ))
+            .collect(Collectors.toList()));
         
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(errorResponse);

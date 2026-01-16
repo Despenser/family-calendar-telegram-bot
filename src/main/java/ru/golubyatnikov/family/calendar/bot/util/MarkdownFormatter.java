@@ -1,6 +1,7 @@
 package ru.golubyatnikov.family.calendar.bot.util;
 
 import java.util.IllegalFormatException;
+import java.util.Locale;
 
 /**
  * Утилитный класс для форматирования текста в MarkdownV2 формате Telegram.
@@ -39,8 +40,10 @@ public final class MarkdownFormatter {
     
     /**
      * Массив специальных символов MarkdownV2, которые требуют экранирования.
+     * Полный список зарезервированных символов согласно спецификации Telegram MarkdownV2:
+     * '_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'
      */
-    private static final char[] SPECIAL_CHARS = {
+    private static final char[] MARKDOWN_SPECIAL_CHARS = {
         '_', '*', '[', ']', '(', ')', '~', '`', 
         '>', '#', '+', '-', '=', '|', '{', '}', 
         '.', '!'
@@ -70,14 +73,14 @@ public final class MarkdownFormatter {
      * 
      * @example
      * <pre>{@code
-     * escape("Hello (world)!") -> "Hello \\(world\\)\\!"
-     * escape("Price: $100") -> "Price: \\$100"
-     * escape("") -> ""
-     * escape(null) -> ""
-     * escape("Привет 👋") -> "Привет 👋" // эмодзи не экранируются
+     * escapeMarkdownV2("Hello (world)!") -> "Hello \\(world\\)\\!"
+     * escapeMarkdownV2("Price: $100") -> "Price: \\$100"
+     * escapeMarkdownV2("") -> ""
+     * escapeMarkdownV2(null) -> ""
+     * escapeMarkdownV2("Привет 👋") -> "Привет 👋" // эмодзи не экранируются
      * }</pre>
      */
-    public static String escape(String text) {
+    public static String escapeMarkdownV2(String text) {
         if (text == null || text.isEmpty()) {
             return "";
         }
@@ -92,6 +95,34 @@ public final class MarkdownFormatter {
         }
         
         return result.toString();
+    }
+    
+    /**
+     * Экранирует специальные символы MarkdownV2 в тексте.
+     * 
+     * <p>Метод добавляет обратный слеш (\) перед каждым специальным символом,
+     * который имеет особое значение в MarkdownV2. Эмодзи и другие Unicode символы
+     * не экранируются.</p>
+     * 
+     * <p>Список экранируемых символов:
+     * _ * [ ] ( ) ~ ` > # + - = | { } . !</p>
+     * 
+     * <p>Этот метод является алиасом для {@link #escapeMarkdownV2(String)} для обратной совместимости.</p>
+     * 
+     * @param text текст для экранирования, может быть null или пустым
+     * @return экранированный текст, или пустая строка если входной текст null или пустой
+     * 
+     * @example
+     * <pre>{@code
+     * escape("Hello (world)!") -> "Hello \\(world\\)\\!"
+     * escape("Price: $100") -> "Price: \\$100"
+     * escape("") -> ""
+     * escape(null) -> ""
+     * escape("Привет 👋") -> "Привет 👋" // эмодзи не экранируются
+     * }</pre>
+     */
+    public static String escape(String text) {
+        return escapeMarkdownV2(text);
     }
     
     /**
@@ -118,7 +149,7 @@ public final class MarkdownFormatter {
             return "";
         }
         
-        return "*" + escape(text) + "*";
+        return "*" + escapeMarkdownV2(text) + "*";
     }
     
     /**
@@ -144,7 +175,7 @@ public final class MarkdownFormatter {
             return "";
         }
         
-        return "_" + escape(text) + "_";
+        return "_" + escapeMarkdownV2(text) + "_";
     }
     
     /**
@@ -202,50 +233,54 @@ public final class MarkdownFormatter {
             return "";
         }
         
-        return "*_" + escape(text) + "_*";
+        return "*_" + escapeMarkdownV2(text) + "_*";
     }
     
     /**
      * Форматирует сообщение с автоматическим экранированием всех частей.
      * 
      * <p>Метод работает аналогично String.format(), но автоматически экранирует
-     * все специальные символы MarkdownV2 как в шаблоне, так и в аргументах.
+     * все специальные символы MarkdownV2 в результате форматирования.
      * Это предотвращает ошибки парсинга MarkdownV2 при отправке сообщений в Telegram.</p>
      * 
-     * <p>Важно: метод экранирует все части сообщения, включая статический текст
-     * в шаблоне. Если какой-то аргумент уже экранирован, это может привести к
-     * двойному экранированию. В таких случаях используйте escape() напрямую.</p>
+     * <p>Поддерживает все стандартные плейсхолдеры Java: %s, %d, %02d, %f, %.2f и т.д.
+     * Метод сначала форматирует сообщение через String.format(), а затем экранирует
+     * все специальные символы MarkdownV2 в результате.</p>
      * 
-     * <p>Поддерживаемые плейсхолдеры: только %s (строка). Все аргументы будут
-     * преобразованы в строки через toString() и экранированы.</p>
+     * <p>Важно: метод экранирует весь результат форматирования, включая статический текст
+     * в шаблоне и отформатированные значения. Эмодзи не экранируются.</p>
      * 
-     * @param template шаблон сообщения с плейсхолдерами %s (например, "Дата: %s")
-     * @param args аргументы для подстановки (будут экранированы автоматически)
+     * @param template шаблон сообщения с плейсхолдерами (например, "Час: %02d:00")
+     * @param args аргументы для подстановки
      * @return полностью экранированное сообщение, готовое для отправки в Telegram
-     * @throws IllegalArgumentException если template равен null, или если количество
-     *         плейсхолдеров не совпадает с количеством аргументов
+     * @throws IllegalArgumentException если template равен null, или если форматирование
+     *         не удалось (несоответствие типов, количества аргументов, некорректный формат плейсхолдера)
      * 
      * @example
      * <pre>{@code
-     * // Простое использование
+     * // Строковые плейсхолдеры
      * String msg = formatMessage("Дата: %s", "12.01.2026");
      * // Результат: "Дата: 12\\.01\\.2026"
      * 
-     * // С несколькими аргументами
-     * String msg = formatMessage("Событие: %s в %s", "Встреча!", "14:30");
-     * // Результат: "Событие: Встреча\\! в 14:30"
+     * // Целочисленные плейсхолдеры
+     * String msg = formatMessage("Час: %02d:00", 9);
+     * // Результат: "Час: 09:00"
      * 
-     * // С числовыми аргументами
-     * String msg = formatMessage("Найдено событий: %s", 5);
-     * // Результат: "Найдено событий: 5"
+     * // Плейсхолдеры с плавающей точкой
+     * String msg = formatMessage("Цена: %.2f руб.", 123.456);
+     * // Результат: "Цена: 123\\.46 руб\\."
      * 
-     * // Со специальными символами в шаблоне
-     * String msg = formatMessage("✅ Дата выбрана: %s\n\nТеперь выберите час:", "12.01.2026");
-     * // Результат: "✅ Дата выбрана: 12\\.01\\.2026\n\nТеперь выберите час:"
+     * // Смешанные плейсхолдеры
+     * String msg = formatMessage("Событие %s в %02d:%02d", "Встреча", 14, 30);
+     * // Результат: "Событие Встреча в 14:30"
      * 
      * // С эмодзи (эмодзи не экранируются)
-     * String msg = formatMessage("Привет 👋 %s!", "Мир");
-     * // Результат: "Привет 👋 Мир\\!"
+     * String msg = formatMessage("✅ Час выбран: %02d:00", 9);
+     * // Результат: "✅ Час выбран: 09:00"
+     * 
+     * // Без аргументов (просто экранирование)
+     * String msg = formatMessage("Привет!");
+     * // Результат: "Привет\\!"
      * }</pre>
      */
     public static String formatMessage(String template, Object... args) {
@@ -255,68 +290,25 @@ public final class MarkdownFormatter {
         
         // Если нет аргументов, просто экранируем шаблон
         if (args == null || args.length == 0) {
-            return escape(template);
+            return escapeMarkdownV2(template);
         }
         
-        // Проверяем количество плейсхолдеров
-        long placeholderCount = countPlaceholders(template);
-        if (placeholderCount != args.length) {
+        try {
+            // Форматируем сообщение через String.format() с Locale.US для точки в числах
+            String formatted = String.format(Locale.US, template, args);
+            
+            // Экранируем результат
+            return escapeMarkdownV2(formatted);
+        } catch (IllegalFormatException e) {
+            // Преобразуем в понятное сообщение об ошибке
             throw new IllegalArgumentException(
                 String.format(
-                    "Ошибка форматирования: количество плейсхолдеров (%d) не совпадает с количеством аргументов (%d). " +
-                    "Шаблон: '%s'",
-                    placeholderCount, args.length, template
-                )
+                    "Ошибка форматирования сообщения. Шаблон: '%s', количество аргументов: %d. Причина: %s",
+                    template, args.length, e.getMessage()
+                ),
+                e
             );
         }
-        
-        // Экранируем все аргументы
-        Object[] escapedArgs = new Object[args.length];
-        for (int i = 0; i < args.length; i++) {
-            if (args[i] == null) {
-                throw new IllegalArgumentException(
-                    String.format("Аргумент с индексом %d не может быть null", i)
-                );
-            }
-            // Преобразуем аргумент в строку и экранируем
-            escapedArgs[i] = escape(args[i].toString());
-        }
-        
-        // Сначала форматируем сообщение с неэкранированным шаблоном
-        String formatted = String.format(template, escapedArgs);
-        
-        // Затем экранируем весь результат, но это приведет к двойному экранированию аргументов
-        // Поэтому нужен другой подход: экранировать шаблон по частям
-        
-        // Разбиваем шаблон на части между плейсхолдерами
-        String[] parts = template.split("%s", -1);
-        
-        // Собираем результат: экранированная часть + экранированный аргумент
-        StringBuilder result = new StringBuilder();
-        for (int i = 0; i < parts.length; i++) {
-            result.append(escape(parts[i]));
-            if (i < escapedArgs.length) {
-                result.append(escapedArgs[i]);
-            }
-        }
-        
-        return result.toString();
-    }
-    
-    /**
-     * Подсчитывает количество плейсхолдеров %s в шаблоне.
-     * 
-     * @param template шаблон для анализа
-     * @return количество плейсхолдеров %s
-     */
-    private static long countPlaceholders(String template) {
-        int count = 0;
-        int index = 0;
-        while ((index = template.indexOf("%s", index)) != -1) {
-            count++;
-            index += 2;
-        }
-        return count;
     }
     
     /**
@@ -326,7 +318,7 @@ public final class MarkdownFormatter {
      * @return true если символ требует экранирования, false в противном случае
      */
     private static boolean isSpecialChar(char c) {
-        for (char specialChar : SPECIAL_CHARS) {
+        for (char specialChar : MARKDOWN_SPECIAL_CHARS) {
             if (c == specialChar) {
                 return true;
             }

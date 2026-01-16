@@ -16,6 +16,9 @@ import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
+
 /**
  * Сервис для управления комментариями к событиям.
  * Предоставляет функциональность для добавления, получения комментариев
@@ -82,7 +85,7 @@ public class CommentService {
             .build();
         
         Comment saved = commentRepository.save(comment);
-        log.info("Комментарий ID {} успешно добавлен к событию ID {} пользователем ID {}", 
+        log.debug("Комментарий ID {} успешно добавлен к событию ID {} пользователем ID {}", 
                  saved.getId(), eventId, userId);
         
         // Уведомить семью о новом комментарии (только для семейных событий)
@@ -154,7 +157,7 @@ public class CommentService {
             }
         }
         
-        log.info("Уведомления о комментарии к событию ID {} отправлены: успешно={}, ошибок={}", 
+        log.debug("Уведомления о комментарии к событию ID {} отправлены: успешно={}, ошибок={}", 
                  event.getId(), notificationsSent, notificationsFailed);
     }
     
@@ -174,14 +177,12 @@ public class CommentService {
             ? commentText.substring(0, 100) + "..." 
             : commentText;
         
-        return String.format(
-            "💬 *Новый комментарий к событию*\n\n" +
-            "📅 Событие: *%s*\n" +
-            "👤 Автор: %s\n" +
-            "💭 Комментарий: %s",
-            event.getTitle(),
-            authorName,
-            truncatedComment
-        );
+        StringBuilder message = new StringBuilder();
+        message.append("💬 ").append(bold("Новый комментарий к событию")).append("\n\n");
+        message.append("📅 Событие: ").append(bold(event.getTitle())).append("\n");
+        message.append(formatMessage("👤 Автор: %s\n", authorName));
+        message.append(formatMessage("💭 Комментарий: %s", truncatedComment));
+        
+        return message.toString();
     }
 }

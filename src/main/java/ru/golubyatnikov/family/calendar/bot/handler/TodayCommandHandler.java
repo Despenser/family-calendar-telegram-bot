@@ -92,13 +92,13 @@ public class TodayCommandHandler implements CommandHandler {
                 .filter(event -> !event.getIsPersonal() || event.belongsToUser(user.getId()))
                 .collect(Collectors.toList());
             
-            log.info("После фильтрации осталось {} событий на сегодня для пользователя ID={}", 
+            log.debug("После фильтрации осталось {} событий на сегодня для пользователя ID={}", 
                     filteredEvents.size(), user.getId());
             
             if (filteredEvents.isEmpty()) {
                 String responseMessage = escape("📅 ") + bold("События на сегодня") + escape("\n\n") +
                                escape("На сегодня событий не запланировано. Отличный день для отдыха! 😊");
-                log.info("Пользователю ID={} будет отправлено сообщение об отсутствии событий на сегодня", user.getId());
+                log.debug("Пользователю ID={} будет отправлено сообщение об отсутствии событий на сегодня", user.getId());
                 return responseMessage;
             }
             
@@ -117,7 +117,7 @@ public class TodayCommandHandler implements CommandHandler {
             messageBuilder.append(escape("\n")).append(italic("Всего событий: " + filteredEvents.size()));
             
             String responseMessage = messageBuilder.toString();
-            log.info("Пользователю ID={} будет отправлен список из {} событий на сегодня", 
+            log.debug("Пользователю ID={} будет отправлен список из {} событий на сегодня", 
                      user.getId(), filteredEvents.size());
             return responseMessage;
             

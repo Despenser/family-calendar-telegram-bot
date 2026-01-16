@@ -104,8 +104,7 @@ public class AddEventCommandHandler implements CommandHandler {
         Long telegramId = user.getTelegramId();
         Long chatId = message.getChatId();
         
-        log.info("Начало создания события через inline-календарь: telegramId={}, userId={}", 
-                telegramId, user.getId());
+        log.debug("Начало создания события через inline-календарь: userId={}", user.getId());
         
         // Проверяем, что пользователь принадлежит семье
         if (!user.hasFamily()) {
@@ -124,10 +123,10 @@ public class AddEventCommandHandler implements CommandHandler {
             InlineKeyboardMarkup typeKeyboard = keyboardService.createEventTypeSelectionKeyboard();
             
             messageService.sendMessageWithInlineKeyboard(chatId, 
-                String.format("📅 %s\n\nВыберите тип события:", bold("Создание нового события")), 
+                formatMessage("📅 %s\n\nВыберите тип события:", "Создание нового события"), 
                 typeKeyboard);
             
-            log.info("Клавиатура выбора типа события отправлена пользователю: userId={}, telegramId={}", 
+            log.debug("Клавиатура выбора типа события отправлена пользователю: userId={}, telegramId={}", 
                     user.getId(), telegramId);
             
             // Возвращаем null, так как ответ уже отправлен через TelegramMessageService
@@ -140,7 +139,7 @@ public class AddEventCommandHandler implements CommandHandler {
             // Очищаем черновик при ошибке
             try {
                 conversationService.cancelEventCreation(user.getId());
-                log.info("Черновик успешно удален после ошибки: userId={}", user.getId());
+                log.debug("Черновик успешно удален после ошибки: userId={}", user.getId());
             } catch (Exception cleanupError) {
                 log.error("Ошибка при очистке черновика после сбоя: userId={}, cleanupError={}", 
                         user.getId(), cleanupError.getMessage(), cleanupError);

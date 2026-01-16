@@ -89,14 +89,14 @@ public class WeekCommandHandler implements CommandHandler {
                 .filter(event -> !event.getIsPersonal() || event.belongsToUser(user.getId()))
                 .collect(Collectors.toList());
             
-            log.info("После фильтрации осталось {} событий на неделю для пользователя ID={}", 
+            log.debug("После фильтрации осталось {} событий на неделю для пользователя ID={}", 
                     filteredEvents.size(), user.getId());
             
             if (filteredEvents.isEmpty()) {
                 String responseMessage = escape("📅 ") + bold("События на неделю (7 дней)") + escape("\n\n") +
                                        escape("На ближайшую неделю событий не запланировано. ") +
                                        escape("Время для новых планов! 📝");
-                log.info("Пользователю ID={} будет отправлено сообщение об отсутствии событий на неделю", user.getId());
+                log.debug("Пользователю ID={} будет отправлено сообщение об отсутствии событий на неделю", user.getId());
                 return responseMessage;
             }
             
@@ -133,7 +133,7 @@ public class WeekCommandHandler implements CommandHandler {
             messageBuilder.append(italic("Всего событий: " + filteredEvents.size()));
             
             String responseMessage = messageBuilder.toString();
-            log.info("Пользователю ID={} будет отправлен список из {} событий на неделю", 
+            log.debug("Пользователю ID={} будет отправлен список из {} событий на неделю", 
                      user.getId(), filteredEvents.size());
             return responseMessage;
             

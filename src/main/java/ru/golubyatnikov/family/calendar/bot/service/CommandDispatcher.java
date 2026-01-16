@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
+import ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter;
 
 /**
  * Сервис для маршрутизации команд к соответствующим обработчикам.
@@ -79,7 +79,7 @@ public class CommandDispatcher {
         if (handlers == null || handlers.isEmpty()) {
             log.warn("Не найдено ни одного обработчика команд. Бот не сможет обрабатывать команды.");
         } else {
-            log.info("Регистрация обработчиков команд. Всего обработчиков: {}", handlers.size());
+            log.debug("Регистрация обработчиков команд. Всего обработчиков: {}", handlers.size());
             
             for (CommandHandler handler : handlers) {
                 String command = handler.getCommand();
@@ -100,7 +100,7 @@ public class CommandDispatcher {
                         handler.getDescription());
             }
             
-            log.info("Регистрация обработчиков завершена. Зарегистрировано команд: {}", 
+            log.debug("Регистрация обработчиков завершена. Зарегистрировано команд: {}", 
                     commandHandlers.size());
         }
     }
@@ -139,32 +139,31 @@ public class CommandDispatcher {
         if (!message.hasText()) {
             log.warn("Получено сообщение без текста от пользователя: telegramId={}, chatId={}", 
                     message.getFrom().getId(), message.getChatId());
-            return "Пожалуйста, отправьте текстовую команду. Используйте " + escape("/help") + " для списка доступных команд.";
+            return MarkdownFormatter.formatMessage("Пожалуйста, отправьте текстовую команду. Используйте /help для списка доступных команд.");
         }
         
         String messageText = message.getText().trim();
         Long telegramId = message.getFrom().getId();
         
-        log.info("Начало маршрутизации команды: text='{}', telegramId={}, chatId={}, messageId={}", 
-                messageText, telegramId, message.getChatId(), message.getMessageId());
-        
         // Извлекаем команду (первое слово, начинающееся с /)
         String command = extractCommand(messageText);
         
+        log.debug("Начало маршрутизации команды: command='{}', telegramId={}, chatId={}, messageId={}", 
+                command, telegramId, message.getChatId(), message.getMessageId());
+        
         if (command == null) {
-            log.warn("Не удалось извлечь команду из текста: '{}', telegramId={}", 
-                    messageText, telegramId);
-            return "Команда должна начинаться с символа '/'. Используйте " + escape("/help") + " для списка доступных команд.";
+            log.warn("Не удалось извлечь команду из текста, telegramId={}", telegramId);
+            return MarkdownFormatter.formatMessage("Команда должна начинаться с символа '/'. Используйте /help для списка доступных команд.");
         }
         
-        log.debug("Извлечена команда: '{}' из текста: '{}'", command, messageText);
+        log.debug("Извлечена команда: '{}', telegramId={}", command, telegramId);
         
         // Ищем обработчик для команды
         CommandHandler handler = commandHandlers.get(command);
         
         if (handler == null) {
             log.warn("Обработчик не найден для команды: '{}', telegramId={}", command, telegramId);
-            return String.format("Неизвестная команда: %s\n\nИспользуйте %s для списка доступных команд.", command, escape("/help"));
+            return MarkdownFormatter.formatMessage("Неизвестная команда: %s\n\nИспользуйте /help для списка доступных команд.", command);
         }
         
         log.debug("Найден обработчик для команды '{}': {}, requiresAuth={}", 
@@ -184,12 +183,11 @@ public class CommandDispatcher {
                 log.warn("Неавторизованная попытка выполнить команду '{}': telegramId={}", 
                         command, telegramId);
                 throw new UnauthorizedAccessException(
-                        String.format("Команда %s требует авторизации. " +
-                                "Пожалуйста, используйте %s для регистрации.", command, escape("/start")));
+                        MarkdownFormatter.formatMessage("Команда %s требует авторизации. Пожалуйста, используйте /start для регистрации.", command));
             }
             
-            log.info("Пользователь авторизован: telegramId={}, userId={}, username={}, familyId={}", 
-                    telegramId, user.getId(), user.getUsername(), 
+            log.debug("Пользователь авторизован: telegramId={}, userId={}, familyId={}", 
+                    telegramId, user.getId(), 
                     user.getFamily() != null ? user.getFamily().getId() : null);
         } else {
             if (user != null) {
@@ -202,12 +200,12 @@ public class CommandDispatcher {
         
         // Делегируем обработку команды
         try {
-            log.info("Делегирование обработки команды '{}' обработчику: {}, telegramId={}", 
+            log.debug("Делегирование обработки команды '{}' обработчику: {}, telegramId={}", 
                     command, handler.getClass().getSimpleName(), telegramId);
             
             String response = handler.handle(message, user);
             
-            log.info("Команда '{}' успешно обработана: telegramId={}, responseLength={}", 
+            log.debug("Команда '{}' успешно обработана: telegramId={}, responseLength={}", 
                     command, telegramId, response != null ? response.length() : 0);
             
             return response;

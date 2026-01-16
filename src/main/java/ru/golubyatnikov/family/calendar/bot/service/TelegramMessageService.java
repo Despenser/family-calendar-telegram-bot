@@ -15,6 +15,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMar
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
 import ru.golubyatnikov.family.calendar.bot.config.BotConfig;
+import ru.golubyatnikov.family.calendar.bot.util.SensitiveDataMasker;
 
 /**
  * Сервис для отправки сообщений через Telegram Bot API.
@@ -90,8 +91,8 @@ public class TelegramMessageService extends DefaultAbsSender {
         super(new DefaultBotOptions());
         this.botConfig = botConfig;
         this.metricsService = metricsService;
-        log.info("TelegramMessageService инициализирован с токеном: {}...", 
-                maskToken(botConfig.getToken()));
+        log.debug("TelegramMessageService инициализирован с токеном: {}...", 
+                SensitiveDataMasker.maskToken(botConfig.getToken()));
     }
 
     /**
@@ -151,7 +152,7 @@ public class TelegramMessageService extends DefaultAbsSender {
         
         try {
             execute(message);
-            log.info("Сообщение успешно отправлено: telegramId={}, textLength={}", 
+            log.debug("Сообщение успешно отправлено: telegramId={}, textLength={}", 
                     telegramId, text.length());
             
         } catch (TelegramApiRequestException e) {
@@ -195,6 +196,15 @@ public class TelegramMessageService extends DefaultAbsSender {
      *   <li>Попытка 3: через 2 секунды</li>
      * </ul>
      * 
+     * <p><b>Обработка ошибок парсинга:</b></p>
+     * <ul>
+     *   <li>При ошибке парсинга MarkdownV2 (400 Bad Request) попытки прекращаются</li>
+     *   <li>Автоматический fallback на отправку без форматирования (plain text)</li>
+     *   <li>Детальное логирование для диагностики проблем с экранированием</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 4.3, 4.4, 4.5</p>
+     * 
      * @param telegramId Telegram ID пользователя-получателя
      * @param text текст сообщения (поддерживает MarkdownV2, требует экранирования)
      * @param replyMarkup разметка inline кнопок
@@ -204,11 +214,6 @@ public class TelegramMessageService extends DefaultAbsSender {
      * @see #sendMessage(Long, String)
      * @see ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter
      */
-    @Retryable(
-        retryFor = TelegramApiException.class,
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000, multiplier = 2.0)
-    )
     public void sendMessage(Long telegramId, String text, InlineKeyboardMarkup replyMarkup) 
             throws TelegramApiException {
         validateSendMessageParams(telegramId, text);
@@ -221,6 +226,7 @@ public class TelegramMessageService extends DefaultAbsSender {
         log.debug("Отправка сообщения с inline кнопками: telegramId={}, textLength={}, buttonsCount={}", 
                 telegramId, text.length(), countButtons(replyMarkup));
         
+        // Попытка отправки с MarkdownV2
         SendMessage message = SendMessage.builder()
                 .chatId(telegramId.toString())
                 .text(text)
@@ -229,20 +235,29 @@ public class TelegramMessageService extends DefaultAbsSender {
                 .build();
         
         try {
-            execute(message);
-            log.info("Сообщение с inline кнопками успешно отправлено: telegramId={}, textLength={}, buttonsCount={}", 
+            executeWithRetry(message, telegramId, text, 3);
+            log.debug("Сообщение с inline кнопками успешно отправлено: telegramId={}, textLength={}, buttonsCount={}", 
                     telegramId, text.length(), countButtons(replyMarkup));
             
         } catch (TelegramApiRequestException e) {
-            recordMetricForTelegramError(e);
-            handleTelegramApiError(e, telegramId, text);
-            throw e;
-            
-        } catch (TelegramApiException e) {
-            recordMetric("network_error");
-            log.error("Ошибка при отправке сообщения с inline кнопками: telegramId={}, error={}", 
-                    telegramId, e.getMessage());
-            throw e;
+            // Если это ошибка парсинга, пробуем fallback на plain text
+            if (isParseError(e)) {
+                log.warn("Ошибка парсинга MarkdownV2, переключаемся на plain text: telegramId={}", 
+                        telegramId);
+                recordMetric("markdown_parse_error_fallback");
+                
+                try {
+                    sendMessageWithoutFormatting(telegramId, text, replyMarkup);
+                    log.info("Сообщение успешно отправлено без форматирования (fallback): telegramId={}", 
+                            telegramId);
+                } catch (TelegramApiException fallbackException) {
+                    log.error("Fallback на plain text также не удался: telegramId={}, error={}", 
+                            telegramId, fallbackException.getMessage());
+                    throw fallbackException;
+                }
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -273,6 +288,14 @@ public class TelegramMessageService extends DefaultAbsSender {
      *   <li>Попытка 3: через 2 секунды</li>
      * </ul>
      * 
+     * <p><b>Обработка ошибок парсинга:</b></p>
+     * <ul>
+     *   <li>При ошибке парсинга MarkdownV2 (400 Bad Request) попытки прекращаются</li>
+     *   <li>Детальное логирование для диагностики проблем с экранированием</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 4.3, 4.4, 4.5</p>
+     * 
      * @param telegramId Telegram ID пользователя-получателя
      * @param text текст сообщения (поддерживает MarkdownV2, требует экранирования)
      * @param keyboard reply клавиатура с кнопками команд
@@ -282,11 +305,6 @@ public class TelegramMessageService extends DefaultAbsSender {
      * @see #sendMessage(Long, String)
      * @see ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter
      */
-    @Retryable(
-        retryFor = TelegramApiException.class,
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000, multiplier = 2.0)
-    )
     public void sendMessage(Long telegramId, String text, ReplyKeyboardMarkup keyboard) 
             throws TelegramApiException {
         validateSendMessageParams(telegramId, text);
@@ -307,11 +325,12 @@ public class TelegramMessageService extends DefaultAbsSender {
                 .build();
         
         try {
-            execute(message);
-            log.info("Сообщение с reply клавиатурой успешно отправлено: telegramId={}, textLength={}, keyboardRows={}", 
+            executeWithRetry(message, telegramId, text, 3);
+            log.debug("Сообщение с reply клавиатурой успешно отправлено: telegramId={}, textLength={}, keyboardRows={}", 
                     telegramId, text.length(), keyboard.getKeyboard() != null ? keyboard.getKeyboard().size() : 0);
             
         } catch (TelegramApiRequestException e) {
+            // Для reply клавиатуры не делаем fallback, так как она не поддерживает inline кнопки
             recordMetricForTelegramError(e);
             handleTelegramApiError(e, telegramId, text);
             throw e;
@@ -340,6 +359,70 @@ public class TelegramMessageService extends DefaultAbsSender {
     public void sendMessageWithInlineKeyboard(Long chatId, String text, InlineKeyboardMarkup keyboard) 
             throws TelegramApiException {
         sendMessage(chatId, text, keyboard);
+    }
+
+    /**
+     * Отправляет текстовое сообщение с inline кнопками без форматирования.
+     * 
+     * <p>Этот метод используется как fallback механизм, когда отправка
+     * с MarkdownV2 форматированием не удается из-за ошибки 400 (Bad Request).
+     * Сообщение отправляется с parseMode=null, что означает отсутствие
+     * какого-либо форматирования.</p>
+     * 
+     * <p>Метод автоматически повторяет попытки отправки при ошибках
+     * с экспоненциальной задержкой. Максимум 3 попытки.</p>
+     * 
+     * <p><b>Требования:</b> 4.4, 5.2</p>
+     * 
+     * @param chatId ID чата для отправки сообщения
+     * @param text текст сообщения (без форматирования)
+     * @param keyboard inline клавиатура с кнопками
+     * @throws TelegramApiException если все попытки отправки не удались
+     * @throws IllegalArgumentException если chatId null, text пустой или keyboard null
+     */
+    public void sendMessageWithoutFormatting(Long chatId, String text, InlineKeyboardMarkup keyboard) 
+            throws TelegramApiException {
+        validateSendMessageParams(chatId, text);
+        
+        if (keyboard == null) {
+            log.error("Попытка отправить сообщение с null keyboard: chatId={}", chatId);
+            throw new IllegalArgumentException("Keyboard не может быть null");
+        }
+        
+        log.debug("Отправка сообщения без форматирования с inline кнопками: chatId={}, textLength={}, buttonsCount={}", 
+                chatId, text.length(), countButtons(keyboard));
+        
+        SendMessage message = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(text)
+                // parseMode не устанавливается - отправка без форматирования
+                .replyMarkup(keyboard)
+                .build();
+        
+        try {
+            execute(message);
+            log.debug("Сообщение без форматирования с inline кнопками успешно отправлено: chatId={}, textLength={}, buttonsCount={}", 
+                    chatId, text.length(), countButtons(keyboard));
+            
+        } catch (TelegramApiRequestException e) {
+            recordMetricForTelegramError(e);
+            
+            // Детальное логирование клавиатуры при ошибке
+            if (e.getErrorCode() != null && e.getErrorCode() == 400) {
+                log.error("Ошибка 400 при отправке без форматирования с inline кнопками. Детали клавиатуры: " +
+                         "chatId={}, buttonsCount={}, keyboardDetails={}", 
+                         chatId, countButtons(keyboard), getKeyboardDetails(keyboard));
+            }
+            
+            handleTelegramApiError(e, chatId, text);
+            throw e;
+            
+        } catch (TelegramApiException e) {
+            recordMetric("network_error");
+            log.error("Ошибка при отправке сообщения без форматирования с inline кнопками: chatId={}, error={}", 
+                    chatId, e.getMessage());
+            throw e;
+        }
     }
 
     /**
@@ -408,7 +491,7 @@ public class TelegramMessageService extends DefaultAbsSender {
         
         try {
             execute(editMessage);
-            log.info("Сообщение успешно отредактировано: chatId={}, messageId={}, newTextLength={}", 
+            log.debug("Сообщение успешно отредактировано: chatId={}, messageId={}, newTextLength={}", 
                     chatId, messageId, newText.length());
             
         } catch (TelegramApiRequestException e) {
@@ -440,17 +523,21 @@ public class TelegramMessageService extends DefaultAbsSender {
      * <p>Метод автоматически повторяет попытки при ошибках
      * с экспоненциальной задержкой. Максимум 3 попытки.</p>
      * 
+     * <p><b>Обработка устаревших запросов:</b></p>
+     * <ul>
+     *   <li>Если callback query старше 30 секунд, Telegram вернет ошибку "query is too old"</li>
+     *   <li>В этом случае метод логирует информационное сообщение и не повторяет попытки</li>
+     *   <li>Это нормальное поведение и не является критической ошибкой</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 4.1, 4.2, 4.3, 4.5</p>
+     * 
      * @param callbackQueryId ID callback query для ответа
      * @param text текст для отображения пользователю (может быть пустым)
      * @throws TelegramApiException если все попытки отправки не удались
      * @throws IllegalArgumentException если callbackQueryId null или пустой
      * @see AnswerCallbackQuery
      */
-    @Retryable(
-        retryFor = TelegramApiException.class,
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000, multiplier = 2.0)
-    )
     public void answerCallbackQuery(String callbackQueryId, String text) 
             throws TelegramApiException {
         if (callbackQueryId == null || callbackQueryId.isBlank()) {
@@ -468,12 +555,20 @@ public class TelegramMessageService extends DefaultAbsSender {
         
         try {
             execute(answer);
-            log.info("Ответ на callback query успешно отправлен: callbackQueryId={}", 
+            log.debug("Ответ на callback query успешно отправлен: callbackQueryId={}", 
                     callbackQueryId);
             
         } catch (TelegramApiRequestException e) {
+            // Проверяем, не устарел ли callback query
+            if (e.getMessage() != null && e.getMessage().contains("query is too old")) {
+                log.info("Callback query устарел (старше 30 секунд): callbackQueryId={}", 
+                        callbackQueryId);
+                recordMetric("stale_callback_query");
+                return; // Не повторяем попытки для устаревших запросов
+            }
+            
             recordMetricForTelegramError(e);
-            handleTelegramApiError(e, null, null);
+            handleCallbackQueryError(e, callbackQueryId);
             throw e;
             
         } catch (TelegramApiException e) {
@@ -599,28 +694,39 @@ public class TelegramMessageService extends DefaultAbsSender {
         String apiResponse = e.getApiResponse();
         
         if (errorCode == null) {
-            log.error("Ошибка Telegram API без кода: telegramId={}, response={}", 
-                    telegramId, apiResponse);
+            log.error("Ошибка Telegram API без кода: telegramId={}, response={}, stackTrace={}", 
+                    telegramId, apiResponse, getStackTraceString(e));
             return;
         }
         
         switch (errorCode) {
             case 400:
+                // Детальное логирование для ошибки 400 (Bad Request)
                 String textPreview = text != null 
                     ? text.substring(0, Math.min(200, text.length())) 
                     : "null";
+                
                 log.error("Bad Request (400): Ошибка парсинга MarkdownV2. " +
-                         "telegramId={}, textPreview={}, response={}", 
-                         telegramId, textPreview, apiResponse);
+                         "telegramId={}, textPreview='{}', fullTextLength={}, response={}, stackTrace={}", 
+                         telegramId, textPreview, text != null ? text.length() : 0, 
+                         apiResponse, getStackTraceString(e));
+                
+                // Логируем полный текст сообщения для детальной диагностики
+                if (text != null) {
+                    log.debug("Полный текст сообщения при ошибке 400: telegramId={}, fullText='{}'", 
+                            telegramId, text);
+                }
                 break;
                 
             case 401:
-                log.error("Unauthorized (401): Неверный токен бота! Проверьте TELEGRAM_BOT_TOKEN. response={}", 
-                        apiResponse);
+                log.error("Unauthorized (401): Неверный токен бота! Проверьте TELEGRAM_BOT_TOKEN. " +
+                         "response={}, stackTrace={}", 
+                         apiResponse, getStackTraceString(e));
                 break;
                 
             case 403:
-                log.warn("Forbidden (403): Бот заблокирован пользователем или нет доступа. telegramId={}, response={}", 
+                log.warn("Forbidden (403): Бот заблокирован пользователем или нет доступа. " +
+                        "telegramId={}, response={}", 
                         telegramId, apiResponse);
                 break;
                 
@@ -630,19 +736,212 @@ public class TelegramMessageService extends DefaultAbsSender {
                 break;
                 
             case 429:
-                log.warn("Too Many Requests (429): Превышен лимит запросов. Требуется увеличить задержку. telegramId={}, response={}", 
+                log.warn("Too Many Requests (429): Превышен лимит запросов. " +
+                        "Требуется увеличить задержку. telegramId={}, response={}", 
                         telegramId, apiResponse);
                 break;
                 
             default:
                 if (errorCode >= 500) {
-                    log.error("Server Error ({}): Ошибка сервера Telegram. telegramId={}, response={}", 
-                            errorCode, telegramId, apiResponse);
+                    log.error("Server Error ({}): Ошибка сервера Telegram. " +
+                            "telegramId={}, response={}, stackTrace={}", 
+                            errorCode, telegramId, apiResponse, getStackTraceString(e));
                 } else {
-                    log.error("Telegram API Error ({}): telegramId={}, response={}", 
-                            errorCode, telegramId, apiResponse);
+                    log.error("Telegram API Error ({}): telegramId={}, response={}, stackTrace={}", 
+                            errorCode, telegramId, apiResponse, getStackTraceString(e));
                 }
         }
+    }
+
+    /**
+     * Обрабатывает ошибки при ответе на callback query.
+     * 
+     * <p>Специализированная обработка ошибок для callback queries,
+     * включая детальное логирование с callbackQueryId.</p>
+     * 
+     * <p><b>Требования:</b> 4.4, 5.2</p>
+     * 
+     * @param e исключение от Telegram API
+     * @param callbackQueryId ID callback query
+     */
+    private void handleCallbackQueryError(TelegramApiRequestException e, String callbackQueryId) {
+        Integer errorCode = e.getErrorCode();
+        String apiResponse = e.getApiResponse();
+        
+        if (errorCode == null) {
+            log.error("Ошибка Telegram API при ответе на callback query без кода: " +
+                     "callbackQueryId={}, response={}, stackTrace={}", 
+                     callbackQueryId, apiResponse, getStackTraceString(e));
+            return;
+        }
+        
+        switch (errorCode) {
+            case 400:
+                log.error("Bad Request (400): Ошибка при ответе на callback query. " +
+                         "callbackQueryId={}, response={}, stackTrace={}", 
+                         callbackQueryId, apiResponse, getStackTraceString(e));
+                break;
+                
+            case 401:
+                log.error("Unauthorized (401): Неверный токен бота! Проверьте TELEGRAM_BOT_TOKEN. " +
+                         "callbackQueryId={}, response={}, stackTrace={}", 
+                         callbackQueryId, apiResponse, getStackTraceString(e));
+                break;
+                
+            case 403:
+                log.warn("Forbidden (403): Нет доступа к callback query. " +
+                        "callbackQueryId={}, response={}", 
+                        callbackQueryId, apiResponse);
+                break;
+                
+            case 429:
+                log.warn("Too Many Requests (429): Превышен лимит запросов. " +
+                        "Требуется увеличить задержку. callbackQueryId={}, response={}", 
+                        callbackQueryId, apiResponse);
+                break;
+                
+            default:
+                if (errorCode >= 500) {
+                    log.error("Server Error ({}): Ошибка сервера Telegram при ответе на callback query. " +
+                            "callbackQueryId={}, response={}, stackTrace={}", 
+                            errorCode, callbackQueryId, apiResponse, getStackTraceString(e));
+                } else {
+                    log.error("Telegram API Error ({}): callbackQueryId={}, response={}, stackTrace={}", 
+                            errorCode, callbackQueryId, apiResponse, getStackTraceString(e));
+                }
+        }
+    }
+
+    /**
+     * Выполняет отправку сообщения с ручным управлением повторными попытками.
+     * 
+     * <p>Этот метод реализует собственную логику retry вместо использования
+     * Spring @Retryable, чтобы иметь полный контроль над процессом и
+     * возможность прекратить попытки при ошибках парсинга.</p>
+     * 
+     * <p><b>Стратегия retry:</b></p>
+     * <ul>
+     *   <li>При ошибках парсинга (400 Bad Request с "can't parse") - прекращаем попытки</li>
+     *   <li>При других ошибках - продолжаем до maxAttempts</li>
+     *   <li>Экспоненциальная задержка между попытками: 1с, 2с, 4с</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 4.3, 4.4, 5.4</p>
+     * 
+     * @param message сообщение для отправки
+     * @param telegramId ID пользователя для логирования
+     * @param text текст сообщения для логирования
+     * @param maxAttempts максимальное количество попыток
+     * @throws TelegramApiException если все попытки не удались
+     */
+    private void executeWithRetry(SendMessage message, Long telegramId, String text, int maxAttempts) 
+            throws TelegramApiException {
+        int attempt = 0;
+        TelegramApiException lastException = null;
+        
+        while (attempt < maxAttempts) {
+            attempt++;
+            
+            try {
+                execute(message);
+                return; // Успешно отправлено
+                
+            } catch (TelegramApiRequestException e) {
+                lastException = e;
+                recordMetricForTelegramError(e);
+                
+                // Детальное логирование каждой попытки
+                String textPreview = text != null 
+                    ? text.substring(0, Math.min(50, text.length())) 
+                    : "null";
+                
+                log.error("Bad Request (400): Ошибка парсинга MarkdownV2. " +
+                         "telegramId={}, textPreview='{}', attempt={}/{}, response={}", 
+                         telegramId, textPreview, attempt, maxAttempts, e.getApiResponse());
+                
+                // Если это ошибка парсинга, прекращаем попытки
+                if (isParseError(e)) {
+                    log.error("Критическая ошибка парсинга MarkdownV2, прекращаем попытки: " +
+                             "telegramId={}, attempts={}, error={}", 
+                             telegramId, attempt, e.getMessage());
+                    handleTelegramApiError(e, telegramId, text);
+                    throw e;
+                }
+                
+                // Детальное логирование при ошибке 400
+                if (e.getErrorCode() != null && e.getErrorCode() == 400) {
+                    log.debug("Полный текст сообщения при ошибке 400: telegramId={}, fullText='{}'", 
+                            telegramId, text);
+                }
+                
+                handleTelegramApiError(e, telegramId, text);
+                
+                // Если это не последняя попытка, делаем задержку
+                if (attempt < maxAttempts) {
+                    try {
+                        long delay = (long) (1000 * Math.pow(2, attempt - 1));
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw e;
+                    }
+                }
+                
+            } catch (TelegramApiException e) {
+                lastException = e;
+                recordMetric("network_error");
+                
+                log.error("Ошибка при отправке сообщения: telegramId={}, attempt={}/{}, error={}", 
+                        telegramId, attempt, maxAttempts, e.getMessage());
+                
+                // Если это не последняя попытка, делаем задержку
+                if (attempt < maxAttempts) {
+                    try {
+                        long delay = (long) (1000 * Math.pow(2, attempt - 1));
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw e;
+                    }
+                } else {
+                    throw e;
+                }
+            }
+        }
+        
+        // Все попытки исчерпаны
+        log.error("Все попытки отправки сообщения исчерпаны: " +
+                 "telegramId={}, textLength={}, attempts={}, error={}, stackTrace={}", 
+                 telegramId, text != null ? text.length() : 0, attempt, 
+                 lastException != null ? lastException.getMessage() : "unknown",
+                 lastException != null ? getStackTraceString(lastException) : "no stack trace");
+        
+        if (lastException != null) {
+            throw lastException;
+        }
+    }
+
+    /**
+     * Проверяет, является ли исключение ошибкой парсинга MarkdownV2.
+     * 
+     * <p>Ошибки парсинга имеют код 400 (Bad Request) и содержат
+     * текст "can't parse entities" в сообщении об ошибке.</p>
+     * 
+     * <p><b>Требования:</b> 4.3, 4.4</p>
+     * 
+     * @param e исключение от Telegram API
+     * @return true если это ошибка парсинга, false иначе
+     */
+    private boolean isParseError(TelegramApiRequestException e) {
+        if (e.getErrorCode() == null || e.getErrorCode() != 400) {
+            return false;
+        }
+        
+        String message = e.getMessage();
+        String apiResponse = e.getApiResponse();
+        
+        return (message != null && message.contains("can't parse entities")) ||
+               (apiResponse != null && apiResponse.contains("can't parse entities"));
     }
 
     /**
@@ -687,22 +986,6 @@ public class TelegramMessageService extends DefaultAbsSender {
     }
 
     /**
-     * Маскирует токен бота для безопасного логирования.
-     * 
-     * <p>Показывает только первые 10 символов токена для идентификации,
-     * остальное заменяет на звездочки.</p>
-     * 
-     * @param token токен бота
-     * @return замаскированный токен
-     */
-    private String maskToken(String token) {
-        if (token == null || token.length() <= 10) {
-            return "***";
-        }
-        return token.substring(0, 10) + "***";
-    }
-    
-    /**
      * Записывает метрику ошибки на основе кода ошибки Telegram API.
      * 
      * @param e исключение от Telegram API
@@ -736,5 +1019,82 @@ public class TelegramMessageService extends DefaultAbsSender {
         if (metricsService != null) {
             metricsService.recordMessageSendError(errorType);
         }
+    }
+    
+    /**
+     * Получает строковое представление стека вызовов исключения.
+     * 
+     * <p>Используется для детального логирования критических ошибок.</p>
+     * 
+     * @param e исключение
+     * @return строка со стеком вызовов (первые 5 элементов)
+     */
+    private String getStackTraceString(Exception e) {
+        if (e == null || e.getStackTrace() == null || e.getStackTrace().length == 0) {
+            return "no stack trace";
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        StackTraceElement[] elements = e.getStackTrace();
+        int limit = Math.min(5, elements.length);
+        
+        for (int i = 0; i < limit; i++) {
+            sb.append(elements[i].toString());
+            if (i < limit - 1) {
+                sb.append(" -> ");
+            }
+        }
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Получает детальное описание inline клавиатуры для логирования.
+     * 
+     * <p>Возвращает информацию о кнопках: текст и callback data.</p>
+     * 
+     * @param markup разметка inline клавиатуры
+     * @return строка с деталями клавиатуры
+     */
+    private String getKeyboardDetails(InlineKeyboardMarkup markup) {
+        if (markup == null || markup.getKeyboard() == null || markup.getKeyboard().isEmpty()) {
+            return "empty keyboard";
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        
+        int rowIndex = 0;
+        for (var row : markup.getKeyboard()) {
+            if (row == null || row.isEmpty()) {
+                continue;
+            }
+            
+            sb.append("row").append(rowIndex).append("=[");
+            
+            int btnIndex = 0;
+            for (var button : row) {
+                if (button != null) {
+                    sb.append("{text='").append(button.getText())
+                      .append("', callback='").append(button.getCallbackData())
+                      .append("'}");
+                    
+                    if (btnIndex < row.size() - 1) {
+                        sb.append(", ");
+                    }
+                }
+                btnIndex++;
+            }
+            
+            sb.append("]");
+            
+            if (rowIndex < markup.getKeyboard().size() - 1) {
+                sb.append(", ");
+            }
+            rowIndex++;
+        }
+        
+        sb.append("]");
+        return sb.toString();
     }
 }

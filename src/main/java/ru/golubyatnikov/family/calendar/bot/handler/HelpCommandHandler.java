@@ -119,8 +119,8 @@ public class HelpCommandHandler implements CommandHandler {
         String username = message.getFrom().getUserName();
         boolean isAuthorized = (user != null && user.hasFamily());
 
-        log.info("Обработка команды /help: telegramId={}, username={}, isAuthorized={}, hasFamily={}", 
-                telegramId, username, isAuthorized, user != null && user.hasFamily());
+        log.debug("Обработка команды /help: telegramId={}, isAuthorized={}", 
+                telegramId, isAuthorized);
 
         // Формируем список команд с учетом статуса авторизации
         String commandsList = buildCommandsList(isAuthorized);
@@ -247,14 +247,8 @@ public class HelpCommandHandler implements CommandHandler {
         
         String result = message.toString();
         
-        // Отладочный вывод
-        log.info("=== ОТЛАДКА СООБЩЕНИЯ СПРАВКИ ===");
-        log.info("Длина: {} символов", result.length());
-        log.info("Длина в байтах: {} байт", result.getBytes().length);
-        log.info("Авторизован: {}", isAuthorized);
-        log.info("Текст сообщения:");
-        log.info("{}", result);
-        log.info("=== КОНЕЦ ОТЛАДКИ ===");
+        log.debug("Сформировано сообщение справки: длина={} символов, isAuthorized={}", 
+                result.length(), isAuthorized);
         
         return result;
     }

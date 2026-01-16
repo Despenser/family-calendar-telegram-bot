@@ -74,41 +74,58 @@ public class StatsCommandHandler implements CommandHandler {
             
             // Формирование сообщения со статистикой
             StringBuilder messageBuilder = new StringBuilder();
-            messageBuilder.append(String.format("📊 %s\n", bold("Статистика событий")));
-            messageBuilder.append(italic(currentMonth.atDay(1).format(MONTH_FORMATTER))).append("\n\n");
+            messageBuilder.append(escape("📊 "))
+                          .append(bold("Статистика событий"))
+                          .append(escape("\n"))
+                          .append(italic(currentMonth.atDay(1).format(MONTH_FORMATTER)))
+                          .append(escape("\n\n"));
             
             // Общая статистика
-            messageBuilder.append(String.format("📋 %s\n", bold("Общая статистика:")));
-            messageBuilder.append(String.format("   • Всего событий: %s\n", bold(String.valueOf(stats.getTotalEvents()))));
-            messageBuilder.append(String.format("   • Завершено: %s\n", bold(String.valueOf(stats.getCompletedEvents()))));
-            messageBuilder.append(String.format("   • Активных: %s\n\n", bold(String.valueOf(stats.getActiveEvents()))));
+            messageBuilder.append(escape("📋 "))
+                          .append(bold("Общая статистика:"))
+                          .append(escape("\n"));
+            messageBuilder.append(escape("• Всего событий: "))
+                          .append(bold(String.valueOf(stats.getTotalEvents())))
+                          .append(escape("\n"));
+            messageBuilder.append(escape("• Завершено: "))
+                          .append(bold(String.valueOf(stats.getCompletedEvents())))
+                          .append(escape("\n"));
+            messageBuilder.append(escape("• Активных: "))
+                          .append(bold(String.valueOf(stats.getActiveEvents())))
+                          .append(escape("\n\n"));
             
             // Статистика по типам
-            messageBuilder.append(String.format("👨‍👩‍👧‍👦 %s\n", bold("По типам событий:")));
-            messageBuilder.append(String.format("   • Семейные: %s\n", bold(String.valueOf(stats.getFamilyEvents()))));
-            messageBuilder.append(String.format("   • Персональные: %s\n\n", bold(String.valueOf(stats.getPersonalEvents()))));
+            messageBuilder.append(escape("👨‍👩‍👧‍👦 "))
+                          .append(bold("По типам событий:"))
+                          .append(escape("\n"));
+            messageBuilder.append(escape("• Семейные: "))
+                          .append(bold(String.valueOf(stats.getFamilyEvents())))
+                          .append(escape("\n"));
+            messageBuilder.append(escape("• Персональные: "))
+                          .append(bold(String.valueOf(stats.getPersonalEvents())))
+                          .append(escape("\n\n"));
             
             // Процент завершенных событий
             if (stats.getTotalEvents() > 0) {
                 double completionRate = (stats.getCompletedEvents() * 100.0) / stats.getTotalEvents();
-                messageBuilder.append(String.format("✅ %s %s\n\n",
-                             bold("Процент завершения:"),
-                             bold(String.format("%.1f%%", completionRate))));
+                messageBuilder.append(escape("✅ "))
+                              .append(bold("Процент завершения:"))
+                              .append(escape(" "))
+                              .append(bold(String.format("%.1f%%", completionRate)))
+                              .append(escape("\n\n"));
             }
             
             // Дополнительная информация
             if (stats.getTotalEvents() == 0) {
-                messageBuilder.append(italic("В этом месяце пока нет событий. " +
-                                    "Создайте первое событие с помощью ")).append(escape("/add_event"));
+                messageBuilder.append(italic("В этом месяце пока нет событий. Создайте первое событие с помощью /add_event"));
             } else if (stats.getActiveEvents() > 0) {
-                messageBuilder.append(italic(String.format("У вас %d активных событий в этом месяце",
-                             stats.getActiveEvents())));
+                messageBuilder.append(italic(String.format("У вас %d активных событий в этом месяце", stats.getActiveEvents())));
             } else {
                 messageBuilder.append(italic("Все события этого месяца завершены! 🎉"));
             }
             
             String responseMessage = messageBuilder.toString();
-            log.info("Пользователю ID={} будет отправлена статистика: всего={}, завершено={}, активных={}", 
+            log.debug("Пользователю ID={} будет отправлена статистика: всего={}, завершено={}, активных={}", 
                      user.getId(), stats.getTotalEvents(), stats.getCompletedEvents(), stats.getActiveEvents());
             return responseMessage;
             

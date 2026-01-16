@@ -24,6 +24,8 @@ spring:
   
   # Конфигурация JPA и Hibernate
   jpa:
+    # Явно отключаем Open Session In View для предотвращения ленивой загрузки в слое представления
+    open-in-view: false
     hibernate:
       # validate - проверяет схему БД, но не изменяет её (миграции через Flyway)
       ddl-auto: validate
@@ -31,7 +33,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+        # Dialect определяется автоматически на основе JDBC URL
         # Оптимизация производительности
         jdbc:
           batch_size: 20

@@ -69,11 +69,10 @@ public class TrashCommandHandler implements CommandHandler {
             List<Event> trashedEvents = trashService.getUserTrash(user.getId());
             
             if (trashedEvents.isEmpty()) {
-                String responseMessage = escape("🗑️ ") + bold("Корзина") + escape("\n\n" +
-                                       "Корзина пуста.\n\n") +
-                                       italic("Удаленные события хранятся здесь 30 дней, " +
-                                       "после чего автоматически удаляются навсегда.");
-                log.info("Пользователю ID={} будет отправлено сообщение о пустой корзине", user.getId());
+                String responseMessage = escape("🗑️ ") + bold("Корзина") + escape("\n\n") +
+                                        escape("Корзина пуста.") + escape("\n\n") +
+                                        italic("Удаленные события хранятся здесь 30 дней, после чего автоматически удаляются навсегда.");
+                log.debug("Пользователю ID={} будет отправлено сообщение о пустой корзине", user.getId());
                 return responseMessage;
             }
             
@@ -97,7 +96,7 @@ public class TrashCommandHandler implements CommandHandler {
                 messageBuilder.setLength(0);
             }
             
-            log.info("Пользователю ID={} отправлено {} удаленных событий", user.getId(), trashedEvents.size());
+            log.debug("Пользователю ID={} отправлено {} удаленных событий", user.getId(), trashedEvents.size());
             // Возвращаем null, так как сообщения уже отправлены
             return null;
             
@@ -191,12 +190,12 @@ public class TrashCommandHandler implements CommandHandler {
             Event restoredEvent = trashService.restoreEvent(eventId, user.getId());
             
             String responseMessage = escape("♻️ ") + bold("Событие восстановлено") + escape("\n\n") +
-                                   bold(restoredEvent.getTitle()) + escape("\n") +
-                                   escape("Дата: ") + escape(restoredEvent.getEventDate().format(DATE_FORMATTER)) + escape("\n\n") +
-                                   italic("Событие снова доступно в календаре.");
+                                    bold(restoredEvent.getTitle()) + escape("\n") +
+                                    escape("Дата: ") + escape(restoredEvent.getEventDate().format(DATE_FORMATTER)) + escape("\n\n") +
+                                    italic("Событие снова доступно в календаре.");
             
             messageService.sendMessage(chatId, responseMessage);
-            log.info("Событие ID={} успешно восстановлено пользователем ID={}", eventId, user.getId());
+            log.debug("Событие ID={} успешно восстановлено пользователем ID={}", eventId, user.getId());
             
         } catch (Exception e) {
             log.error("Ошибка при восстановлении события ID={} пользователем ID={}", eventId, user.getId(), e);
@@ -223,10 +222,10 @@ public class TrashCommandHandler implements CommandHandler {
             trashService.permanentlyDelete(eventId, user.getId());
             
             String responseMessage = escape("❌ ") + bold("Событие удалено навсегда") + escape("\n\n") +
-                                   italic("Событие окончательно удалено из системы и не может быть восстановлено.");
+                                    italic("Событие окончательно удалено из системы и не может быть восстановлено.");
             
             messageService.sendMessage(chatId, responseMessage);
-            log.info("Событие ID={} окончательно удалено пользователем ID={}", eventId, user.getId());
+            log.debug("Событие ID={} окончательно удалено пользователем ID={}", eventId, user.getId());
             
         } catch (Exception e) {
             log.error("Ошибка при окончательном удалении события ID={} пользователем ID={}", 

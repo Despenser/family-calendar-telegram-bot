@@ -232,10 +232,22 @@ public class KeyboardService {
      * 
      * @param eventId идентификатор события для формирования callback data
      * @return настроенная InlineKeyboardMarkup с кнопками управления событием
+     * @throws IllegalArgumentException если eventId равен null или не является положительным числом
      * @see #createDeleteConfirmationKeyboard(Long)
      */
     public InlineKeyboardMarkup createEventActionsKeyboard(Long eventId) {
-        log.debug("Создание inline клавиатуры для события {}", eventId);
+        // Валидация eventId
+        if (eventId == null) {
+            log.error("Попытка создать клавиатуру с null eventId");
+            throw new IllegalArgumentException("EventId не может быть null");
+        }
+        
+        if (eventId <= 0) {
+            log.error("Попытка создать клавиатуру с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом, получено: " + eventId);
+        }
+        
+        log.debug("Создание inline клавиатуры для события ID={}", eventId);
         
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         
@@ -245,17 +257,22 @@ public class KeyboardService {
         List<InlineKeyboardButton> row1 = new ArrayList<>();
         
         InlineKeyboardButton editBtn = new InlineKeyboardButton("✏️ Редактировать");
-        editBtn.setCallbackData("edit_event_" + eventId);
+        String editCallbackData = "edit_event_" + eventId;
+        editBtn.setCallbackData(editCallbackData);
         row1.add(editBtn);
         
         InlineKeyboardButton deleteBtn = new InlineKeyboardButton("🗑️ Удалить");
-        deleteBtn.setCallbackData("delete_event_" + eventId);
+        String deleteCallbackData = "delete_event_" + eventId;
+        deleteBtn.setCallbackData(deleteCallbackData);
         row1.add(deleteBtn);
         
         rows.add(row1);
         keyboard.setKeyboard(rows);
         
-        log.debug("Inline клавиатура для события {} создана с {} кнопками", eventId, row1.size());
+        // Детальное логирование созданной клавиатуры
+        log.debug("Inline клавиатура для события ID={} создана: buttonCount={}, " +
+                "editCallback='{}', deleteCallback='{}'", 
+                eventId, row1.size(), editCallbackData, deleteCallbackData);
         
         return keyboard;
     }
@@ -845,6 +862,118 @@ public class KeyboardService {
     }
     
     /**
+     * Создает inline-клавиатуру для выбора поля редактирования события.
+     * 
+     * <p>Клавиатура содержит кнопки для выбора полей: Название, Дата, Время, Описание, Отмена.</p>
+     * <p>Кнопки расположены по 2 в ряд для удобства использования.</p>
+     * 
+     * <p><b>Требования:</b> 3.1, 3.4</p>
+     * 
+     * @param eventId идентификатор события для формирования callback data
+     * @return настроенная InlineKeyboardMarkup с кнопками выбора поля
+     * @throws IllegalArgumentException если eventId равен null или не является положительным числом
+     */
+    public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId) {
+        // Валидация eventId
+        if (eventId == null) {
+            log.error("Попытка создать клавиатуру выбора поля с null eventId");
+            throw new IllegalArgumentException("EventId не может быть null");
+        }
+        
+        if (eventId <= 0) {
+            log.error("Попытка создать клавиатуру выбора поля с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом, получено: " + eventId);
+        }
+        
+        log.debug("Создание inline-клавиатуры выбора поля для редактирования события ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Ряд 1: Название и Дата
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        row1.add(createButton("📝 Название", "edit_field_title_" + eventId));
+        row1.add(createButton("📅 Дата", "edit_field_date_" + eventId));
+        rows.add(row1);
+        
+        // Ряд 2: Время и Описание
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        row2.add(createButton("🕐 Время", "edit_field_time_" + eventId));
+        row2.add(createButton("📄 Описание", "edit_field_description_" + eventId));
+        rows.add(row2);
+        
+        // Ряд 3: Отмена
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        row3.add(createButton("❌ Отменить", "edit_cancel_" + eventId));
+        rows.add(row3);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура выбора поля для события ID={} создана: {} рядов, {} кнопок", 
+                eventId, rows.size(), rows.stream().mapToInt(List::size).sum());
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру для завершения редактирования события.
+     * 
+     * <p>Клавиатура содержит кнопки: "Редактировать еще" и "Завершить".</p>
+     * <p>Позволяет пользователю продолжить редактирование других полей или завершить процесс.</p>
+     * 
+     * <p><b>Требования:</b> 3.1, 3.4</p>
+     * 
+     * @param eventId идентификатор события для формирования callback data
+     * @return настроенная InlineKeyboardMarkup с кнопками завершения
+     * @throws IllegalArgumentException если eventId равен null или не является положительным числом
+     */
+    public InlineKeyboardMarkup createEditCompletionKeyboard(Long eventId) {
+        // Валидация eventId
+        if (eventId == null) {
+            log.error("Попытка создать клавиатуру завершения с null eventId");
+            throw new IllegalArgumentException("EventId не может быть null");
+        }
+        
+        if (eventId <= 0) {
+            log.error("Попытка создать клавиатуру завершения с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом, получено: " + eventId);
+        }
+        
+        log.debug("Создание inline-клавиатуры завершения редактирования для события ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Ряд 1: Редактировать еще или Завершить
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        row1.add(createButton("✏️ Редактировать еще", "edit_more_" + eventId));
+        row1.add(createButton("✅ Завершить", "edit_complete_" + eventId));
+        rows.add(row1);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура завершения для события ID={} создана", eventId);
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-кнопку с заданным текстом и callback data.
+     * 
+     * <p>Вспомогательный метод для упрощения создания кнопок.</p>
+     * 
+     * @param text текст кнопки
+     * @param callbackData данные для callback query
+     * @return настроенная InlineKeyboardButton
+     */
+    private InlineKeyboardButton createButton(String text, String callbackData) {
+        InlineKeyboardButton button = new InlineKeyboardButton();
+        button.setText(text);
+        button.setCallbackData(callbackData);
+        return button;
+    }
+    
+    /**
      * Создает inline-клавиатуру для настройки напоминаний.
      * 
      * <p>Позволяет выбрать тип напоминания для события.</p>
@@ -1151,6 +1280,67 @@ public class KeyboardService {
         keyboard.setKeyboard(rows);
         
         log.debug("Inline-клавиатура для комментария создана");
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру для фильтрации событий.
+     * 
+     * <p>Позволяет пользователю выбрать тип событий для отображения:
+     * все события, только семейные или только личные.</p>
+     * 
+     * <p>Клавиатура содержит следующие кнопки:</p>
+     * <ul>
+     *   <li>📋 Все события - показать все события (семейные и личные)</li>
+     *   <li>👨‍👩‍👧‍👦 Семейные - показать только семейные события</li>
+     *   <li>👤 Личные - показать только личные события</li>
+     * </ul>
+     * 
+     * <p>Callback data формируется в формате "filter_{тип}":</p>
+     * <ul>
+     *   <li>"filter_all" - для всех событий</li>
+     *   <li>"filter_family" - для семейных событий</li>
+     *   <li>"filter_personal" - для личных событий</li>
+     * </ul>
+     * 
+     * <p>Кнопки расположены в 2 ряда: первая кнопка "Все события" в отдельном ряду,
+     * вторая и третья кнопки ("Семейные" и "Личные") в одном ряду для удобства выбора.</p>
+     * 
+     * <p><b>Требования:</b> 3.3</p>
+     * 
+     * @return настроенная InlineKeyboardMarkup с кнопками фильтрации
+     */
+    public InlineKeyboardMarkup createFilterKeyboard() {
+        log.debug("Создание inline-клавиатуры для фильтрации событий");
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Первая строка: Все события
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton allBtn = new InlineKeyboardButton("📋 Все события");
+        allBtn.setCallbackData("filter_all");
+        row1.add(allBtn);
+        rows.add(row1);
+        
+        // Вторая строка: Семейные и Личные
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        
+        InlineKeyboardButton familyBtn = new InlineKeyboardButton("👨‍👩‍👧‍👦 Семейные");
+        familyBtn.setCallbackData("filter_family");
+        row2.add(familyBtn);
+        
+        InlineKeyboardButton personalBtn = new InlineKeyboardButton("👤 Личные");
+        personalBtn.setCallbackData("filter_personal");
+        row2.add(personalBtn);
+        
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура для фильтрации событий создана: {} рядов, {} кнопок", 
+                rows.size(), rows.stream().mapToInt(List::size).sum());
         
         return keyboard;
     }

@@ -188,7 +188,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
     private String buildNoEventsMessage() {
         return escape("📅 ") + bold("Предстоящие события семьи (30 дней)") + escape("\n\n") +
                 escape("На ближайшие " + DEFAULT_DAYS + " дней событий не запланировано.\n\n") +
-                escape("Используйте ") + escape("/add_event") + escape(" для добавления нового события.");
+                escape("Используйте /add_event для добавления нового события.");
     }
 
     /**
@@ -213,14 +213,9 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
                 .map(this::formatEvent)
                 .collect(Collectors.joining("\n\n"));
 
-        return String.format(
-                "📅 %s\n\n" +
-                "%s\n\n" +
-                "Всего событий: %d",
-                bold("Предстоящие события семьи (30 дней)"),
-                eventsList,
-                filteredEvents.size()
-        );
+        return escape("📅 ") + bold("Предстоящие события семьи (30 дней)") + escape("\n\n") +
+                eventsList + escape("\n\n") +
+                escape("Всего событий: ") + escape(String.valueOf(filteredEvents.size()));
     }
 
     /**
@@ -251,31 +246,25 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
         
         // Иконка типа события (персональное или семейное)
         String eventTypeIcon = event.getIsPersonal() ? "🔒" : "👨‍👩‍👧‍👦";
-        formatted.append(String.format("%s 📌 %s\n", 
-                escape(eventTypeIcon), 
-                bold(event.getTitle())));
+        formatted.append(escape(eventTypeIcon + " 📌 ")).append(bold(event.getTitle())).append(escape("\n"));
         
         // Дата события
-        formatted.append(String.format("📅 Дата: %s\n", escape(event.getFormattedDate())));
+        formatted.append(escape("📅 Дата: ")).append(escape(event.getFormattedDate())).append(escape("\n"));
         
         // Время события (с интервалом, если указано)
         if (event.hasTimeInterval()) {
-            formatted.append(String.format("🕐 Время: %s\n", 
-                    escape(event.getFormattedTimeInterval())));
+            formatted.append(escape("🕐 Время: ")).append(escape(event.getFormattedTimeInterval())).append(escape("\n"));
         } else {
-            formatted.append(String.format("🕐 Время: %s\n", 
-                    escape(event.getFormattedTime())));
+            formatted.append(escape("🕐 Время: ")).append(escape(event.getFormattedTime())).append(escape("\n"));
         }
         
         // Описание события (опционально)
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            formatted.append(String.format("📝 Описание: %s\n", 
-                    escape(event.getDescription())));
+            formatted.append(escape("📝 Описание: ")).append(escape(event.getDescription())).append(escape("\n"));
         }
         
         // Создатель события
-        formatted.append(String.format("👤 Создал: %s", 
-                escape(event.getUser().getFullName())));
+        formatted.append(escape("👤 Создал: ")).append(escape(event.getUser().getFullName()));
         
         return formatted.toString();
     }

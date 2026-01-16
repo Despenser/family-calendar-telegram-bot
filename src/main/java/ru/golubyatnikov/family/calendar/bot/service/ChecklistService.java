@@ -96,7 +96,7 @@ public class ChecklistService {
         }
         
         List<ChecklistItem> saved = checklistItemRepository.saveAll(checklistItems);
-        log.info("Чек-лист из {} пунктов успешно создан для события ID {}", saved.size(), eventId);
+        log.debug("Чек-лист из {} пунктов успешно создан для события ID {}", saved.size(), eventId);
         
         return saved;
     }
@@ -130,21 +130,21 @@ public class ChecklistService {
             item.setCompletedAt(null);
             item.setCompletedBy(null);
             
-            log.info("Пункт чек-листа ID {} отмечен как невыполненный пользователем ID {}", itemId, userId);
+            log.debug("Пункт чек-листа ID {} отмечен как невыполненный пользователем ID {}", itemId, userId);
         } else {
             // Отметить как выполненный
             item.setCompleted(true);
             item.setCompletedAt(LocalDateTime.now());
             item.setCompletedBy(user);
             
-            log.info("Пункт чек-листа ID {} отмечен как выполненный пользователем ID {}", itemId, userId);
+            log.debug("Пункт чек-листа ID {} отмечен как выполненный пользователем ID {}", itemId, userId);
         }
         
         ChecklistItem saved = checklistItemRepository.save(item);
         
         // Проверить, завершен ли весь чек-лист
         if (!wasCompleted && isChecklistComplete(item.getEvent().getId())) {
-            log.info("Чек-лист события ID {} полностью выполнен", item.getEvent().getId());
+            log.debug("Чек-лист события ID {} полностью выполнен", item.getEvent().getId());
         }
         
         return saved;

@@ -13,6 +13,8 @@ spring:
   
   # JPA настройки для разработки
   jpa:
+    # Явно отключаем Open Session In View
+    open-in-view: false
     show-sql: true
     properties:
       hibernate:

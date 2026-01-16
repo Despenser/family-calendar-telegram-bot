@@ -13,6 +13,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
+import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
@@ -26,6 +27,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.BDDMockito.*;
 
 /**
  * Unit тесты для MyEventsCommandHandler.
@@ -60,6 +62,9 @@ class MyEventsCommandHandlerTest {
     private TelegramMessageService messageService;
 
     @Mock
+    private ConversationStateService conversationStateService;
+
+    @Mock
     private Message message;
 
     @Mock
@@ -69,7 +74,7 @@ class MyEventsCommandHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new MyEventsCommandHandler(eventService, keyboardService, messageService);
+        handler = new MyEventsCommandHandler(eventService, keyboardService, messageService, conversationStateService);
     }
 
     @Test
@@ -109,13 +114,18 @@ class MyEventsCommandHandlerTest {
         ru.golubyatnikov.family.calendar.bot.model.User user = createUser();
         List<Event> events = createTestEvents(user);
         
+        // Создаем клавиатуру с непустым списком кнопок
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        keyboard.setKeyboard(List.of(List.of()));
+        
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
         when(message.getChatId()).thenReturn(123456789L);
         when(eventService.getUserEvents(user.getId())).thenReturn(events);
-        when(keyboardService.createEventActionsKeyboard(anyLong())).thenReturn(new InlineKeyboardMarkup());
-        doNothing().when(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
+        when(keyboardService.createEventActionsKeyboard(anyLong())).thenReturn(keyboard);
+        // Мокаем sendMessageWithInlineKeyboard
+        willDoNothing().given(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
 
         // When
         String response = handler.handle(message, user);
@@ -151,7 +161,7 @@ class MyEventsCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("*Мои события*"), "Ответ должен содержать заголовок 'Мои события'");
+        assertTrue(response.contains("Мои события"), "Ответ должен содержать заголовок 'Мои события'");
         assertTrue(response.contains("У вас пока нет созданных событий"), "Ответ должен содержать сообщение об отсутствии событий");
         assertTrue(response.contains("/add\\_event") || response.contains("/add_event"), "Ответ должен содержать подсказку о команде /add_event");
         
@@ -201,7 +211,11 @@ class MyEventsCommandHandlerTest {
         assertNotNull(response);
         assertTrue(response.contains("Событие удалено"));
         assertTrue(response.contains("успешно удалено"));
-        assertTrue(response.contains("/my\\_events") || response.contains("my_events")); // Проверяем наличие команды (экранированной или нет)
+        // Проверяем, что команда кликабельна (не в code-форматировании)
+        assertTrue(response.contains("/my_events") || response.contains("/my\\_events"), 
+                  "Должен содержать кликабельную команду /my_events");
+        assertFalse(response.contains("`/my_events`"), 
+                  "НЕ должен содержать команду в code-форматировании");
         
         verify(eventService).deleteEvent(eventId, userId);
     }
@@ -249,20 +263,36 @@ class MyEventsCommandHandlerTest {
     }
 
     @Test
-    @DisplayName("Должен вернуть сообщение о редактировании события")
-    void shouldReturnEditMessage() {
+    @DisplayName("Должен начать редактирование события")
+    void shouldStartEditingEvent() throws Exception {
         // Given
         Long eventId = 1L;
         Long userId = 1L;
+        Long chatId = 123456789L;
+        
+        ru.golubyatnikov.family.calendar.bot.model.User user = createUser();
+        Event event = createEventWithDescription(user);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        keyboard.setKeyboard(List.of(List.of()));
+        
+        when(eventService.getEventById(eventId)).thenReturn(event);
+        when(keyboardService.createEditFieldSelectionKeyboard(eventId)).thenReturn(keyboard);
+        doNothing().when(conversationStateService).startEventEditing(userId, eventId, chatId);
+        doNothing().when(messageService).sendMessageWithInlineKeyboard(eq(chatId), anyString(), any(InlineKeyboardMarkup.class));
 
         // When
-        String response = handler.handleEditCallback(eventId, userId);
+        String response = handler.handleEditCallback(eventId, userId, chatId);
 
         // Then
         assertNotNull(response);
         assertTrue(response.contains("Редактирование события"));
-        assertTrue(response.contains("будет реализована"));
-        assertTrue(response.contains("ID события: 1"));
+        assertTrue(response.contains("День рождения")); // Название события
+        
+        verify(eventService).getEventById(eventId);
+        verify(conversationStateService).startEventEditing(userId, eventId, chatId);
+        verify(keyboardService).createEditFieldSelectionKeyboard(eventId);
+        verify(messageService).sendMessageWithInlineKeyboard(eq(chatId), anyString(), any(InlineKeyboardMarkup.class));
     }
 
     @Test
@@ -273,13 +303,18 @@ class MyEventsCommandHandlerTest {
         Event event = createEventWithDescription(user);
         List<Event> events = Collections.singletonList(event);
         
+        // Создаем клавиатуру с непустым списком кнопок
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        keyboard.setKeyboard(List.of(List.of()));
+        
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
         when(message.getChatId()).thenReturn(123456789L);
         when(eventService.getUserEvents(user.getId())).thenReturn(events);
-        when(keyboardService.createEventActionsKeyboard(anyLong())).thenReturn(new InlineKeyboardMarkup());
-        doNothing().when(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
+        when(keyboardService.createEventActionsKeyboard(anyLong())).thenReturn(keyboard);
+        // Мокаем sendMessageWithInlineKeyboard
+        willDoNothing().given(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
 
         // When
         String response = handler.handle(message, user);
@@ -415,4 +450,43 @@ class MyEventsCommandHandlerTest {
                 .family(user.getFamily())
                 .build();
     }
+
+    @Test
+    @DisplayName("Должен корректно экранировать специальные символы в сообщении редактирования")
+    void shouldEscapeSpecialCharsInEditMessage() {
+        // Given
+        ru.golubyatnikov.family.calendar.bot.model.User user = createUser();
+        Event event = Event.builder()
+                .id(1L)
+                .title("Почистить снег")
+                .description("Весь на участке")
+                .eventDate(LocalDate.of(2026, 1, 14))
+                .eventTime(LocalTime.of(21, 0))
+                .user(user)
+                .family(user.getFamily())
+                .build();
+
+        // When
+        String message = handler.buildEditFieldSelectionMessage(event);
+
+        // Then
+        assertNotNull(message);
+        // Проверяем, что точки в дате экранированы
+        assertTrue(message.contains("14\\.01\\.2026"), 
+            "Дата должна содержать экранированные точки");
+        // Проверяем, что двоеточие в времени экранировано
+        assertTrue(message.contains("21:00"), 
+            "Время должно быть корректно отформатировано");
+        // Проверяем, что сообщение не содержит неэкранированных точек в статическом тексте
+        assertFalse(message.matches(".*[^\\\\]\\.$"), 
+            "Сообщение не должно содержать неэкранированные точки в конце");
+        // Проверяем наличие основных элементов
+        assertTrue(message.contains("Редактирование события"), 
+            "Сообщение должно содержать заголовок");
+        assertTrue(message.contains("Почистить снег"), 
+            "Сообщение должно содержать название события");
+        assertTrue(message.contains("Текущие данные"), 
+            "Сообщение должно содержать секцию текущих данных");
+    }
 }
+

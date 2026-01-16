@@ -302,9 +302,11 @@ class CommandDispatcherTest {
                 "Должно быть выброшено UnauthorizedAccessException"
         );
 
-        assertTrue(exception.getMessage().contains("/add_event"),
-                "Сообщение об ошибке должно содержать название команды");
-        assertTrue(exception.getMessage().contains("авторизации"),
+        // Проверяем, что сообщение содержит команду (может быть экранирована)
+        String errorMessage = exception.getMessage();
+        assertTrue(errorMessage.contains("/add_event") || errorMessage.contains("/add\\_event"),
+                "Сообщение об ошибке должно содержать название команды. Actual: " + errorMessage);
+        assertTrue(errorMessage.contains("авторизации"),
                 "Сообщение об ошибке должно упоминать авторизацию");
         verify(userService).findByTelegramId(testTelegramId);
         verify(addEventHandler, never()).handle(any(), any());

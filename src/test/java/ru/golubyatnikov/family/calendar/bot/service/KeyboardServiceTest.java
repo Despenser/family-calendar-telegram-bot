@@ -726,4 +726,63 @@ class KeyboardServiceTest {
         
         assertEquals("Month must be between 1 and 12", exception.getMessage());
     }
+
+    // ========== Тесты валидации eventId ==========
+
+    @Test
+    @DisplayName("Должен выбросить исключение при null eventId в createEventActionsKeyboard")
+    void shouldThrowExceptionWhenEventIdIsNull() {
+        // When & Then
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> keyboardService.createEventActionsKeyboard(null)
+        );
+        
+        assertEquals("EventId не может быть null", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Должен выбросить исключение при отрицательном eventId")
+    void shouldThrowExceptionWhenEventIdIsNegative() {
+        // Given
+        Long negativeEventId = -1L;
+
+        // When & Then
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> keyboardService.createEventActionsKeyboard(negativeEventId)
+        );
+        
+        assertTrue(exception.getMessage().contains("EventId должен быть положительным числом"));
+    }
+
+    @Test
+    @DisplayName("Должен выбросить исключение при нулевом eventId")
+    void shouldThrowExceptionWhenEventIdIsZero() {
+        // Given
+        Long zeroEventId = 0L;
+
+        // When & Then
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> keyboardService.createEventActionsKeyboard(zeroEventId)
+        );
+        
+        assertTrue(exception.getMessage().contains("EventId должен быть положительным числом"));
+    }
+
+    @Test
+    @DisplayName("Должен успешно создать клавиатуру с положительным eventId")
+    void shouldSuccessfullyCreateKeyboardWithPositiveEventId() {
+        // Given
+        Long positiveEventId = 1L;
+
+        // When
+        InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(positiveEventId);
+
+        // Then
+        assertNotNull(keyboard);
+        assertNotNull(keyboard.getKeyboard());
+        assertFalse(keyboard.getKeyboard().isEmpty());
+    }
 }

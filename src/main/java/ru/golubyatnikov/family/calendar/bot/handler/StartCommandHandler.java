@@ -131,19 +131,16 @@ public class StartCommandHandler implements CommandHandler {
         String username = message.getFrom().getUserName();
         String firstName = message.getFrom().getFirstName();
 
-        log.info("Обработка команды /start: telegramId={}, username={}, firstName={}", 
-                telegramId, username, firstName);
+        log.debug("Обработка команды /start: telegramId={}", telegramId);
 
         // Проверяем наличие пользователя в БД
         boolean isRegistered = userService.isUserAuthorized(telegramId);
 
         if (isRegistered) {
-            log.info("Пользователь зарегистрирован: telegramId={}, username={}", 
-                    telegramId, username);
+            log.debug("Пользователь зарегистрирован: telegramId={}", telegramId);
             return buildWelcomeMessageForRegisteredUser(firstName);
         } else {
-            log.info("Пользователь не зарегистрирован: telegramId={}, username={}", 
-                    telegramId, username);
+            log.debug("Пользователь не зарегистрирован: telegramId={}", telegramId);
             return buildWelcomeMessageForUnregisteredUser(firstName);
         }
     }
@@ -161,31 +158,33 @@ public class StartCommandHandler implements CommandHandler {
      * 
      * <p><b>Важно:</b> Все команды отображаются без моноширинного форматирования
      * (без использования метода code()), что делает их кликабельными в Telegram.
-     * Используется только метод escape() для корректного экранирования специальных
+     * Используется метод formatMessage() для корректного экранирования специальных
      * символов MarkdownV2.</p>
      * 
      * @param firstName имя пользователя для персонализации
      * @return отформатированное приветственное сообщение с кликабельными командами
      */
     private String buildWelcomeMessageForRegisteredUser(String firstName) {
-        String greeting = firstName != null && !firstName.isBlank() 
-                ? escape("Добро пожаловать, ") + escape(firstName) + escape("! 👋")
+        // Формируем приветствие с экранированием
+        String greetingText = firstName != null && !firstName.isBlank() 
+                ? escape("Добро пожаловать, " + firstName + "! 👋")
                 : escape("Добро пожаловать! 👋");
 
-        return greeting + escape("\n\n") +
-                bold("Семейный Календарь Бот") + escape(" - это ваш персональный помощник для управления семейными событиями и планами.\n\n") +
-                escape("Вы уже зарегистрированы в системе и можете пользоваться всеми возможностями бота:\n\n") +
-                bold("🎯 Основные возможности:") + escape("\n") +
-                escape("📅 Создание и управление событиями\n") +
-                escape("🔔 Получение напоминаний о важных датах\n") +
-                escape("👥 Совместное планирование с семьей\n") +
-                escape("📊 Просмотр статистики и аналитики\n") +
-                escape("🔍 Поиск и фильтрация событий\n\n") +
-                bold("Основные команды:") + escape("\n") +
-                escape("/help ") + escape("- Показать список всех команд\n") +
-                escape("/add_event ") + escape("- Добавить новое событие\n") +
-                escape("/upcoming_events ") + escape("- Показать предстоящие события\n") +
-                escape("/my_events ") + escape("- Управление моими событиями\n\n") +
+        // Собираем сообщение из уже экранированных частей
+        return greetingText + "\n\n" +
+                bold("Семейный Календарь Бот") + escape(" - это ваш персональный помощник для управления семейными событиями и планами.") + "\n\n" +
+                escape("Вы уже зарегистрированы в системе и можете пользоваться всеми возможностями бота:") + "\n\n" +
+                bold("🎯 Основные возможности:") + "\n" +
+                escape("📅 Создание и управление событиями") + "\n" +
+                escape("🔔 Получение напоминаний о важных датах") + "\n" +
+                escape("👥 Совместное планирование с семьей") + "\n" +
+                escape("📊 Просмотр статистики и аналитики") + "\n" +
+                escape("🔍 Поиск и фильтрация событий") + "\n\n" +
+                bold("Основные команды:") + "\n" +
+                escape("/help - Показать список всех команд") + "\n" +
+                escape("/add_event - Добавить новое событие") + "\n" +
+                escape("/upcoming_events - Показать предстоящие события") + "\n" +
+                escape("/my_events - Управление моими событиями") + "\n\n" +
                 escape("Используйте /help для получения подробной информации о каждой команде.");
     }
 
@@ -205,26 +204,28 @@ public class StartCommandHandler implements CommandHandler {
      * @return отформатированное сообщение о необходимости регистрации
      */
     private String buildWelcomeMessageForUnregisteredUser(String firstName) {
-        String greeting = firstName != null && !firstName.isBlank() 
-                ? escape("Добро пожаловать, ") + escape(firstName) + escape("! 👋")
+        // Формируем приветствие с экранированием
+        String greetingText = firstName != null && !firstName.isBlank() 
+                ? escape("Добро пожаловать, " + firstName + "! 👋")
                 : escape("Добро пожаловать! 👋");
 
-        return greeting + escape("\n\n") +
-                bold("Семейный Календарь Бот") + escape(" - это ваш персональный помощник для управления семейными событиями и планами.\n\n") +
-                escape("С помощью этого бота вы сможете:\n") +
-                escape("📅 Создавать и управлять событиями\n") +
-                escape("🔔 Получать напоминания о важных датах\n") +
-                escape("👥 Совместно планировать с семьей\n") +
-                escape("📊 Просматривать статистику и аналитику\n") +
-                escape("🔍 Искать и фильтровать события\n\n") +
-                escape("🔒 ") + bold("Для доступа к функционалу требуется регистрация") + escape("\n\n") +
-                escape("К сожалению, вы еще не зарегистрированы в системе. ") +
-                escape("Для получения доступа к боту обратитесь к администратору вашей семьи.\n\n") +
-                bold("Как получить доступ:") + escape("\n") +
-                escape("1️⃣ Свяжитесь с администратором вашей семьи\n") +
-                escape("2️⃣ Сообщите ему ваш Telegram ID или username\n") +
-                escape("3️⃣ Дождитесь подтверждения регистрации\n") +
-                escape("4️⃣ После регистрации отправьте /start снова\n\n") +
+        // Собираем сообщение из уже экранированных частей
+        return greetingText + "\n\n" +
+                bold("Семейный Календарь Бот") + escape(" - это ваш персональный помощник для управления семейными событиями и планами.") + "\n\n" +
+                escape("С помощью этого бота вы сможете:") + "\n" +
+                escape("📅 Создавать и управлять событиями") + "\n" +
+                escape("🔔 Получать напоминания о важных датах") + "\n" +
+                escape("👥 Совместно планировать с семьей") + "\n" +
+                escape("📊 Просматривать статистику и аналитику") + "\n" +
+                escape("🔍 Искать и фильтровать события") + "\n\n" +
+                escape("🔒 ") + bold("Для доступа к функционалу требуется регистрация") + "\n\n" +
+                escape("К сожалению, вы еще не зарегистрированы в системе. " +
+                "Для получения доступа к боту обратитесь к администратору вашей семьи.") + "\n\n" +
+                bold("Как получить доступ:") + "\n" +
+                escape("1️⃣ Свяжитесь с администратором вашей семьи") + "\n" +
+                escape("2️⃣ Сообщите ему ваш Telegram ID или username") + "\n" +
+                escape("3️⃣ Дождитесь подтверждения регистрации") + "\n" +
+                escape("4️⃣ После регистрации отправьте /start снова") + "\n\n" +
                 escape("После регистрации вам станут доступны все возможности бота для управления семейным календарем!");
     }
 

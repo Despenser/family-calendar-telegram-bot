@@ -154,46 +154,8 @@ class EventServiceTest {
         verify(eventRepository, never()).save(any(Event.class));
     }
 
-    @Test
-    @DisplayName("Должен выбросить исключение при пустом названии события")
-    void shouldThrowExceptionWhenTitleIsBlank() {
-        // Given
-        String blankTitle = "   ";
-        String description = "Test Description";
-        LocalDateTime eventDateTime = LocalDateTime.now().plusDays(1);
-
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> eventService.createEvent(
-                        testUser.getId(), blankTitle, description, eventDateTime),
-                "Должно быть выброшено IllegalArgumentException"
-        );
-
-        assertEquals("Название события не может быть пустым", exception.getMessage());
-        verify(userRepository, never()).findById(any());
-        verify(eventRepository, never()).save(any(Event.class));
-    }
-
-    @Test
-    @DisplayName("Должен выбросить исключение при null названии события")
-    void shouldThrowExceptionWhenTitleIsNull() {
-        // Given
-        String description = "Test Description";
-        LocalDateTime eventDateTime = LocalDateTime.now().plusDays(1);
-
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> eventService.createEvent(
-                        testUser.getId(), null, description, eventDateTime),
-                "Должно быть выброшено IllegalArgumentException"
-        );
-
-        assertEquals("Название события не может быть пустым", exception.getMessage());
-        verify(userRepository, never()).findById(any());
-        verify(eventRepository, never()).save(any(Event.class));
-    }
+    // Примечание: Тесты на пустой/null title перенесены в EventServiceBeanValidationPropertyTest,
+    // так как Bean Validation требует Spring контекста с @Validated
 
     @Test
     @DisplayName("Должен выбросить исключение когда пользователь не найден")
@@ -488,28 +450,8 @@ class EventServiceTest {
         verify(eventRepository, never()).save(any(Event.class));
     }
 
-    @Test
-    @DisplayName("Должен выбросить исключение при обновлении с пустым названием")
-    void shouldThrowExceptionWhenUpdatingWithBlankTitle() {
-        // Given
-        Long eventId = testEvent.getId();
-        Long userId = testUser.getId();
-        String blankTitle = "   ";
-        String newDescription = "Updated Description";
-        LocalDateTime newDateTime = LocalDateTime.now().plusDays(10);
-
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> eventService.updateEvent(
-                        eventId, userId, blankTitle, newDescription, newDateTime),
-                "Должно быть выброшено IllegalArgumentException"
-        );
-
-        assertEquals("Название события не может быть пустым", exception.getMessage());
-        verify(eventRepository, never()).findById(any());
-        verify(eventRepository, never()).save(any(Event.class));
-    }
+    // Примечание: Тест на пустой title при обновлении перенесен в EventServiceBeanValidationPropertyTest,
+    // так как Bean Validation требует Spring контекста с @Validated
 
     // ========== Тесты для deleteEvent ==========
 

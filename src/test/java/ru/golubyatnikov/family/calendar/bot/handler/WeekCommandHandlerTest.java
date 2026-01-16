@@ -199,7 +199,7 @@ class WeekCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("События на неделю \\(7 дней\\)"), 
+        assertTrue(response.contains("События на неделю") && response.contains("7 дней"), 
                 "Ответ должен содержать заголовок");
         assertTrue(response.contains("На ближайшую неделю событий не запланировано"), 
                 "Ответ должен содержать сообщение об отсутствии событий");

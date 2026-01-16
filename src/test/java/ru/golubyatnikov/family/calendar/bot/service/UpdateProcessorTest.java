@@ -2,31 +2,37 @@ package ru.golubyatnikov.family.calendar.bot.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.util.TextEventParser;
 
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
  * Unit тесты для UpdateProcessor.
  * 
  * <p>Проверяет корректность асинхронной обработки обновлений от Telegram,
- * включая извлечение сообщений и делегирование обработки CommandDispatcher.</p>
+ * включая извлечение сообщений и делегирование обработки CommandDispatcher
+ * и CallbackQueryDispatcher.</p>
  * 
  * @see UpdateProcessor
  * @author Family Calendar Bot Team
- * @version 1.0.0
+ * @version 2.0.0
  * @since 2025-12-30
  */
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +43,9 @@ class UpdateProcessorTest {
     private CommandDispatcher commandDispatcher;
 
     @Mock
+    private CallbackQueryDispatcher callbackQueryDispatcher;
+
+    @Mock
     private UserService userService;
 
     @Mock
@@ -44,9 +53,6 @@ class UpdateProcessorTest {
 
     @Mock
     private TelegramMessageService messageService;
-
-    @Mock
-    private ru.golubyatnikov.family.calendar.bot.handler.MyEventsCommandHandler myEventsCommandHandler;
     
     @Mock
     private ConversationStateService conversationStateService;
@@ -254,5 +260,251 @@ class UpdateProcessorTest {
         verify(commandDispatcher).dispatch(argThat(msg ->
                 msg.getText().equals("/start")
         ));
+    }
+
+    /**
+     * Тесты для обработки callback queries.
+     * 
+     * <p>Проверяет делегирование callback queries в CallbackQueryDispatcher.</p>
+     * 
+     * _Requirements: 1.1_
+     */
+    @Nested
+    @DisplayName("Тесты обработки Callback Queries")
+    class CallbackQueryTests {
+
+        private CallbackQuery callbackQuery;
+        private Message callbackMessage;
+        private User callbackUser;
+
+        @Test
+        @DisplayName("Должен делегировать callback query в CallbackQueryDispatcher")
+        void shouldDelegateCallbackQueryToDispatcher() {
+            // Given
+            Update update = mock(Update.class);
+            callbackQuery = mock(CallbackQuery.class);
+
+            when(update.getUpdateId()).thenReturn(12345);
+            when(update.hasCallbackQuery()).thenReturn(true);
+            when(update.getCallbackQuery()).thenReturn(callbackQuery);
+
+            // When
+            updateProcessor.processUpdate(update);
+
+            // Then
+            verify(update).hasCallbackQuery();
+            verify(update).getCallbackQuery();
+            verify(callbackQueryDispatcher).dispatch(callbackQuery);
+        }
+
+        @Test
+        @DisplayName("Должен делегировать calendar_ignore callback в CallbackQueryDispatcher")
+        void shouldDelegateCalendarIgnoreCallback() {
+            // Given
+            Update update = mock(Update.class);
+            callbackQuery = mock(CallbackQuery.class);
+
+            when(update.getUpdateId()).thenReturn(12345);
+            when(update.hasCallbackQuery()).thenReturn(true);
+            when(update.getCallbackQuery()).thenReturn(callbackQuery);
+
+            // When
+            updateProcessor.processUpdate(update);
+
+            // Then
+            verify(callbackQueryDispatcher).dispatch(callbackQuery);
+        }
+
+        @Test
+        @DisplayName("Должен делегировать time_ignore callback в CallbackQueryDispatcher")
+        void shouldDelegateTimeIgnoreCallback() {
+            // Given
+            Update update = mock(Update.class);
+            callbackQuery = mock(CallbackQuery.class);
+
+            when(update.getUpdateId()).thenReturn(12345);
+            when(update.hasCallbackQuery()).thenReturn(true);
+            when(update.getCallbackQuery()).thenReturn(callbackQuery);
+
+            // When
+            updateProcessor.processUpdate(update);
+
+            // Then
+            verify(callbackQueryDispatcher).dispatch(callbackQuery);
+        }
+
+        @Test
+        @DisplayName("Должен делегировать date callback в CallbackQueryDispatcher")
+        void shouldDelegateDateCallback() {
+            // Given
+            Update update = mock(Update.class);
+            callbackQuery = mock(CallbackQuery.class);
+
+            when(update.getUpdateId()).thenReturn(12345);
+            when(update.hasCallbackQuery()).thenReturn(true);
+            when(update.getCallbackQuery()).thenReturn(callbackQuery);
+
+            // When
+            updateProcessor.processUpdate(update);
+
+            // Then
+            verify(callbackQueryDispatcher).dispatch(callbackQuery);
+        }
+
+        @Test
+        @DisplayName("Должен делегировать unknown callback в CallbackQueryDispatcher")
+        void shouldDelegateUnknownCallback() {
+            // Given
+            Update update = mock(Update.class);
+            callbackQuery = mock(CallbackQuery.class);
+
+            when(update.getUpdateId()).thenReturn(12345);
+            when(update.hasCallbackQuery()).thenReturn(true);
+            when(update.getCallbackQuery()).thenReturn(callbackQuery);
+
+            // When
+            updateProcessor.processUpdate(update);
+
+            // Then
+            verify(callbackQueryDispatcher).dispatch(callbackQuery);
+        }
+
+        @Test
+        @DisplayName("Должен обработать исключение от CallbackQueryDispatcher")
+        void shouldHandleExceptionFromDispatcher() {
+            // Given
+            Update update = mock(Update.class);
+            callbackQuery = mock(CallbackQuery.class);
+
+            when(update.getUpdateId()).thenReturn(12345);
+            when(update.hasCallbackQuery()).thenReturn(true);
+            when(update.getCallbackQuery()).thenReturn(callbackQuery);
+            
+            doThrow(new RuntimeException("Ошибка диспетчера"))
+                .when(callbackQueryDispatcher).dispatch(any(CallbackQuery.class));
+
+            // When & Then
+            assertDoesNotThrow(() -> updateProcessor.processUpdate(update));
+            verify(callbackQueryDispatcher).dispatch(callbackQuery);
+        }
+    }
+
+    /**
+     * Тесты для обработки сообщений.
+     * 
+     * <p>Проверяет различные сценарии обработки текстовых сообщений.</p>
+     * 
+     * _Requirements: 1.1_
+     */
+    @Nested
+    @DisplayName("Тесты обработки сообщений")
+    class MessageProcessingTests {
+
+        @Test
+        @DisplayName("Должен пропустить сообщение без текста")
+        void shouldSkipMessageWithoutText() {
+            // Given
+            Update update = mock(Update.class);
+            Message message = mock(Message.class);
+
+            when(update.getUpdateId()).thenReturn(12345);
+            when(update.hasMessage()).thenReturn(true);
+            when(update.hasCallbackQuery()).thenReturn(false);
+            when(update.getMessage()).thenReturn(message);
+            when(message.getText()).thenReturn(null);
+            when(message.getMessageId()).thenReturn(67890);
+
+            // When
+            updateProcessor.processUpdate(update);
+
+            // Then
+            verify(commandDispatcher, never()).dispatch(any(Message.class));
+        }
+
+        @Test
+        @DisplayName("Должен пропустить сообщение с пустым текстом")
+        void shouldSkipMessageWithBlankText() {
+            // Given
+            Update update = mock(Update.class);
+            Message message = mock(Message.class);
+
+            when(update.getUpdateId()).thenReturn(12345);
+            when(update.hasMessage()).thenReturn(true);
+            when(update.hasCallbackQuery()).thenReturn(false);
+            when(update.getMessage()).thenReturn(message);
+            when(message.getText()).thenReturn("   ");
+            when(message.getMessageId()).thenReturn(67890);
+
+            // When
+            updateProcessor.processUpdate(update);
+
+            // Then
+            verify(commandDispatcher, never()).dispatch(any(Message.class));
+        }
+
+        @Test
+        @DisplayName("Должен обработать сообщение с активным черновиком")
+        void shouldProcessMessageWithActiveDraft() {
+            // Given
+            Update update = mock(Update.class);
+            Message message = mock(Message.class);
+            User telegramUser = mock(User.class);
+            ru.golubyatnikov.family.calendar.bot.model.User dbUser = mock(ru.golubyatnikov.family.calendar.bot.model.User.class);
+
+            when(update.getUpdateId()).thenReturn(12345);
+            when(update.hasMessage()).thenReturn(true);
+            when(update.hasCallbackQuery()).thenReturn(false);
+            when(update.getMessage()).thenReturn(message);
+            when(message.getText()).thenReturn("Название события");
+            when(message.getFrom()).thenReturn(telegramUser);
+            when(message.getChatId()).thenReturn(111222333L);
+            when(telegramUser.getId()).thenReturn(123456L);
+            
+            when(keyboardService.buttonTextToCommand("Название события")).thenReturn("Название события");
+            when(userService.findByTelegramId(123456L)).thenReturn(Optional.of(dbUser));
+            when(dbUser.getId()).thenReturn(1L);
+            when(conversationStateService.isAwaitingSearchQuery(1L)).thenReturn(false);
+            when(conversationService.hasActiveDraft(1L)).thenReturn(true);
+
+            // When
+            updateProcessor.processUpdate(update);
+
+            // Then
+            verify(conversationService).hasActiveDraft(1L);
+            // Не должен вызывать commandDispatcher, так как есть активный черновик
+            verify(commandDispatcher, never()).dispatch(any(Message.class));
+        }
+
+        @Test
+        @DisplayName("Должен обработать поисковый запрос")
+        void shouldProcessSearchQuery() {
+            // Given
+            Update update = mock(Update.class);
+            Message message = mock(Message.class);
+            User telegramUser = mock(User.class);
+            ru.golubyatnikov.family.calendar.bot.model.User dbUser = mock(ru.golubyatnikov.family.calendar.bot.model.User.class);
+
+            when(update.getUpdateId()).thenReturn(12345);
+            when(update.hasMessage()).thenReturn(true);
+            when(update.hasCallbackQuery()).thenReturn(false);
+            when(update.getMessage()).thenReturn(message);
+            when(message.getText()).thenReturn("поисковый запрос");
+            when(message.getFrom()).thenReturn(telegramUser);
+            when(message.getChatId()).thenReturn(111222333L);
+            when(telegramUser.getId()).thenReturn(123456L);
+            
+            when(keyboardService.buttonTextToCommand("поисковый запрос")).thenReturn("поисковый запрос");
+            when(userService.findByTelegramId(123456L)).thenReturn(Optional.of(dbUser));
+            when(dbUser.getId()).thenReturn(1L);
+            when(conversationStateService.isAwaitingSearchQuery(1L)).thenReturn(true);
+
+            // When
+            updateProcessor.processUpdate(update);
+
+            // Then
+            verify(conversationStateService).isAwaitingSearchQuery(1L);
+            // Не должен вызывать commandDispatcher, так как ожидается поисковый запрос
+            verify(commandDispatcher, never()).dispatch(any(Message.class));
+        }
     }
 }

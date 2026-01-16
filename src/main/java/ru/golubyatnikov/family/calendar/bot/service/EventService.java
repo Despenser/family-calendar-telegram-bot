@@ -1,14 +1,20 @@
 package ru.golubyatnikov.family.calendar.bot.service;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.InvalidDateException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.EventFilter;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
@@ -32,10 +38,10 @@ import java.util.List;
  * </ul>
  * 
  * <p>Все операции изменения данных выполняются в транзакциях для обеспечения
- * целостности данных. Сервис выполняет валидацию входных данных и проверку
- * прав доступа перед выполнением операций.</p>
+ * целостности данных. Сервис выполняет валидацию входных данных через Bean Validation
+ * и проверку прав доступа перед выполнением операций.</p>
  * 
- * <p><b>Требования:</b> 4.1, 4.2, 4.3, 5.1, 5.4, 7.1, 7.2, 7.3, 7.4, 7.5</p>
+ * <p><b>Требования:</b> 4.1, 4.2, 4.3, 5.1, 5.4, 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 8.4, 8.5</p>
  * 
  * @see Event
  * @see EventRepository
@@ -46,6 +52,7 @@ import java.util.List;
  */
 @Service
 @Transactional
+@Validated
 @RequiredArgsConstructor
 @Slf4j
 public class EventService {
@@ -70,15 +77,20 @@ public class EventService {
      * <p><b>Требования:</b> 4.1, 4.2, 4.3, 26.2, 32.1, 18.5</p>
      * 
      * @param userId идентификатор пользователя, создающего событие
-     * @param title название события (обязательное)
-     * @param description описание события (может быть null)
+     * @param title название события (обязательное, не более 255 символов)
+     * @param description описание события (может быть null, не более 2000 символов)
      * @param eventDateTime дата и время события
      * @return созданное и сохраненное событие
      * @throws UserNotFoundException если пользователь с указанным ID не найден
      * @throws InvalidDateException если дата события находится в прошлом
-     * @throws IllegalArgumentException если title пустой или null
+     * @throws jakarta.validation.ConstraintViolationException если параметры не прошли валидацию
      */
-    public Event createEvent(Long userId, String title, String description, LocalDateTime eventDateTime) {
+    public Event createEvent(
+            @NotNull(message = "userId не может быть null") Long userId, 
+            @NotBlank(message = "Название события не может быть пустым") 
+            @Size(max = 255, message = "Название события не может превышать 255 символов") String title, 
+            @Size(max = 2000, message = "Описание события не может превышать 2000 символов") String description, 
+            @NotNull(message = "Дата и время события не могут быть null") LocalDateTime eventDateTime) {
         return createEvent(userId, title, description, eventDateTime, null, false);
     }
     
@@ -98,29 +110,29 @@ public class EventService {
      * <p><b>Требования:</b> 4.1, 4.2, 4.3, 26.2, 32.1, 18.5</p>
      * 
      * @param userId идентификатор пользователя, создающего событие
-     * @param title название события (обязательное)
-     * @param description описание события (может быть null)
+     * @param title название события (обязательное, не более 255 символов)
+     * @param description описание события (может быть null, не более 2000 символов)
      * @param eventDateTime дата и время начала события
      * @param endTime время окончания события (может быть null)
      * @param isPersonal флаг персонального события (true - видно только создателю)
      * @return созданное и сохраненное событие
      * @throws UserNotFoundException если пользователь с указанным ID не найден
      * @throws InvalidDateException если дата события находится в прошлом или endTime раньше eventTime
-     * @throws IllegalArgumentException если title пустой или null
+     * @throws jakarta.validation.ConstraintViolationException если параметры не прошли валидацию
      */
-    public Event createEvent(Long userId, String title, String description, 
-                            LocalDateTime eventDateTime, LocalTime endTime, Boolean isPersonal) {
+    public Event createEvent(
+            @NotNull(message = "userId не может быть null") Long userId, 
+            @NotBlank(message = "Название события не может быть пустым") 
+            @Size(max = 255, message = "Название события не может превышать 255 символов") String title, 
+            @Size(max = 2000, message = "Описание события не может превышать 2000 символов") String description, 
+            @NotNull(message = "Дата и время события не могут быть null") LocalDateTime eventDateTime, 
+            LocalTime endTime, 
+            Boolean isPersonal) {
         log.debug("Создание события для пользователя ID={}: title='{}', dateTime={}, endTime={}, isPersonal={}", 
                   userId, title, eventDateTime, endTime, isPersonal);
         
-        // Валидация входных параметров
-        if (title == null || title.isBlank()) {
-            log.warn("Попытка создать событие с пустым названием для пользователя ID={}", userId);
-            throw new IllegalArgumentException("Название события не может быть пустым");
-        }
-        
-        // Валидация даты - событие не должно быть в прошлом
-        if (eventDateTime.isBefore(LocalDateTime.now())) {
+        // Валидация даты - событие не должно быть в прошлом (сравниваем только даты без времени)
+        if (eventDateTime.toLocalDate().isBefore(LocalDate.now())) {
             log.warn("Попытка создать событие с датой в прошлом: {} для пользователя ID={}", 
                      eventDateTime, userId);
             throw new InvalidDateException("Дата события не может быть в прошлом");
@@ -271,17 +283,22 @@ public class EventService {
      * 
      * @param eventId идентификатор события для обновления
      * @param userId идентификатор пользователя, выполняющего обновление
-     * @param title новое название события (обязательное)
-     * @param description новое описание события (может быть null)
+     * @param title новое название события (обязательное, не более 255 символов)
+     * @param description новое описание события (может быть null, не более 2000 символов)
      * @param eventDateTime новая дата и время события
      * @return обновленное событие
      * @throws EventNotFoundException если событие с указанным ID не найдено
      * @throws UnauthorizedAccessException если пользователь не является создателем события
      * @throws InvalidDateException если новая дата находится в прошлом
-     * @throws IllegalArgumentException если title пустой или null
+     * @throws jakarta.validation.ConstraintViolationException если параметры не прошли валидацию
      */
-    public Event updateEvent(Long eventId, Long userId, String title, 
-                            String description, LocalDateTime eventDateTime) {
+    public Event updateEvent(
+            @NotNull(message = "eventId не может быть null") Long eventId, 
+            @NotNull(message = "userId не может быть null") Long userId, 
+            @NotBlank(message = "Название события не может быть пустым") 
+            @Size(max = 255, message = "Название события не может превышать 255 символов") String title, 
+            @Size(max = 2000, message = "Описание события не может превышать 2000 символов") String description, 
+            @NotNull(message = "Дата и время события не могут быть null") LocalDateTime eventDateTime) {
         return updateEvent(eventId, userId, title, description, eventDateTime, null);
     }
     
@@ -302,28 +319,28 @@ public class EventService {
      * 
      * @param eventId идентификатор события для обновления
      * @param userId идентификатор пользователя, выполняющего обновление
-     * @param title новое название события (обязательное)
-     * @param description новое описание события (может быть null)
+     * @param title новое название события (обязательное, не более 255 символов)
+     * @param description новое описание события (может быть null, не более 2000 символов)
      * @param eventDateTime новая дата и время начала события
      * @param endTime новое время окончания события (может быть null)
      * @return обновленное событие
      * @throws EventNotFoundException если событие с указанным ID не найдено
      * @throws UnauthorizedAccessException если пользователь не является создателем события
      * @throws InvalidDateException если новая дата находится в прошлом или endTime раньше eventTime
-     * @throws IllegalArgumentException если title пустой или null
+     * @throws jakarta.validation.ConstraintViolationException если параметры не прошли валидацию
      */
-    public Event updateEvent(Long eventId, Long userId, String title, 
-                            String description, LocalDateTime eventDateTime, LocalTime endTime) {
+    public Event updateEvent(
+            @NotNull(message = "eventId не может быть null") Long eventId, 
+            @NotNull(message = "userId не может быть null") Long userId, 
+            @NotBlank(message = "Название события не может быть пустым") 
+            @Size(max = 255, message = "Название события не может превышать 255 символов") String title, 
+            @Size(max = 2000, message = "Описание события не может превышать 2000 символов") String description, 
+            @NotNull(message = "Дата и время события не могут быть null") LocalDateTime eventDateTime, 
+            LocalTime endTime) {
         log.debug("Обновление события ID={} пользователем ID={}, endTime={}", eventId, userId, endTime);
         
-        // Валидация входных параметров
-        if (title == null || title.isBlank()) {
-            log.warn("Попытка обновить событие ID={} с пустым названием", eventId);
-            throw new IllegalArgumentException("Название события не может быть пустым");
-        }
-        
-        // Валидация даты
-        if (eventDateTime.isBefore(LocalDateTime.now())) {
+        // Валидация даты (сравниваем только даты без времени)
+        if (eventDateTime.toLocalDate().isBefore(LocalDate.now())) {
             log.warn("Попытка обновить событие ID={} с датой в прошлом: {}", eventId, eventDateTime);
             throw new InvalidDateException("Дата события не может быть в прошлом");
         }
@@ -513,6 +530,276 @@ public class EventService {
     }
     
     /**
+     * Обновляет название события.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Проверяет существование события</li>
+     *   <li>Проверяет права доступа на редактирование</li>
+     *   <li>Валидирует новое название</li>
+     *   <li>Обновляет название события</li>
+     *   <li>Записывает изменение в историю</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 2.4, 2.5</p>
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя
+     * @param newTitle новое название события (не более 255 символов)
+     * @return обновленное событие
+     * @throws EventNotFoundException если событие не найдено
+     * @throws UnauthorizedAccessException если нет прав на редактирование
+     * @throws jakarta.validation.ConstraintViolationException если название пустое или слишком длинное
+     */
+    public Event updateEventTitle(
+            @NotNull(message = "eventId не может быть null") Long eventId, 
+            @NotNull(message = "userId не может быть null") Long userId, 
+            @NotBlank(message = "Название события не может быть пустым") 
+            @Size(max = 255, message = "Название события не может превышать 255 символов") String newTitle) {
+        log.debug("Обновление названия события ID={} пользователем ID={}", eventId, userId);
+        
+        // Получение события и проверка прав
+        Event event = getEventById(eventId);
+        checkEditPermission(event, userId);
+        
+        // Сохранение старого значения
+        String oldTitle = event.getTitle();
+        
+        // Обновление названия
+        event.setTitle(newTitle);
+        Event updated = eventRepository.save(event);
+        
+        log.info("Название события ID={} обновлено пользователем ID={}: '{}' → '{}'", 
+                 eventId, userId, oldTitle, newTitle);
+        
+        // Запись в историю
+        eventHistoryService.recordChange(
+            eventId,
+            userId,
+            EventHistory.ActionType.UPDATED,
+            "title",
+            oldTitle,
+            newTitle
+        );
+        
+        return updated;
+    }
+    
+    /**
+     * Обновляет дату события.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Проверяет существование события</li>
+     *   <li>Проверяет права доступа на редактирование</li>
+     *   <li>Валидирует новую дату (не должна быть в прошлом)</li>
+     *   <li>Обновляет дату события</li>
+     *   <li>Записывает изменение в историю</li>
+     *   <li>Пересчитывает напоминания</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 2.4, 2.5</p>
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя
+     * @param newDate новая дата события
+     * @return обновленное событие
+     * @throws EventNotFoundException если событие не найдено
+     * @throws UnauthorizedAccessException если нет прав на редактирование
+     * @throws InvalidDateException если дата в прошлом
+     * @throws jakarta.validation.ConstraintViolationException если параметры null
+     */
+    public Event updateEventDate(
+            @NotNull(message = "eventId не может быть null") Long eventId, 
+            @NotNull(message = "userId не может быть null") Long userId, 
+            @NotNull(message = "Дата события не может быть null") LocalDate newDate) {
+        log.debug("Обновление даты события ID={} пользователем ID={}", eventId, userId);
+        
+        // Валидация даты - не должна быть в прошлом (сравниваем только даты без времени)
+        if (newDate.isBefore(LocalDate.now())) {
+            log.warn("Попытка установить дату в прошлом для события ID={}: {}", eventId, newDate);
+            throw new InvalidDateException("Дата события не может быть в прошлом");
+        }
+        
+        // Получение события и проверка прав
+        Event event = getEventById(eventId);
+        checkEditPermission(event, userId);
+        
+        // Сохранение старого значения
+        LocalDate oldDate = event.getEventDate();
+        
+        // Обновление даты
+        event.setEventDate(newDate);
+        Event updated = eventRepository.save(event);
+        
+        log.info("Дата события ID={} обновлена пользователем ID={}: {} → {}", 
+                 eventId, userId, oldDate, newDate);
+        
+        // Запись в историю
+        eventHistoryService.recordChange(
+            eventId,
+            userId,
+            EventHistory.ActionType.UPDATED,
+            "event_date",
+            oldDate.toString(),
+            newDate.toString()
+        );
+        
+        // Пересчет напоминаний
+        handleEventDateTimeChange(eventId);
+        
+        return updated;
+    }
+    
+    /**
+     * Обновляет время события.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Проверяет существование события</li>
+     *   <li>Проверяет права доступа на редактирование</li>
+     *   <li>Валидирует новое время</li>
+     *   <li>Обновляет время события</li>
+     *   <li>Записывает изменение в историю</li>
+     *   <li>Пересчитывает напоминания</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 2.4, 2.5</p>
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя
+     * @param newTime новое время события
+     * @return обновленное событие
+     * @throws EventNotFoundException если событие не найдено
+     * @throws UnauthorizedAccessException если нет прав на редактирование
+     * @throws jakarta.validation.ConstraintViolationException если параметры null
+     */
+    public Event updateEventTime(
+            @NotNull(message = "eventId не может быть null") Long eventId, 
+            @NotNull(message = "userId не может быть null") Long userId, 
+            @NotNull(message = "Время события не может быть null") LocalTime newTime) {
+        log.debug("Обновление времени события ID={} пользователем ID={}", eventId, userId);
+        
+        // Получение события и проверка прав
+        Event event = getEventById(eventId);
+        checkEditPermission(event, userId);
+        
+        // Сохранение старого значения
+        LocalTime oldTime = event.getEventTime();
+        
+        // Обновление времени
+        event.setEventTime(newTime);
+        Event updated = eventRepository.save(event);
+        
+        log.info("Время события ID={} обновлено пользователем ID={}: {} → {}", 
+                 eventId, userId, oldTime, newTime);
+        
+        // Запись в историю
+        eventHistoryService.recordChange(
+            eventId,
+            userId,
+            EventHistory.ActionType.UPDATED,
+            "event_time",
+            oldTime != null ? oldTime.toString() : null,
+            newTime.toString()
+        );
+        
+        // Пересчет напоминаний
+        handleEventDateTimeChange(eventId);
+        
+        return updated;
+    }
+    
+    /**
+     * Обновляет описание события.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Проверяет существование события</li>
+     *   <li>Проверяет права доступа на редактирование</li>
+     *   <li>Обновляет описание события</li>
+     *   <li>Записывает изменение в историю</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 2.4, 2.5</p>
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя
+     * @param newDescription новое описание события (может быть null или пустым, не более 2000 символов)
+     * @return обновленное событие
+     * @throws EventNotFoundException если событие не найдено
+     * @throws UnauthorizedAccessException если нет прав на редактирование
+     * @throws jakarta.validation.ConstraintViolationException если описание слишком длинное
+     */
+    public Event updateEventDescription(
+            @NotNull(message = "eventId не может быть null") Long eventId, 
+            @NotNull(message = "userId не может быть null") Long userId, 
+            @Size(max = 2000, message = "Описание события не может превышать 2000 символов") String newDescription) {
+        log.debug("Обновление описания события ID={} пользователем ID={}", eventId, userId);
+        
+        // Получение события и проверка прав
+        Event event = getEventById(eventId);
+        checkEditPermission(event, userId);
+        
+        // Сохранение старого значения
+        String oldDescription = event.getDescription();
+        
+        // Обновление описания
+        event.setDescription(newDescription);
+        Event updated = eventRepository.save(event);
+        
+        log.info("Описание события ID={} обновлено пользователем ID={}", eventId, userId);
+        
+        // Запись в историю
+        eventHistoryService.recordChange(
+            eventId,
+            userId,
+            EventHistory.ActionType.UPDATED,
+            "description",
+            oldDescription,
+            newDescription
+        );
+        
+        return updated;
+    }
+    
+    /**
+     * Проверяет права пользователя на редактирование события.
+     * 
+     * <p>Пользователь может редактировать событие, если:</p>
+     * <ul>
+     *   <li>Он является создателем события</li>
+     *   <li>Событие семейное (не персональное) и пользователь из той же семьи</li>
+     * </ul>
+     * 
+     * @param event событие для проверки
+     * @param userId идентификатор пользователя
+     * @throws UnauthorizedAccessException если у пользователя нет прав на редактирование
+     */
+    private void checkEditPermission(Event event, Long userId) {
+        // Проверка: пользователь - создатель события
+        if (event.getUser().getId().equals(userId)) {
+            return;
+        }
+        
+        // Проверка: событие семейное и пользователь из той же семьи
+        if (!event.getIsPersonal() && event.getFamily() != null) {
+            boolean isFromSameFamily = event.getFamily().getMembers().stream()
+                .anyMatch(u -> u.getId().equals(userId));
+            
+            if (isFromSameFamily) {
+                return;
+            }
+        }
+        
+        // Нет прав на редактирование
+        log.warn("Пользователь ID={} попытался отредактировать событие ID={} без прав доступа", 
+                 userId, event.getId());
+        throw new UnauthorizedAccessException(
+            "У вас нет прав для редактирования этого события");
+    }
+    
+    /**
      * Обрабатывает изменение даты или времени события.
      * Пересчитывает все неотправленные напоминания для нового времени.
      * 
@@ -550,5 +837,79 @@ public class EventService {
             log.error("Ошибка при отметке напоминаний для события ID={}: {}", 
                      eventId, e.getMessage(), e);
         }
+    }
+    
+    /**
+     * Получает отфильтрованные события пользователя по типу фильтра.
+     * 
+     * <p>Метод возвращает события в зависимости от выбранного фильтра:</p>
+     * <ul>
+     *   <li>{@link EventFilter#ALL ALL} - все события семьи (семейные и личные события пользователя)</li>
+     *   <li>{@link EventFilter#FAMILY FAMILY} - только семейные события (isPersonal = false)</li>
+     *   <li>{@link EventFilter#PERSONAL PERSONAL} - только личные события пользователя (isPersonal = true)</li>
+     * </ul>
+     * 
+     * <p>События автоматически сортируются по дате и времени в порядке возрастания.</p>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.2, 2.3</p>
+     * 
+     * @param user пользователь, для которого выполняется фильтрация
+     * @param filter тип фильтра событий
+     * @return список отфильтрованных событий, отсортированный по дате и времени
+     * @throws IllegalArgumentException если user или filter равны null
+     */
+    @Transactional(readOnly = true)
+    public List<Event> getFilteredEvents(
+            @NotNull(message = "user не может быть null") User user, 
+            @NotNull(message = "filter не может быть null") EventFilter filter) {
+        log.debug("Получение отфильтрованных событий для пользователя ID={}, фильтр={}", 
+                  user.getId(), filter);
+        
+        if (user.getFamily() == null) {
+            log.warn("Пользователь ID={} не принадлежит ни одной семье", user.getId());
+            return List.of();
+        }
+        
+        Long familyId = user.getFamily().getId();
+        Long userId = user.getId();
+        
+        List<Event> events;
+        
+        switch (filter) {
+            case ALL:
+                // Все события семьи (семейные + личные события пользователя)
+                events = eventRepository.findByFamilyIdAndStatusOrderByEventDateAscEventTimeAsc(
+                    familyId, Event.EventStatus.ACTIVE);
+                
+                // Фильтруем: оставляем семейные события и личные события текущего пользователя
+                events = events.stream()
+                    .filter(event -> !event.getIsPersonal() || event.belongsToUser(userId))
+                    .toList();
+                
+                log.debug("Найдено {} событий (ALL) для пользователя ID={}", events.size(), userId);
+                break;
+                
+            case FAMILY:
+                // Только семейные события (isPersonal = false)
+                events = eventRepository.findByFamilyIdAndIsPersonalAndStatusOrderByEventDateAscEventTimeAsc(
+                    familyId, false, Event.EventStatus.ACTIVE);
+                
+                log.debug("Найдено {} семейных событий для пользователя ID={}", events.size(), userId);
+                break;
+                
+            case PERSONAL:
+                // Только личные события пользователя (isPersonal = true)
+                events = eventRepository.findByUserIdAndIsPersonalAndStatusOrderByEventDateAscEventTimeAsc(
+                    userId, true, Event.EventStatus.ACTIVE);
+                
+                log.debug("Найдено {} личных событий для пользователя ID={}", events.size(), userId);
+                break;
+                
+            default:
+                log.warn("Неизвестный тип фильтра: {}, возвращаем пустой список", filter);
+                events = List.of();
+        }
+        
+        return events;
     }
 }

@@ -7,14 +7,13 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.SearchService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
@@ -28,12 +27,12 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  *   <li>Все события (семейные + персональные)</li>
  *   <li>Только семейные события</li>
  *   <li>Только персональные события</li>
- *   <li>Предстоящие события</li>
  * </ul>
  * 
- * <p><b>Требования:</b> 28.5</p>
+ * <p><b>Требования:</b> 3.1, 3.2, 3.3, 3.5</p>
  * 
  * @see CommandHandler
+ * @see KeyboardService
  * @see SearchService
  * @author Family Calendar Bot Team
  * @version 1.0.0
@@ -44,6 +43,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 @Slf4j
 public class FilterCommandHandler implements CommandHandler {
     
+    private final KeyboardService keyboardService;
     private final SearchService searchService;
     private final TelegramMessageService messageService;
     
@@ -53,7 +53,11 @@ public class FilterCommandHandler implements CommandHandler {
     /**
      * Обрабатывает команду /filter.
      * 
-     * <p>Отправляет пользователю inline-клавиатуру с вариантами фильтрации.</p>
+     * <p>Отправляет пользователю inline-клавиатуру с вариантами фильтрации.
+     * Использует KeyboardService для создания клавиатуры и применяет корректное
+     * экранирование MarkdownV2 к тексту сообщения.</p>
+     * 
+     * <p><b>Требования:</b> 3.1, 3.2, 3.3, 3.5</p>
      * 
      * @param message сообщение от пользователя с командой
      * @param user пользователь, отправивший команду
@@ -64,56 +68,25 @@ public class FilterCommandHandler implements CommandHandler {
         log.debug("Обработка команды /filter для пользователя ID={}", user.getId());
         
         try {
-            String responseMessage = String.format("🔎 %s\n\nВыберите тип событий для отображения:",
-                    bold("Фильтрация событий"));
+            // Создаем inline-клавиатуру через KeyboardService
+            InlineKeyboardMarkup keyboard = keyboardService.createFilterKeyboard();
             
-            // Отправляем сообщение с inline-клавиатурой напрямую, так как нужна клавиатура
-            InlineKeyboardMarkup keyboard = createFilterKeyboard();
-            messageService.sendMessage(message.getChatId(), responseMessage, keyboard);
-            log.info("Пользователю ID={} отправлено меню фильтрации", user.getId());
+            // Формируем текст сообщения с корректным экранированием
+            String messageText = "🔍 " + bold("Выберите тип событий для отображения") + "\n\n" +
+                    escape("Используйте кнопки ниже для фильтрации событий по категориям.");
+            
+            // Отправляем сообщение с inline-клавиатурой напрямую
+            messageService.sendMessage(message.getChatId(), messageText, keyboard);
+            
+            log.debug("Пользователю ID={} отправлено меню фильтрации", user.getId());
+            
             // Возвращаем null, так как сообщение уже отправлено
             return null;
+            
         } catch (Exception e) {
             log.error("Ошибка при отправке меню фильтрации пользователю ID={}", user.getId(), e);
             return "❌ " + escape("Произошла ошибка при отображении меню фильтрации");
         }
-    }
-    
-    /**
-     * Создает inline-клавиатуру с вариантами фильтрации.
-     * 
-     * @return объект InlineKeyboardMarkup с кнопками фильтров
-     */
-    private InlineKeyboardMarkup createFilterKeyboard() {
-        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
-        
-        // Кнопка "Все события"
-        List<InlineKeyboardButton> row1 = new ArrayList<>();
-        InlineKeyboardButton allButton = new InlineKeyboardButton();
-        allButton.setText("📋 Все события");
-        allButton.setCallbackData("filter_all");
-        row1.add(allButton);
-        keyboard.add(row1);
-        
-        // Кнопка "Семейные события"
-        List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton familyButton = new InlineKeyboardButton();
-        familyButton.setText("👨‍👩‍👧‍👦 Семейные события");
-        familyButton.setCallbackData("filter_family");
-        row2.add(familyButton);
-        keyboard.add(row2);
-        
-        // Кнопка "Персональные события"
-        List<InlineKeyboardButton> row3 = new ArrayList<>();
-        InlineKeyboardButton personalButton = new InlineKeyboardButton();
-        personalButton.setText("🔒 Персональные события");
-        personalButton.setCallbackData("filter_personal");
-        row3.add(personalButton);
-        keyboard.add(row3);
-        
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(keyboard);
-        return markup;
     }
     
     /**
@@ -148,7 +121,7 @@ public class FilterCommandHandler implements CommandHandler {
             // Формирование сообщения с результатами
             String filterName = getFilterName(filter);
             StringBuilder messageBuilder = new StringBuilder();
-            messageBuilder.append(String.format("🔎 %s\n\n", bold(filterName)));
+            messageBuilder.append(formatMessage("🔎 %s\n\n", filterName));
             
             if (results.isEmpty()) {
                 messageBuilder.append(escape("Событий не найдено.")).append("\n\n");
@@ -162,7 +135,7 @@ public class FilterCommandHandler implements CommandHandler {
             }
             
             messageService.sendMessage(chatId, messageBuilder.toString());
-            log.info("Пользователю ID={} отправлено {} событий по фильтру {}", 
+            log.debug("Пользователю ID={} отправлено {} событий по фильтру {}", 
                      user.getId(), results.size(), filter);
             
         } catch (Exception e) {

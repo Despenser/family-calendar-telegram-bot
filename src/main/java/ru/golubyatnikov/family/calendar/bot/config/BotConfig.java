@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.NonNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.client.RestTemplate;
 
@@ -48,7 +49,7 @@ public class BotConfig {
      * @return настроенный экземпляр RestTemplate
      */
     @Bean
-    public RestTemplate restTemplate(RestTemplateBuilder builder) {
+    public RestTemplate restTemplate(@NonNull RestTemplateBuilder builder) {
         return builder.build();
     }
 }

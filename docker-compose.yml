@@ -13,7 +13,7 @@ services:
       # Персистентное хранилище данных PostgreSQL
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     networks:
       - family-calendar-network
     healthcheck:

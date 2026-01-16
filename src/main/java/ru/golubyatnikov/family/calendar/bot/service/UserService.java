@@ -3,6 +3,8 @@ package ru.golubyatnikov.family.calendar.bot.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
+import ru.golubyatnikov.family.calendar.bot.model.EventFilter;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
@@ -141,5 +143,83 @@ public class UserService {
                 telegramId, isAuthorized);
         
         return isAuthorized;
+    }
+
+    /**
+     * Устанавливает фильтр событий для пользователя.
+     * 
+     * <p>Сохраняет выбранный пользователем фильтр событий в базу данных.
+     * Фильтр определяет, какие события будут отображаться пользователю:
+     * все события, только семейные или только личные.</p>
+     * 
+     * <p><b>Требования:</b> 3.4</p>
+     * 
+     * @param userId внутренний идентификатор пользователя
+     * @param filter тип фильтра событий для установки
+     *
+     * @throws UserNotFoundException если пользователь с указанным ID не найден
+     * @throws IllegalArgumentException если userId или filter равны null
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    @Transactional
+    public void setEventFilter(Long userId, EventFilter filter) {
+        log.info("Установка фильтра событий: userId={}, filter={}", userId, filter);
+        
+        if (userId == null) {
+            log.error("Попытка установить фильтр с null userId");
+            throw new IllegalArgumentException("User ID не может быть null");
+        }
+        
+        if (filter == null) {
+            log.error("Попытка установить null фильтр для пользователя: userId={}", userId);
+            throw new IllegalArgumentException("Фильтр событий не может быть null");
+        }
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.error("Пользователь не найден при установке фильтра: userId={}", userId);
+                    return new UserNotFoundException("Пользователь не найден: userId=" + userId);
+                });
+        
+        user.setEventFilter(filter);
+        userRepository.save(user);
+        
+        log.info("Фильтр событий успешно установлен: userId={}, filter={}", userId, filter);
+    }
+
+    /**
+     * Получает текущий фильтр событий пользователя.
+     * 
+     * <p>Возвращает сохраненный фильтр событий для указанного пользователя.
+     * Если фильтр не был установлен явно, возвращается значение по умолчанию (ALL).</p>
+     * 
+     * <p><b>Требования:</b> 3.4</p>
+     * 
+     * @param userId внутренний идентификатор пользователя
+     *
+     * @return текущий фильтр событий пользователя
+     * @throws UserNotFoundException если пользователь с указанным ID не найден
+     * @throws IllegalArgumentException если userId равен null
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    public EventFilter getEventFilter(Long userId) {
+        log.debug("Получение фильтра событий: userId={}", userId);
+        
+        if (userId == null) {
+            log.error("Попытка получить фильтр с null userId");
+            throw new IllegalArgumentException("User ID не может быть null");
+        }
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.error("Пользователь не найден при получении фильтра: userId={}", userId);
+                    return new UserNotFoundException("Пользователь не найден: userId=" + userId);
+                });
+        
+        EventFilter filter = user.getEventFilter();
+        
+        log.info("Фильтр событий получен: userId={}, filter={}", userId, filter);
+        
+        return filter;
     }
 }

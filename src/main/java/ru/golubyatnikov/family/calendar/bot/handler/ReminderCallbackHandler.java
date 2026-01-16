@@ -15,6 +15,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.italic;
+
 /**
  * Обработчик callback-запросов для управления напоминаниями о событиях.
  * 
@@ -58,29 +62,32 @@ public class ReminderCallbackHandler {
      * @param callbackQueryId идентификатор callback query для ответа
      */
     public void handleSetupReminders(Long eventId, Long chatId, Integer messageId, String callbackQueryId) {
-        log.info("Настройка напоминаний для события ID={}", eventId);
+        log.debug("Настройка напоминаний для события ID={}", eventId);
         
         try {
-            String message = "🔔 *Настройка напоминаний*\n\n" +
-                           "Выберите один или несколько типов напоминаний:\n\n" +
-                           "• Утром в день события (9:00)\n" +
-                           "• Вечером накануне (20:00)\n" +
-                           "• За 1 час до события\n" +
-                           "• За 10 минут до события\n" +
-                           "• Свое время\n\n" +
-                           "_Нажмите на тип, чтобы выбрать или отменить выбор_";
+            StringBuilder message = new StringBuilder();
+            message.append("🔔 ").append(bold("Настройка напоминаний")).append("\n\n");
+            message.append("Выберите один или несколько типов напоминаний:\n\n");
+            message.append("• Утром в день события (9:00)\n");
+            message.append("• Вечером накануне (20:00)\n");
+            message.append("• За 1 час до события\n");
+            message.append("• За 10 минут до события\n");
+            message.append("• Свое время\n\n");
+            message.append(italic("Нажмите на тип, чтобы выбрать или отменить выбор"));
             
             InlineKeyboardMarkup keyboard = createReminderTypesKeyboard(eventId);
             
-            messageService.editMessageText(chatId, messageId, message, keyboard);
+            messageService.editMessageText(chatId, messageId, message.toString(), keyboard);
             messageService.answerCallbackQuery(callbackQueryId, "Выберите типы напоминаний");
             
         } catch (Exception e) {
-            log.error("Ошибка при настройке напоминаний для события ID={}: {}", eventId, e.getMessage(), e);
+            log.error("Ошибка при настройке напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
+                    eventId, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
                 messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка при настройке напоминаний");
             } catch (Exception ex) {
-                log.error("Ошибка при ответе на callback query: {}", ex.getMessage(), ex);
+                log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
+                        callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
             }
         }
     }
@@ -97,7 +104,7 @@ public class ReminderCallbackHandler {
      */
     public void handleReminderTypeSelection(Long eventId, Reminder.ReminderType type, 
                                            Long chatId, Integer messageId, String callbackQueryId) {
-        log.info("Выбор типа напоминания {} для события ID={}", type, eventId);
+        log.debug("Выбор типа напоминания {} для события ID={}", type, eventId);
         
         try {
             String key = eventId + "_" + type.name();
@@ -113,11 +120,12 @@ public class ReminderCallbackHandler {
             
             // Если выбран CUSTOM, запрашиваем ввод минут
             if (type == Reminder.ReminderType.CUSTOM && selectedReminders.contains(key)) {
-                String message = "⏱️ *Свое время напоминания*\n\n" +
-                               "Введите количество минут до события, за которое нужно отправить напоминание.\n\n" +
-                               "Например: 30 (за 30 минут), 120 (за 2 часа), 1440 (за 1 день)";
+                StringBuilder message = new StringBuilder();
+                message.append("⏱️ ").append(bold("Свое время напоминания")).append("\n\n");
+                message.append("Введите количество минут до события, за которое нужно отправить напоминание.\n\n");
+                message.append("Например: 30 (за 30 минут), 120 (за 2 часа), 1440 (за 1 день)");
                 
-                messageService.editMessageText(chatId, messageId, message, null);
+                messageService.editMessageText(chatId, messageId, message.toString(), null);
                 messageService.answerCallbackQuery(callbackQueryId, "Введите количество минут");
                 return;
             }
@@ -131,11 +139,13 @@ public class ReminderCallbackHandler {
                 selectedReminders.contains(key) ? "✅ Выбрано" : "Отменено");
             
         } catch (Exception e) {
-            log.error("Ошибка при выборе типа напоминания для события ID={}: {}", eventId, e.getMessage(), e);
+            log.error("Ошибка при выборе типа напоминания: eventId={}, type={}, chatId={}, error={}, stackTrace={}", 
+                    eventId, type, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
                 messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка");
             } catch (Exception ex) {
-                log.error("Ошибка при ответе на callback query: {}", ex.getMessage(), ex);
+                log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
+                        callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
             }
         }
     }
@@ -148,7 +158,7 @@ public class ReminderCallbackHandler {
      * @param chatId идентификатор чата
      */
     public void handleCustomReminderInput(Long eventId, String input, Long chatId) {
-        log.info("Обработка custom напоминания для события ID={}: input={}", eventId, input);
+        log.debug("Обработка custom напоминания для события ID={}: input={}", eventId, input);
         
         try {
             int minutes = Integer.parseInt(input.trim());
@@ -168,34 +178,34 @@ public class ReminderCallbackHandler {
             // Создаем custom напоминание
             Reminder reminder = reminderService.createCustomReminder(eventId, minutes);
             
-            String message = String.format(
-                "✅ *Напоминание создано*\n\n" +
-                "Тип: Свое время\n" +
-                "За %d минут до события\n" +
-                "Время отправки: %s",
-                minutes,
-                reminder.getReminderTime().format(TIME_FORMATTER)
-            );
+            StringBuilder message = new StringBuilder();
+            message.append("✅ ").append(bold("Напоминание создано")).append("\n\n");
+            message.append(formatMessage("Тип: Свое время\n"));
+            message.append(formatMessage("За %d минут до события\n", minutes));
+            message.append(formatMessage("Время отправки: %s", 
+                reminder.getReminderTime().format(TIME_FORMATTER)));
             
-            messageService.sendMessage(chatId, message);
-            log.info("Custom напоминание создано для события ID={}: {} минут", eventId, minutes);
+            messageService.sendMessage(chatId, message.toString());
+            log.debug("Custom напоминание создано для события ID={}: {} минут", eventId, minutes);
             
         } catch (NumberFormatException e) {
-            log.warn("Некорректный ввод для custom напоминания: {}", input);
+            log.warn("Некорректный ввод для custom напоминания: input='{}', chatId={}", input, chatId);
             try {
                 messageService.sendMessage(chatId, 
                     "❌ Некорректный формат. Введите число (количество минут).");
             } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: {}", ex.getMessage(), ex);
+                log.error("Ошибка при отправке сообщения: chatId={}, error={}, stackTrace={}", 
+                        chatId, ex.getMessage(), getStackTraceString(ex), ex);
             }
         } catch (Exception e) {
-            log.error("Ошибка при создании custom напоминания для события ID={}: {}", 
-                     eventId, e.getMessage(), e);
+            log.error("Ошибка при создании custom напоминания: eventId={}, chatId={}, error={}, stackTrace={}", 
+                     eventId, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
                 messageService.sendMessage(chatId, 
                     "❌ Ошибка при создании напоминания: " + e.getMessage());
             } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: {}", ex.getMessage(), ex);
+                log.error("Ошибка при отправке сообщения: chatId={}, error={}, stackTrace={}", 
+                        chatId, ex.getMessage(), getStackTraceString(ex), ex);
             }
         }
     }
@@ -208,22 +218,23 @@ public class ReminderCallbackHandler {
      * @param messageId идентификатор сообщения для редактирования
      */
     public void handleViewReminders(Long eventId, Long chatId, Integer messageId) {
-        log.info("Просмотр напоминаний для события ID={}", eventId);
+        log.debug("Просмотр напоминаний для события ID={}", eventId);
         
         try {
             List<Reminder> reminders = reminderService.getEventReminders(eventId);
             
             if (reminders.isEmpty()) {
-                String message = "🔔 *Напоминания*\n\n" +
-                               "Для этого события пока не настроено ни одного напоминания.\n\n" +
-                               "Используйте кнопку \"🔔 Настроить напоминания\" для добавления.";
+                StringBuilder message = new StringBuilder();
+                message.append("🔔 ").append(bold("Напоминания")).append("\n\n");
+                message.append("Для этого события пока не настроено ни одного напоминания.\n\n");
+                message.append("Используйте кнопку \"🔔 Настроить напоминания\" для добавления.");
                 
-                messageService.editMessageText(chatId, messageId, message, null);
+                messageService.editMessageText(chatId, messageId, message.toString(), null);
                 return;
             }
             
             StringBuilder message = new StringBuilder();
-            message.append("🔔 *Настроенные напоминания*\n\n");
+            message.append("🔔 ").append(bold("Настроенные напоминания")).append("\n\n");
             
             for (Reminder reminder : reminders) {
                 message.append(formatReminder(reminder));
@@ -234,11 +245,13 @@ public class ReminderCallbackHandler {
             messageService.editMessageText(chatId, messageId, message.toString(), keyboard);
             
         } catch (Exception e) {
-            log.error("Ошибка при просмотре напоминаний для события ID={}: {}", eventId, e.getMessage(), e);
+            log.error("Ошибка при просмотре напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
+                    eventId, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
                 messageService.sendMessage(chatId, "❌ Ошибка при загрузке напоминаний");
             } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: {}", ex.getMessage(), ex);
+                log.error("Ошибка при отправке сообщения: chatId={}, error={}, stackTrace={}", 
+                        chatId, ex.getMessage(), getStackTraceString(ex), ex);
             }
         }
     }
@@ -252,23 +265,29 @@ public class ReminderCallbackHandler {
      * @param callbackQueryId идентификатор callback query для ответа
      */
     public void handleDeleteReminder(Long reminderId, Long chatId, Integer messageId, String callbackQueryId) {
-        log.info("Удаление напоминания ID={}", reminderId);
+        log.debug("Удаление напоминания ID={}", reminderId);
         
         try {
             reminderService.deleteReminder(reminderId);
             
             messageService.answerCallbackQuery(callbackQueryId, "✅ Напоминание удалено");
-            messageService.editMessageText(chatId, messageId, 
-                "✅ *Напоминание удалено*\n\nНапоминание успешно удалено.", null);
             
-            log.info("Напоминание ID={} успешно удалено", reminderId);
+            StringBuilder message = new StringBuilder();
+            message.append("✅ ").append(bold("Напоминание удалено")).append("\n\n");
+            message.append("Напоминание успешно удалено.");
+            
+            messageService.editMessageText(chatId, messageId, message.toString(), null);
+            
+            log.debug("Напоминание ID={} успешно удалено", reminderId);
             
         } catch (Exception e) {
-            log.error("Ошибка при удалении напоминания ID={}: {}", reminderId, e.getMessage(), e);
+            log.error("Ошибка при удалении напоминания: reminderId={}, chatId={}, error={}, stackTrace={}", 
+                    reminderId, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
                 messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка при удалении");
             } catch (Exception ex) {
-                log.error("Ошибка при ответе на callback query: {}", ex.getMessage(), ex);
+                log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
+                        callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
             }
         }
     }
@@ -282,7 +301,7 @@ public class ReminderCallbackHandler {
      * @param callbackQueryId идентификатор callback query для ответа
      */
     public void handleConfirmReminders(Long eventId, Long chatId, Integer messageId, String callbackQueryId) {
-        log.info("Подтверждение напоминаний для события ID={}", eventId);
+        log.debug("Подтверждение напоминаний для события ID={}", eventId);
         
         try {
             // Собираем выбранные типы
@@ -313,8 +332,8 @@ public class ReminderCallbackHandler {
             selectedReminders.removeIf(key -> key.startsWith(eventId + "_"));
             
             StringBuilder message = new StringBuilder();
-            message.append("✅ *Напоминания созданы*\n\n");
-            message.append(String.format("Создано напоминаний: %d\n\n", createdReminders.size()));
+            message.append("✅ ").append(bold("Напоминания созданы")).append("\n\n");
+            message.append(formatMessage("Создано напоминаний: %d\n\n", createdReminders.size()));
             
             for (Reminder reminder : createdReminders) {
                 message.append(formatReminder(reminder));
@@ -324,14 +343,16 @@ public class ReminderCallbackHandler {
             messageService.editMessageText(chatId, messageId, message.toString(), null);
             messageService.answerCallbackQuery(callbackQueryId, "✅ Напоминания созданы");
             
-            log.info("Создано {} напоминаний для события ID={}", createdReminders.size(), eventId);
+            log.debug("Создано {} напоминаний для события ID={}", createdReminders.size(), eventId);
             
         } catch (Exception e) {
-            log.error("Ошибка при создании напоминаний для события ID={}: {}", eventId, e.getMessage(), e);
+            log.error("Ошибка при создании напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
+                    eventId, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
                 messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: " + e.getMessage());
             } catch (Exception ex) {
-                log.error("Ошибка при ответе на callback query: {}", ex.getMessage(), ex);
+                log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
+                        callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
             }
         }
     }
@@ -459,7 +480,7 @@ public class ReminderCallbackHandler {
      */
     private String buildReminderSelectionMessage(Long eventId) {
         StringBuilder message = new StringBuilder();
-        message.append("🔔 *Настройка напоминаний*\n\n");
+        message.append("🔔 ").append(bold("Настройка напоминаний")).append("\n\n");
         
         long selectedCount = selectedReminders.stream()
             .filter(key -> key.startsWith(eventId + "_"))
@@ -471,9 +492,36 @@ public class ReminderCallbackHandler {
             message.append(String.format("Выбрано типов: %d\n\n", selectedCount));
         }
         
-        message.append("_Нажмите на тип, чтобы выбрать или отменить выбор_\n");
-        message.append("_После выбора нажмите \"✅ Создать напоминания\"_");
+        message.append(italic("Нажмите на тип, чтобы выбрать или отменить выбор")).append("\n");
+        message.append(italic("После выбора нажмите \"✅ Создать напоминания\""));
         
         return message.toString();
+    }
+    
+    /**
+     * Получает строковое представление стека вызовов исключения.
+     * 
+     * <p>Используется для детального логирования критических ошибок.</p>
+     * 
+     * @param e исключение
+     * @return строка со стеком вызовов (первые 5 элементов)
+     */
+    private String getStackTraceString(Exception e) {
+        if (e == null || e.getStackTrace() == null || e.getStackTrace().length == 0) {
+            return "no stack trace";
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        StackTraceElement[] elements = e.getStackTrace();
+        int limit = Math.min(5, elements.length);
+        
+        for (int i = 0; i < limit; i++) {
+            sb.append(elements[i].toString());
+            if (i < limit - 1) {
+                sb.append(" -> ");
+            }
+        }
+        
+        return sb.toString();
     }
 }

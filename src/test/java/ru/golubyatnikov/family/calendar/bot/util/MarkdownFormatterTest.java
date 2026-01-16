@@ -52,15 +52,13 @@ class MarkdownFormatterTest {
     }
 
     @Test
-    @DisplayName("formatMessage должен выбросить исключение при null аргументе")
-    void shouldThrowExceptionWhenArgumentIsNull() {
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> MarkdownFormatter.formatMessage("Шаблон: %s", (Object) null)
-        );
+    @DisplayName("formatMessage должен обрабатывать null аргумент как строку 'null'")
+    void shouldHandleNullArgumentAsString() {
+        // When
+        String result = MarkdownFormatter.formatMessage("Шаблон: %s", (Object) null);
         
-        assertTrue(exception.getMessage().contains("Аргумент с индексом 0 не может быть null"));
+        // Then
+        assertEquals("Шаблон: null", result);
     }
 
     @Test
@@ -72,8 +70,7 @@ class MarkdownFormatterTest {
             () -> MarkdownFormatter.formatMessage("Шаблон: %s %s", "arg1")
         );
         
-        assertTrue(exception.getMessage().contains("количество плейсхолдеров"));
-        assertTrue(exception.getMessage().contains("не совпадает"));
+        assertTrue(exception.getMessage().contains("Ошибка форматирования сообщения"));
     }
 
     @Test
@@ -162,5 +159,107 @@ class MarkdownFormatterTest {
         
         // Then
         assertEquals("", result);
+    }
+
+    @Test
+    @DisplayName("formatMessage должен поддерживать целочисленные плейсхолдеры %d")
+    void shouldSupportIntegerPlaceholders() {
+        // Given
+        String template = "Найдено: %d событий";
+        int count = 42;
+        
+        // When
+        String result = MarkdownFormatter.formatMessage(template, count);
+        
+        // Then
+        assertEquals("Найдено: 42 событий", result);
+    }
+
+    @Test
+    @DisplayName("formatMessage должен поддерживать форматирование с ведущими нулями %02d")
+    void shouldSupportLeadingZeroFormatting() {
+        // Given
+        String template = "Час: %02d:00";
+        int hour = 9;
+        
+        // When
+        String result = MarkdownFormatter.formatMessage(template, hour);
+        
+        // Then
+        assertEquals("Час: 09:00", result);
+    }
+
+    @Test
+    @DisplayName("formatMessage должен поддерживать плейсхолдеры с плавающей точкой %f")
+    void shouldSupportFloatPlaceholders() {
+        // Given
+        String template = "Цена: %.2f руб.";
+        double price = 123.456;
+        
+        // When
+        String result = MarkdownFormatter.formatMessage(template, price);
+        
+        // Then
+        // Точка должна быть экранирована
+        assertTrue(result.contains("123\\.46"));
+        assertTrue(result.contains("руб\\."));
+    }
+
+    @Test
+    @DisplayName("formatMessage должен поддерживать смешанные плейсхолдеры")
+    void shouldSupportMixedPlaceholders() {
+        // Given
+        String template = "Событие %s в %02d:%02d";
+        String event = "Встреча";
+        int hour = 14;
+        int minute = 30;
+        
+        // When
+        String result = MarkdownFormatter.formatMessage(template, event, hour, minute);
+        
+        // Then
+        assertEquals("Событие Встреча в 14:30", result);
+    }
+
+    @Test
+    @DisplayName("formatMessage должен экранировать точки в числах с плавающей точкой")
+    void shouldEscapeDotsInFloatingPointNumbers() {
+        // Given
+        String template = "Значение: %f";
+        double value = 3.14;
+        
+        // When
+        String result = MarkdownFormatter.formatMessage(template, value);
+        
+        // Then
+        // Точка должна быть экранирована
+        assertTrue(result.contains("3\\.14"));
+    }
+
+    @Test
+    @DisplayName("formatMessage должен выбросить исключение при несоответствии типов")
+    void shouldThrowExceptionWhenTypeMismatch() {
+        // When & Then
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> MarkdownFormatter.formatMessage("Число: %d", "строка")
+        );
+        
+        assertTrue(exception.getMessage().contains("Ошибка форматирования сообщения"));
+    }
+
+    @Test
+    @DisplayName("formatMessage должен сохранять эмодзи при форматировании чисел")
+    void shouldPreserveEmojiWithNumericFormatting() {
+        // Given
+        String template = "✅ Час выбран: %02d:00";
+        int hour = 9;
+        
+        // When
+        String result = MarkdownFormatter.formatMessage(template, hour);
+        
+        // Then
+        assertEquals("✅ Час выбран: 09:00", result);
+        assertTrue(result.contains("✅"));
     }
 }

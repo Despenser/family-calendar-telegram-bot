@@ -83,6 +83,18 @@ public class User {
     private Family family;
 
     /**
+     * Фильтр событий, выбранный пользователем.
+     * Определяет, какие события отображаются пользователю (все, семейные или личные).
+     * По умолчанию установлен в ALL (все события).
+     * 
+     * <p><b>Требования:</b> 3.4</p>
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "event_filter", length = 20)
+    @Builder.Default
+    private EventFilter eventFilter = EventFilter.ALL;
+
+    /**
      * Дата и время регистрации пользователя в системе.
      * Устанавливается автоматически при создании записи.
      */

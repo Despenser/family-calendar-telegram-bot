@@ -237,7 +237,7 @@ class AddEventCommandHandlerTest {
         // Then
         verify(messageService).sendMessageWithInlineKeyboard(
                 eq(123L),
-                eq("📅 *Создание нового события*\n\nВыберите тип события:"),
+                eq("📅 Создание нового события\n\nВыберите тип события:"),
                 eq(typeKeyboard)
         );
     }

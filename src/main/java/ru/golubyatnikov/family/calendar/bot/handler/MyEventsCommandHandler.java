@@ -8,6 +8,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
@@ -79,6 +80,7 @@ public class MyEventsCommandHandler implements CommandHandler {
     private final EventService eventService;
     private final KeyboardService keyboardService;
     private final TelegramMessageService messageService;
+    private final ConversationStateService conversationStateService;
 
     /**
      * Обрабатывает команду /my_events от пользователя.
@@ -108,34 +110,97 @@ public class MyEventsCommandHandler implements CommandHandler {
         String username = message.getFrom().getUserName();
         Long chatId = message.getChatId();
 
-        log.info("Обработка команды /my_events: telegramId={}, username={}, userId={}", 
-                telegramId, username, user.getId());
+        log.debug("Обработка команды /my_events: telegramId={}, userId={}", 
+                telegramId, user.getId());
 
         // Получаем события пользователя
         List<Event> userEvents = eventService.getUserEvents(user.getId());
 
-        log.info("Найдено {} событий для пользователя ID={}", userEvents.size(), user.getId());
+        log.debug("Найдено {} событий для пользователя ID={}", userEvents.size(), user.getId());
 
         if (userEvents.isEmpty()) {
             return buildNoEventsMessage();
         }
 
         // Отправляем заголовок
-        String header = formatMessage("📋 %s\n\nВсего событий: %s\n", 
-                bold("Мои события"), userEvents.size());
+        StringBuilder header = new StringBuilder();
+        header.append("📋 ").append(bold("Мои события")).append("\n\n");
+        header.append(escape("Всего событий: ")).append(escape(String.valueOf(userEvents.size()))).append(escape("\n"));
+        
+        log.debug("Начало отправки {} событий пользователю chatId={}", userEvents.size(), chatId);
         
         // Отправляем каждое событие отдельным сообщением с inline-кнопками
+        int successCount = 0;
+        int failureCount = 0;
+        
         for (Event event : userEvents) {
             try {
                 String eventText = formatEvent(event);
                 InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event.getId());
+                
+                // Проверяем, что клавиатура создана корректно
+                if (keyboard == null) {
+                    log.warn("Клавиатура для события ID={} равна null, пропускаем отправку", event.getId());
+                    failureCount++;
+                    continue;
+                }
+                
+                if (keyboard.getKeyboard() == null || keyboard.getKeyboard().isEmpty()) {
+                    log.warn("Клавиатура для события ID={} пустая (нет кнопок), пропускаем отправку", event.getId());
+                    failureCount++;
+                    continue;
+                }
+                
+                // Логируем детали перед отправкой
+                int buttonCount = keyboard.getKeyboard().stream()
+                        .mapToInt(List::size)
+                        .sum();
+                String textPreview = eventText.length() > 50 
+                        ? eventText.substring(0, 50) + "..." 
+                        : eventText;
+                
+                log.debug("Отправка события ID={}: textPreview='{}', buttonCount={}", 
+                        event.getId(), textPreview, buttonCount);
+                
                 messageService.sendMessageWithInlineKeyboard(chatId, eventText, keyboard);
+                
+                successCount++;
+                log.debug("Событие ID={} успешно отправлено", event.getId());
+                
+            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException e) {
+                // Обработка ошибок Telegram API с fallback механизмом
+                if (e.getErrorCode() != null && e.getErrorCode() == 400) {
+                    // Ошибка 400 - проблема с форматированием MarkdownV2
+                    log.warn("Ошибка 400 при отправке события ID={} с MarkdownV2, " +
+                            "попытка отправить без форматирования. Ошибка: {}", 
+                            event.getId(), e.getMessage());
+                    
+                    try {
+                        // Используем fallback механизм - отправка без форматирования
+                        sendWithoutFormatting(chatId, event);
+                        successCount++;
+                        log.debug("Событие ID={} успешно отправлено через fallback механизм (без форматирования)", 
+                                event.getId());
+                    } catch (Exception fallbackException) {
+                        failureCount++;
+                        log.error("Fallback механизм не сработал для события ID={}: {}", 
+                                event.getId(), fallbackException.getMessage(), fallbackException);
+                    }
+                } else {
+                    // Другие ошибки Telegram API
+                    failureCount++;
+                    log.error("Ошибка Telegram API при отправке события ID={}: код={}, сообщение={}", 
+                            event.getId(), e.getErrorCode(), e.getMessage(), e);
+                }
             } catch (Exception e) {
+                failureCount++;
                 log.error("Ошибка при отправке события ID={}: {}", event.getId(), e.getMessage(), e);
             }
         }
         
-        return header;
+        log.debug("Завершена отправка событий: успешно={}, ошибок={}", successCount, failureCount);
+        
+        return header.toString();
     }
 
     /**
@@ -151,7 +216,11 @@ public class MyEventsCommandHandler implements CommandHandler {
      * @return отформатированное сообщение об отсутствии событий
      */
     private String buildNoEventsMessage() {
-        return escape("📋 ") + bold("Мои события") + escape("\n\nУ вас пока нет созданных событий.\n\nИспользуйте ") + code("/add_event") + escape(" для добавления нового события.");
+        StringBuilder message = new StringBuilder();
+        message.append("📋 ").append(bold("Мои события")).append("\n\n");
+        message.append(escape("У вас пока нет созданных событий.\n\n"));
+        message.append(escape("Используйте ")).append(escape("/add_event")).append(escape(" для добавления нового события."));
+        return message.toString();
     }
 
     /**
@@ -168,16 +237,58 @@ public class MyEventsCommandHandler implements CommandHandler {
     private String formatEvent(Event event) {
         StringBuilder formatted = new StringBuilder();
         
-        formatted.append(formatMessage("📌 %s\n", bold(event.getTitle())));
-        formatted.append(formatMessage("📅 Дата: %s\n", escape(event.getFormattedDate())));
-        formatted.append(formatMessage("🕐 Время: %s", escape(event.getFormattedTime())));
+        // Используем escape() для эмодзи и bold() для названия
+        formatted.append(escape("📌 ")).append(bold(event.getTitle())).append(escape("\n"));
+        formatted.append(escape("📅 Дата: ")).append(escape(event.getFormattedDate())).append(escape("\n"));
+        formatted.append(escape("🕐 Время: ")).append(escape(event.getFormattedTime()));
         
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            formatted.append(formatMessage("\n📝 Описание: %s", 
-                    escape(event.getDescription())));
+            formatted.append(escape("\n📝 Описание: ")).append(escape(event.getDescription()));
         }
         
         return formatted.toString();
+    }
+
+    /**
+     * Отправляет событие без форматирования MarkdownV2.
+     * 
+     * <p>Этот метод используется как fallback механизм, когда отправка
+     * с MarkdownV2 форматированием не удается из-за ошибки 400 (Bad Request).
+     * Он форматирует текст события без использования MarkdownFormatter
+     * и отправляет сообщение с parseMode=null.</p>
+     * 
+     * <p>Метод создает простое текстовое представление события с эмодзи,
+     * но без специального форматирования (жирный текст, экранирование и т.д.).</p>
+     * 
+     * <p><b>Требования:</b> 4.4</p>
+     * 
+     * @param chatId ID чата для отправки сообщения
+     * @param event событие для отправки
+     * @throws org.telegram.telegrambots.meta.exceptions.TelegramApiException если отправка не удалась
+     */
+    private void sendWithoutFormatting(Long chatId, Event event) 
+            throws org.telegram.telegrambots.meta.exceptions.TelegramApiException {
+        
+        log.debug("Отправка события ID={} без форматирования MarkdownV2", event.getId());
+        
+        // Форматируем текст без использования MarkdownFormatter
+        StringBuilder plainText = new StringBuilder();
+        
+        plainText.append("📌 ").append(event.getTitle()).append("\n");
+        plainText.append("📅 Дата: ").append(event.getFormattedDate()).append("\n");
+        plainText.append("🕐 Время: ").append(event.getFormattedTime());
+        
+        if (event.getDescription() != null && !event.getDescription().isBlank()) {
+            plainText.append("\n📝 Описание: ").append(event.getDescription());
+        }
+        
+        // Создаем inline кнопки
+        InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event.getId());
+        
+        // Отправляем сообщение без форматирования через новый метод TelegramMessageService
+        messageService.sendMessageWithoutFormatting(chatId, plainText.toString(), keyboard);
+        
+        log.debug("Событие ID={} успешно отправлено без форматирования", event.getId());
     }
 
     /**
@@ -232,7 +343,7 @@ public class MyEventsCommandHandler implements CommandHandler {
      * @return сообщение с полной информацией о событии
      */
     public String handleViewEventDetails(Long eventId, Long userId) {
-        log.info("Обработка callback просмотра деталей события ID={} пользователем ID={}", 
+        log.debug("Обработка callback просмотра деталей события ID={} пользователем ID={}", 
                 eventId, userId);
         
         try {
@@ -249,37 +360,37 @@ public class MyEventsCommandHandler implements CommandHandler {
             
             // Формируем детальное описание события
             StringBuilder details = new StringBuilder();
-            details.append(formatMessage("📋 %s\n\n", bold("Детали события")));
+            details.append("📋 ").append(bold("Детали события")).append("\n\n");
             
             // Название
-            details.append(formatMessage("📌 %s\n\n", bold(event.getTitle())));
+            details.append("📌 ").append(bold(event.getTitle())).append("\n\n");
             
             // Дата
-            details.append(formatMessage("📅 Дата: %s\n", escape(event.getFormattedDate())));
+            details.append(formatMessage("📅 Дата: %s\n", event.getFormattedDate()));
             
             // Время
             if (event.getEventTime() != null) {
                 if (event.getEndTime() != null) {
                     details.append(formatMessage("🕐 Время: %s - %s\n", 
-                        escape(event.getFormattedTime()), 
-                        escape(event.getEndTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")))));
+                        event.getFormattedTime(), 
+                        event.getEndTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))));
                 } else {
-                    details.append(formatMessage("🕐 Время: %s\n", escape(event.getFormattedTime())));
+                    details.append(formatMessage("🕐 Время: %s\n", event.getFormattedTime()));
                 }
             }
             
             // Описание
             if (event.getDescription() != null && !event.getDescription().isBlank()) {
-                details.append(formatMessage("📝 Описание: %s\n", escape(event.getDescription())));
+                details.append(formatMessage("📝 Описание: %s\n", event.getDescription()));
             }
             
             // Тип события
             details.append("\n");
             if (event.getIsPersonal()) {
-                details.append(formatMessage("🔒 %s\n", bold("Персональное событие")));
+                details.append("🔒 ").append(bold("Персональное событие")).append("\n");
             } else {
                 details.append(formatMessage("👨‍👩‍👧‍👦 Семейное событие (создал: %s)\n", 
-                    escape(event.getUser().getFirstName())));
+                    event.getUser().getFirstName()));
             }
             
             // Статус
@@ -289,7 +400,7 @@ public class MyEventsCommandHandler implements CommandHandler {
                 details.append(escape("🗑️ Статус: Удалено\n"));
             }
             
-            log.info("Детали события ID={} успешно отображены пользователю ID={}", eventId, userId);
+            log.debug("Детали события ID={} успешно отображены пользователю ID={}", eventId, userId);
             
             return details.toString();
             
@@ -298,7 +409,7 @@ public class MyEventsCommandHandler implements CommandHandler {
             
             return formatMessage("❌ %s\n\n%s",
                    bold("Ошибка"),
-                   "Не удалось загрузить детали события\\. Возможно, событие было удалено\\.");
+                   "Не удалось загрузить детали события. Возможно, событие было удалено.");
         }
     }
 
@@ -306,23 +417,54 @@ public class MyEventsCommandHandler implements CommandHandler {
      * Обрабатывает callback query для редактирования события.
      * 
      * <p>Извлекает ID события из callback data и инициирует процесс редактирования.
-     * В будущем это будет многошаговый диалог для изменения полей события.</p>
+     * Проверяет права доступа пользователя и начинает многошаговый диалог редактирования.</p>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.2, 4.1</p>
      * 
      * @param eventId идентификатор события для редактирования
      * @param userId идентификатор пользователя, инициировавшего редактирование
-     * @return сообщение с инструкциями по редактированию
+     * @param chatId идентификатор чата для отправки сообщений
+     * @return сообщение с текущими данными события и клавиатурой выбора поля
      */
-    public String handleEditCallback(Long eventId, Long userId) {
-        log.info("Обработка callback редактирования события ID={} пользователем ID={}", 
+    public String handleEditCallback(Long eventId, Long userId, Long chatId) {
+        log.debug("Обработка callback редактирования события ID={} пользователем ID={}", 
                 eventId, userId);
         
-        // TODO: Реализовать многошаговый диалог редактирования
-        // Пока возвращаем заглушку
-        return formatMessage(
-                "✏️ %s\n\nФункция редактирования будет реализована в следующей версии\\.\n\nID события: %s", 
-                bold("Редактирование события"),
-                eventId
-        );
+        try {
+            // Получаем событие и проверяем права доступа
+            Event event = eventService.getEventById(eventId);
+            
+            // Проверяем права доступа
+            if (!canUserEditEvent(event, userId)) {
+                log.warn("Пользователь ID={} не имеет прав для редактирования события ID={}", 
+                        userId, eventId);
+                return formatMessage("❌ %s\n\nУ вас нет прав для редактирования этого события.",
+                       bold("Доступ запрещен"));
+            }
+            
+            // Начинаем диалог редактирования
+            conversationStateService.startEventEditing(userId, eventId, chatId);
+            
+            // Формируем сообщение с текущими данными события и клавиатурой выбора поля
+            String message = buildEditFieldSelectionMessage(event);
+            
+            // Отправляем сообщение с клавиатурой
+            InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId);
+            messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+            
+            log.debug("Начато редактирование события ID={} пользователем ID={}", eventId, userId);
+            
+            return message;
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
+            log.error("Событие ID={} не найдено: {}", eventId, e.getMessage());
+            return formatMessage("❌ %s\n\nСобытие не найдено. Возможно, оно было удалено.",
+                   bold("Ошибка"));
+        } catch (Exception e) {
+            log.error("Ошибка при начале редактирования события ID={}: {}", eventId, e.getMessage(), e);
+            return formatMessage("❌ %s\n\nПроизошла ошибка при начале редактирования.",
+                   bold("Ошибка"));
+        }
     }
 
     /**
@@ -336,24 +478,146 @@ public class MyEventsCommandHandler implements CommandHandler {
      * @return сообщение с запросом подтверждения или результатом удаления
      */
     public String handleDeleteCallback(Long eventId, Long userId) {
-        log.info("Обработка callback удаления события ID={} пользователем ID={}", 
+        log.debug("Обработка callback удаления события ID={} пользователем ID={}", 
                 eventId, userId);
         
         try {
             // Удаляем событие через сервис (он проверит права доступа)
             eventService.deleteEvent(eventId, userId);
             
-            log.info("Событие ID={} успешно удалено пользователем ID={}", eventId, userId);
+            log.debug("Событие ID={} успешно удалено пользователем ID={}", eventId, userId);
             
-            return formatMessage("✅ %s\n\nСобытие успешно удалено из календаря\\.\n\nИспользуйте %s для просмотра оставшихся событий\\.",
-                   bold("Событие удалено"), code("/my_events"));
+            return formatMessage("✅ %s\n\nСобытие успешно удалено из календаря.\n\nИспользуйте %s для просмотра оставшихся событий.",
+                   bold("Событие удалено"), "/my_events");
                    
         } catch (Exception e) {
             log.error("Ошибка при удалении события ID={}: {}", eventId, e.getMessage(), e);
             
-            return formatMessage("❌ %s\n\nНе удалось удалить событие\\. Возможно, у вас нет прав на удаление этого события\\.",
+            return formatMessage("❌ %s\n\nНе удалось удалить событие. Возможно, у вас нет прав на удаление этого события.",
                    bold("Ошибка удаления"));
         }
+    }
+    
+    /**
+     * Проверяет, может ли пользователь редактировать событие.
+     * 
+     * <p>Пользователь может редактировать событие, если:</p>
+     * <ul>
+     *   <li>Он создатель события</li>
+     *   <li>Событие семейное и пользователь из той же семьи</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 2.2, 4.1, 4.3</p>
+     * 
+     * @param event событие для проверки
+     * @param userId идентификатор пользователя
+     * @return true, если пользователь может редактировать событие
+     */
+    private boolean canUserEditEvent(Event event, Long userId) {
+        // Пользователь может редактировать событие, если:
+        // 1. Он создатель события
+        if (event.getUser().getId().equals(userId)) {
+            return true;
+        }
+        
+        // 2. Событие семейное и пользователь из той же семьи
+        if (!event.getIsPersonal() && event.getFamily() != null) {
+            return event.getFamily().getMembers().stream()
+                    .anyMatch(u -> u.getId().equals(userId));
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Формирует сообщение с выбором поля для редактирования.
+     * 
+     * <p>Отображает текущие данные события и предлагает выбрать поле для редактирования.</p>
+     * <p>Все специальные символы MarkdownV2 корректно экранированы.</p>
+     * 
+     * <p><b>Требования:</b> 2.2, 4.1, 4.3</p>
+     * 
+     * @param event событие для отображения
+     * @return отформатированное сообщение с текущими данными события
+     */
+    public String buildEditFieldSelectionMessage(Event event) {
+        StringBuilder message = new StringBuilder();
+        
+        // Заголовок
+        message.append("✏️ ").append(bold("Редактирование события")).append("\n\n");
+        
+        // Название события
+        message.append("📌 ").append(bold(event.getTitle())).append("\n\n");
+        
+        // Текущие данные
+        message.append(formatMessage("Текущие данные:\n"));
+        message.append(formatMessage("📅 Дата: %s\n", event.getFormattedDate()));
+        message.append(formatMessage("🕐 Время: %s\n", event.getFormattedTime()));
+        
+        if (event.getDescription() != null && !event.getDescription().isBlank()) {
+            message.append(formatMessage("📝 Описание: %s\n", event.getDescription()));
+        } else {
+            message.append(formatMessage("📝 Описание: не указано\n"));
+        }
+        
+        message.append(formatMessage("\nВыберите поле для редактирования:"));
+        
+        return message.toString();
+    }
+    
+    /**
+     * Формирует сообщение об успешном обновлении поля события.
+     * 
+     * <p>Отображает обновленные данные события после изменения поля.</p>
+     * <p>Все специальные символы MarkdownV2 корректно экранированы.</p>
+     * 
+     * <p><b>Требования:</b> 2.2, 4.1, 4.3</p>
+     * 
+     * @param event событие с обновленными данными
+     * @param field обновленное поле
+     * @return отформатированное сообщение об успешном обновлении
+     */
+    private String buildFieldUpdateSuccessMessage(Event event, ConversationStateService.EditField field) {
+        StringBuilder message = new StringBuilder();
+        
+        // Заголовок
+        message.append("✅ ").append(bold("Поле обновлено")).append("\n\n");
+        
+        // Название события
+        message.append("📌 ").append(bold(event.getTitle())).append("\n\n");
+        
+        // Информация об обновленном поле
+        switch (field) {
+            case TITLE:
+                message.append("Название изменено на: ").append(bold(event.getTitle())).append("\n");
+                break;
+            case DATE:
+                message.append(formatMessage("Дата изменена на: %s\n", event.getFormattedDate()));
+                break;
+            case TIME:
+                message.append(formatMessage("Время изменено на: %s\n", event.getFormattedTime()));
+                break;
+            case DESCRIPTION:
+                if (event.getDescription() != null && !event.getDescription().isBlank()) {
+                    message.append(formatMessage("Описание изменено на: %s\n", event.getDescription()));
+                } else {
+                    message.append(formatMessage("Описание удалено\n"));
+                }
+                break;
+        }
+        
+        // Текущие данные
+        message.append(formatMessage("\nТекущие данные события:\n"));
+        message.append(formatMessage("📅 Дата: %s\n", event.getFormattedDate()));
+        message.append(formatMessage("🕐 Время: %s\n", event.getFormattedTime()));
+        
+        if (event.getDescription() != null && !event.getDescription().isBlank()) {
+            message.append(formatMessage("📝 Описание: %s", event.getDescription()));
+        } else {
+            message.append(formatMessage("📝 Описание: не указано"));
+        }
+        
+        return message.toString();
     }
 
     /**
