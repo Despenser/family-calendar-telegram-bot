@@ -25,36 +25,42 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * Она выполняет следующие функции:</p>
  * <ul>
  *   <li>Получает список всех событий пользователя</li>
- *   <li>Отображает события с inline кнопками для редактирования и удаления</li>
- *   <li>Форматирует события с использованием Markdown для улучшения читаемости</li>
+ *   <li>Отображает заголовок и первое событие в одном сообщении для единообразия с командой /trash</li>
+ *   <li>Отображает остальные события отдельными сообщениями с inline кнопками для редактирования и удаления</li>
+ *   <li>Форматирует события с использованием MarkdownV2 для улучшения читаемости</li>
  *   <li>Сортирует события по дате</li>
  *   <li>Отправляет соответствующее сообщение, если событий нет</li>
+ *   <li>Использует fallback механизм при ошибках форматирования MarkdownV2</li>
  * </ul>
  * 
  * <p>Команда требует авторизации - пользователь должен быть зарегистрирован в системе.</p>
  * 
- * <p><b>Требования:</b> 7.1, 7.2, 7.3, 7.4, 7.5</p>
+ * <p><b>Требования:</b> 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3</p>
  * 
  * <p><b>Пример использования:</b></p>
  * <pre>
  * Пользователь отправляет: /my_events
  * 
  * Если есть события:
- * Бот отвечает: "📋 *Мои события*
- *                
- *                📌 *День рождения мамы*
- *                📅 Дата: 31.12.2025
- *                🕐 Время: 18:00
- *                📝 Описание: Празднование дня рождения
- *                
- *                [Редактировать] [Удалить]
- *                
- *                📌 *Поход в кино*
- *                📅 Дата: 02.01.2026
- *                🕐 Время: 20:00
- *                📝 Описание: Смотрим новый фильм
- *                
- *                [Редактировать] [Удалить]"
+ * Бот отвечает одним сообщением (заголовок + первое событие):
+ * "📋 *Мои события*
+ *  
+ *  Всего событий: 2
+ *  
+ *  📌 *День рождения мамы*
+ *  📅 Дата: 31.12.2025
+ *  🕐 Время: 18:00
+ *  📝 Описание: Празднование дня рождения
+ *  
+ *  [Редактировать] [Удалить]"
+ * 
+ * Затем отдельным сообщением (второе событие):
+ * "📌 *Поход в кино*
+ *  📅 Дата: 02.01.2026
+ *  🕐 Время: 20:00
+ *  📝 Описание: Смотрим новый фильм
+ *  
+ *  [Редактировать] [Удалить]"
  * 
  * Если событий нет:
  * Бот отвечает: "📋 *Мои события*
@@ -69,7 +75,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * @see Event
  * @see User
  * @author Family Calendar Bot Team
- * @version 1.0.0
+ * @version 2.0.0
  * @since 2025-12-30
  */
 @Component
@@ -85,13 +91,46 @@ public class MyEventsCommandHandler implements CommandHandler {
     /**
      * Обрабатывает команду /my_events от пользователя.
      * 
-     * <p>Метод получает список всех событий пользователя и отправляет
-     * каждое событие отдельным сообщением с inline кнопками для редактирования и удаления.</p>
+     * <p>Метод получает список всех событий пользователя. Если события есть,
+     * отправляет заголовок вместе с первым событием в одном сообщении,
+     * а остальные события отправляет отдельными сообщениями с inline кнопками
+     * для редактирования и удаления.</p>
+     * 
+     * <p>Формат вывода соответствует команде /trash для единообразия интерфейса.</p>
+     * 
+     * <p><b>Алгоритм работы:</b></p>
+     * <ol>
+     *   <li>Получение списка событий пользователя из базы данных</li>
+     *   <li>Если список пуст - отправка сообщения об отсутствии событий</li>
+     *   <li>Если события есть:
+     *     <ul>
+     *       <li>Формирование заголовка с количеством событий</li>
+     *       <li>Объединение заголовка с первым событием в одно сообщение</li>
+     *       <li>Отправка объединенного сообщения с inline-кнопками первого события</li>
+     *       <li>Отправка остальных событий отдельными сообщениями</li>
+     *     </ul>
+     *   </li>
+     *   <li>При ошибке форматирования MarkdownV2 (код 400) используется fallback механизм:
+     *     <ul>
+     *       <li>Заголовок отправляется отдельно</li>
+     *       <li>Первое событие отправляется без форматирования, но с inline-кнопками</li>
+     *     </ul>
+     *   </li>
+     * </ol>
+     * 
+     * <p><b>Обработка ошибок:</b></p>
+     * <ul>
+     *   <li>Ошибки форматирования MarkdownV2 (400) - fallback без форматирования</li>
+     *   <li>Другие ошибки Telegram API - логирование и продолжение обработки</li>
+     *   <li>Общие исключения - логирование и увеличение счетчика ошибок</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 4.1, 4.2, 4.3</p>
      * 
      * @param message входящее сообщение от Telegram, содержащее команду /my_events
      * @param user пользователь из базы данных, запросивший список своих событий.
      *             Не может быть null, так как команда требует авторизации.
-     * @return текст заголовка со списком событий пользователя или сообщение об их отсутствии
+     * @return null, так как все сообщения отправляются внутри метода
      * @throws IllegalArgumentException если message или user равны null
      */
     @Override
@@ -119,21 +158,90 @@ public class MyEventsCommandHandler implements CommandHandler {
         log.debug("Найдено {} событий для пользователя ID={}", userEvents.size(), user.getId());
 
         if (userEvents.isEmpty()) {
-            return buildNoEventsMessage();
+            String noEventsMessage = buildNoEventsMessage();
+            try {
+                messageService.sendMessage(chatId, noEventsMessage);
+                log.debug("Сообщение об отсутствии событий отправлено пользователю chatId={}", chatId);
+            } catch (Exception e) {
+                log.error("Ошибка при отправке сообщения об отсутствии событий: chatId={}, error={}", 
+                        chatId, e.getMessage(), e);
+            }
+            return null;
         }
 
-        // Отправляем заголовок
-        StringBuilder header = new StringBuilder();
-        header.append("📋 ").append(bold("Мои события")).append("\n\n");
-        header.append(escape("Всего событий: ")).append(escape(String.valueOf(userEvents.size()))).append(escape("\n"));
+        // Формируем заголовок
+        String header = buildHeader(userEvents.size());
         
         log.debug("Начало отправки {} событий пользователю chatId={}", userEvents.size(), chatId);
         
-        // Отправляем каждое событие отдельным сообщением с inline-кнопками
         int successCount = 0;
         int failureCount = 0;
         
-        for (Event event : userEvents) {
+        // Обрабатываем первое событие - объединяем с заголовком
+        Event firstEvent = userEvents.get(0);
+        try {
+            String firstEventText = formatEvent(firstEvent);
+            String combinedMessage = header + "\n" + firstEventText;
+            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(firstEvent.getId());
+            
+            // Проверяем, что клавиатура создана корректно
+            if (keyboard == null || keyboard.getKeyboard() == null || keyboard.getKeyboard().isEmpty()) {
+                log.warn("Клавиатура для первого события ID={} некорректна, используем fallback", firstEvent.getId());
+                throw new IllegalStateException("Некорректная клавиатура");
+            }
+            
+            // Логируем детали перед отправкой
+            int buttonCount = keyboard.getKeyboard().stream()
+                    .mapToInt(List::size)
+                    .sum();
+            String textPreview = combinedMessage.length() > 50 
+                    ? combinedMessage.substring(0, 50) + "..." 
+                    : combinedMessage;
+            
+            log.debug("Отправка объединенного сообщения (заголовок + первое событие ID={}): textPreview='{}', buttonCount={}", 
+                    firstEvent.getId(), textPreview, buttonCount);
+            
+            messageService.sendMessageWithInlineKeyboard(chatId, combinedMessage, keyboard);
+            
+            successCount++;
+            log.debug("Объединенное сообщение с первым событием ID={} успешно отправлено", firstEvent.getId());
+            
+        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException e) {
+            // Обработка ошибок Telegram API с fallback механизмом
+            if (e.getErrorCode() != null && e.getErrorCode() == 400) {
+                // Ошибка 400 - проблема с форматированием MarkdownV2
+                log.warn("Ошибка 400 при отправке объединенного сообщения с MarkdownV2, " +
+                        "используем fallback: отправка заголовка и первого события отдельно. Ошибка: {}", 
+                        e.getMessage());
+                
+                try {
+                    // Fallback: отправляем заголовок отдельно
+                    messageService.sendMessage(chatId, header);
+                    // Отправляем первое событие без форматирования
+                    sendWithoutFormatting(chatId, firstEvent);
+                    successCount++;
+                    log.debug("Заголовок и первое событие ID={} успешно отправлены через fallback механизм", 
+                            firstEvent.getId());
+                } catch (Exception fallbackException) {
+                    failureCount++;
+                    log.error("Fallback механизм не сработал для первого события ID={}: {}", 
+                            firstEvent.getId(), fallbackException.getMessage(), fallbackException);
+                }
+            } else {
+                // Другие ошибки Telegram API
+                failureCount++;
+                log.error("Ошибка Telegram API при отправке объединенного сообщения: код={}, сообщение={}", 
+                        e.getErrorCode(), e.getMessage(), e);
+            }
+        } catch (Exception e) {
+            failureCount++;
+            log.error("Ошибка при отправке объединенного сообщения с первым событием ID={}: {}", 
+                    firstEvent.getId(), e.getMessage(), e);
+        }
+        
+        // Отправляем остальные события отдельными сообщениями
+        for (int i = 1; i < userEvents.size(); i++) {
+            Event event = userEvents.get(i);
             try {
                 String eventText = formatEvent(event);
                 InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event.getId());
@@ -200,7 +308,8 @@ public class MyEventsCommandHandler implements CommandHandler {
         
         log.debug("Завершена отправка событий: успешно={}, ошибок={}", successCount, failureCount);
         
-        return header.toString();
+        // Возвращаем null, так как все сообщения уже отправлены внутри метода
+        return null;
     }
 
     /**
@@ -221,6 +330,39 @@ public class MyEventsCommandHandler implements CommandHandler {
         message.append(escape("У вас пока нет созданных событий.\n\n"));
         message.append(escape("Используйте ")).append(escape("/add_event")).append(escape(" для добавления нового события."));
         return message.toString();
+    }
+
+    /**
+     * Формирует заголовок для списка событий.
+     * 
+     * <p>Заголовок включает:</p>
+     * <ul>
+     *   <li>Эмодзи 📋 и название "Мои события" (выделено жирным)</li>
+     *   <li>Информацию о количестве событий в формате "Всего событий: N"</li>
+     * </ul>
+     * 
+     * <p>Все специальные символы MarkdownV2 корректно экранированы с помощью
+     * метода {@link ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter#escape(String)}.</p>
+     * 
+     * <p>Формат заголовка соответствует команде /trash для единообразия интерфейса.</p>
+     * 
+     * <p><b>Пример вывода:</b></p>
+     * <pre>
+     * 📋 *Мои события*
+     * 
+     * Всего событий: 5
+     * </pre>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.2, 2.3</p>
+     * 
+     * @param eventCount количество событий пользователя (должно быть больше 0)
+     * @return отформатированный заголовок с использованием MarkdownV2
+     */
+    private String buildHeader(int eventCount) {
+        StringBuilder header = new StringBuilder();
+        header.append("📋 ").append(bold("Мои события")).append("\n\n");
+        header.append(escape("Всего событий: ")).append(escape(String.valueOf(eventCount))).append(escape("\n"));
+        return header.toString();
     }
 
     /**

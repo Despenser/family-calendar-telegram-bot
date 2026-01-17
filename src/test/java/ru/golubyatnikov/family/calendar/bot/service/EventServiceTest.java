@@ -305,17 +305,19 @@ class EventServiceTest {
                 .id(1L)
                 .title("User Event 1")
                 .eventDate(LocalDate.now().plusDays(1))
+                .status(Event.EventStatus.ACTIVE)
                 .build();
 
         Event event2 = Event.builder()
                 .id(2L)
                 .title("User Event 2")
                 .eventDate(LocalDate.now().plusDays(5))
+                .status(Event.EventStatus.ACTIVE)
                 .build();
 
         List<Event> expectedEvents = Arrays.asList(event1, event2);
 
-        when(eventRepository.findByUserIdOrderByEventDateAsc(userId))
+        when(eventRepository.findByUserIdAndStatusOrderByEventDateAsc(userId, Event.EventStatus.ACTIVE))
                 .thenReturn(expectedEvents);
 
         // When
@@ -326,7 +328,7 @@ class EventServiceTest {
         assertEquals(2, result.size(), "Должно быть найдено 2 события");
         assertEquals("User Event 1", result.get(0).getTitle());
         assertEquals("User Event 2", result.get(1).getTitle());
-        verify(eventRepository).findByUserIdOrderByEventDateAsc(userId);
+        verify(eventRepository).findByUserIdAndStatusOrderByEventDateAsc(userId, Event.EventStatus.ACTIVE);
     }
 
     @Test
@@ -335,7 +337,7 @@ class EventServiceTest {
         // Given
         Long userId = testUser.getId();
 
-        when(eventRepository.findByUserIdOrderByEventDateAsc(userId))
+        when(eventRepository.findByUserIdAndStatusOrderByEventDateAsc(userId, Event.EventStatus.ACTIVE))
                 .thenReturn(List.of());
 
         // When
@@ -344,7 +346,7 @@ class EventServiceTest {
         // Then
         assertNotNull(result, "Результат не должен быть null");
         assertTrue(result.isEmpty(), "Список должен быть пустым");
-        verify(eventRepository).findByUserIdOrderByEventDateAsc(userId);
+        verify(eventRepository).findByUserIdAndStatusOrderByEventDateAsc(userId, Event.EventStatus.ACTIVE);
     }
 
     // ========== Тесты для updateEvent ==========

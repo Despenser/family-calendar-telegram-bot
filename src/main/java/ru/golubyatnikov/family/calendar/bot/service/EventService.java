@@ -221,23 +221,30 @@ public class EventService {
     }
     
     /**
-     * Получает все события пользователя, отсортированные по дате.
+     * Получает активные события пользователя.
      * 
-     * <p>Метод возвращает все события, созданные указанным пользователем,
-     * отсортированные по дате в порядке возрастания (от ближайших к более поздним).</p>
+     * <p>Возвращает только события со статусом ACTIVE, исключая:</p>
+     * <ul>
+     *   <li>Удаленные события (DELETED) - доступны через /trash</li>
+     *   <li>Черновики (DRAFT) - незавершенные события</li>
+     *   <li>Завершенные события (COMPLETED) - прошедшие события</li>
+     * </ul>
      * 
-     * <p><b>Требования:</b> 7.1</p>
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4, 3.1, 3.2, 3.3</p>
      * 
      * @param userId идентификатор пользователя
-     * @return список событий пользователя, отсортированный по дате
+     * @return список активных событий пользователя, отсортированный по дате
      */
     @Transactional(readOnly = true)
     public List<Event> getUserEvents(Long userId) {
-        log.debug("Получение событий пользователя ID={}", userId);
+        log.debug("Получение активных событий пользователя ID={}", userId);
         
-        List<Event> events = eventRepository.findByUserIdOrderByEventDateAsc(userId);
+        List<Event> events = eventRepository.findByUserIdAndStatusOrderByEventDateAsc(
+            userId, 
+            Event.EventStatus.ACTIVE
+        );
         
-        log.debug("Найдено {} событий для пользователя ID={}", events.size(), userId);
+        log.debug("Найдено {} активных событий для пользователя ID={}", events.size(), userId);
         return events;
     }
     

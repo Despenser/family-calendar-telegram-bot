@@ -131,14 +131,21 @@ class MyEventsCommandHandlerTest {
         String response = handler.handle(message, user);
 
         // Then
-        assertNotNull(response);
-        assertTrue(response.contains("Мои события"), "Ответ должен содержать заголовок 'Мои события'");
-        assertTrue(response.contains("Всего событий: 2"), "Ответ должен содержать количество событий");
+        // Метод должен вернуть null, так как все сообщения отправляются внутри метода
+        assertNull(response, "Метод должен вернуть null, так как сообщения отправляются внутри");
         
         // Проверяем, что для каждого события был вызван метод отправки сообщения
-        verify(messageService, times(2)).sendMessageWithInlineKeyboard(
+        // Первое сообщение должно содержать заголовок и первое событие
+        verify(messageService, times(1)).sendMessageWithInlineKeyboard(
                 eq(123456789L), 
-                anyString(), 
+                argThat((String text) -> text.contains("Мои события") && text.contains("Всего событий: 2") && text.contains("День рождения")), 
+                any(InlineKeyboardMarkup.class)
+        );
+        
+        // Второе событие отправляется отдельно
+        verify(messageService, times(1)).sendMessageWithInlineKeyboard(
+                eq(123456789L), 
+                argThat((String text) -> text.contains("Поход в кино")), 
                 any(InlineKeyboardMarkup.class)
         );
         
@@ -147,23 +154,32 @@ class MyEventsCommandHandlerTest {
 
     @Test
     @DisplayName("Должен отобразить сообщение об отсутствии событий")
-    void shouldDisplayNoEventsMessage() {
+    void shouldDisplayNoEventsMessage() throws Exception {
         // Given
         ru.golubyatnikov.family.calendar.bot.model.User user = createUser();
         
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
+        when(message.getChatId()).thenReturn(123456789L);
         when(eventService.getUserEvents(user.getId())).thenReturn(Collections.emptyList());
+        // Мокаем sendMessage для отправки сообщения об отсутствии событий
+        willDoNothing().given(messageService).sendMessage(anyLong(), anyString());
 
         // When
         String response = handler.handle(message, user);
 
         // Then
-        assertNotNull(response);
-        assertTrue(response.contains("Мои события"), "Ответ должен содержать заголовок 'Мои события'");
-        assertTrue(response.contains("У вас пока нет созданных событий"), "Ответ должен содержать сообщение об отсутствии событий");
-        assertTrue(response.contains("/add\\_event") || response.contains("/add_event"), "Ответ должен содержать подсказку о команде /add_event");
+        // Метод должен вернуть null, так как сообщение отправляется внутри метода
+        assertNull(response, "Метод должен вернуть null, так как сообщение отправляется внутри");
+        
+        // Проверяем, что было отправлено сообщение об отсутствии событий
+        verify(messageService, times(1)).sendMessage(
+                eq(123456789L), 
+                argThat((String text) -> text.contains("Мои события") && 
+                                        text.contains("У вас пока нет созданных событий") && 
+                                        (text.contains("/add\\_event") || text.contains("/add_event")))
+        );
         
         verify(eventService).getUserEvents(user.getId());
     }
@@ -320,34 +336,51 @@ class MyEventsCommandHandlerTest {
         String response = handler.handle(message, user);
 
         // Then
-        assertNotNull(response);
-        // Проверяем, что метод отправки был вызван с сообщением, содержащим описание
+        // Метод должен вернуть null, так как сообщение отправляется внутри метода
+        assertNull(response, "Метод должен вернуть null, так как сообщение отправляется внутри");
+        // Проверяем, что метод отправки был вызван с объединенным сообщением (заголовок + событие)
         verify(messageService).sendMessageWithInlineKeyboard(
                 eq(123456789L), 
-                argThat((String text) -> text.contains("Описание: Празднование дня рождения")), 
+                argThat((String text) -> text.contains("Мои события") && 
+                                        text.contains("Всего событий: 1") && 
+                                        text.contains("Описание: Празднование дня рождения")), 
                 any(InlineKeyboardMarkup.class)
         );
     }
 
     @Test
     @DisplayName("Должен корректно форматировать события без описания")
-    void shouldFormatEventsWithoutDescription() {
+    void shouldFormatEventsWithoutDescription() throws Exception {
         // Given
         ru.golubyatnikov.family.calendar.bot.model.User user = createUser();
         Event event = createEventWithoutDescription(user);
         List<Event> events = Collections.singletonList(event);
         
+        // Создаем клавиатуру с непустым списком кнопок
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        keyboard.setKeyboard(List.of(List.of()));
+        
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
+        when(message.getChatId()).thenReturn(123456789L);
         when(eventService.getUserEvents(user.getId())).thenReturn(events);
+        when(keyboardService.createEventActionsKeyboard(anyLong())).thenReturn(keyboard);
+        // Мокаем sendMessageWithInlineKeyboard
+        willDoNothing().given(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
 
         // When
         String response = handler.handle(message, user);
 
         // Then
-        assertNotNull(response);
-        assertFalse(response.contains("Описание:"));
+        // Метод должен вернуть null, так как сообщение отправляется внутри метода
+        assertNull(response, "Метод должен вернуть null, так как сообщение отправляется внутри");
+        // Проверяем, что метод отправки был вызван и сообщение не содержит описание
+        verify(messageService).sendMessageWithInlineKeyboard(
+                eq(123456789L), 
+                argThat((String text) -> !text.contains("Описание:")), 
+                any(InlineKeyboardMarkup.class)
+        );
     }
 
     @Test

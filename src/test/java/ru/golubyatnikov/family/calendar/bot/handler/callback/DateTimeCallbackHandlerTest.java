@@ -12,6 +12,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.ConversationService;
+import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
@@ -48,6 +50,12 @@ class DateTimeCallbackHandlerTest {
 
     @Mock
     private BotMessageBuilder messageBuilder;
+    
+    @Mock
+    private ConversationStateService conversationStateService;
+    
+    @Mock
+    private EventService eventService;
 
     @Mock
     private CallbackQuery callbackQuery;
@@ -64,7 +72,7 @@ class DateTimeCallbackHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new DateTimeCallbackHandler(conversationService, messageService, 
-                keyboardService, messageBuilder);
+                keyboardService, messageBuilder, conversationStateService, eventService);
         
         user = new User();
         user.setId(1L);
@@ -131,6 +139,9 @@ class DateTimeCallbackHandlerTest {
         
         setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
         
+        // Мокируем режим создания нового события (не редактирование)
+        when(conversationStateService.isEditingEvent(user.getId())).thenReturn(false);
+        
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         when(keyboardService.createHourSelectionKeyboard()).thenReturn(keyboard);
         when(messageBuilder.buildDateSelectedMessage(anyString())).thenReturn("Дата выбрана");
@@ -179,6 +190,9 @@ class DateTimeCallbackHandlerTest {
         String callbackQueryId = "query123";
         
         setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
+        
+        // Мокируем режим создания нового события (не редактирование)
+        when(conversationStateService.isEditingEvent(user.getId())).thenReturn(false);
         
         when(messageBuilder.buildTimeSelectedMessage(anyString())).thenReturn("Время выбрано");
 

@@ -98,6 +98,26 @@ public class BotMessageBuilder {
     }
     
     /**
+     * Формирует сообщение об обновлении даты события.
+     * 
+     * @param formattedDate отформатированная дата
+     * @return отформатированное сообщение
+     */
+    public String buildDateUpdatedMessage(String formattedDate) {
+        return formatMessage("✅ Дата события обновлена: %s", formattedDate);
+    }
+    
+    /**
+     * Формирует сообщение об обновлении времени события.
+     * 
+     * @param formattedTime отформатированное время
+     * @return отформатированное сообщение
+     */
+    public String buildTimeUpdatedMessage(String formattedTime) {
+        return formatMessage("✅ Время события обновлено: %s", formattedTime);
+    }
+    
+    /**
      * Формирует сообщение о выборе часа.
      * 
      * @param hour выбранный час

@@ -9,6 +9,8 @@ import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.ConversationService;
+import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
@@ -47,6 +49,8 @@ public class DateTimeCallbackHandler implements CallbackHandler {
     private final TelegramMessageService messageService;
     private final KeyboardService keyboardService;
     private final BotMessageBuilder messageBuilder;
+    private final ConversationStateService conversationStateService;
+    private final EventService eventService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -102,7 +106,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
     
     /**
      * Обрабатывает выбор даты из календаря.
-     * Обновляет черновик события и показывает выбор часа.
+     * Обновляет черновик события или существующее событие и показывает выбор часа.
      * 
      * @param callbackData данные callback (формат: date_YYYY-MM-DD)
      * @param userId идентификатор пользователя
@@ -116,24 +120,52 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         String dateStr = CallbackPrefix.DATE.extractPayload(callbackData);
         LocalDate date = LocalDate.parse(dateStr);
         
-        // Обновляем черновик с выбранной датой
-        conversationService.updateEventDate(userId, date);
-        
-        // Показываем выбор часа
-        InlineKeyboardMarkup keyboard = keyboardService.createHourSelectionKeyboard();
-        String formattedDate = date.format(DATE_FORMATTER);
-        String message = messageBuilder.buildDateSelectedMessage(formattedDate);
-        
-        try {
-            messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "Дата выбрана");
-        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
-            log.error("Ошибка при выборе даты: userId={}, date={}, error={}", 
-                     userId, date, e.getMessage());
-            throw new RuntimeException("Ошибка при выборе даты", e);
+        // Проверяем, редактируется ли существующее событие
+        if (conversationStateService.isEditingEvent(userId)) {
+            // Редактирование существующего события
+            ConversationStateService.EditingContext context = conversationStateService.getEditingContext(userId);
+            if (context != null && context.getEventId() != null) {
+                try {
+                    // Обновляем дату события через EventService
+                    eventService.updateEventDate(context.getEventId(), userId, date);
+                    
+                    String formattedDate = date.format(DATE_FORMATTER);
+                    String message = messageBuilder.buildDateUpdatedMessage(formattedDate);
+                    
+                    messageService.editMessageText(chatId, messageId, message, null);
+                    messageService.answerCallbackQuery(callbackQueryId, "Дата обновлена");
+                    
+                    // Очищаем состояние редактирования
+                    conversationStateService.clearEventEditing(userId);
+                    
+                    log.info("Дата события обновлена: eventId={}, userId={}, date={}", 
+                            context.getEventId(), userId, date);
+                } catch (Exception e) {
+                    log.error("Ошибка при обновлении даты события: userId={}, date={}, error={}", 
+                             userId, date, e.getMessage());
+                    throw new RuntimeException("Ошибка при обновлении даты", e);
+                }
+            }
+        } else {
+            // Создание нового события (черновик)
+            conversationService.updateEventDate(userId, date);
+            
+            // Показываем выбор часа
+            InlineKeyboardMarkup keyboard = keyboardService.createHourSelectionKeyboard();
+            String formattedDate = date.format(DATE_FORMATTER);
+            String message = messageBuilder.buildDateSelectedMessage(formattedDate);
+            
+            try {
+                messageService.editMessageText(chatId, messageId, message, keyboard);
+                messageService.answerCallbackQuery(callbackQueryId, "Дата выбрана");
+            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                log.error("Ошибка при выборе даты: userId={}, date={}, error={}", 
+                         userId, date, e.getMessage());
+                throw new RuntimeException("Ошибка при выборе даты", e);
+            }
+            
+            log.info("Дата выбрана для пользователя {}: {}", userId, date);
         }
-        
-        log.info("Дата выбрана для пользователя {}: {}", userId, date);
     }
     
     /**
@@ -168,7 +200,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
     
     /**
      * Обрабатывает выбор времени (час и минуты).
-     * Обновляет черновик и запрашивает название события.
+     * Обновляет черновик или существующее событие и запрашивает название события.
      * 
      * @param callbackData данные callback (формат: time_HH:MM)
      * @param userId идентификатор пользователя
@@ -182,23 +214,51 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         String timeStr = callbackData.substring(5); // Убираем "time_"
         LocalTime time = LocalTime.parse(timeStr);
         
-        // Обновляем черновик с выбранным временем
-        conversationService.updateEventTime(userId, time);
-        
-        // Запрашиваем название события
-        String formattedTime = time.format(TIME_FORMATTER);
-        String message = messageBuilder.buildTimeSelectedMessage(formattedTime);
-        
-        try {
-            messageService.editMessageText(chatId, messageId, message, null);
-            messageService.answerCallbackQuery(callbackQueryId, "Время выбрано");
-        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
-            log.error("Ошибка при выборе времени: userId={}, time={}, error={}", 
-                     userId, time, e.getMessage());
-            throw new RuntimeException("Ошибка при выборе времени", e);
+        // Проверяем, редактируется ли существующее событие
+        if (conversationStateService.isEditingEvent(userId)) {
+            // Редактирование существующего события
+            ConversationStateService.EditingContext context = conversationStateService.getEditingContext(userId);
+            if (context != null && context.getEventId() != null) {
+                try {
+                    // Обновляем время события через EventService
+                    eventService.updateEventTime(context.getEventId(), userId, time);
+                    
+                    String formattedTime = time.format(TIME_FORMATTER);
+                    String message = messageBuilder.buildTimeUpdatedMessage(formattedTime);
+                    
+                    messageService.editMessageText(chatId, messageId, message, null);
+                    messageService.answerCallbackQuery(callbackQueryId, "Время обновлено");
+                    
+                    // Очищаем состояние редактирования
+                    conversationStateService.clearEventEditing(userId);
+                    
+                    log.info("Время события обновлено: eventId={}, userId={}, time={}", 
+                            context.getEventId(), userId, time);
+                } catch (Exception e) {
+                    log.error("Ошибка при обновлении времени события: userId={}, time={}, error={}", 
+                             userId, time, e.getMessage());
+                    throw new RuntimeException("Ошибка при обновлении времени", e);
+                }
+            }
+        } else {
+            // Создание нового события (черновик)
+            conversationService.updateEventTime(userId, time);
+            
+            // Запрашиваем название события
+            String formattedTime = time.format(TIME_FORMATTER);
+            String message = messageBuilder.buildTimeSelectedMessage(formattedTime);
+            
+            try {
+                messageService.editMessageText(chatId, messageId, message, null);
+                messageService.answerCallbackQuery(callbackQueryId, "Время выбрано");
+            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                log.error("Ошибка при выборе времени: userId={}, time={}, error={}", 
+                         userId, time, e.getMessage());
+                throw new RuntimeException("Ошибка при выборе времени", e);
+            }
+            
+            log.info("Время выбрано для пользователя {}: {}", userId, time);
         }
-        
-        log.info("Время выбрано для пользователя {}: {}", userId, time);
     }
     
     /**

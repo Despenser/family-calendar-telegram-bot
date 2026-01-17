@@ -38,6 +38,12 @@ class EventCallbackHandlerTest {
     private TelegramMessageService messageService;
 
     @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.ConversationStateService conversationStateService;
+
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.KeyboardService keyboardService;
+
+    @Mock
     private CallbackQuery callbackQuery;
 
     @Mock
@@ -48,7 +54,7 @@ class EventCallbackHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new EventCallbackHandler(myEventsCommandHandler, messageService);
+        handler = new EventCallbackHandler(myEventsCommandHandler, messageService, conversationStateService, keyboardService);
         
         user = new User();
         user.setId(1L);
@@ -170,7 +176,7 @@ class EventCallbackHandlerTest {
     @DisplayName("Должен корректно обработать редактирование поля события")
     void shouldHandleEditField() throws Exception {
         // Given
-        String callbackData = "edit_field_title";
+        String callbackData = "edit_field_title_123";
         Long chatId = 100L;
         Integer messageId = 1;
         String callbackQueryId = "query123";
@@ -181,6 +187,8 @@ class EventCallbackHandlerTest {
         handler.handle(callbackQuery, user);
 
         // Then
+        verify(conversationStateService).startEventEditing(eq(user.getId()), eq(123L), eq(chatId));
+        verify(conversationStateService).setEditingField(eq(user.getId()), any());
         verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), isNull());
         verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq(""));
     }

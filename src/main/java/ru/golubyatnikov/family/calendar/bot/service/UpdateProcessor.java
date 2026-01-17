@@ -9,6 +9,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.handler.SearchCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.MessageCategory;
 import ru.golubyatnikov.family.calendar.bot.model.User;
@@ -63,6 +64,7 @@ public class UpdateProcessor {
     private final TextEventParser textEventParser;
     private final AttachmentService attachmentService;
     private final AuthorizationService authorizationService;
+    private final EventService eventService;
 
     /**
      * Асинхронно обрабатывает входящее обновление от Telegram Bot API.
@@ -153,6 +155,12 @@ public class UpdateProcessor {
             // Если пользователь ожидает ввода поискового запроса, обрабатываем текст как запрос
             if (userOptional.isPresent() && conversationStateService.isAwaitingSearchQuery(userOptional.get().getId())) {
                 handleSearchQuery(message, userOptional.get());
+                return;
+            }
+            
+            // Если пользователь редактирует событие, обрабатываем текст как редактирование
+            if (userOptional.isPresent() && conversationStateService.isEditingEvent(userOptional.get().getId())) {
+                handleEventEditing(message, userOptional.get());
                 return;
             }
             
@@ -711,5 +719,63 @@ public class UpdateProcessor {
         }
         
         return sb.toString();
+    }
+    
+    /**
+     * Обрабатывает ввод текста при редактировании события.
+     * 
+     * @param message сообщение от пользователя
+     * @param user авторизованный пользователь
+     */
+    private void handleEventEditing(Message message, User user) {
+        try {
+            ConversationStateService.EditingContext context = 
+                conversationStateService.getEditingContext(user.getId());
+            
+            if (context == null || context.getCurrentField() == null) {
+                log.warn("Контекст редактирования не найден для пользователя: userId={}", user.getId());
+                conversationStateService.clearEventEditing(user.getId());
+                return;
+            }
+            
+            String text = message.getText();
+            Long chatId = message.getChatId();
+            Long eventId = context.getEventId();
+            ConversationStateService.EditField field = context.getCurrentField();
+            
+            log.debug("Обработка редактирования события: userId={}, eventId={}, field={}, text='{}'", 
+                user.getId(), eventId, field, text);
+            
+            // Обновляем поле события
+            switch (field) {
+                case TITLE -> {
+                    eventService.updateEventTitle(eventId, user.getId(), text);
+                    messageService.sendMessage(chatId, "✅ Название обновлено: " + text);
+                    log.info("Название события обновлено: eventId={}, userId={}", eventId, user.getId());
+                }
+                case DESCRIPTION -> {
+                    eventService.updateEventDescription(eventId, user.getId(), text);
+                    messageService.sendMessage(chatId, "✅ Описание обновлено");
+                    log.info("Описание события обновлено: eventId={}, userId={}", eventId, user.getId());
+                }
+                default -> {
+                    log.warn("Неподдерживаемое поле для текстового редактирования: field={}", field);
+                }
+            }
+            
+            // Очищаем состояние редактирования
+            conversationStateService.clearEventEditing(user.getId());
+            
+        } catch (Exception e) {
+            log.error("Ошибка при редактировании события: userId={}, error={}", 
+                user.getId(), e.getMessage(), e);
+            try {
+                messageService.sendMessage(message.getChatId(), 
+                    "❌ Произошла ошибка при обновлении события");
+            } catch (TelegramApiException ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: {}", ex.getMessage());
+            }
+            conversationStateService.clearEventEditing(user.getId());
+        }
     }
 }

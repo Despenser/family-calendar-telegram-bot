@@ -3,7 +3,6 @@ package ru.golubyatnikov.family.calendar.bot.handler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -136,109 +135,7 @@ public class TrashCommandHandler implements CommandHandler {
         return markup;
     }
     
-    /**
-     * Обрабатывает callback query от inline-кнопок корзины.
-     * 
-     * <p>Этот метод вызывается из UpdateProcessor при нажатии на кнопку
-     * восстановления или удаления события.</p>
-     * 
-     * @param callbackQuery callback query от Telegram
-     * @param user пользователь, нажавший кнопку
-     */
-    public void handleTrashCallback(CallbackQuery callbackQuery, User user) {
-        String data = callbackQuery.getData();
-        Long chatId = callbackQuery.getMessage().getChatId();
-        
-        log.debug("Обработка callback корзины '{}' для пользователя ID={}", data, user.getId());
-        
-        try {
-            if (data.startsWith("trash_restore_")) {
-                Long eventId = Long.parseLong(data.substring("trash_restore_".length()));
-                handleRestore(chatId, user, eventId);
-            } else if (data.startsWith("trash_delete_")) {
-                Long eventId = Long.parseLong(data.substring("trash_delete_".length()));
-                handlePermanentDelete(chatId, user, eventId);
-            }
-        } catch (NumberFormatException e) {
-            log.error("Ошибка парсинга ID события из callback data: {}", data, e);
-            try {
-                messageService.sendMessage(chatId, "❌ Ошибка обработки запроса.");
-            } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: {}", ex.getMessage(), ex);
-            }
-        } catch (Exception e) {
-            log.error("Ошибка при обработке callback корзины для пользователя ID={}", user.getId(), e);
-            try {
-                messageService.sendMessage(chatId, "❌ Произошла ошибка. Попробуйте позже.");
-            } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: {}", ex.getMessage(), ex);
-            }
-        }
-    }
-    
-    /**
-     * Обрабатывает восстановление события из корзины.
-     * 
-     * @param chatId идентификатор чата
-     * @param user пользователь, восстанавливающий событие
-     * @param eventId идентификатор события
-     */
-    private void handleRestore(Long chatId, User user, Long eventId) {
-        log.debug("Восстановление события ID={} пользователем ID={}", eventId, user.getId());
-        
-        try {
-            Event restoredEvent = trashService.restoreEvent(eventId, user.getId());
-            
-            String responseMessage = escape("♻️ ") + bold("Событие восстановлено") + escape("\n\n") +
-                                    bold(restoredEvent.getTitle()) + escape("\n") +
-                                    escape("Дата: ") + escape(restoredEvent.getEventDate().format(DATE_FORMATTER)) + escape("\n\n") +
-                                    italic("Событие снова доступно в календаре.");
-            
-            messageService.sendMessage(chatId, responseMessage);
-            log.debug("Событие ID={} успешно восстановлено пользователем ID={}", eventId, user.getId());
-            
-        } catch (Exception e) {
-            log.error("Ошибка при восстановлении события ID={} пользователем ID={}", eventId, user.getId(), e);
-            try {
-                messageService.sendMessage(chatId, 
-                    escape("❌ Не удалось восстановить событие. ") + escape(e.getMessage()));
-            } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: {}", ex.getMessage(), ex);
-            }
-        }
-    }
-    
-    /**
-     * Обрабатывает окончательное удаление события.
-     * 
-     * @param chatId идентификатор чата
-     * @param user пользователь, удаляющий событие
-     * @param eventId идентификатор события
-     */
-    private void handlePermanentDelete(Long chatId, User user, Long eventId) {
-        log.debug("Окончательное удаление события ID={} пользователем ID={}", eventId, user.getId());
-        
-        try {
-            trashService.permanentlyDelete(eventId, user.getId());
-            
-            String responseMessage = escape("❌ ") + bold("Событие удалено навсегда") + escape("\n\n") +
-                                    italic("Событие окончательно удалено из системы и не может быть восстановлено.");
-            
-            messageService.sendMessage(chatId, responseMessage);
-            log.debug("Событие ID={} окончательно удалено пользователем ID={}", eventId, user.getId());
-            
-        } catch (Exception e) {
-            log.error("Ошибка при окончательном удалении события ID={} пользователем ID={}", 
-                     eventId, user.getId(), e);
-            try {
-                messageService.sendMessage(chatId, 
-                    escape("❌ Не удалось удалить событие. ") + escape(e.getMessage()));
-            } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: {}", ex.getMessage(), ex);
-            }
-        }
-    }
-    
+
     /**
      * Форматирует событие для отображения в корзине.
      * 

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.handler.MyEventsCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
@@ -34,6 +35,8 @@ public class EventCallbackHandler implements CallbackHandler {
     
     private final MyEventsCommandHandler myEventsCommandHandler;
     private final TelegramMessageService messageService;
+    private final ru.golubyatnikov.family.calendar.bot.service.ConversationStateService conversationStateService;
+    private final ru.golubyatnikov.family.calendar.bot.service.KeyboardService keyboardService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -70,7 +73,7 @@ public class EventCallbackHandler implements CallbackHandler {
         } else if (CallbackPrefix.DELETE_EVENT.matches(callbackData)) {
             handleDeleteEvent(callbackData, user.getId(), chatId, callbackQueryId);
         } else if (CallbackPrefix.EDIT_FIELD.matches(callbackData)) {
-            handleEditField(callbackData, user.getId(), chatId, messageId, callbackQueryId);
+            handleEditField(callbackData, user, chatId, messageId, callbackQueryId);
         }
     }
     
@@ -152,35 +155,112 @@ public class EventCallbackHandler implements CallbackHandler {
     /**
      * Обрабатывает редактирование конкретного поля события.
      * 
+     * <p>Извлекает имя поля и ID события из callback data формата edit_field_{field}_{eventId},
+     * устанавливает состояние редактирования и отправляет соответствующее сообщение пользователю.</p>
+     * 
      * @param callbackData данные callback (формат: edit_field_{field}_{eventId})
-     * @param userId идентификатор пользователя
+     * @param user объект пользователя
      * @param chatId идентификатор чата
      * @param messageId идентификатор сообщения
      * @param callbackQueryId идентификатор callback query
      */
-    private void handleEditField(String callbackData, Long userId, Long chatId, 
+    private void handleEditField(String callbackData, User user, Long chatId, 
                                  Integer messageId, String callbackQueryId) {
-        // Извлекаем поле для редактирования (date, time, title, description)
-        String payload = CallbackPrefix.EDIT_FIELD.extractPayload(callbackData);
-        
-        log.info("Пользователь {} начал редактирование поля: {}", userId, payload);
-        
-        String message = switch (payload) {
-            case "date" -> "📅 Редактирование даты\n\nВыберите новую дату из календаря:";
-            case "time" -> "🕐 Редактирование времени\n\nВыберите новое время:";
-            case "title" -> "📝 Редактирование названия\n\nОтправьте новое название события:";
-            case "description" -> "📄 Редактирование описания\n\nОтправьте новое описание события:";
-            default -> "❌ Неизвестное поле для редактирования";
-        };
-        
-        // TODO: Показать соответствующую клавиатуру (календарь для даты, выбор времени и т.д.)
-        
+        Long userId = user.getId();
         try {
-            messageService.editMessageText(chatId, messageId, message, null);
+            // Извлекаем payload после префикса edit_field_
+            String payload = CallbackPrefix.EDIT_FIELD.extractPayload(callbackData);
+            
+            log.debug("Извлечен payload из callback data: payload='{}', userId={}", payload, userId);
+            
+            // Разделяем payload на поле и eventId
+            String[] parts = payload.split("_", 2);
+            
+            // Валидация формата
+            if (parts.length != 2) {
+                log.error("Некорректный формат callback data: ожидается 2 части, получено {}. " +
+                         "CallbackData='{}', userId={}", parts.length, callbackData, userId);
+                messageService.editMessageText(chatId, messageId, 
+                    "❌ Произошла ошибка при обработке запроса", null);
+                messageService.answerCallbackQuery(callbackQueryId, "");
+                return;
+            }
+            
+            String field = parts[0];
+            Long eventId;
+            
+            // Парсинг eventId с обработкой NumberFormatException
+            try {
+                eventId = Long.parseLong(parts[1]);
+                log.debug("Успешно извлечены данные: field='{}', eventId={}, userId={}", 
+                         field, eventId, userId);
+            } catch (NumberFormatException e) {
+                log.error("Некорректный eventId в callback data: eventId='{}', callbackData='{}', " +
+                         "userId={}, error={}", parts[1], callbackData, userId, e.getMessage());
+                messageService.editMessageText(chatId, messageId, 
+                    "❌ Произошла ошибка при обработке запроса", null);
+                messageService.answerCallbackQuery(callbackQueryId, "");
+                return;
+            }
+            
+            log.info("Пользователь ID={} начал редактирование поля '{}' события ID={}", 
+                    userId, field, eventId);
+            
+            // Устанавливаем состояние редактирования
+            ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditField editField = mapToEditField(field);
+            if (editField != null) {
+                conversationStateService.startEventEditing(userId, eventId, chatId);
+                conversationStateService.setEditingField(userId, editField);
+                log.debug("Установлено состояние редактирования: userId={}, eventId={}, field={}", 
+                         userId, eventId, editField);
+            }
+            
+            // Формируем сообщение и клавиатуру в зависимости от поля
+            String message;
+            InlineKeyboardMarkup keyboard = null;
+            
+            switch (field) {
+                case "date" -> {
+                    log.debug("Выбрано поле для редактирования: DATE, userId={}", userId);
+                    message = "📅 Редактирование даты\n\nВыберите новую дату из календаря:";
+                    // Получаем ID семьи пользователя для отображения событий в календаре
+                    // Используем текущий месяц для начального отображения
+                    java.time.LocalDate now = java.time.LocalDate.now();
+                    Long familyId = user.getFamily() != null ? user.getFamily().getId() : null;
+                    if (familyId != null) {
+                        keyboard = keyboardService.createCalendarKeyboard(
+                            now.getYear(), 
+                            now.getMonthValue(), 
+                            familyId
+                        );
+                    }
+                }
+                case "time" -> {
+                    log.debug("Выбрано поле для редактирования: TIME, userId={}", userId);
+                    message = "🕐 Редактирование времени\n\nВыберите новое время:";
+                    // Показываем выбор часа
+                    keyboard = keyboardService.createHourSelectionKeyboard();
+                }
+                case "title" -> {
+                    log.debug("Выбрано поле для редактирования: TITLE, userId={}", userId);
+                    message = "📝 Редактирование названия\n\nОтправьте новое название события:";
+                }
+                case "description" -> {
+                    log.debug("Выбрано поле для редактирования: DESCRIPTION, userId={}", userId);
+                    message = "📄 Редактирование описания\n\nОтправьте новое описание события:";
+                }
+                default -> {
+                    log.warn("Неизвестное поле для редактирования: field='{}', userId={}", field, userId);
+                    message = "❌ Неизвестное поле для редактирования";
+                }
+            }
+            
+            messageService.editMessageText(chatId, messageId, message, keyboard);
             messageService.answerCallbackQuery(callbackQueryId, "");
+            
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
-            log.error("Ошибка при редактировании поля: userId={}, field={}, error={}", 
-                     userId, payload, e.getMessage());
+            log.error("Ошибка Telegram API при редактировании поля: userId={}, callbackData='{}', error={}", 
+                     userId, callbackData, e.getMessage(), e);
             throw new RuntimeException("Ошибка при редактировании поля", e);
         }
     }
@@ -195,5 +275,24 @@ public class EventCallbackHandler implements CallbackHandler {
     private Long extractEventId(String callbackData, CallbackPrefix prefix) {
         String payload = prefix.extractPayload(callbackData);
         return Long.parseLong(payload);
+    }
+    
+    /**
+     * Преобразует строковое представление поля в EditField enum.
+     * 
+     * <p>Используется для маппинга строковых значений полей из callback data
+     * в типизированный enum для установки состояния редактирования.</p>
+     * 
+     * @param fieldName строковое имя поля (date, time, title, description)
+     * @return соответствующий EditField или null если поле неизвестно
+     */
+    private ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditField mapToEditField(String fieldName) {
+        return switch (fieldName) {
+            case "date" -> ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditField.DATE;
+            case "time" -> ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditField.TIME;
+            case "title" -> ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditField.TITLE;
+            case "description" -> ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditField.DESCRIPTION;
+            default -> null;
+        };
     }
 }
