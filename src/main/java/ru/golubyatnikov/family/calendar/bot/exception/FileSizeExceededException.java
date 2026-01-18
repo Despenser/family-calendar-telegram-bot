@@ -2,13 +2,10 @@ package ru.golubyatnikov.family.calendar.bot.exception;
 
 /**
  * Исключение, выбрасываемое при попытке загрузить файл, превышающий максимально допустимый размер.
- * 
- * <p>Максимальный размер файла составляет 20 МБ согласно требованиям системы.</p>
- * 
- * <p><b>Требования:</b> 20.6</p>
- * 
- * @author Family Calendar Bot
- * @version 1.0
+ *
+ * @author Golubyatnikov Aleksey
+ * @version 1.0.0
+ * @since 2026-01-16
  */
 public class FileSizeExceededException extends RuntimeException {
     

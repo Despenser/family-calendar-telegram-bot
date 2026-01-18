@@ -5,15 +5,15 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.time.LocalDateTime;
 
 /**
  * Entity класс для вложений событий.
  * Хранит информацию о файлах, прикрепленных к событиям (билеты, документы, изображения).
- * 
- * @author Family Calendar Bot
- * @version 1.0
+ *
+ * @author Golubyatnikov Aleksey
+ * @version 1.0.0
+ * @since 2026-01-16
  * @see Event
  */
 @Entity

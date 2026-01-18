@@ -10,19 +10,12 @@ import java.time.LocalDateTime;
 
 /**
  * Entity класс для представления пользователя Telegram бота.
- * 
- * <p>Пользователь идентифицируется по уникальному Telegram ID и может быть членом одной семьи.
- * Каждый пользователь может создавать события в календаре своей семьи.</p>
- * 
- * <p>Соответствует таблице {@code users} в базе данных.</p>
- * 
- * <p><b>Требования:</b> 11.2, 11.3, 11.4</p>
- * 
+ *
+ * @author Golubyatnikov Aleksey
+ * @version 1.0.0
+ * @since 2026-01-16
  * @see Family
  * @see Event
- * @author Family Calendar Bot Team
- * @version 1.0.0
- * @since 2025-12-30
  */
 @Entity
 @Table(name = "users", indexes = {
@@ -55,28 +48,26 @@ public class User {
      * Username пользователя в Telegram.
      * Опциональное поле, так как не все пользователи Telegram имеют username.
      */
-    @Column(name = "username", length = 255)
+    @Column(name = "username")
     private String username;
 
     /**
      * Имя пользователя.
      * Обязательное поле, берется из профиля Telegram.
      */
-    @Column(name = "first_name", nullable = false, length = 255)
+    @Column(name = "first_name", nullable = false)
     private String firstName;
 
     /**
      * Фамилия пользователя.
      * Опциональное поле, берется из профиля Telegram.
      */
-    @Column(name = "last_name", length = 255)
+    @Column(name = "last_name")
     private String lastName;
 
     /**
      * Семья, к которой принадлежит пользователь.
-     * Связь многие-к-одному с сущностью Family.
      * Может быть null, если пользователь еще не добавлен в семью.
-     * При удалении семьи устанавливается в NULL (ON DELETE SET NULL).
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "family_id", foreignKey = @ForeignKey(name = "users_family_fk"))
@@ -86,8 +77,6 @@ public class User {
      * Фильтр событий, выбранный пользователем.
      * Определяет, какие события отображаются пользователю (все, семейные или личные).
      * По умолчанию установлен в ALL (все события).
-     * 
-     * <p><b>Требования:</b> 3.4</p>
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "event_filter", length = 20)
@@ -102,7 +91,6 @@ public class User {
     private LocalDateTime createdAt;
 
     /**
-     * Callback метод JPA, вызываемый перед сохранением новой сущности.
      * Автоматически устанавливает дату и время регистрации.
      */
     @PrePersist

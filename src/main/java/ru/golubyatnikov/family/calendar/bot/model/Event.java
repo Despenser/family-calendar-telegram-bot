@@ -15,27 +15,13 @@ import java.util.List;
 
 /**
  * Entity класс для представления события в семейном календаре.
- * 
- * <p>Событие создается пользователем и принадлежит его семье. Каждое событие имеет
- * дату, время, название и описание. Система отслеживает, было ли отправлено уведомление
- * о событии через поле {@code notified}.</p>
- * 
- * <p>События могут находиться в двух состояниях:</p>
- * <ul>
- *   <li>{@link EventStatus#DRAFT DRAFT} - черновик события в процессе создания через диалог</li>
- *   <li>{@link EventStatus#ACTIVE ACTIVE} - активное событие, готовое к отображению и уведомлениям</li>
- * </ul>
- * 
- * <p>Соответствует таблице {@code events} в базе данных.</p>
- * 
- * <p><b>Требования:</b> 11.3, 11.4, 11.6, 15.1</p>
- * 
+ *
+ * @author Golubyatnikov Aleksey
+ * @version 1.0.0
+ * @since 2026-01-16
  * @see User
  * @see Family
  * @see EventStatus
- * @author Family Calendar Bot Team
- * @version 1.0.0
- * @since 2025-12-30
  */
 @Entity
 @Table(name = "events", indexes = {
@@ -91,8 +77,6 @@ public class Event {
 
     /**
      * Пользователь, создавший событие.
-     * Связь многие-к-одному с сущностью User.
-     * Обязательное поле. При удалении пользователя событие также удаляется (ON DELETE CASCADE).
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "events_user_fk"))
@@ -100,8 +84,6 @@ public class Event {
 
     /**
      * Семья, к которой относится событие.
-     * Связь многие-к-одному с сущностью Family.
-     * Обязательное поле. При удалении семьи событие также удаляется (ON DELETE CASCADE).
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "family_id", nullable = false, foreignKey = @ForeignKey(name = "events_family_fk"))
@@ -111,7 +93,7 @@ public class Event {
      * Название события.
      * Может быть NULL для черновиков в процессе создания.
      */
-    @Column(name = "title", length = 255)
+    @Column(name = "title")
     private String title;
 
     /**
@@ -190,8 +172,7 @@ public class Event {
 
     /**
      * Флаг отправки уведомления о событии.
-     * По умолчанию false. Устанавливается в true после отправки уведомления
-     * всем членам семьи за 1 час до события.
+     * По умолчанию false. Устанавливается в true после отправки уведомления всем членам семьи за 1 час до события.
      */
     @Column(name = "notified", nullable = false)
     @Builder.Default
@@ -206,7 +187,6 @@ public class Event {
 
     /**
      * Вложения события (файлы, документы, изображения).
-     * Связь один-ко-многим с сущностью Attachment.
      */
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -214,7 +194,6 @@ public class Event {
 
     /**
      * Комментарии к событию от членов семьи.
-     * Связь один-ко-многим с сущностью Comment.
      */
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -222,7 +201,6 @@ public class Event {
 
     /**
      * Пункты чек-листа события.
-     * Связь один-ко-многим с сущностью ChecklistItem.
      */
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -230,14 +208,12 @@ public class Event {
 
     /**
      * Напоминания о событии.
-     * Связь один-ко-многим с сущностью Reminder.
      */
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Reminder> reminders = new ArrayList<>();
 
     /**
-     * Callback метод JPA, вызываемый перед сохранением новой сущности.
      * Автоматически устанавливает дату и время создания.
      */
     @PrePersist

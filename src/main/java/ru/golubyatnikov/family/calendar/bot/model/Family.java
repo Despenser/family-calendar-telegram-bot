@@ -5,26 +5,18 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Entity класс для представления семьи в системе.
- * 
- * <p>Семья представляет собой группу пользователей, имеющих доступ к общему календарю.
- * Каждая семья может содержать несколько пользователей (members) и иметь множество событий.</p>
- * 
- * <p>Соответствует таблице {@code families} в базе данных.</p>
- * 
- * <p><b>Требования:</b> 11.2, 11.4</p>
- * 
+ *
+ * @author Golubyatnikov Aleksey
+ * @version 1.0.0
+ * @since 2026-01-16
  * @see User
  * @see Event
- * @author Family Calendar Bot Team
- * @version 1.0.0
- * @since 2025-12-30
  */
 @Entity
 @Table(name = "families")
@@ -46,15 +38,13 @@ public class Family {
      * Название семьи.
      * Обязательное поле, не может быть пустым.
      */
-    @Column(name = "name", nullable = false, length = 255)
+    @Column(name = "name", nullable = false)
     private String name;
 
     /**
      * Список членов семьи.
-     * Связь один-ко-многим с сущностью User.
-     * При удалении семьи связь с пользователями устанавливается в NULL (ON DELETE SET NULL).
      */
-    @OneToMany(mappedBy = "family", cascade = CascadeType.ALL, orphanRemoval = false)
+    @OneToMany(mappedBy = "family", cascade = CascadeType.ALL)
     @Builder.Default
     private List<User> members = new ArrayList<>();
 
@@ -66,7 +56,6 @@ public class Family {
     private LocalDateTime createdAt;
 
     /**
-     * Callback метод JPA, вызываемый перед сохранением новой сущности.
      * Автоматически устанавливает дату и время создания.
      */
     @PrePersist

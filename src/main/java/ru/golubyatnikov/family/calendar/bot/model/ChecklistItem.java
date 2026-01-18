@@ -5,15 +5,15 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.time.LocalDateTime;
 
 /**
  * Entity класс для пунктов чек-листа события.
  * Позволяет создавать списки задач внутри событий с возможностью отметки выполнения.
- * 
- * @author Family Calendar Bot
- * @version 1.0
+ *
+ * @author Golubyatnikov Aleksey
+ * @version 1.0.0
+ * @since 2026-01-16
  * @see Event
  * @see User
  */

@@ -2,21 +2,13 @@ package ru.golubyatnikov.family.calendar.bot.model;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 
 /**
  * Enum для типизации callback data prefixes.
  * Устраняет магические строки и обеспечивает type-safety.
- * 
- * <p>Каждый префикс соответствует определённой функциональной области обработки callback queries.
- * Использование enum вместо строковых литералов позволяет:</p>
- * <ul>
- *   <li>Избежать опечаток в callback data</li>
- *   <li>Упростить рефакторинг</li>
- *   <li>Обеспечить автодополнение в IDE</li>
- *   <li>Централизовать все префиксы в одном месте</li>
- * </ul>
- * 
- * @author Family Calendar Bot Team
+ *
+ * @author Golubyatnikov Aleksey
  * @version 1.0.0
  * @since 2026-01-16
  */
@@ -138,10 +130,6 @@ public enum CallbackPrefix {
     /**
      * Проверяет, соответствует ли callback data данному префиксу.
      * 
-     * <p>Для префиксов без параметров (TIME_BACK, TIME_CANCEL, SKIP_DESCRIPTION, 
-     * CANCEL_TEXT_EVENT, CALENDAR_IGNORE, TIME_IGNORE) проверяется точное совпадение.
-     * Для остальных префиксов проверяется, что callback data начинается с префикса.</p>
-     * 
      * @param callbackData строка callback data для проверки
      * @return true если callback data соответствует данному префиксу
      */
@@ -161,13 +149,12 @@ public enum CallbackPrefix {
     /**
      * Извлекает payload из callback data (часть после префикса).
      * 
-     * <p>Для префиксов без параметров возвращает пустую строку.</p>
-     * 
      * @param callbackData строка callback data
+     *
      * @return payload (часть после префикса) или пустая строка
      * @throws IllegalArgumentException если callback data не соответствует данному префиксу
      */
-    public String extractPayload(String callbackData) {
+    public @NonNull String extractPayload(String callbackData) {
         if (!matches(callbackData)) {
             throw new IllegalArgumentException(
                 String.format("Callback data '%s' не соответствует префиксу '%s'", 
@@ -185,8 +172,6 @@ public enum CallbackPrefix {
     /**
      * Создаёт callback data с данным payload.
      * 
-     * <p>Для префиксов без параметров payload игнорируется и возвращается только префикс.</p>
-     * 
      * @param payload данные для добавления к префиксу
      * @return callback data в формате prefix + payload
      */
@@ -201,9 +186,6 @@ public enum CallbackPrefix {
     
     /**
      * Находит CallbackPrefix по callback data.
-     * 
-     * <p>Метод перебирает все значения enum и возвращает первый подходящий префикс.
-     * Порядок проверки важен: сначала проверяются более специфичные префиксы.</p>
      * 
      * @param callbackData строка callback data
      * @return соответствующий CallbackPrefix или null если не найден

@@ -21,7 +21,11 @@ import java.util.Map;
 
 /**
  * Компонент для регистрации Webhook при старте приложения.
- * <p>Компонент активируется только когда свойство telegram.bot.webhook.enabled=true (по умолчанию true)
+ * Компонент активируется только когда свойство telegram.bot.webhook.enabled=true (по умолчанию true)
+ *
+ * @author Golubyatnikov Aleksey
+ * @version 1.0.0
+ * @since 2026-01-16
  */
 @Component
 @RequiredArgsConstructor

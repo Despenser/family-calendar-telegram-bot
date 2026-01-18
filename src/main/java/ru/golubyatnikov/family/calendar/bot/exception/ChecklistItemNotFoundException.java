@@ -2,9 +2,10 @@ package ru.golubyatnikov.family.calendar.bot.exception;
 
 /**
  * Исключение, выбрасываемое когда пункт чек-листа не найден в базе данных.
- * 
- * @author Family Calendar Bot
- * @version 1.0
+ *
+ * @author Golubyatnikov Aleksey
+ * @version 1.0.0
+ * @since 2026-01-16
  */
 public class ChecklistItemNotFoundException extends RuntimeException {
     

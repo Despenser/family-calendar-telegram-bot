@@ -14,18 +14,8 @@ import java.util.Optional;
 
 /**
  * Spring Data JPA репозиторий для работы с сущностью {@link Event}.
- * 
- * <p>Предоставляет методы для:</p>
- * <ul>
- *   <li>Поиска событий семьи в диапазоне дат</li>
- *   <li>Получения событий пользователя</li>
- *   <li>Поиска событий для отправки уведомлений</li>
- *   <li>Работы с черновиками событий (для многошагового создания)</li>
- * </ul>
  *
- * <p><b>Требования:</b> 11.1, 15.1, 15.2, 5.6</p>
- *
- * @author Family Calendar Bot Team
+ * @author Golubyatnikov Aleksey
  * @version 1.0.0
  * @since 2025-12-30
  */
@@ -34,8 +24,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     
     /**
      * Находит все события семьи в заданном диапазоне дат.
-     * Использует @EntityGraph для загрузки связанной сущности User,
-     * чтобы избежать LazyInitializationException при доступе к event.getUser().
      * 
      * @param familyId идентификатор семьи
      * @param startDate начальная дата диапазона (включительно)
@@ -53,8 +41,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     
     /**
      * Находит все события семьи в заданном диапазоне дат с определенным статусом.
-     * Используется для получения только активных событий (без черновиков) для отображения в календаре.
-     * Использует @EntityGraph для загрузки связанной сущности User для доступа к имени создателя.
      * 
      * @param familyId идентификатор семьи
      * @param startDate начальная дата диапазона (включительно)
@@ -74,8 +60,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     
     /**
      * Находит все события пользователя, отсортированные по дате в порядке возрастания.
-     * Использует @EntityGraph для загрузки связанных сущностей User и Family,
-     * чтобы избежать N+1 проблемы при доступе к связанным данным.
      * 
      * @param userId идентификатор пользователя
      *
@@ -86,21 +70,12 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByUserIdOrderByEventDateAsc(Long userId);
     
     /**
-     * Находит все события пользователя с определенным статусом, 
-     * отсортированные по дате в порядке возрастания.
-     * Использует @EntityGraph для загрузки связанных сущностей User и Family,
-     * чтобы избежать N+1 проблемы при доступе к связанным данным.
-     * 
-     * <p>Используется для получения событий пользователя с фильтрацией по статусу,
-     * например, только активных событий (ACTIVE) для команды /my_events,
-     * исключая удаленные (DELETED), черновики (DRAFT) и завершенные (COMPLETED) события.</p>
-     * 
-     * <p><b>Требования:</b> 1.1, 3.1, 3.2</p>
+     * Находит все события пользователя с определенным статусом, отсортированные по дате в порядке возрастания.
      * 
      * @param userId идентификатор пользователя
      * @param status статус события (ACTIVE, DELETED, COMPLETED, DRAFT)
-     * @return список событий пользователя с указанным статусом, 
-     *         отсортированный по дате возрастания
+     *
+     * @return список событий пользователя с указанным статусом, отсортированный по дате возрастания
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
@@ -143,8 +118,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     /**
      * Находит все черновики пользователя по статусу.
      * Используется для очистки старых незавершенных черновиков.
-     * Использует @EntityGraph для загрузки связанных сущностей User и Family,
-     * чтобы избежать N+1 проблемы при доступе к связанным данным.
      * 
      * @param userId идентификатор пользователя
      * @param status статус события (обычно DRAFT)
@@ -158,8 +131,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     /**
      * Находит удаленные события пользователя (корзина), отсортированные по дате удаления.
      * Используется для отображения корзины пользователя.
-     * Использует @EntityGraph для загрузки связанных сущностей User и Family,
-     * чтобы избежать N+1 проблемы при доступе к связанным данным.
      * 
      * @param userId идентификатор пользователя
      * @param status статус события (DELETED)
@@ -192,23 +163,23 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @Query("""
-        SELECT e FROM Event e
-        WHERE e.status = 'ACTIVE'
-        AND e.eventDate IS NOT NULL
-        AND e.eventTime IS NOT NULL
-        AND (
-            (e.endTime IS NOT NULL AND CAST(CONCAT(CAST(e.eventDate AS string), ' ', CAST(e.endTime AS string)) AS timestamp) < :currentDateTime)
-            OR (e.endTime IS NULL AND CAST(CONCAT(CAST(e.eventDate AS string), ' ', CAST(e.eventTime AS string)) AS timestamp) < :currentDateTime)
-        )
+                SELECT e FROM Event e
+                WHERE e.status = 'ACTIVE'
+                AND e.eventDate IS NOT NULL
+                AND e.eventTime IS NOT NULL
+                AND (
+                    (e.endTime IS NOT NULL AND CAST(CONCAT(CAST(e.eventDate AS string),
+                        ' ', CAST(e.endTime AS string)) AS timestamp) < :currentDateTime)
+                    OR (e.endTime IS NULL AND CAST(CONCAT(CAST(e.eventDate AS string),
+                        ' ', CAST(e.eventTime AS string)) AS timestamp) < :currentDateTime)
+                )
     """)
     List<Event> findExpiredActiveEvents(@Param("currentDateTime") LocalDateTime currentDateTime);
     
     /**
      * Поиск событий по названию или описанию.
      * Используется для функции поиска событий пользователя.
-     * Использует @EntityGraph для загрузки связанных сущностей User и Family,
-     * чтобы избежать N+1 проблемы при доступе к связанным данным.
-     * 
+     *
      * @param familyId идентификатор семьи
      * @param userId идентификатор пользователя
      * @param query поисковый запрос
@@ -218,18 +189,18 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      */
     @EntityGraph(attributePaths = {"user", "family"})
     @Query("""
-        SELECT e FROM Event e
-        WHERE e.family.id = :familyId
-        AND e.status = 'ACTIVE'
-        AND (
-            (e.isPersonal = false)
-            OR (e.isPersonal = true AND e.user.id = :userId)
-        )
-        AND (
-            LOWER(e.title) LIKE LOWER(CONCAT('%', :query, '%'))
-            OR LOWER(e.description) LIKE LOWER(CONCAT('%', :query, '%'))
-        )
-        ORDER BY e.eventDate DESC, e.eventTime DESC
+                SELECT e FROM Event e
+                WHERE e.family.id = :familyId
+                AND e.status = 'ACTIVE'
+                AND (
+                    (e.isPersonal = false)
+                    OR (e.isPersonal = true AND e.user.id = :userId)
+                )
+                AND (
+                    LOWER(e.title) LIKE LOWER(CONCAT('%', :query, '%'))
+                    OR LOWER(e.description) LIKE LOWER(CONCAT('%', :query, '%'))
+                )
+                ORDER BY e.eventDate DESC, e.eventTime DESC
     """)
     List<Event> searchByTitleOrDescription(
         @Param("familyId") Long familyId,
@@ -273,8 +244,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     /**
      * Находит предстоящие события семьи и пользователя.
      * Включает семейные события и персональные события пользователя.
-     * Использует @EntityGraph для загрузки связанных сущностей User и Family,
-     * чтобы избежать N+1 проблемы при доступе к связанным данным.
      * 
      * @param familyId идентификатор семьи
      * @param userId идентификатор пользователя
@@ -285,15 +254,15 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      */
     @EntityGraph(attributePaths = {"user", "family"})
     @Query("""
-        SELECT e FROM Event e
-        WHERE e.family.id = :familyId
-        AND e.status = 'ACTIVE'
-        AND e.eventDate >= :currentDate
-        AND (
-            (e.isPersonal = false)
-            OR (e.isPersonal = true AND e.user.id = :userId)
-        )
-        ORDER BY e.eventDate ASC, e.eventTime ASC
+                SELECT e FROM Event e
+                WHERE e.family.id = :familyId
+                AND e.status = 'ACTIVE'
+                AND e.eventDate >= :currentDate
+                AND (
+                    (e.isPersonal = false)
+                    OR (e.isPersonal = true AND e.user.id = :userId)
+                )
+                ORDER BY e.eventDate ASC, e.eventTime ASC
     """)
     List<Event> findUpcomingEvents(
         @Param("familyId") Long familyId,
@@ -304,8 +273,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     /**
      * Находит все события серии с определенным статусом.
      * Используется для операций с повторяющимися событиями.
-     * Использует @EntityGraph для загрузки связанных сущностей User и Family,
-     * чтобы избежать N+1 проблемы при доступе к связанным данным.
      * 
      * @param seriesId UUID серии событий
      * @param status статус события
@@ -367,8 +334,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     /**
      * Находит все события семьи с определенным статусом, отсортированные по дате и времени.
      * Используется для фильтрации событий по типу (ALL).
-     * Использует @EntityGraph для загрузки связанных сущностей User и Family,
-     * чтобы избежать N+1 проблемы при доступе к связанным данным.
      * 
      * @param familyId идентификатор семьи
      * @param status статус события
@@ -385,8 +350,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     /**
      * Находит семейные события (не персональные) с определенным статусом, отсортированные по дате и времени.
      * Используется для фильтрации событий по типу (FAMILY).
-     * Использует @EntityGraph для загрузки связанных сущностей User и Family,
-     * чтобы избежать N+1 проблемы при доступе к связанным данным.
      * 
      * @param familyId идентификатор семьи
      * @param isPersonal флаг персонального события (false для семейных)
@@ -405,8 +368,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     /**
      * Находит персональные события пользователя с определенным статусом, отсортированные по дате и времени.
      * Используется для фильтрации событий по типу (PERSONAL).
-     * Использует @EntityGraph для загрузки связанных сущностей User и Family,
-     * чтобы избежать N+1 проблемы при доступе к связанным данным.
      * 
      * @param userId идентификатор пользователя
      * @param isPersonal флаг персонального события (true для личных)

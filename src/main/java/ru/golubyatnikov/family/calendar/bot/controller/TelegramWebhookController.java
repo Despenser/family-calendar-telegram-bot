@@ -12,9 +12,10 @@ import ru.golubyatnikov.family.calendar.bot.service.UpdateProcessor;
 
 /**
  * REST контроллер для приема webhook обновлений от Telegram Bot API.
- * @author Family Calendar Bot Team
+ *
+ * @author Golubyatnikov Aleksey
  * @version 1.0.0
- * @since 2025-12-30
+ * @since 2026-01-16
  */
 @RestController
 @RequestMapping("/webhook")
@@ -27,18 +28,16 @@ public class TelegramWebhookController {
 
     /**
      * Обрабатывает входящие webhook обновления от Telegram Bot API.
-     * 
-     * <p>Этот метод вызывается Telegram каждый раз, когда происходит событие,
-     * связанное с ботом (новое сообщение, команда, callback и т.д.).</p>
+     * Этот метод вызывается Telegram каждый раз, когда происходит событие,
+     * связанное с ботом (новое сообщение, команда, callback и т.д.)
      * 
      * @param botToken токен бота из URL пути, используется для валидации запроса
      * @param update объект Update от Telegram, содержащий информацию о событии
      * @return ResponseEntity с HTTP 200 OK при успешной обработке, или HTTP 401 Unauthorized при неверном токене
      */
     @PostMapping("/{botToken}")
-    public ResponseEntity<Void> onUpdateReceived(
-            @PathVariable String botToken,
-            @RequestBody Update update) {
+    public ResponseEntity<Void> onUpdateReceived(@PathVariable String botToken,
+                                                 @RequestBody Update update) {
         
         log.debug("Получен webhook запрос с токеном: {}...", 
                  botToken.substring(0, Math.min(10, botToken.length())));

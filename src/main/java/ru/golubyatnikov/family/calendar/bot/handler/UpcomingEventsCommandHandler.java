@@ -166,10 +166,13 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      * @return сообщение с инструкциями для пользователя без семьи
      */
     private String buildNoFamilyMessage() {
-        return String.format("❌ %s\n\n" +
-               "Вы не принадлежите ни одной семье.\n\n" +
-               "Для просмотра событий необходимо быть членом семьи. " +
-               "Обратитесь к администратору для добавления в семью.",
+        return String.format("""
+                        ❌ %s
+                        
+                        Вы не принадлежите ни одной семье.
+                        
+                        Для просмотра событий необходимо быть членом семьи. \
+                        Обратитесь к администратору для добавления в семью.""",
                bold("Ошибка"));
     }
 
@@ -213,7 +216,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
                 .map(this::formatEvent)
                 .collect(Collectors.joining("\n\n"));
 
-        return escape("📅 ") + bold("Предстоящие события семьи (30 дней)") + escape("\n\n") +
+        return escape("📅 ") + bold("Предстоящие события (30 дней)") + escape("\n\n") +
                 eventsList + escape("\n\n") +
                 escape("Всего событий: ") + escape(String.valueOf(filteredEvents.size()));
     }
@@ -246,7 +249,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
         
         // Иконка типа события (персональное или семейное)
         String eventTypeIcon = event.getIsPersonal() ? "🔒" : "👨‍👩‍👧‍👦";
-        formatted.append(escape(eventTypeIcon + " 📌 ")).append(bold(event.getTitle())).append(escape("\n"));
+        formatted.append(escape(eventTypeIcon)).append(bold(event.getTitle())).append(escape("\n"));
         
         // Дата события
         formatted.append(escape("📅 Дата: ")).append(escape(event.getFormattedDate())).append(escape("\n"));

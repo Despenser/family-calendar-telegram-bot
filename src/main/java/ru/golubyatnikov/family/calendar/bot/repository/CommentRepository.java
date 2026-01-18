@@ -3,20 +3,15 @@ package ru.golubyatnikov.family.calendar.bot.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import ru.golubyatnikov.family.calendar.bot.model.Comment;
-
 import java.util.List;
 
 /**
  * Repository интерфейс для работы с комментариями к событиям.
  * Предоставляет методы для CRUD операций и поиска комментариев.
- * 
- * <p>Использует Spring Data JPA для автоматической генерации реализации
- * на основе сигнатур методов.</p>
- * 
- * <p><b>Требования:</b> 21.4</p>
- * 
- * @author Family Calendar Bot
- * @version 1.0
+ *
+ * @author Golubyatnikov Aleksey
+ * @version 1.0.0
+ * @since 2026-01-16
  * @see Comment
  */
 @Repository

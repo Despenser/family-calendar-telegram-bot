@@ -10,7 +10,6 @@ import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,14 +20,33 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.italic
 
 /**
  * Глобальный обработчик исключений для всего приложения.
- * 
- * @author Family Calendar Bot Team
+ *
+ * @author Golubyatnikov Aleksey
  * @version 1.0.0
- * @since 2025-12-30
+ * @since 2026-01-16
  */
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    /**
+     * Создает стандартизированный объект ответа об ошибке.
+     *
+     * @param status HTTP статус
+     * @param error краткое описание ошибки
+     * @param message детальное сообщение для пользователя
+     * @return Map с информацией об ошибке
+     */
+    private @NonNull Map<String, Object> createErrorResponse(@NonNull HttpStatus status,
+                                                             String error,
+                                                             String message) {
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp", LocalDateTime.now().toString());
+        errorResponse.put("status", status.value());
+        errorResponse.put("error", error);
+        errorResponse.put("message", message);
+        return errorResponse;
+    }
     
     /**
      * Обрабатывает исключение UserNotFoundException.
@@ -38,6 +56,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleUserNotFoundException(UserNotFoundException ex) {
+
         log.error("Пользователь не найден: {}", ex.getMessage(), ex);
         
         Map<String, Object> errorResponse = createErrorResponse(
@@ -58,6 +77,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(EventNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleEventNotFoundException(EventNotFoundException ex) {
+
         log.error("Событие не найдено: {}", ex.getMessage(), ex);
         
         Map<String, Object> errorResponse = createErrorResponse(
@@ -78,6 +98,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(UnauthorizedAccessException.class)
     public ResponseEntity<Map<String, Object>> handleUnauthorizedAccessException(UnauthorizedAccessException ex) {
+
         log.error("Несанкционированный доступ: {}", ex.getMessage(), ex);
         
         Map<String, Object> errorResponse = createErrorResponse(
@@ -98,6 +119,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(InvalidDateException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidDateException(InvalidDateException ex) {
+
         log.error("Некорректная дата: {}", ex.getMessage(), ex);
         
         Map<String, Object> errorResponse = createErrorResponse(
@@ -113,17 +135,12 @@ public class GlobalExceptionHandler {
     /**
      * Обрабатывает исключение ConstraintViolationException (ошибки Bean Validation).
      * 
-     * <p>Возвращает понятное сообщение об ошибке валидации с перечислением
-     * всех нарушенных ограничений.</p>
-     * 
-     * <p><b>Требования:</b> 8.3</p>
-     * 
      * @param ex исключение ConstraintViolationException
      * @return ResponseEntity с информацией об ошибке валидации
      */
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<Map<String, Object>> handleConstraintViolationException(ConstraintViolationException ex) {
-        // Собираем все сообщения об ошибках валидации
+    public ResponseEntity<Map<String, Object>> handleConstraintViolationException(@NonNull ConstraintViolationException ex) {
+
         String validationErrors = ex.getConstraintViolations().stream()
             .map(ConstraintViolation::getMessage)
             .collect(Collectors.joining(", "));
@@ -158,6 +175,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<Map<String, Object>> handleDataAccessException(DataAccessException ex) {
+
         log.error("Ошибка доступа к базе данных: {}", ex.getMessage(), ex);
         
         Map<String, Object> errorResponse = createErrorResponse(
@@ -178,6 +196,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(TelegramApiException.class)
     public ResponseEntity<Map<String, Object>> handleTelegramApiException(TelegramApiException ex) {
+
         log.error("Ошибка Telegram API: {}", ex.getMessage(), ex);
         
         Map<String, Object> errorResponse = createErrorResponse(
@@ -198,6 +217,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
+
         log.error("Необработанное исключение: {}", ex.getMessage(), ex);
         
         Map<String, Object> errorResponse = createErrorResponse(
@@ -208,24 +228,5 @@ public class GlobalExceptionHandler {
         
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(errorResponse);
-    }
-    
-    /**
-     * Создает стандартизированный объект ответа об ошибке.
-     * 
-     * @param status HTTP статус
-     * @param error краткое описание ошибки
-     * @param message детальное сообщение для пользователя
-     * @return Map с информацией об ошибке
-     */
-    private @NonNull Map<String, Object> createErrorResponse(@NonNull HttpStatus status,
-                                                                      String error,
-                                                                      String message) {
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("timestamp", LocalDateTime.now().toString());
-        errorResponse.put("status", status.value());
-        errorResponse.put("error", error);
-        errorResponse.put("message", message);
-        return errorResponse;
     }
 }

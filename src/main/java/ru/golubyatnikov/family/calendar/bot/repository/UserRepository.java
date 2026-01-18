@@ -4,23 +4,20 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import ru.golubyatnikov.family.calendar.bot.model.User;
-
 import java.util.Optional;
 
 /**
  * Spring Data JPA репозиторий для работы с сущностью {@link User}.
  *
- * @author Family Calendar Bot Team
+ * @author Golubyatnikov Aleksey
  * @version 1.0.0
- * @since 2025-12-30
+ * @since 2026-01-16
  */
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
     
     /**
      * Находит пользователя по его уникальному Telegram ID.
-     * Использует EntityGraph для явной загрузки связи с семьей (family),
-     * чтобы избежать проблем с ленивой загрузкой при проверке авторизации.
      * 
      * @param telegramId уникальный идентификатор пользователя в Telegram
      *

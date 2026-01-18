@@ -3,20 +3,15 @@ package ru.golubyatnikov.family.calendar.bot.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import ru.golubyatnikov.family.calendar.bot.model.RecurrenceRule;
-
 import java.util.Optional;
 
 /**
  * Repository интерфейс для работы с правилами повторения событий.
  * Предоставляет методы для CRUD операций и поиска правил повторения.
- * 
- * <p>Использует Spring Data JPA для автоматической генерации реализации
- * на основе сигнатур методов.</p>
- * 
- * <p><b>Требования:</b> 27.6</p>
- * 
- * @author Family Calendar Bot
- * @version 1.0
+ *
+ * @author Golubyatnikov Aleksey
+ * @version 1.0.0
+ * @since 2026-01-16
  * @see RecurrenceRule
  */
 @Repository

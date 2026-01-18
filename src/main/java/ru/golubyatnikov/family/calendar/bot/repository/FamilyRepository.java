@@ -7,9 +7,9 @@ import ru.golubyatnikov.family.calendar.bot.model.Family;
 /**
  * Spring Data JPA репозиторий для работы с сущностью {@link Family}.
  *
- * @author Family Calendar Bot Team
+ * @author Golubyatnikov Aleksey
  * @version 1.0.0
- * @since 2025-12-30
+ * @since 2026-01-16
  */
 @Repository
 public interface FamilyRepository extends JpaRepository<Family, Long> { }

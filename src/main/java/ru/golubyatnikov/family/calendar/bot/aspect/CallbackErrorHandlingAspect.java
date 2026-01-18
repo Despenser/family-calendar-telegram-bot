@@ -113,6 +113,9 @@ public class CallbackErrorHandlingAspect {
     
     /**
      * Извлекает chatId из CallbackQuery.
+     *
+     * @param callbackQuery объект callback query
+     * @return chatId или null если не найден
      */
     private Long extractChatId(CallbackQuery callbackQuery) {
         if (callbackQuery == null || callbackQuery.getMessage() == null) {
