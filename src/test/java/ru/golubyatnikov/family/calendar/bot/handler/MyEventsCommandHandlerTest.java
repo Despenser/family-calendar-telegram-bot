@@ -235,8 +235,6 @@ class MyEventsCommandHandlerTest {
         // Given
         Long eventId = 1L;
         Long userId = 1L;
-        
-        doNothing().when(eventService).deleteEvent(eventId, userId);
 
         // When
         handler.handleDeleteCallback(eventId, userId);

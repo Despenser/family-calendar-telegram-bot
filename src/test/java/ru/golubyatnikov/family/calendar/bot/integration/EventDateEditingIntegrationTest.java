@@ -53,7 +53,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
     "telegram.bot.webhook.enabled=false",
-    "spring.jpa.hibernate.ddl-auto=create-drop"
+    "spring.jpa.hibernate.ddl-auto=validate",
+    "spring.flyway.enabled=true",
+    "spring.flyway.clean-disabled=false"
 })
 @Testcontainers
 @Transactional
@@ -72,6 +74,8 @@ class EventDateEditingIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.PostgreSQLDialect");
+        registry.add("spring.flyway.enabled", () -> "true");
+        registry.add("spring.flyway.clean-disabled", () -> "false");
     }
 
     @Autowired
