@@ -82,10 +82,16 @@ public class KeyboardService {
 
     // Константы для текста кнопок
     private static final String BTN_START = "🚀 Начать";
-    private static final String BTN_UPCOMING_EVENTS = "📅 Предстоящие события";
-    private static final String BTN_ADD_EVENT = "➕ Добавить событие";
-    private static final String BTN_MY_EVENTS = "📋 Мои события";
+    private static final String BTN_UPCOMING = "📋 Планы";
+    private static final String BTN_ADD = "➕ Добавить";
+    private static final String BTN_MY = "📝 Мои события";
     private static final String BTN_HELP = "❓ Помощь";
+    private static final String BTN_TODAY = "📅 Сегодня";
+    private static final String BTN_WEEK = "📆 Неделя";
+    private static final String BTN_TRASH = "🗑️ Корзина";
+    private static final String BTN_STATS = "📊 Статистика";
+    private static final String BTN_SEARCH = "🔍 Поиск";
+    private static final String BTN_FILTER = "🎯 Фильтр";
     
     // Маппинг русских букв на надстрочные Unicode символы
     private static final Map<Character, Character> SUPERSCRIPT_MAP = Map.ofEntries(
@@ -123,13 +129,25 @@ public class KeyboardService {
      * 
      * <p>Клавиатура содержит следующие кнопки:</p>
      * <ul>
-     *   <li>📅 Предстоящие события - просмотр событий на ближайшие 7 дней</li>
-     *   <li>➕ Добавить событие - создание нового события</li>
-     *   <li>📋 Мои события - просмотр и управление своими событиями</li>
+     *   <li>📝 Мои события - просмотр и управление своими событиями</li>
+     *   <li>➕ Добавить - создание нового события</li>
+     *   <li>📅 Сегодня - события на текущий день</li>
+     *   <li>📆 Неделя - события на текущую неделю</li>
+     *   <li>📋 Планы - просмотр событий на ближайшие 30 дней</li>
+     *   <li>🔍 Поиск - поиск событий</li>
+     *   <li>🎯 Фильтр - фильтрация событий</li>
+     *   <li>📊 Статистика - статистика по событиям</li>
+     *   <li>🗑️ Корзина - просмотр удаленных событий</li>
      *   <li>❓ Помощь - справка по командам</li>
      * </ul>
      * 
-     * <p>Кнопки расположены в 2 ряда по 2 кнопки для удобства использования.</p>
+     * <p>Кнопки расположены в 4 ряда для удобства использования:</p>
+     * <ul>
+     *   <li>Ряд 1: Мои события | Добавить (управление событиями)</li>
+     *   <li>Ряд 2: Сегодня | Неделя | Планы (просмотр событий)</li>
+     *   <li>Ряд 3: Поиск | Фильтр | Статистика (утилиты)</li>
+     *   <li>Ряд 4: Корзина | Помощь (дополнительные функции)</li>
+     * </ul>
      * 
      * <p>Параметры клавиатуры:</p>
      * <ul>
@@ -147,17 +165,31 @@ public class KeyboardService {
         
         List<KeyboardRow> rows = new ArrayList<>();
         
-        // Первая строка: Предстоящие события | Добавить событие
+        // Ряд 1: Мои события | Добавить
         KeyboardRow row1 = new KeyboardRow();
-        row1.add(new KeyboardButton(BTN_UPCOMING_EVENTS));
-        row1.add(new KeyboardButton(BTN_ADD_EVENT));
+        row1.add(new KeyboardButton(BTN_MY));
+        row1.add(new KeyboardButton(BTN_ADD));
         rows.add(row1);
         
-        // Вторая строка: Мои события | Помощь
+        // Ряд 2: Сегодня | Неделя | Предстоящие
         KeyboardRow row2 = new KeyboardRow();
-        row2.add(new KeyboardButton(BTN_MY_EVENTS));
-        row2.add(new KeyboardButton(BTN_HELP));
+        row2.add(new KeyboardButton(BTN_TODAY));
+        row2.add(new KeyboardButton(BTN_WEEK));
+        row2.add(new KeyboardButton(BTN_UPCOMING));
         rows.add(row2);
+        
+        // Ряд 3: Поиск | Фильтр | Статистика
+        KeyboardRow row3 = new KeyboardRow();
+        row3.add(new KeyboardButton(BTN_SEARCH));
+        row3.add(new KeyboardButton(BTN_FILTER));
+        row3.add(new KeyboardButton(BTN_STATS));
+        rows.add(row3);
+        
+        // Ряд 4: Корзина | Помощь
+        KeyboardRow row4 = new KeyboardRow();
+        row4.add(new KeyboardButton(BTN_TRASH));
+        row4.add(new KeyboardButton(BTN_HELP));
+        rows.add(row4);
         
         keyboard.setKeyboard(rows);
         
@@ -430,10 +462,16 @@ public class KeyboardService {
      * <p>Поддерживаемые преобразования:</p>
      * <ul>
      *   <li>"🚀 Начать" → "/start"</li>
-     *   <li>"📅 Предстоящие события" → "/upcoming_events"</li>
-     *   <li>"➕ Добавить событие" → "/add_event"</li>
-     *   <li>"📋 Мои события" → "/my_events"</li>
+     *   <li>"📋 Планы" → "/upcoming_events"</li>
+     *   <li>"➕ Добавить" → "/add_event"</li>
+     *   <li>"📝 Мои события" → "/my_events"</li>
      *   <li>"❓ Помощь" → "/help"</li>
+     *   <li>"📅 Сегодня" → "/today"</li>
+     *   <li>"📆 Неделя" → "/week"</li>
+     *   <li>"🗑️ Корзина" → "/trash"</li>
+     *   <li>"📊 Статистика" → "/stats"</li>
+     *   <li>"🔍 Поиск" → "/search"</li>
+     *   <li>"🎯 Фильтр" → "/filter"</li>
      * </ul>
      * 
      * <p>Если текст не соответствует ни одной кнопке, он возвращается без изменений.
@@ -453,10 +491,16 @@ public class KeyboardService {
         
         String command = switch (buttonText) {
             case BTN_START -> "/start";
-            case BTN_UPCOMING_EVENTS -> "/upcoming_events";
-            case BTN_ADD_EVENT -> "/add_event";
-            case BTN_MY_EVENTS -> "/my_events";
+            case BTN_UPCOMING -> "/upcoming_events";
+            case BTN_ADD -> "/add_event";
+            case BTN_MY -> "/my_events";
             case BTN_HELP -> "/help";
+            case BTN_TODAY -> "/today";
+            case BTN_WEEK -> "/week";
+            case BTN_TRASH -> "/trash";
+            case BTN_STATS -> "/stats";
+            case BTN_SEARCH -> "/search";
+            case BTN_FILTER -> "/filter";
             default -> buttonText;
         };
         

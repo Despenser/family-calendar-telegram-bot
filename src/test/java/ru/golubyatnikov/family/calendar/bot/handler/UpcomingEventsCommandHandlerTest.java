@@ -80,7 +80,7 @@ class UpcomingEventsCommandHandlerTest {
         String description = handler.getDescription();
 
         // Then
-        assertEquals("Показать все предстоящие события (30 дней)", description);
+        assertEquals("Показать планы на 30 дней", description);
     }
 
     @Test
@@ -112,7 +112,7 @@ class UpcomingEventsCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("Предстоящие события семьи \\(30 дней\\)"));
+        assertTrue(response.contains("Планы на 30 дней"));
         assertTrue(response.contains("День рождения"));
         assertTrue(response.contains("Поход в кино"));
         assertTrue(response.contains("31\\.12\\.2025")); // Точки экранируются
@@ -139,7 +139,7 @@ class UpcomingEventsCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("Предстоящие события семьи") && response.contains("30 дней"), "Ответ должен содержать заголовок с указанием 30 дней");
+        assertTrue(response.contains("Планы на 30 дней"), "Ответ должен содержать заголовок");
         assertTrue(response.contains("На ближайшие 30 дней событий не запланировано"), "Ответ должен содержать сообщение об отсутствии событий на 30 дней");
         assertTrue(response.contains("/add\\_event") || response.contains("/add_event"), "Ответ должен содержать подсказку о команде /add_event");
         

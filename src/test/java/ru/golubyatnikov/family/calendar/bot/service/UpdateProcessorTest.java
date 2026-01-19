@@ -204,11 +204,11 @@ class UpdateProcessorTest {
         // 1. Первый вызов возвращает оригинальный текст кнопки
         // 2. После setText() последующие вызовы возвращают команду
         when(message.getText())
-                .thenReturn("📅 Предстоящие события")  // Первый вызов
+                .thenReturn("📋 Планы")  // Первый вызов
                 .thenReturn("/upcoming_events");        // Последующие вызовы после setText()
         
         // Настраиваем KeyboardService для преобразования текста кнопки
-        when(keyboardService.buttonTextToCommand("📅 Предстоящие события"))
+        when(keyboardService.buttonTextToCommand("📋 Планы"))
                 .thenReturn("/upcoming_events");
         
         // Мокируем userService, conversationStateService и conversationService
@@ -221,7 +221,7 @@ class UpdateProcessorTest {
         updateProcessor.processUpdate(update);
 
         // Then
-        verify(keyboardService).buttonTextToCommand("📅 Предстоящие события");
+        verify(keyboardService).buttonTextToCommand("📋 Планы");
         verify(message).setText("/upcoming_events");
         verify(commandDispatcher).hasHandler("/upcoming_events");
         verify(commandDispatcher).dispatch(message);

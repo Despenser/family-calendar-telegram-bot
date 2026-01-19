@@ -35,7 +35,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * Пользователь отправляет: /upcoming_events
  * 
  * Если есть события:
- * Бот отвечает: "📅 *Предстоящие события семьи*
+ * Бот отвечает: "📅 *Планы на 30 дней*
  *                
  *                📌 *День рождения мамы*
  *                📅 Дата: 31.12.2025
@@ -50,7 +50,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  *                👤 Создал: Мария Петрова"
  * 
  * Если событий нет:
- * Бот отвечает: "📅 *Предстоящие события семьи*
+ * Бот отвечает: "📅 *Планы на 30 дней*
  *                
  *                На ближайшие 7 дней событий не запланировано.
  *                
@@ -189,7 +189,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      * @return отформатированное сообщение об отсутствии событий
      */
     private String buildNoEventsMessage() {
-        return escape("📅 ") + bold("Предстоящие события семьи (30 дней)") + escape("\n\n") +
+        return escape("📅 ") + bold("Планы на 30 дней") + escape("\n\n") +
                 escape("На ближайшие " + DEFAULT_DAYS + " дней событий не запланировано.\n\n") +
                 escape("Используйте /add_event для добавления нового события.");
     }
@@ -216,7 +216,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
                 .map(this::formatEvent)
                 .collect(Collectors.joining("\n\n"));
 
-        return escape("📅 ") + bold("Предстоящие события семьи (30 дней)") + escape("\n\n") +
+        return escape("📅 ") + bold("Планы на 30 дней") + escape("\n\n") +
                 eventsList + escape("\n\n") +
                 escape("Всего событий: ") + escape(String.valueOf(filteredEvents.size()));
     }
@@ -289,7 +289,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      */
     @Override
     public String getDescription() {
-        return "Показать все предстоящие события (30 дней)";
+        return "Показать планы на 30 дней";
     }
 
     /**
