@@ -5,11 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
+import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,12 +44,37 @@ import java.util.List;
 public class TrashService {
     
     private final EventRepository eventRepository;
+    private final UserRepository userRepository;
     private final EventHistoryService eventHistoryService;
     private final ReminderService reminderService;
     private final TelegramMessageService messageService;
     private final ru.golubyatnikov.family.calendar.bot.handler.MyEventsCommandHandler myEventsCommandHandler;
+    private final ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder botMessageBuilder;
+    private final KeyboardService keyboardService;
     
     private static final int TRASH_RETENTION_DAYS = 30;
+    
+    /**
+     * Сохраняет событие в базу данных.
+     * 
+     * <p>Вспомогательный метод для сохранения изменений события.</p>
+     * 
+     * @param event событие для сохранения
+     * @return сохраненное событие
+     * @throws IllegalArgumentException если event равен null
+     */
+    public Event saveEvent(Event event) {
+        if (event == null) {
+            log.error("Попытка сохранить null событие");
+            throw new IllegalArgumentException("Событие не может быть null");
+        }
+        
+        log.debug("Сохранение события ID={}", event.getId());
+        Event savedEvent = eventRepository.save(event);
+        log.debug("Событие ID={} успешно сохранено", savedEvent.getId());
+        
+        return savedEvent;
+    }
     
     /**
      * Получает список удаленных событий пользователя.
@@ -140,6 +167,8 @@ public class TrashService {
         event.setMessageId(null);
         // ВАЖНО: Сбрасываем флаг isMyEventsHeader, он будет установлен заново при вызове /my_events
         event.setIsMyEventsHeader(false);
+        // Сбрасываем флаг isTrashHeader при восстановлении (Требование 1.1)
+        event.setIsTrashHeader(false);
         
         Event restoredEvent = eventRepository.save(event);
         
@@ -170,6 +199,10 @@ public class TrashService {
         // Обновляем счетчик событий в шапке после восстановления
         myEventsCommandHandler.updateMyEventsHeaderCount(userId);
         log.debug("Счетчик событий в шапке обновлен после восстановления события ID={}", eventId);
+        
+        // Обновляем шапку корзины после восстановления
+        updateTrashHeaderAfterRemoval(userId);
+        log.debug("Шапка корзины обновлена после восстановления события ID={}", eventId);
         
         return restoredEvent;
     }
@@ -232,6 +265,184 @@ public class TrashService {
         eventRepository.delete(event);
         
         log.info("Событие ID={} окончательно удалено пользователем ID={}", eventId, userId);
+        
+        // Обновляем шапку корзины после удаления
+        updateTrashHeaderAfterRemoval(userId);
+        log.debug("Шапка корзины обновлена после окончательного удаления события ID={}", eventId);
+    }
+    
+    /**
+     * Обновляет шапку корзины после удаления или восстановления события.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Получает актуальный список событий в корзине</li>
+     *   <li>Если корзина пуста - отправляет сообщение о пустой корзине</li>
+     *   <li>Если есть события - обновляет флаг isTrashHeader и счетчик</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.2, 2.3, 3.1, 3.3, 6.1, 6.2, 6.3</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @throws IllegalArgumentException если userId равен null
+     */
+    @Transactional
+    public void updateTrashHeaderAfterRemoval(Long userId) {
+        if (userId == null) {
+            log.error("Попытка обновить шапку корзины с userId=null");
+            throw new IllegalArgumentException("ID пользователя не может быть null");
+        }
+        
+        log.debug("Обновление шапки корзины для пользователя ID={}", userId);
+        
+        List<Event> trashedEvents = getUserTrash(userId);
+        
+        // Получаем chatId пользователя
+        Long chatId = userRepository.findById(userId)
+            .map(user -> user.getTelegramId())
+            .orElse(null);
+        
+        if (chatId == null) {
+            log.warn("Не удалось получить chatId для пользователя ID={}", userId);
+            return;
+        }
+        
+        if (trashedEvents.isEmpty()) {
+            // Отправляем сообщение о пустой корзине
+            String emptyMessage = buildEmptyTrashMessage();
+            try {
+                messageService.sendMessage(chatId, emptyMessage);
+                log.info("Отправлено сообщение о пустой корзине для пользователя ID={}", userId);
+            } catch (Exception e) {
+                log.error("Ошибка при отправке сообщения о пустой корзине для пользователя ID={}: {}", 
+                         userId, e.getMessage(), e);
+            }
+            return;
+        }
+        
+        // Находим новое первое событие
+        Event newFirstEvent = trashedEvents.get(0);
+        
+        // Сбрасываем флаг isTrashHeader у всех событий кроме первого
+        for (Event event : trashedEvents) {
+            if (event.getId().equals(newFirstEvent.getId())) {
+                // Устанавливаем флаг для первого события
+                if (!Boolean.TRUE.equals(event.getIsTrashHeader())) {
+                    event.setIsTrashHeader(true);
+                    eventRepository.save(event);
+                    log.debug("Флаг isTrashHeader установлен для события ID={}", event.getId());
+                }
+            } else {
+                // Сбрасываем флаг для остальных событий
+                if (Boolean.TRUE.equals(event.getIsTrashHeader())) {
+                    event.setIsTrashHeader(false);
+                    eventRepository.save(event);
+                    log.debug("Флаг isTrashHeader сброшен для события ID={}", event.getId());
+                }
+            }
+        }
+        
+        // Обновляем счетчик в шапке
+        updateTrashHeaderCount(userId);
+        log.debug("Шапка корзины обновлена для пользователя ID={}", userId);
+    }
+    
+    /**
+     * Обновляет счетчик событий в шапке корзины.
+     * 
+     * <p>Метод находит событие с флагом isTrashHeader и обновляет его сообщение,
+     * добавляя актуальный счетчик событий в корзине.</p>
+     * 
+     * <p><b>Требования:</b> 6.1, 6.2, 6.3, 6.4</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @throws IllegalArgumentException если userId равен null
+     */
+    public void updateTrashHeaderCount(Long userId) {
+        if (userId == null) {
+            log.error("Попытка обновить счетчик корзины с userId=null");
+            throw new IllegalArgumentException("ID пользователя не может быть null");
+        }
+        
+        log.debug("Обновление счетчика в шапке корзины для пользователя ID={}", userId);
+        
+        List<Event> trashedEvents = getUserTrash(userId);
+        
+        if (trashedEvents.isEmpty()) {
+            log.debug("Корзина пуста, обновление счетчика не требуется для пользователя ID={}", userId);
+            return;
+        }
+        
+        // Находим событие с шапкой
+        Event headerEvent = trashedEvents.stream()
+            .filter(e -> Boolean.TRUE.equals(e.getIsTrashHeader()))
+            .findFirst()
+            .orElse(null);
+        
+        if (headerEvent == null) {
+            log.warn("Не найдено событие с флагом isTrashHeader для пользователя ID={}", userId);
+            return;
+        }
+        
+        if (headerEvent.getMessageId() == null) {
+            log.warn("У события с шапкой ID={} отсутствует messageId", headerEvent.getId());
+            return;
+        }
+        
+        // Формируем новую шапку
+        String header = botMessageBuilder.buildTrashHeader(trashedEvents.size());
+        String eventText = botMessageBuilder.buildEventMessage(headerEvent);
+        String combinedMessage = header + "\n" + eventText;
+        
+        // Получаем клавиатуру
+        InlineKeyboardMarkup keyboard = keyboardService.createTrashActionsKeyboard(headerEvent.getId());
+        
+        // Обновляем сообщение
+        Long chatId = headerEvent.getUser().getTelegramId();
+        try {
+            boolean updated = messageService.tryEditMessageText(
+                chatId,
+                headerEvent.getMessageId().intValue(),
+                combinedMessage,
+                keyboard
+            );
+            
+            if (updated) {
+                log.info("Счетчик в шапке корзины обновлен для пользователя ID={}, событие ID={}", 
+                        userId, headerEvent.getId());
+            } else {
+                log.warn("Не удалось обновить счетчик в шапке корзины для пользователя ID={}, событие ID={}", 
+                        userId, headerEvent.getId());
+            }
+        } catch (Exception e) {
+            log.error("Ошибка при обновлении счетчика в шапке корзины для пользователя ID={}: {}", 
+                     userId, e.getMessage(), e);
+            // Не выбрасываем исключение, чтобы не прерывать основной процесс
+        }
+    }
+    
+    /**
+     * Формирует сообщение о пустой корзине.
+     * 
+     * <p>Сообщение содержит:</p>
+     * <ul>
+     *   <li>Эмодзи 🗑️ и заголовок "Корзина" (выделено жирным)</li>
+     *   <li>Текст "Корзина пуста."</li>
+     *   <li>Информацию о сроке хранения событий (italic текст)</li>
+     * </ul>
+     * 
+     * <p>Все специальные символы MarkdownV2 корректно экранированы.</p>
+     * 
+     * <p><b>Требования:</b> 3.1, 3.2, 3.3</p>
+     * 
+     * @return отформатированное сообщение о пустой корзине с MarkdownV2 форматированием
+     */
+    private String buildEmptyTrashMessage() {
+        StringBuilder message = new StringBuilder();
+        message.append("🗑️ ").append(ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold("Корзина")).append("\n\n");
+        message.append(ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape("Корзина пуста.\n\n"));
+        message.append(ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.italic("Удаленные события хранятся здесь 30 дней, после чего автоматически удаляются навсегда."));
+        return message.toString();
     }
     
     /**
@@ -266,12 +477,19 @@ public class TrashService {
         int deletedCount = 0;
         for (Event event : oldEvents) {
             try {
-                // Удаляем сообщение события перед окончательным удалением
+                // Удаляем сообщение события перед окончательным удалением (Требование 1.2, 1.3)
                 if (event.getMessageId() != null) {
-                    Long chatId = event.getUser().getTelegramId();
-                    messageService.deleteMessage(chatId, event.getMessageId().intValue());
-                    log.debug("Сообщение события удалено при автоматической очистке: eventId={}, messageId={}", 
-                             event.getId(), event.getMessageId());
+                    try {
+                        Long chatId = event.getUser().getTelegramId();
+                        messageService.deleteMessage(chatId, event.getMessageId().intValue());
+                        log.debug("Сообщение события удалено при автоматической очистке: eventId={}, messageId={}", 
+                                 event.getId(), event.getMessageId());
+                    } catch (Exception e) {
+                        // Обрабатываем ошибки удаления сообщений без прерывания процесса очистки
+                        log.warn("Не удалось удалить сообщение события ID={}, messageId={}: {}. Продолжаем очистку.", 
+                                event.getId(), event.getMessageId(), e.getMessage());
+                        // Продолжаем удаление события из БД даже если не удалось удалить сообщение
+                    }
                 }
                 
                 eventRepository.delete(event);
@@ -279,7 +497,7 @@ public class TrashService {
                 log.debug("Событие ID={} окончательно удалено (в корзине с {})", 
                          event.getId(), event.getDeletedAt());
             } catch (Exception e) {
-                log.error("Ошибка при удалении события ID={}: {}", 
+                log.error("Ошибка при удалении события ID={} из базы данных: {}", 
                          event.getId(), e.getMessage(), e);
             }
         }

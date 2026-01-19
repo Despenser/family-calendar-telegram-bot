@@ -8,11 +8,9 @@ import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
-import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.TrashService;
-import ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter;
 
 /**
  * Обработчик callback queries для операций с корзиной.
@@ -133,11 +131,11 @@ public class TrashCallbackHandler implements CallbackHandler {
     /**
      * Обрабатывает восстановление события из корзины.
      * 
-     * <p>Вызывает TrashService для восстановления события и отправляет
-     * подтверждающее сообщение пользователю. При ошибках отправляет
-     * соответствующее сообщение об ошибке.</p>
+     * <p>Вызывает TrashService для восстановления события.
+     * НЕ отправляет дополнительные уведомления согласно требованию 1.4.
+     * При ошибках логирует их без отправки сообщений пользователю.</p>
      * 
-     * <p><b>Требования:</b> 1.1, 1.3</p>
+     * <p><b>Требования:</b> 1.1, 1.3, 1.4</p>
      * 
      * @param chatId ID чата для отправки сообщения
      * @param user пользователь, выполняющий восстановление
@@ -149,76 +147,39 @@ public class TrashCallbackHandler implements CallbackHandler {
         
         try {
             // Восстанавливаем событие через TrashService
-            Event restoredEvent = trashService.restoreEvent(eventId, user.getId());
-            
-            // Формируем подтверждающее сообщение с использованием MarkdownFormatter
-            String message = MarkdownFormatter.escape("♻️ ") + 
-                           MarkdownFormatter.bold("Событие восстановлено") + 
-                           MarkdownFormatter.escape("\n\n") +
-                           MarkdownFormatter.bold(restoredEvent.getTitle());
-            
-            // Добавляем дату и время, если они есть
-            if (restoredEvent.getEventDate() != null) {
-                message += MarkdownFormatter.escape("\n📅 " + restoredEvent.getFormattedDate());
-            }
-            if (restoredEvent.getEventTime() != null) {
-                message += MarkdownFormatter.escape("\n🕐 " + restoredEvent.getFormattedTime());
-            }
-            
-            // Отправляем сообщение пользователю
-            try {
-                messageService.sendMessage(chatId, message);
-            } catch (Exception telegramException) {
-                log.error("Ошибка при отправке сообщения о восстановлении события ID={}: {}", 
-                         eventId, telegramException.getMessage(), telegramException);
-                // Событие уже восстановлено, просто логируем ошибку отправки сообщения
-            }
+            // Сообщение события будет удалено внутри метода restoreEvent
+            trashService.restoreEvent(eventId, user.getId());
             
             log.info("Событие ID={} успешно восстановлено пользователем ID={}", 
                     eventId, user.getId());
             
+            // НЕ отправляем дополнительное сообщение "♻️ Событие восстановлено" (Требование 1.4)
+            
         } catch (EventNotFoundException e) {
             log.error("Событие ID={} не найдено при попытке восстановления пользователем ID={}", 
                      eventId, user.getId(), e);
-            try {
-                messageService.sendMessage(chatId, MarkdownFormatter.escape("❌ Событие не найдено"));
-            } catch (Exception telegramException) {
-                log.error("Ошибка при отправке сообщения об ошибке: {}", 
-                         telegramException.getMessage(), telegramException);
-            }
+            // Обработка ошибок без отправки сообщений
             
         } catch (UnauthorizedAccessException e) {
             log.error("Пользователь ID={} попытался восстановить чужое событие ID={}", 
                      user.getId(), eventId, e);
-            try {
-                messageService.sendMessage(chatId, 
-                        MarkdownFormatter.escape("❌ У вас нет доступа к этому событию"));
-            } catch (Exception telegramException) {
-                log.error("Ошибка при отправке сообщения об ошибке: {}", 
-                         telegramException.getMessage(), telegramException);
-            }
+            // Обработка ошибок без отправки сообщений
             
         } catch (Exception e) {
             log.error("Ошибка при восстановлении события ID={} пользователем ID={}: {}", 
                      eventId, user.getId(), e.getMessage(), e);
-            try {
-                messageService.sendMessage(chatId, 
-                        MarkdownFormatter.escape("❌ Ошибка при восстановлении события"));
-            } catch (Exception telegramException) {
-                log.error("Ошибка при отправке сообщения об ошибке: {}", 
-                         telegramException.getMessage(), telegramException);
-            }
+            // Обработка ошибок без отправки сообщений
         }
     }
     
     /**
      * Обрабатывает окончательное удаление события.
      * 
-     * <p>Вызывает TrashService для окончательного удаления события и отправляет
-     * подтверждающее сообщение пользователю. При ошибках отправляет
-     * соответствующее сообщение об ошибке.</p>
+     * <p>Вызывает TrashService для окончательного удаления события.
+     * НЕ отправляет дополнительные уведомления согласно требованию 1.4.
+     * При ошибках логирует их без отправки сообщений пользователю.</p>
      * 
-     * <p><b>Требования:</b> 1.2, 1.3</p>
+     * <p><b>Требования:</b> 1.2, 1.3, 1.4</p>
      * 
      * @param chatId ID чата для отправки сообщения
      * @param user пользователь, выполняющий удаление
@@ -230,57 +191,28 @@ public class TrashCallbackHandler implements CallbackHandler {
         
         try {
             // Окончательно удаляем событие через TrashService
+            // Сообщение события будет удалено внутри метода permanentlyDelete
             trashService.permanentlyDelete(eventId, user.getId());
-            
-            // Формируем подтверждающее сообщение с использованием MarkdownFormatter
-            String message = MarkdownFormatter.escape("❌ ") + 
-                           MarkdownFormatter.bold("Событие удалено навсегда") + 
-                           MarkdownFormatter.escape("\n\n") +
-                           MarkdownFormatter.escape("Событие ID: " + eventId + " было окончательно удалено из системы.");
-            
-            // Отправляем сообщение пользователю
-            try {
-                messageService.sendMessage(chatId, message);
-            } catch (Exception telegramException) {
-                log.error("Ошибка при отправке сообщения об удалении события ID={}: {}", 
-                         eventId, telegramException.getMessage(), telegramException);
-                // Событие уже удалено, просто логируем ошибку отправки сообщения
-            }
             
             log.info("Событие ID={} успешно удалено навсегда пользователем ID={}", 
                     eventId, user.getId());
             
+            // НЕ отправляем дополнительное сообщение "❌ Событие удалено навсегда" (Требование 1.4)
+            
         } catch (EventNotFoundException e) {
             log.error("Событие ID={} не найдено при попытке удаления пользователем ID={}", 
                      eventId, user.getId(), e);
-            try {
-                messageService.sendMessage(chatId, MarkdownFormatter.escape("❌ Событие не найдено"));
-            } catch (Exception telegramException) {
-                log.error("Ошибка при отправке сообщения об ошибке: {}", 
-                         telegramException.getMessage(), telegramException);
-            }
+            // Обработка ошибок без отправки сообщений
             
         } catch (UnauthorizedAccessException e) {
             log.error("Пользователь ID={} попытался удалить чужое событие ID={}", 
                      user.getId(), eventId, e);
-            try {
-                messageService.sendMessage(chatId, 
-                        MarkdownFormatter.escape("❌ У вас нет доступа к этому событию"));
-            } catch (Exception telegramException) {
-                log.error("Ошибка при отправке сообщения об ошибке: {}", 
-                         telegramException.getMessage(), telegramException);
-            }
+            // Обработка ошибок без отправки сообщений
             
         } catch (Exception e) {
             log.error("Ошибка при удалении события ID={} пользователем ID={}: {}", 
                      eventId, user.getId(), e.getMessage(), e);
-            try {
-                messageService.sendMessage(chatId, 
-                        MarkdownFormatter.escape("❌ Ошибка при удалении события"));
-            } catch (Exception telegramException) {
-                log.error("Ошибка при отправке сообщения об ошибке: {}", 
-                         telegramException.getMessage(), telegramException);
-            }
+            // Обработка ошибок без отправки сообщений
         }
     }
 }

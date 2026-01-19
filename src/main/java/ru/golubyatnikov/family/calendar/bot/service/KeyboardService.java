@@ -1445,4 +1445,68 @@ public class KeyboardService {
         
         return keyboard;
     }
+    
+    /**
+     * Создает inline-клавиатуру для управления событием в корзине.
+     * 
+     * <p>Эта клавиатура отображается под каждым событием в корзине
+     * и позволяет выполнять действия восстановления или окончательного удаления.</p>
+     * 
+     * <p>Клавиатура содержит следующие кнопки:</p>
+     * <ul>
+     *   <li>♻️ Восстановить - восстановление события из корзины</li>
+     *   <li>❌ Удалить навсегда - окончательное удаление события</li>
+     * </ul>
+     * 
+     * <p>Callback data формируется в формате:</p>
+     * <ul>
+     *   <li>"trash_restore_{eventId}" - для восстановления</li>
+     *   <li>"trash_delete_{eventId}" - для окончательного удаления</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 4.1, 4.4</p>
+     * 
+     * @param eventId идентификатор события для формирования callback data
+     * @return настроенная InlineKeyboardMarkup с кнопками управления событием в корзине
+     * @throws IllegalArgumentException если eventId равен null или не является положительным числом
+     */
+    public InlineKeyboardMarkup createTrashActionsKeyboard(Long eventId) {
+        // Валидация eventId
+        if (eventId == null) {
+            log.error("Попытка создать клавиатуру корзины с null eventId");
+            throw new IllegalArgumentException("EventId не может быть null");
+        }
+        
+        if (eventId <= 0) {
+            log.error("Попытка создать клавиатуру корзины с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом, получено: " + eventId);
+        }
+        
+        log.debug("Создание inline-клавиатуры для события в корзине ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопки восстановления и удаления
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        
+        InlineKeyboardButton restoreBtn = new InlineKeyboardButton("♻️ Восстановить");
+        String restoreCallbackData = "trash_restore_" + eventId;
+        restoreBtn.setCallbackData(restoreCallbackData);
+        row1.add(restoreBtn);
+        
+        InlineKeyboardButton deleteBtn = new InlineKeyboardButton("❌ Удалить навсегда");
+        String deleteCallbackData = "trash_delete_" + eventId;
+        deleteBtn.setCallbackData(deleteCallbackData);
+        row1.add(deleteBtn);
+        
+        rows.add(row1);
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура для события в корзине ID={} создана: buttonCount={}, " +
+                "restoreCallback='{}', deleteCallback='{}'", 
+                eventId, row1.size(), restoreCallbackData, deleteCallbackData);
+        
+        return keyboard;
+    }
 }

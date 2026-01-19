@@ -5,14 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.TrashService;
+import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
@@ -29,13 +28,17 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * 
  * <p>События хранятся в корзине 30 дней, после чего автоматически удаляются.</p>
  * 
- * <p><b>Требования:</b> 19.4</p>
+ * <p>Первое событие в корзине отображается вместе с шапкой в одном сообщении,
+ * аналогично команде /my_events. Шапка содержит информацию о количестве событий
+ * в корзине и сроке хранения.</p>
+ * 
+ * <p><b>Требования:</b> 19.4, 4.1, 4.2, 4.3, 4.4, 2.1, 2.2</p>
  * 
  * @see CommandHandler
  * @see TrashService
  * @author Family Calendar Bot Team
- * @version 1.0.0
- * @since 2026-01-08
+ * @version 2.0.0
+ * @since 2026-01-19
  */
 @Component
 @RequiredArgsConstructor
@@ -44,10 +47,8 @@ public class TrashCommandHandler implements CommandHandler {
     
     private final TrashService trashService;
     private final TelegramMessageService messageService;
-    
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
+    private final KeyboardService keyboardService;
+    private final BotMessageBuilder botMessageBuilder;
     
     /**
      * Обрабатывает команду /trash.
@@ -55,9 +56,15 @@ public class TrashCommandHandler implements CommandHandler {
      * <p>Получает список удаленных событий пользователя и отправляет их
      * с inline-кнопками для восстановления или окончательного удаления.</p>
      * 
+     * <p>Первое событие отправляется вместе с шапкой корзины в одном сообщении.
+     * Для первого события устанавливается флаг isTrashHeader=true, для остальных
+     * событий флаг сбрасывается в false.</p>
+     * 
+     * <p>Для всех событий сохраняется messageId для последующего управления.</p>
+     * 
      * @param message сообщение от пользователя с командой
      * @param user пользователь, отправивший команду
-     * @return сообщение для отправки пользователю
+     * @return null, так как сообщения отправляются напрямую
      */
     @Override
     public String handle(Message message, User user) {
@@ -68,31 +75,54 @@ public class TrashCommandHandler implements CommandHandler {
             List<Event> trashedEvents = trashService.getUserTrash(user.getId());
             
             if (trashedEvents.isEmpty()) {
-                String responseMessage = escape("🗑️ ") + bold("Корзина") + escape("\n\n") +
-                                        escape("Корзина пуста.") + escape("\n\n") +
-                                        italic("Удаленные события хранятся здесь 30 дней, после чего автоматически удаляются навсегда.");
+                String responseMessage = buildEmptyTrashMessage();
                 log.debug("Пользователю ID={} будет отправлено сообщение о пустой корзине", user.getId());
                 return responseMessage;
             }
             
-            // Формирование сообщения с удаленными событиями
-            StringBuilder messageBuilder = new StringBuilder();
-            messageBuilder.append(escape("🗑️ ")).append(bold("Корзина")).append(escape("\n\n"));
-            messageBuilder.append(italic("Удаленные события хранятся 30 дней")).append(escape("\n\n"));
+            // Управление флагами isTrashHeader
+            Event firstEvent = trashedEvents.get(0);
+            if (!Boolean.TRUE.equals(firstEvent.getIsTrashHeader())) {
+                firstEvent.setIsTrashHeader(true);
+                trashService.saveEvent(firstEvent);
+                log.debug("Установлен флаг isTrashHeader=true для первого события ID={}", firstEvent.getId());
+            }
             
-            for (int i = 0; i < trashedEvents.size(); i++) {
+            // Сбрасываем флаг для остальных событий
+            for (int i = 1; i < trashedEvents.size(); i++) {
                 Event event = trashedEvents.get(i);
-                messageBuilder.append(formatEvent(event, i + 1));
-                messageBuilder.append("\n");
-                
-                // Отправка сообщения с кнопками для каждого события
-                InlineKeyboardMarkup keyboard = createEventActionsKeyboard(event.getId());
-                try {
-                    messageService.sendMessage(chatId, messageBuilder.toString(), keyboard);
-                } catch (Exception ex) {
-                    log.error("Ошибка при отправке сообщения: {}", ex.getMessage(), ex);
+                if (Boolean.TRUE.equals(event.getIsTrashHeader())) {
+                    event.setIsTrashHeader(false);
+                    trashService.saveEvent(event);
+                    log.debug("Сброшен флаг isTrashHeader для события ID={}", event.getId());
                 }
-                messageBuilder.setLength(0);
+            }
+            
+            // Формируем шапку
+            String header = botMessageBuilder.buildTrashHeader(trashedEvents.size());
+            
+            // Отправляем первое событие с шапкой
+            String firstEventText = botMessageBuilder.buildEventMessage(firstEvent);
+            String combinedMessage = header + "\n" + firstEventText;
+            InlineKeyboardMarkup keyboard = keyboardService.createTrashActionsKeyboard(firstEvent.getId());
+            
+            log.debug("Отправка первого события ID={} с шапкой корзины", firstEvent.getId());
+            Message sentMessage = messageService.sendMessageAndGet(chatId, combinedMessage, keyboard);
+            firstEvent.setMessageId((long) sentMessage.getMessageId());
+            trashService.saveEvent(firstEvent);
+            log.debug("Сохранен messageId={} для первого события ID={}", sentMessage.getMessageId(), firstEvent.getId());
+            
+            // Отправляем остальные события
+            for (int i = 1; i < trashedEvents.size(); i++) {
+                Event event = trashedEvents.get(i);
+                String eventText = botMessageBuilder.buildEventMessage(event);
+                InlineKeyboardMarkup eventKeyboard = keyboardService.createTrashActionsKeyboard(event.getId());
+                
+                log.debug("Отправка события ID={} (позиция {})", event.getId(), i + 1);
+                Message eventMessage = messageService.sendMessageAndGet(chatId, eventText, eventKeyboard);
+                event.setMessageId((long) eventMessage.getMessageId());
+                trashService.saveEvent(event);
+                log.debug("Сохранен messageId={} для события ID={}", eventMessage.getMessageId(), event.getId());
             }
             
             log.debug("Пользователю ID={} отправлено {} удаленных событий", user.getId(), trashedEvents.size());
@@ -106,78 +136,25 @@ public class TrashCommandHandler implements CommandHandler {
     }
     
     /**
-     * Создает inline-клавиатуру с действиями для события в корзине.
+     * Формирует сообщение о пустой корзине.
      * 
-     * @param eventId идентификатор события
-     * @return объект InlineKeyboardMarkup с кнопками действий
-     */
-    private InlineKeyboardMarkup createEventActionsKeyboard(Long eventId) {
-        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
-        
-        List<InlineKeyboardButton> row = new ArrayList<>();
-        
-        // Кнопка "Восстановить"
-        InlineKeyboardButton restoreButton = new InlineKeyboardButton();
-        restoreButton.setText("♻️ Восстановить");
-        restoreButton.setCallbackData("trash_restore_" + eventId);
-        row.add(restoreButton);
-        
-        // Кнопка "Удалить навсегда"
-        InlineKeyboardButton deleteButton = new InlineKeyboardButton();
-        deleteButton.setText("❌ Удалить навсегда");
-        deleteButton.setCallbackData("trash_delete_" + eventId);
-        row.add(deleteButton);
-        
-        keyboard.add(row);
-        
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(keyboard);
-        return markup;
-    }
-    
-
-    /**
-     * Форматирует событие для отображения в корзине.
+     * <p>Сообщение содержит:</p>
+     * <ul>
+     *   <li>Эмодзи 🗑️ и заголовок "Корзина" (выделено жирным)</li>
+     *   <li>Текст "Корзина пуста."</li>
+     *   <li>Информацию о сроке хранения событий (italic текст)</li>
+     * </ul>
      * 
-     * @param event событие для форматирования
-     * @param number порядковый номер события
-     * @return отформатированная строка с информацией о событии
+     * <p>Все специальные символы MarkdownV2 корректно экранированы.</p>
+     * 
+     * @return отформатированное сообщение о пустой корзине
      */
-    private String formatEvent(Event event, int number) {
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append(bold(String.valueOf(number))).append(escape(". "));
-        
-        // Иконка типа события
-        if (event.getIsPersonal()) {
-            sb.append(escape("🔒 "));
-        } else {
-            sb.append(escape("👨‍👩‍👧‍👦 "));
-        }
-        
-        // Название события
-        sb.append(bold(event.getTitle())).append(escape("\n"));
-        
-        // Дата события
-        sb.append(escape("   📅 ")).append(escape(event.getEventDate().format(DATE_FORMATTER)));
-        
-        // Время события
-        if (event.getEventTime() != null) {
-            sb.append(escape(" в ")).append(escape(event.getEventTime().format(TIME_FORMATTER)));
-            
-            if (event.getEndTime() != null) {
-                sb.append(escape(" - ")).append(escape(event.getEndTime().format(TIME_FORMATTER)));
-            }
-        }
-        
-        sb.append(escape("\n"));
-        
-        // Дата удаления
-        if (event.getDeletedAt() != null) {
-            sb.append(escape("   🗑️ Удалено: ")).append(escape(event.getDeletedAt().format(DATETIME_FORMATTER))).append(escape("\n"));
-        }
-        
-        return sb.toString();
+    private String buildEmptyTrashMessage() {
+        StringBuilder message = new StringBuilder();
+        message.append("🗑️ ").append(bold("Корзина")).append("\n\n");
+        message.append(escape("Корзина пуста.\n\n"));
+        message.append(italic("Удаленные события хранятся здесь 30 дней, после чего автоматически удаляются навсегда."));
+        return message.toString();
     }
     
     @Override
