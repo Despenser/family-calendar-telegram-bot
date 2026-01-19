@@ -45,6 +45,7 @@ public class TrashService {
     private final EventHistoryService eventHistoryService;
     private final ReminderService reminderService;
     private final TelegramMessageService messageService;
+    private final ru.golubyatnikov.family.calendar.bot.handler.MyEventsCommandHandler myEventsCommandHandler;
     
     private static final int TRASH_RETENTION_DAYS = 30;
     
@@ -165,6 +166,10 @@ public class TrashService {
         );
         
         log.info("Событие ID={} успешно восстановлено пользователем ID={}", eventId, userId);
+        
+        // Обновляем счетчик событий в шапке после восстановления
+        myEventsCommandHandler.updateMyEventsHeaderCount(userId);
+        log.debug("Счетчик событий в шапке обновлен после восстановления события ID={}", eventId);
         
         return restoredEvent;
     }

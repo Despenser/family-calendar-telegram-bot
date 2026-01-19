@@ -787,6 +787,112 @@ public class MyEventsCommandHandler implements CommandHandler {
     }
 
     /**
+     * Обновляет счетчик событий в шапке первого сообщения.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Получает актуальное количество активных событий пользователя</li>
+     *   <li>Находит событие с флагом isMyEventsHeader=true</li>
+     *   <li>Формирует новую шапку с актуальным счетчиком</li>
+     *   <li>Формирует полный текст сообщения (шапка + событие)</li>
+     *   <li>Обновляет сообщение через Telegram API</li>
+     *   <li>Сохраняет inline-кнопки события</li>
+     * </ol>
+     * 
+     * <p>Если событие с шапкой не найдено или обновление не удается,
+     * метод логирует ошибку и продолжает работу без выброса исключения.</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5</p>
+     * 
+     * @param userId идентификатор пользователя
+     */
+    public void updateMyEventsHeaderCount(Long userId) {
+        if (userId == null) {
+            log.error("Попытка обновить шапку с null userId");
+            return;
+        }
+        
+        log.debug("Обновление счетчика событий в шапке для пользователя ID={}", userId);
+        
+        try {
+            // Получаем актуальное количество активных событий пользователя
+            List<Event> userEvents = eventService.getUserEvents(userId);
+            int eventCount = userEvents.size();
+            
+            log.debug("Найдено {} активных событий для пользователя ID={}", eventCount, userId);
+            
+            // Если нет событий, нечего обновлять
+            if (eventCount == 0) {
+                log.debug("Нет активных событий для пользователя ID={}, обновление шапки не требуется", userId);
+                return;
+            }
+            
+            // Находим событие с флагом isMyEventsHeader=true
+            Event headerEvent = userEvents.stream()
+                    .filter(e -> Boolean.TRUE.equals(e.getIsMyEventsHeader()))
+                    .findFirst()
+                    .orElse(null);
+            
+            if (headerEvent == null) {
+                log.warn("Событие с флагом isMyEventsHeader не найдено для пользователя ID={}", userId);
+                return;
+            }
+            
+            // Проверяем наличие messageId
+            if (headerEvent.getMessageId() == null) {
+                log.warn("У события ID={} с флагом isMyEventsHeader отсутствует messageId", headerEvent.getId());
+                return;
+            }
+            
+            log.debug("Найдено событие с шапкой: ID={}, messageId={}", 
+                    headerEvent.getId(), headerEvent.getMessageId());
+            
+            // Формируем новую шапку с актуальным счетчиком
+            String header = botMessageBuilder.buildMyEventsHeader(eventCount);
+            
+            // Формируем текст события
+            String eventText = botMessageBuilder.buildEventMessage(headerEvent);
+            
+            // Объединяем шапку и событие
+            String combinedMessage = header + "\n" + eventText;
+            
+            // Получаем inline-кнопки события
+            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(headerEvent, userId);
+            
+            // Получаем chatId пользователя
+            Long chatId = headerEvent.getUser().getTelegramId();
+            
+            log.debug("Попытка обновить сообщение: chatId={}, messageId={}, textLength={}", 
+                    chatId, headerEvent.getMessageId(), combinedMessage.length());
+            
+            // Обновляем сообщение через Telegram API
+            boolean updated = messageService.tryEditMessageText(
+                    chatId, 
+                    headerEvent.getMessageId().intValue(), 
+                    combinedMessage, 
+                    keyboard);
+            
+            if (updated) {
+                log.info("Счетчик событий в шапке успешно обновлен для пользователя ID={}, новое значение: {}", 
+                        userId, eventCount);
+            } else {
+                log.warn("Не удалось обновить счетчик событий в шапке для пользователя ID={}: сообщение не найдено или удалено", 
+                        userId);
+            }
+            
+        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+            log.error("Ошибка Telegram API при обновлении счетчика событий в шапке для пользователя ID={}: {}", 
+                    userId, e.getMessage(), e);
+            // Продолжаем работу без выброса исключения
+            
+        } catch (Exception e) {
+            log.error("Неожиданная ошибка при обновлении счетчика событий в шапке для пользователя ID={}: {}", 
+                    userId, e.getMessage(), e);
+            // Продолжаем работу без выброса исключения
+        }
+    }
+
+    /**
      * Определяет, требуется ли авторизация для выполнения этой команды.
      * 
      * <p>Команда /my_events требует авторизации, так как она отображает

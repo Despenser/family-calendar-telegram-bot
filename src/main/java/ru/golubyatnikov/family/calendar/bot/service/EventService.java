@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -13,6 +14,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.InvalidDateException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
+import ru.golubyatnikov.family.calendar.bot.handler.MyEventsCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventFilter;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
@@ -57,7 +59,6 @@ import java.util.List;
 @Service
 @Transactional
 @Validated
-@RequiredArgsConstructor
 @Slf4j
 public class EventService {
     
@@ -68,6 +69,30 @@ public class EventService {
     private final TelegramMessageService telegramMessageService;
     private final KeyboardService keyboardService;
     private final BotMessageBuilder botMessageBuilder;
+    private final MyEventsCommandHandler myEventsCommandHandler;
+    
+    /**
+     * Конструктор с инъекцией зависимостей.
+     * MyEventsCommandHandler инжектируется с @Lazy для разрыва циклической зависимости.
+     */
+    public EventService(
+            EventRepository eventRepository,
+            UserRepository userRepository,
+            EventHistoryService eventHistoryService,
+            ReminderService reminderService,
+            TelegramMessageService telegramMessageService,
+            KeyboardService keyboardService,
+            BotMessageBuilder botMessageBuilder,
+            @Lazy MyEventsCommandHandler myEventsCommandHandler) {
+        this.eventRepository = eventRepository;
+        this.userRepository = userRepository;
+        this.eventHistoryService = eventHistoryService;
+        this.reminderService = reminderService;
+        this.telegramMessageService = telegramMessageService;
+        this.keyboardService = keyboardService;
+        this.botMessageBuilder = botMessageBuilder;
+        this.myEventsCommandHandler = myEventsCommandHandler;
+    }
     
     /**
      * Создает новое событие в календаре.
@@ -520,6 +545,9 @@ public class EventService {
                 log.debug("Следующее событие не найдено, это было последнее событие пользователя");
             }
         }
+        
+        // Обновляем счетчик событий в шапке
+        myEventsCommandHandler.updateMyEventsHeaderCount(userId);
     }
     
     /**
@@ -593,6 +621,9 @@ public class EventService {
         
         // Обработка напоминаний
         handleEventCompletion(eventId);
+        
+        // Обновляем счетчик событий в шапке
+        myEventsCommandHandler.updateMyEventsHeaderCount(userId);
         
         return completedEvent;
     }

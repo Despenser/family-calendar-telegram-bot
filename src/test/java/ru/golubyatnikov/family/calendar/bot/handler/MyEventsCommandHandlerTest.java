@@ -136,8 +136,10 @@ class MyEventsCommandHandlerTest {
             return "📌 *" + event.getTitle() + "*\n📅 Дата: " + event.getFormattedDate() + "\n🕐 Время: " + event.getFormattedTime();
         });
         
-        // Мокаем sendMessageWithInlineKeyboard
-        willDoNothing().given(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
+        // Мокаем sendMessageAndGet вместо sendMessageWithInlineKeyboard
+        org.telegram.telegrambots.meta.api.objects.Message sentMessage = mock(org.telegram.telegrambots.meta.api.objects.Message.class);
+        when(sentMessage.getMessageId()).thenReturn(1);
+        when(messageService.sendMessageAndGet(anyLong(), anyString(), any(InlineKeyboardMarkup.class))).thenReturn(sentMessage);
 
         // When
         String response = handler.handle(message, user);
@@ -152,14 +154,14 @@ class MyEventsCommandHandlerTest {
         
         // Проверяем, что для каждого события был вызван метод отправки сообщения
         // Первое сообщение должно содержать заголовок и первое событие
-        verify(messageService, times(1)).sendMessageWithInlineKeyboard(
+        verify(messageService, times(1)).sendMessageAndGet(
                 eq(123456789L), 
                 argThat((String text) -> text.contains("Мои события") && text.contains("Всего событий: 2") && text.contains("День рождения")), 
                 any(InlineKeyboardMarkup.class)
         );
         
         // Второе событие отправляется отдельно
-        verify(messageService, times(1)).sendMessageWithInlineKeyboard(
+        verify(messageService, times(1)).sendMessageAndGet(
                 eq(123456789L), 
                 argThat((String text) -> text.contains("Поход в кино")), 
                 any(InlineKeyboardMarkup.class)
@@ -342,8 +344,10 @@ class MyEventsCommandHandlerTest {
             return result;
         });
         
-        // Мокаем sendMessageWithInlineKeyboard
-        willDoNothing().given(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
+        // Мокаем sendMessageAndGet вместо sendMessageWithInlineKeyboard
+        org.telegram.telegrambots.meta.api.objects.Message sentMessage = mock(org.telegram.telegrambots.meta.api.objects.Message.class);
+        when(sentMessage.getMessageId()).thenReturn(1);
+        when(messageService.sendMessageAndGet(anyLong(), anyString(), any(InlineKeyboardMarkup.class))).thenReturn(sentMessage);
 
         // When
         String response = handler.handle(message, user);
@@ -357,7 +361,7 @@ class MyEventsCommandHandlerTest {
         verify(botMessageBuilder).buildEventMessage(any(Event.class));
         
         // Проверяем, что метод отправки был вызван с объединенным сообщением (заголовок + событие)
-        verify(messageService).sendMessageWithInlineKeyboard(
+        verify(messageService).sendMessageAndGet(
                 eq(123456789L), 
                 argThat((String text) -> text.contains("Мои события") && 
                                         text.contains("Всего событий: 1") && 
@@ -396,8 +400,10 @@ class MyEventsCommandHandlerTest {
             return result;
         });
         
-        // Мокаем sendMessageWithInlineKeyboard
-        willDoNothing().given(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
+        // Мокаем sendMessageAndGet вместо sendMessageWithInlineKeyboard
+        org.telegram.telegrambots.meta.api.objects.Message sentMessage = mock(org.telegram.telegrambots.meta.api.objects.Message.class);
+        when(sentMessage.getMessageId()).thenReturn(1);
+        when(messageService.sendMessageAndGet(anyLong(), anyString(), any(InlineKeyboardMarkup.class))).thenReturn(sentMessage);
 
         // When
         String response = handler.handle(message, user);
@@ -411,7 +417,7 @@ class MyEventsCommandHandlerTest {
         verify(botMessageBuilder).buildEventMessage(any(Event.class));
         
         // Проверяем, что метод отправки был вызван и сообщение не содержит описание
-        verify(messageService).sendMessageWithInlineKeyboard(
+        verify(messageService).sendMessageAndGet(
                 eq(123456789L), 
                 argThat((String text) -> !text.contains("Описание:")), 
                 any(InlineKeyboardMarkup.class)
