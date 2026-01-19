@@ -12,6 +12,7 @@ import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -87,6 +88,7 @@ public class MyEventsCommandHandler implements CommandHandler {
     private final KeyboardService keyboardService;
     private final TelegramMessageService messageService;
     private final ConversationStateService conversationStateService;
+    private final BotMessageBuilder botMessageBuilder;
 
     /**
      * Обрабатывает команду /my_events от пользователя.
@@ -169,8 +171,27 @@ public class MyEventsCommandHandler implements CommandHandler {
             return null;
         }
 
+        // Управление флагами isMyEventsHeader для событий
+        // Устанавливаем флаг для первого события
+        Event firstEvent = userEvents.get(0);
+        if (!Boolean.TRUE.equals(firstEvent.getIsMyEventsHeader())) {
+            log.debug("Установка флага isMyEventsHeader=true для первого события ID={}", firstEvent.getId());
+            firstEvent.setIsMyEventsHeader(true);
+            eventService.saveEvent(firstEvent);
+        }
+        
+        // Сбрасываем флаг для остальных событий (если он был установлен)
+        for (int i = 1; i < userEvents.size(); i++) {
+            Event event = userEvents.get(i);
+            if (Boolean.TRUE.equals(event.getIsMyEventsHeader())) {
+                log.debug("Сброс флага isMyEventsHeader=false для события ID={}", event.getId());
+                event.setIsMyEventsHeader(false);
+                eventService.saveEvent(event);
+            }
+        }
+
         // Формируем заголовок
-        String header = buildHeader(userEvents.size());
+        String header = botMessageBuilder.buildMyEventsHeader(userEvents.size());
         
         log.debug("Начало отправки {} событий пользователю chatId={}", userEvents.size(), chatId);
         
@@ -178,11 +199,10 @@ public class MyEventsCommandHandler implements CommandHandler {
         int failureCount = 0;
         
         // Обрабатываем первое событие - объединяем с заголовком
-        Event firstEvent = userEvents.get(0);
         try {
-            String firstEventText = formatEvent(firstEvent);
+            String firstEventText = botMessageBuilder.buildEventMessage(firstEvent);
             String combinedMessage = header + "\n" + firstEventText;
-            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(firstEvent.getId());
+            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(firstEvent, user.getId());
             
             // Проверяем, что клавиатура создана корректно
             if (keyboard == null || keyboard.getKeyboard() == null || keyboard.getKeyboard().isEmpty()) {
@@ -201,10 +221,17 @@ public class MyEventsCommandHandler implements CommandHandler {
             log.debug("Отправка объединенного сообщения (заголовок + первое событие ID={}): textPreview='{}', buttonCount={}", 
                     firstEvent.getId(), textPreview, buttonCount);
             
-            messageService.sendMessageWithInlineKeyboard(chatId, combinedMessage, keyboard);
+            // ИЗМЕНЕНИЕ: Используем sendMessageAndGet для получения messageId
+            org.telegram.telegrambots.meta.api.objects.Message sentMessage = 
+                messageService.sendMessageAndGet(chatId, combinedMessage, keyboard);
+            
+            // ИЗМЕНЕНИЕ: Сохраняем messageId в базу данных
+            firstEvent.setMessageId((long) sentMessage.getMessageId());
+            eventService.saveEvent(firstEvent);
             
             successCount++;
-            log.debug("Объединенное сообщение с первым событием ID={} успешно отправлено", firstEvent.getId());
+            log.debug("Объединенное сообщение с первым событием ID={} успешно отправлено, messageId={} сохранен", 
+                    firstEvent.getId(), sentMessage.getMessageId());
             
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException e) {
             // Обработка ошибок Telegram API с fallback механизмом
@@ -217,8 +244,8 @@ public class MyEventsCommandHandler implements CommandHandler {
                 try {
                     // Fallback: отправляем заголовок отдельно
                     messageService.sendMessage(chatId, header);
-                    // Отправляем первое событие без форматирования
-                    sendWithoutFormatting(chatId, firstEvent);
+                    // Отправляем первое событие без форматирования и сохраняем messageId
+                    sendWithoutFormattingAndSaveMessageId(chatId, firstEvent, user.getId());
                     successCount++;
                     log.debug("Заголовок и первое событие ID={} успешно отправлены через fallback механизм", 
                             firstEvent.getId());
@@ -243,8 +270,8 @@ public class MyEventsCommandHandler implements CommandHandler {
         for (int i = 1; i < userEvents.size(); i++) {
             Event event = userEvents.get(i);
             try {
-                String eventText = formatEvent(event);
-                InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event.getId());
+                String eventText = botMessageBuilder.buildEventMessage(event);
+                InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, user.getId());
                 
                 // Проверяем, что клавиатура создана корректно
                 if (keyboard == null) {
@@ -270,10 +297,17 @@ public class MyEventsCommandHandler implements CommandHandler {
                 log.debug("Отправка события ID={}: textPreview='{}', buttonCount={}", 
                         event.getId(), textPreview, buttonCount);
                 
-                messageService.sendMessageWithInlineKeyboard(chatId, eventText, keyboard);
+                // ИЗМЕНЕНИЕ: Используем sendMessageAndGet для получения messageId
+                org.telegram.telegrambots.meta.api.objects.Message sentMessage = 
+                    messageService.sendMessageAndGet(chatId, eventText, keyboard);
+                
+                // ИЗМЕНЕНИЕ: Сохраняем messageId в базу данных
+                event.setMessageId((long) sentMessage.getMessageId());
+                eventService.saveEvent(event);
                 
                 successCount++;
-                log.debug("Событие ID={} успешно отправлено", event.getId());
+                log.debug("Событие ID={} успешно отправлено, messageId={} сохранен", 
+                        event.getId(), sentMessage.getMessageId());
                 
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException e) {
                 // Обработка ошибок Telegram API с fallback механизмом
@@ -284,8 +318,8 @@ public class MyEventsCommandHandler implements CommandHandler {
                             event.getId(), e.getMessage());
                     
                     try {
-                        // Используем fallback механизм - отправка без форматирования
-                        sendWithoutFormatting(chatId, event);
+                        // Используем fallback механизм - отправка без форматирования и сохранение messageId
+                        sendWithoutFormattingAndSaveMessageId(chatId, event, user.getId());
                         successCount++;
                         log.debug("Событие ID={} успешно отправлено через fallback механизм (без форматирования)", 
                                 event.getId());
@@ -333,65 +367,6 @@ public class MyEventsCommandHandler implements CommandHandler {
     }
 
     /**
-     * Формирует заголовок для списка событий.
-     * 
-     * <p>Заголовок включает:</p>
-     * <ul>
-     *   <li>Эмодзи 📋 и название "Мои события" (выделено жирным)</li>
-     *   <li>Информацию о количестве событий в формате "Всего событий: N"</li>
-     * </ul>
-     * 
-     * <p>Все специальные символы MarkdownV2 корректно экранированы с помощью
-     * метода {@link ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter#escape(String)}.</p>
-     * 
-     * <p>Формат заголовка соответствует команде /trash для единообразия интерфейса.</p>
-     * 
-     * <p><b>Пример вывода:</b></p>
-     * <pre>
-     * 📋 *Мои события*
-     * 
-     * Всего событий: 5
-     * </pre>
-     * 
-     * <p><b>Требования:</b> 2.1, 2.2, 2.3</p>
-     * 
-     * @param eventCount количество событий пользователя (должно быть больше 0)
-     * @return отформатированный заголовок с использованием MarkdownV2
-     */
-    private String buildHeader(int eventCount) {
-        StringBuilder header = new StringBuilder();
-        header.append("📋 ").append(bold("Мои события")).append("\n\n");
-        header.append(escape("Всего событий: ")).append(escape(String.valueOf(eventCount))).append(escape("\n"));
-        return header.toString();
-    }
-
-    /**
-     * Форматирует одно событие в читаемый вид.
-     * 
-     * <p>Использует эмодзи для визуального выделения различных полей события.
-     * Название события выделяется жирным шрифтом с помощью Markdown.</p>
-     * 
-     * <p>Если у события нет описания, поле "Описание" не отображается.</p>
-     * 
-     * @param event событие для форматирования
-     * @return отформатированная строка с информацией о событии
-     */
-    private String formatEvent(Event event) {
-        StringBuilder formatted = new StringBuilder();
-        
-        // Используем escape() для эмодзи и bold() для названия
-        formatted.append(escape("📌 ")).append(bold(event.getTitle())).append(escape("\n"));
-        formatted.append(escape("📅 Дата: ")).append(escape(event.getFormattedDate())).append(escape("\n"));
-        formatted.append(escape("🕐 Время: ")).append(escape(event.getFormattedTime()));
-        
-        if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            formatted.append(escape("\n📝 Описание: ")).append(escape(event.getDescription()));
-        }
-        
-        return formatted.toString();
-    }
-
-    /**
      * Отправляет событие без форматирования MarkdownV2.
      * 
      * <p>Этот метод используется как fallback механизм, когда отправка
@@ -406,9 +381,10 @@ public class MyEventsCommandHandler implements CommandHandler {
      * 
      * @param chatId ID чата для отправки сообщения
      * @param event событие для отправки
+     * @param userId идентификатор пользователя для создания клавиатуры с учетом прав доступа
      * @throws org.telegram.telegrambots.meta.exceptions.TelegramApiException если отправка не удалась
      */
-    private void sendWithoutFormatting(Long chatId, Event event) 
+    private void sendWithoutFormatting(Long chatId, Event event, Long userId) 
             throws org.telegram.telegrambots.meta.exceptions.TelegramApiException {
         
         log.debug("Отправка события ID={} без форматирования MarkdownV2", event.getId());
@@ -424,13 +400,64 @@ public class MyEventsCommandHandler implements CommandHandler {
             plainText.append("\n📝 Описание: ").append(event.getDescription());
         }
         
-        // Создаем inline кнопки
-        InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event.getId());
+        // Создаем inline кнопки с учетом статуса и прав доступа
+        InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
         
         // Отправляем сообщение без форматирования через новый метод TelegramMessageService
         messageService.sendMessageWithoutFormatting(chatId, plainText.toString(), keyboard);
         
         log.debug("Событие ID={} успешно отправлено без форматирования", event.getId());
+    }
+
+    /**
+     * Отправляет сообщение о событии без форматирования MarkdownV2 и сохраняет messageId.
+     * 
+     * <p>Этот метод используется как fallback механизм, когда отправка с MarkdownV2
+     * форматированием не удается из-за ошибки 400 (Bad Request). После успешной отправки
+     * сохраняет messageId в базу данных.</p>
+     * 
+     * @param chatId идентификатор чата для отправки сообщения
+     * @param event событие для отправки
+     * @param userId идентификатор пользователя для создания клавиатуры
+     * @throws org.telegram.telegrambots.meta.exceptions.TelegramApiException если отправка не удалась
+     */
+    private void sendWithoutFormattingAndSaveMessageId(Long chatId, Event event, Long userId) 
+            throws org.telegram.telegrambots.meta.exceptions.TelegramApiException {
+        
+        log.debug("Отправка события ID={} без форматирования MarkdownV2 с сохранением messageId", event.getId());
+        
+        // Форматируем текст без использования MarkdownFormatter
+        StringBuilder plainText = new StringBuilder();
+        
+        plainText.append("📌 ").append(event.getTitle()).append("\n");
+        plainText.append("📅 Дата: ").append(event.getFormattedDate()).append("\n");
+        plainText.append("🕐 Время: ").append(event.getFormattedTime());
+        
+        if (event.getDescription() != null && !event.getDescription().isBlank()) {
+            plainText.append("\n📝 Описание: ").append(event.getDescription());
+        }
+        
+        // Создаем inline кнопки с учетом статуса и прав доступа
+        InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
+        
+        // Отправляем сообщение без форматирования и получаем messageId
+        // Используем sendMessageAndGet, но без parseMode (plain text)
+        org.telegram.telegrambots.meta.api.methods.send.SendMessage sendMessage = 
+            org.telegram.telegrambots.meta.api.methods.send.SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(plainText.toString())
+                .replyMarkup(keyboard)
+                .build();
+        
+        org.telegram.telegrambots.meta.api.objects.Message sentMessage = 
+            messageService.execute(sendMessage);
+        
+        // Сохраняем messageId в базу данных
+        event.setMessageId((long) sentMessage.getMessageId());
+        eventService.saveEvent(event);
+        
+        log.debug("Событие ID={} успешно отправлено без форматирования, messageId={} сохранен", 
+                event.getId(), sentMessage.getMessageId());
     }
 
     /**
@@ -612,32 +639,29 @@ public class MyEventsCommandHandler implements CommandHandler {
     /**
      * Обрабатывает callback query для удаления события.
      * 
-     * <p>Запрашивает подтверждение удаления события и выполняет удаление
-     * после подтверждения пользователя.</p>
+     * <p>Выполняет удаление события через EventService.
+     * Метод больше не возвращает сообщение для отправки,
+     * так как подтверждение теперь отправляется через callback query ответ
+     * в {@link ru.golubyatnikov.family.calendar.bot.handler.callback.EventCallbackHandler}.</p>
+     * 
+     * <p>Метод делегирует удаление в {@link EventService#deleteEvent(Long, Long)},
+     * который выполняет проверку прав доступа и перемещает событие в корзину.</p>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.3</p>
      * 
      * @param eventId идентификатор события для удаления
      * @param userId идентификатор пользователя, инициировавшего удаление
-     * @return сообщение с запросом подтверждения или результатом удаления
+     * @throws ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException если событие не найдено
+     * @throws ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException если пользователь не имеет прав на удаление
      */
-    public String handleDeleteCallback(Long eventId, Long userId) {
+    public void handleDeleteCallback(Long eventId, Long userId) {
         log.debug("Обработка callback удаления события ID={} пользователем ID={}", 
                 eventId, userId);
         
-        try {
-            // Удаляем событие через сервис (он проверит права доступа)
-            eventService.deleteEvent(eventId, userId);
-            
-            log.debug("Событие ID={} успешно удалено пользователем ID={}", eventId, userId);
-            
-            return formatMessage("✅ %s\n\nСобытие успешно удалено из календаря.\n\nИспользуйте %s для просмотра оставшихся событий.",
-                   bold("Событие удалено"), "/my_events");
-                   
-        } catch (Exception e) {
-            log.error("Ошибка при удалении события ID={}: {}", eventId, e.getMessage(), e);
-            
-            return formatMessage("❌ %s\n\nНе удалось удалить событие. Возможно, у вас нет прав на удаление этого события.",
-                   bold("Ошибка удаления"));
-        }
+        // Удаляем событие через сервис (он проверит права доступа)
+        eventService.deleteEvent(eventId, userId);
+        
+        log.debug("Событие ID={} успешно удалено пользователем ID={}", eventId, userId);
     }
     
     /**

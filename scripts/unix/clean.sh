@@ -1,7 +1,10 @@
 #!/bin/bash
 
+# Переход в корневую директорию проекта
+cd "$(dirname "$0")/../.." || exit 1
+
 # Скрипт для полной очистки Docker Compose (включая volumes)
-# Использование: ./clean.sh
+# Использование: ./scripts/unix/clean.sh
 
 set -e
 
@@ -41,5 +44,5 @@ fi
 echo ""
 echo "✅ Очистка завершена!"
 echo ""
-echo "💡 Для повторного запуска используйте: ./start.sh"
+echo "💡 Для повторного запуска используйте: ./scripts/unix/start.sh"
 echo ""

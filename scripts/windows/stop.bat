@@ -1,4 +1,7 @@
 @echo off
+REM Переход в корневую директорию проекта
+cd /d "%~dp0\..\.."
+
 REM Скрипт для остановки Docker Compose в Windows
 REM Использование: stop.bat
 

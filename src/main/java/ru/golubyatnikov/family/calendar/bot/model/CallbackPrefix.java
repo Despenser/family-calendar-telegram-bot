@@ -44,8 +44,14 @@ public enum CallbackPrefix {
     /** Редактирование события (формат: edit_event_{eventId}) */
     EDIT_EVENT("edit_event_"),
     
+    /** Отмена редактирования события (формат: edit_cancel_{eventId}) */
+    EDIT_CANCEL("edit_cancel_"),
+    
     /** Удаление события (формат: delete_event_{eventId}) */
     DELETE_EVENT("delete_event_"),
+    
+    /** Завершение события (формат: complete_event_{eventId}) */
+    COMPLETE_EVENT("complete_event_"),
     
     /** Редактирование поля события (формат: edit_field_{field}_{eventId}) */
     EDIT_FIELD("edit_field_"),
@@ -108,6 +114,9 @@ public enum CallbackPrefix {
     
     /** Добавление заметки к завершенному событию (формат: add_completion_note_{eventId}) */
     ADD_COMPLETION_NOTE("add_completion_note_"),
+    
+    /** Пропуск добавления заметки к завершенному событию */
+    SKIP_COMPLETION_NOTE("skip_completion_note"),
     
     // ===== Создание события из текста =====
     
@@ -221,6 +230,7 @@ public enum CallbackPrefix {
         return this == TIME_BACK || 
                this == TIME_CANCEL || 
                this == SKIP_DESCRIPTION || 
+               this == SKIP_COMPLETION_NOTE ||
                this == CANCEL_TEXT_EVENT ||
                this == CALENDAR_IGNORE ||
                this == TIME_IGNORE;

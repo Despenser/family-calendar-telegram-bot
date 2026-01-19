@@ -9,7 +9,9 @@ import org.telegram.telegrambots.bots.DefaultAbsSender;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -344,6 +346,82 @@ public class TelegramMessageService extends DefaultAbsSender {
     }
 
     /**
+     * Отправляет текстовое сообщение с inline кнопками и возвращает отправленное сообщение.
+     * 
+     * <p>Этот метод аналогичен {@link #sendMessage(Long, String, InlineKeyboardMarkup)},
+     * но возвращает объект Message, содержащий messageId и другую информацию
+     * об отправленном сообщении.</p>
+     * 
+     * <p>Метод автоматически обрабатывает ошибки парсинга MarkdownV2 с fallback
+     * на отправку без форматирования (plain text).</p>
+     * 
+     * <p><b>Обработка ошибок парсинга:</b></p>
+     * <ul>
+     *   <li>При ошибке парсинга MarkdownV2 (400 Bad Request) автоматически переключается на plain text</li>
+     *   <li>Детальное логирование для диагностики проблем с экранированием</li>
+     *   <li>Метрика "markdown_parse_error_fallback" для мониторинга</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2</p>
+     * 
+     * @param telegramId Telegram ID пользователя-получателя
+     * @param text текст сообщения (поддерживает MarkdownV2)
+     * @param replyMarkup разметка inline кнопок
+     * @return отправленное сообщение с messageId
+     * @throws TelegramApiException если все попытки отправки не удались
+     * @throws IllegalArgumentException если telegramId null, text пустой или replyMarkup null
+     */
+    public Message sendMessageAndGet(Long telegramId, String text, InlineKeyboardMarkup replyMarkup) 
+            throws TelegramApiException {
+        validateSendMessageParams(telegramId, text);
+        
+        if (replyMarkup == null) {
+            log.error("Попытка отправить сообщение с null replyMarkup: telegramId={}", telegramId);
+            throw new IllegalArgumentException("ReplyMarkup не может быть null");
+        }
+        
+        log.debug("Отправка сообщения с inline кнопками (с возвратом Message): telegramId={}, textLength={}, buttonsCount={}", 
+                telegramId, text.length(), countButtons(replyMarkup));
+        
+        SendMessage message = SendMessage.builder()
+                .chatId(telegramId.toString())
+                .text(text)
+                .parseMode("MarkdownV2")
+                .replyMarkup(replyMarkup)
+                .build();
+        
+        try {
+            Message sentMessage = execute(message);
+            log.debug("Сообщение успешно отправлено: telegramId={}, messageId={}", 
+                    telegramId, sentMessage.getMessageId());
+            return sentMessage;
+            
+        } catch (TelegramApiRequestException e) {
+            // Обработка ошибок парсинга с fallback
+            if (isParseError(e)) {
+                log.warn("Ошибка парсинга MarkdownV2, переключаемся на plain text: telegramId={}", 
+                        telegramId);
+                recordMetric("markdown_parse_error_fallback");
+                
+                SendMessage plainMessage = SendMessage.builder()
+                        .chatId(telegramId.toString())
+                        .text(text)
+                        .replyMarkup(replyMarkup)
+                        .build();
+                
+                Message sentMessage = execute(plainMessage);
+                log.info("Сообщение успешно отправлено без форматирования (fallback): telegramId={}, messageId={}", 
+                        telegramId, sentMessage.getMessageId());
+                return sentMessage;
+            }
+            
+            recordMetricForTelegramError(e);
+            handleTelegramApiError(e, telegramId, text);
+            throw e;
+        }
+    }
+
+    /**
      * Отправляет текстовое сообщение с inline кнопками пользователю.
      * 
      * <p>Это удобный метод-обертка для {@link #sendMessage(Long, String, InlineKeyboardMarkup)}
@@ -508,6 +586,133 @@ public class TelegramMessageService extends DefaultAbsSender {
     }
 
     /**
+     * Редактирует текст существующего сообщения с обработкой ошибок удалённых сообщений.
+     * 
+     * <p>Этот метод пытается отредактировать существующее сообщение и возвращает
+     * результат операции. В отличие от {@link #editMessageText}, этот метод не
+     * выбрасывает исключение, если сообщение не найдено или слишком старое для
+     * редактирования.</p>
+     * 
+     * <p><b>Обработка ошибок:</b></p>
+     * <ul>
+     *   <li>Сообщение удалено пользователем - возвращает false</li>
+     *   <li>Сообщение слишком старое (>48 часов) - возвращает false</li>
+     *   <li>Сообщение не может быть отредактировано - возвращает false</li>
+     *   <li>Успешное редактирование - возвращает true</li>
+     *   <li>Другие ошибки - выбрасывает TelegramApiException</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 4.1, 4.2, 4.3, 4.4</p>
+     * 
+     * @param chatId ID чата, где находится сообщение
+     * @param messageId ID сообщения для редактирования
+     * @param newText новый текст сообщения (поддерживает MarkdownV2)
+     * @param replyMarkup новая inline клавиатура
+     * @return true если редактирование успешно, false если сообщение не найдено/удалено/старое
+     * @throws TelegramApiException при других ошибках (сетевые, парсинга и т.д.)
+     * @throws IllegalArgumentException если chatId или messageId null, или newText пустой
+     */
+    public boolean tryEditMessageText(Long chatId, Integer messageId, String newText, 
+                                      InlineKeyboardMarkup replyMarkup) throws TelegramApiException {
+        try {
+            editMessageText(chatId, messageId, newText, replyMarkup);
+            return true;
+            
+        } catch (TelegramApiRequestException e) {
+            // Проверяем, не удалено ли сообщение
+            if (isMessageNotFoundError(e)) {
+                log.info("Сообщение не найдено или удалено: chatId={}, messageId={}", 
+                        chatId, messageId);
+                return false;
+            }
+            
+            // Проверяем, не слишком ли старое сообщение
+            if (isMessageTooOldError(e)) {
+                log.info("Сообщение слишком старое для редактирования: chatId={}, messageId={}", 
+                        chatId, messageId);
+                return false;
+            }
+            
+            // Проверяем, не идентично ли новое содержимое текущему
+            if (isMessageNotModifiedError(e)) {
+                log.debug("Сообщение не изменилось (содержимое идентично): chatId={}, messageId={}", 
+                        chatId, messageId);
+                return true; // Считаем это успехом, так как сообщение уже в нужном состоянии
+            }
+            
+            // Другие ошибки пробрасываем дальше
+            throw e;
+        }
+    }
+
+    /**
+     * Проверяет, является ли ошибка "сообщение не найдено".
+     * 
+     * <p>Эта ошибка возникает когда:</p>
+     * <ul>
+     *   <li>Пользователь удалил сообщение</li>
+     *   <li>Сообщение не существует</li>
+     *   <li>Бот не имеет доступа к сообщению</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 4.1, 4.2</p>
+     * 
+     * @param e исключение от Telegram API
+     * @return true если это ошибка "сообщение не найдено", false иначе
+     */
+    private boolean isMessageNotFoundError(TelegramApiRequestException e) {
+        String message = e.getMessage();
+        String apiResponse = e.getApiResponse();
+        
+        return (message != null && message.contains("message to edit not found")) ||
+               (message != null && message.contains("message can't be edited")) ||
+               (message != null && message.contains("message to delete not found")) ||
+               (apiResponse != null && apiResponse.contains("message to edit not found")) ||
+               (apiResponse != null && apiResponse.contains("message can't be edited")) ||
+               (apiResponse != null && apiResponse.contains("message to delete not found"));
+    }
+
+    /**
+     * Проверяет, является ли ошибка "сообщение слишком старое".
+     * 
+     * <p>Telegram позволяет редактировать сообщения только в течение 48 часов
+     * после отправки. После этого срока редактирование невозможно.</p>
+     * 
+     * <p><b>Требования:</b> 4.2</p>
+     * 
+     * @param e исключение от Telegram API
+     * @return true если это ошибка "сообщение слишком старое", false иначе
+     */
+    private boolean isMessageTooOldError(TelegramApiRequestException e) {
+        String message = e.getMessage();
+        String apiResponse = e.getApiResponse();
+        
+        return (message != null && message.contains("message is too old")) ||
+               (message != null && message.contains("message can't be edited")) ||
+               (apiResponse != null && apiResponse.contains("message is too old")) ||
+               (apiResponse != null && apiResponse.contains("message can't be edited"));
+    }
+
+    /**
+     * Проверяет, является ли ошибка "сообщение не изменилось".
+     * 
+     * <p>Эта ошибка возникает когда новое содержимое и клавиатура
+     * идентичны текущему содержимому сообщения.</p>
+     * 
+     * <p><b>Требования:</b> 4.3</p>
+     * 
+     * @param e исключение от Telegram API
+     * @return true если это ошибка "сообщение не изменилось", false иначе
+     */
+    private boolean isMessageNotModifiedError(TelegramApiRequestException e) {
+        String message = e.getMessage();
+        String apiResponse = e.getApiResponse();
+        
+        return (message != null && message.contains("message is not modified")) ||
+               (apiResponse != null && apiResponse.contains("message is not modified"));
+    }
+
+    /**
      * Отправляет ответ на callback query от inline кнопки.
      * 
      * <p>Когда пользователь нажимает на inline кнопку, Telegram отправляет
@@ -576,6 +781,77 @@ public class TelegramMessageService extends DefaultAbsSender {
             log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}", 
                     callbackQueryId, e.getMessage());
             throw e;
+        }
+    }
+
+    /**
+     * Удаляет сообщение из чата.
+     * 
+     * <p>Этот метод используется для удаления промежуточных сообщений пользователя,
+     * например, текстовых сообщений с новыми значениями полей при редактировании события.
+     * Удаление помогает поддерживать чистоту чата.</p>
+     * 
+     * <p><b>Обработка ошибок:</b></p>
+     * <ul>
+     *   <li>Сообщение не найдено или удалено - логирует предупреждение, не выбрасывает исключение</li>
+     *   <li>Сообщение слишком старое (>48 часов) - логирует предупреждение, не выбрасывает исключение</li>
+     *   <li>Нет прав на удаление - логирует предупреждение, не выбрасывает исключение</li>
+     *   <li>Другие ошибки - логирует предупреждение, не выбрасывает исключение</li>
+     * </ul>
+     * 
+     * <p>Метод никогда не выбрасывает исключения, чтобы ошибка удаления сообщения
+     * не прерывала основной процесс обработки (например, обновление события).</p>
+     * 
+     * <p><b>Требования:</b> 5.4, 8.1, 8.2, 8.3, 8.4</p>
+     * 
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для удаления
+     * @see DeleteMessage
+     */
+    public void deleteMessage(Long chatId, Integer messageId) {
+        if (chatId == null) {
+            log.error("Попытка удалить сообщение с null chatId");
+            return;
+        }
+        
+        if (messageId == null) {
+            log.error("Попытка удалить сообщение с null messageId: chatId={}", chatId);
+            return;
+        }
+        
+        log.debug("Удаление сообщения: chatId={}, messageId={}", chatId, messageId);
+        
+        DeleteMessage deleteMessage = new DeleteMessage();
+        deleteMessage.setChatId(chatId.toString());
+        deleteMessage.setMessageId(messageId);
+        
+        try {
+            execute(deleteMessage);
+            log.debug("Сообщение успешно удалено: chatId={}, messageId={}", chatId, messageId);
+            
+        } catch (TelegramApiRequestException e) {
+            // Проверяем, не удалено ли сообщение уже
+            if (isMessageNotFoundError(e)) {
+                log.info("Сообщение не найдено или уже удалено: chatId={}, messageId={}", 
+                        chatId, messageId);
+                return;
+            }
+            
+            // Проверяем, не слишком ли старое сообщение
+            if (isMessageTooOldError(e)) {
+                log.info("Сообщение слишком старое для удаления: chatId={}, messageId={}", 
+                        chatId, messageId);
+                return;
+            }
+            
+            // Логируем другие ошибки как предупреждения, но не выбрасываем исключение
+            log.warn("Не удалось удалить сообщение: chatId={}, messageId={}, errorCode={}, error={}", 
+                    chatId, messageId, e.getErrorCode(), e.getMessage());
+            
+        } catch (TelegramApiException e) {
+            // Логируем сетевые и другие ошибки как предупреждения
+            log.warn("Ошибка при удалении сообщения: chatId={}, messageId={}, error={}", 
+                    chatId, messageId, e.getMessage());
         }
     }
 

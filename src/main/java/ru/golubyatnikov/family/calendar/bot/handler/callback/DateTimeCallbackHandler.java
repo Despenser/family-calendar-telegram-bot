@@ -127,16 +127,41 @@ public class DateTimeCallbackHandler implements CallbackHandler {
             if (context != null && context.getEventId() != null) {
                 try {
                     // Обновляем дату события через EventService
-                    eventService.updateEventDate(context.getEventId(), userId, date);
+                    ru.golubyatnikov.family.calendar.bot.model.Event updatedEvent = 
+                        eventService.updateEventDate(context.getEventId(), userId, date);
                     
-                    String formattedDate = date.format(DATE_FORMATTER);
-                    String message = messageBuilder.buildDateUpdatedMessage(formattedDate);
+                    // ИЗМЕНЕНИЕ: Получаем messageId из контекста вместо параметра callback
+                    Integer editingMessageId = context.getMessageId();
                     
-                    messageService.editMessageText(chatId, messageId, message, null);
-                    messageService.answerCallbackQuery(callbackQueryId, "Дата обновлена");
+                    if (editingMessageId != null) {
+                        // ИЗМЕНЕНИЕ: Обновляем сообщение о событии через editMessageText с messageId из контекста
+                        // Используем buildEventMessageWithHeader для сохранения шапки, если это первое событие
+                        int eventCount = eventService.getActiveEventsCount(updatedEvent.getUser().getId());
+                        String eventMessage = messageBuilder.buildEventMessageWithHeader(updatedEvent, eventCount);
+                        InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(updatedEvent, userId);
+                        
+                        try {
+                            messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
+                            log.info("Дата события обновлена и сообщение обновлено: eventId={}, messageId={}", 
+                                    context.getEventId(), editingMessageId);
+                        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                            log.warn("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
+                                    context.getEventId(), editingMessageId, e.getMessage());
+                            
+                            // ИЗМЕНЕНИЕ: Fallback на sendOrUpdateEventMessage если messageId не найден
+                            log.warn("MessageId не найден в контексте, используем sendOrUpdateEventMessage");
+                            eventService.sendOrUpdateEventMessage(updatedEvent, chatId);
+                        }
+                    } else {
+                        // ИЗМЕНЕНИЕ: Fallback на sendOrUpdateEventMessage если messageId не найден
+                        log.warn("MessageId не найден в контексте, используем sendOrUpdateEventMessage");
+                        eventService.sendOrUpdateEventMessage(updatedEvent, chatId);
+                    }
                     
-                    // Очищаем состояние редактирования
+                    // ИЗМЕНЕНИЕ: Очищаем состояние редактирования после успешного обновления
                     conversationStateService.clearEventEditing(userId);
+                    
+                    messageService.answerCallbackQuery(callbackQueryId, "Дата обновлена");
                     
                     log.info("Дата события обновлена: eventId={}, userId={}, date={}", 
                             context.getEventId(), userId, date);
@@ -221,16 +246,41 @@ public class DateTimeCallbackHandler implements CallbackHandler {
             if (context != null && context.getEventId() != null) {
                 try {
                     // Обновляем время события через EventService
-                    eventService.updateEventTime(context.getEventId(), userId, time);
+                    ru.golubyatnikov.family.calendar.bot.model.Event updatedEvent = 
+                        eventService.updateEventTime(context.getEventId(), userId, time);
                     
-                    String formattedTime = time.format(TIME_FORMATTER);
-                    String message = messageBuilder.buildTimeUpdatedMessage(formattedTime);
+                    // ИЗМЕНЕНИЕ: Получаем messageId из контекста вместо параметра callback
+                    Integer editingMessageId = context.getMessageId();
                     
-                    messageService.editMessageText(chatId, messageId, message, null);
-                    messageService.answerCallbackQuery(callbackQueryId, "Время обновлено");
+                    if (editingMessageId != null) {
+                        // ИЗМЕНЕНИЕ: Обновляем сообщение о событии через editMessageText с messageId из контекста
+                        // Используем buildEventMessageWithHeader для сохранения шапки, если это первое событие
+                        int eventCount = eventService.getActiveEventsCount(updatedEvent.getUser().getId());
+                        String eventMessage = messageBuilder.buildEventMessageWithHeader(updatedEvent, eventCount);
+                        InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(updatedEvent, userId);
+                        
+                        try {
+                            messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
+                            log.info("Время события обновлено и сообщение обновлено: eventId={}, messageId={}", 
+                                    context.getEventId(), editingMessageId);
+                        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                            log.warn("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
+                                    context.getEventId(), editingMessageId, e.getMessage());
+                            
+                            // ИЗМЕНЕНИЕ: Fallback на sendOrUpdateEventMessage если messageId не найден
+                            log.warn("MessageId не найден в контексте, используем sendOrUpdateEventMessage");
+                            eventService.sendOrUpdateEventMessage(updatedEvent, chatId);
+                        }
+                    } else {
+                        // ИЗМЕНЕНИЕ: Fallback на sendOrUpdateEventMessage если messageId не найден
+                        log.warn("MessageId не найден в контексте, используем sendOrUpdateEventMessage");
+                        eventService.sendOrUpdateEventMessage(updatedEvent, chatId);
+                    }
                     
-                    // Очищаем состояние редактирования
+                    // ИЗМЕНЕНИЕ: Очищаем состояние редактирования после успешного обновления
                     conversationStateService.clearEventEditing(userId);
+                    
+                    messageService.answerCallbackQuery(callbackQueryId, "Время обновлено");
                     
                     log.info("Время события обновлено: eventId={}, userId={}, time={}", 
                             context.getEventId(), userId, time);

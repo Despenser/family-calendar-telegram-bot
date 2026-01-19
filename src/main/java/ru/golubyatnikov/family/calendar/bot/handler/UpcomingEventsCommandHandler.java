@@ -216,7 +216,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
                 .map(this::formatEvent)
                 .collect(Collectors.joining("\n\n"));
 
-        return escape("📅 ") + bold("Предстоящие события (30 дней)") + escape("\n\n") +
+        return escape("📅 ") + bold("Предстоящие события семьи (30 дней)") + escape("\n\n") +
                 eventsList + escape("\n\n") +
                 escape("Всего событий: ") + escape(String.valueOf(filteredEvents.size()));
     }

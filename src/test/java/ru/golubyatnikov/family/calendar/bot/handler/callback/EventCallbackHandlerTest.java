@@ -44,6 +44,12 @@ class EventCallbackHandlerTest {
     private ru.golubyatnikov.family.calendar.bot.service.KeyboardService keyboardService;
 
     @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
+
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder botMessageBuilder;
+
+    @Mock
     private CallbackQuery callbackQuery;
 
     @Mock
@@ -54,7 +60,7 @@ class EventCallbackHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new EventCallbackHandler(myEventsCommandHandler, messageService, conversationStateService, keyboardService);
+        handler = new EventCallbackHandler(myEventsCommandHandler, messageService, conversationStateService, keyboardService, eventService, botMessageBuilder);
         
         user = new User();
         user.setId(1L);
@@ -90,6 +96,12 @@ class EventCallbackHandlerTest {
     @DisplayName("Должен обрабатывать callback с префиксом edit_field_")
     void shouldHandleEditFieldCallback() {
         assertTrue(handler.canHandle("edit_field_title_123"));
+    }
+
+    @Test
+    @DisplayName("Должен обрабатывать callback с префиксом complete_event_")
+    void shouldHandleCompleteEventCallback() {
+        assertTrue(handler.canHandle("complete_event_123"));
     }
 
     @Test
@@ -138,15 +150,26 @@ class EventCallbackHandlerTest {
         
         setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
         
-        when(myEventsCommandHandler.handleEditCallback(456L, user.getId(), chatId))
-                .thenReturn("Редактирование события");
+        // Создаем мок события
+        ru.golubyatnikov.family.calendar.bot.model.Event event = 
+            new ru.golubyatnikov.family.calendar.bot.model.Event();
+        event.setId(456L);
+        event.setTitle("Тестовое событие");
+        event.setUser(user);
+        
+        when(eventService.getEventById(456L)).thenReturn(event);
+        when(botMessageBuilder.buildEventMessage(event)).thenReturn("Информация о событии");
+        when(keyboardService.createEditFieldSelectionKeyboard(456L))
+            .thenReturn(new org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup());
 
         // When
         handler.handle(callbackQuery, user);
 
         // Then
-        verify(myEventsCommandHandler).handleEditCallback(456L, user.getId(), chatId);
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Обработано"));
+        verify(eventService).getEventById(456L);
+        verify(conversationStateService).startEventEditing(user.getId(), 456L, chatId, messageId);
+        verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), any());
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq(""));
     }
 
     @Test
@@ -160,16 +183,16 @@ class EventCallbackHandlerTest {
         
         setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
         
-        when(myEventsCommandHandler.handleDeleteCallback(789L, user.getId()))
-                .thenReturn("Событие удалено");
+        doNothing().when(myEventsCommandHandler).handleDeleteCallback(789L, user.getId());
 
         // When
         handler.handle(callbackQuery, user);
 
         // Then
         verify(myEventsCommandHandler).handleDeleteCallback(789L, user.getId());
-        verify(messageService).sendMessage(eq(chatId), eq("Событие удалено"));
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Обработано"));
+        verify(messageService).deleteMessage(eq(chatId), eq(messageId));
+        verify(messageService, never()).sendMessage(eq(chatId), anyString());
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Событие удалено"));
     }
 
     @Test
@@ -187,9 +210,9 @@ class EventCallbackHandlerTest {
         handler.handle(callbackQuery, user);
 
         // Then
-        verify(conversationStateService).startEventEditing(eq(user.getId()), eq(123L), eq(chatId));
+        verify(conversationStateService).startEventEditing(eq(user.getId()), eq(123L), eq(chatId), eq(messageId));
         verify(conversationStateService).setEditingField(eq(user.getId()), any());
-        verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), isNull());
+        verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), any());
         verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq(""));
     }
 

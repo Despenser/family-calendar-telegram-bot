@@ -48,6 +48,9 @@ class TextEventCallbackHandlerTest {
     private BotMessageBuilder messageBuilder;
 
     @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
+
+    @Mock
     private CallbackQuery callbackQuery;
 
     @Mock
@@ -58,7 +61,7 @@ class TextEventCallbackHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new TextEventCallbackHandler(conversationService, messageService, messageBuilder);
+        handler = new TextEventCallbackHandler(conversationService, messageService, messageBuilder, eventService);
         
         user = new User();
         user.setId(1L);
@@ -131,7 +134,7 @@ class TextEventCallbackHandlerTest {
         verify(conversationService).updateEventTime(user.getId(), time);
         verify(conversationService).updateEventTitle(user.getId(), title);
         verify(conversationService).completeEventCreation(user.getId(), null);
-        verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), isNull());
+        verify(eventService).sendOrUpdateEventMessage(eq(createdEvent), eq(chatId));
         verify(messageService).answerCallbackQuery(eq(callbackQueryId), contains("Событие создано"));
     }
 

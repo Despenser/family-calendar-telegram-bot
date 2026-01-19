@@ -277,6 +277,114 @@ public class BotMessageBuilder {
         return "✅ Описание пропущено\\. Событие создано\\!";
     }
     
+    // ===== Централизованное форматирование события =====
+    
+    /**
+     * Формирует заголовок для списка "Мои события".
+     * 
+     * <p>Заголовок включает:</p>
+     * <ul>
+     *   <li>Эмодзи 📋 и название "Мои события" (выделено жирным)</li>
+     *   <li>Информацию о количестве событий в формате "Всего событий: N"</li>
+     * </ul>
+     * 
+     * <p>Все специальные символы MarkdownV2 корректно экранированы с помощью
+     * метода {@link MarkdownFormatter#escape(String)}.</p>
+     * 
+     * <p>Формат заголовка соответствует команде /trash для единообразия интерфейса.</p>
+     * 
+     * <p><b>Пример вывода:</b></p>
+     * <pre>
+     * 📋 *Мои события*
+     * 
+     * Всего событий: 5
+     * </pre>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.2, 2.3, 4.1, 4.2, 4.3</p>
+     * 
+     * @param eventCount количество событий пользователя (должно быть больше 0)
+     * @return отформатированный заголовок с использованием MarkdownV2
+     */
+    public String buildMyEventsHeader(int eventCount) {
+        StringBuilder header = new StringBuilder();
+        header.append("📋 ").append(bold("Мои события")).append("\n\n");
+        header.append(escape("Всего событий: ")).append(escape(String.valueOf(eventCount))).append(escape("\n"));
+        return header.toString();
+    }
+    
+    /**
+     * Формирует сообщение о событии для отображения в списке "Мои события".
+     * 
+     * <p>Этот метод обеспечивает централизованное и консистентное форматирование
+     * сообщений о событиях во всех частях приложения. Автоматически применяет
+     * экранирование специальных символов MarkdownV2 для всех пользовательских данных.</p>
+     * 
+     * <p><b>Формат сообщения:</b></p>
+     * <ul>
+     *   <li>Заголовок с эмодзи 📌 и названием события (выделено жирным)</li>
+     *   <li>Дата события в формате "📅 Дата: DD.MM.YYYY"</li>
+     *   <li>Время события в формате "🕐 Время: HH:MM"</li>
+     *   <li>Описание события (если указано) в формате "📝 Описание: текст"</li>
+     * </ul>
+     * 
+     * <p>Использует единый формат для всех случаев отображения событий:
+     * первоначальный список, обновление после редактирования, отдельное сообщение.</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.5, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3</p>
+     * 
+     * @param event событие для форматирования
+     * @return отформатированное сообщение с MarkdownV2 экранированием
+     * @throws IllegalArgumentException если event равен null
+     */
+    public String buildEventMessage(Event event) {
+        if (event == null) {
+            throw new IllegalArgumentException("Event не может быть null");
+        }
+        
+        StringBuilder formatted = new StringBuilder();
+        
+        // Используем escape() для эмодзи и bold() для названия
+        formatted.append(escape("📌 ")).append(bold(event.getTitle())).append(escape("\n"));
+        formatted.append(escape("📅 Дата: ")).append(escape(event.getFormattedDate())).append(escape("\n"));
+        formatted.append(escape("🕐 Время: ")).append(escape(event.getFormattedTime()));
+        
+        if (event.getDescription() != null && !event.getDescription().isBlank()) {
+            formatted.append(escape("\n📝 Описание: ")).append(escape(event.getDescription()));
+        }
+        
+        return formatted.toString();
+    }
+    
+    /**
+     * Формирует текст сообщения о событии с учетом флага isMyEventsHeader.
+     * 
+     * <p>Если событие помечено как первое в списке "Мои события" (isMyEventsHeader = true),
+     * добавляет шапку списка перед текстом события. Это обеспечивает сохранение шапки
+     * при редактировании первого события через обработчики callback.</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 3.5</p>
+     * 
+     * @param event событие для форматирования
+     * @param eventCount количество активных событий пользователя (используется только если isMyEventsHeader = true)
+     * @return отформатированный текст сообщения, возможно с шапкой
+     * @throws IllegalArgumentException если event равен null
+     */
+    public String buildEventMessageWithHeader(Event event, int eventCount) {
+        if (event == null) {
+            throw new IllegalArgumentException("Event не может быть null");
+        }
+        
+        String messageText = buildEventMessage(event);
+        
+        // Если это первое событие в списке "Мои события", добавляем шапку
+        if (Boolean.TRUE.equals(event.getIsMyEventsHeader())) {
+            String header = buildMyEventsHeader(eventCount);
+            messageText = header + "\n" + messageText;
+        }
+        
+        return messageText;
+    }
+    
     // ===== Вспомогательные методы =====
     
     /**

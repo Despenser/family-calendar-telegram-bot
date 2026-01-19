@@ -179,6 +179,46 @@ public class Event {
     private Boolean notified = false;
 
     /**
+     * Идентификатор сообщения Telegram, связанного с этим событием.
+     * Используется для обновления существующего сообщения при редактировании события
+     * вместо отправки нового сообщения, что предотвращает засорение чата.
+     * 
+     * <p>Значение NULL возможно в следующих случаях:
+     * <ul>
+     *   <li>Событие создано до внедрения функции редактирования сообщений</li>
+     *   <li>Сообщение о событии было удалено пользователем</li>
+     *   <li>Событие находится в статусе DRAFT и сообщение еще не отправлено</li>
+     * </ul>
+     * </p>
+     * 
+     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#sendMessageAndGet
+     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#tryEditMessageText
+     */
+    @Column(name = "message_id")
+    private Long messageId;
+
+    /**
+     * Флаг, указывающий, что сообщение этого события содержит шапку списка "Мои события".
+     * 
+     * <p>Используется для корректного обновления первого события в списке "Мои события",
+     * чтобы при редактировании сохранялась шапка с заголовком "📋 Мои события" и 
+     * информацией о количестве событий пользователя.</p>
+     * 
+     * <p>Значение true устанавливается для события с самой ранней датой и временем
+     * при отображении списка через команду /my_events. При удалении первого события
+     * флаг автоматически передается следующему событию по дате.</p>
+     * 
+     * <p>По умолчанию false - событие не является первым в списке и не должно
+     * содержать шапку при обновлении.</p>
+     * 
+     * @see ru.golubyatnikov.family.calendar.bot.handler.MyEventsCommandHandler
+     * @see ru.golubyatnikov.family.calendar.bot.service.EventService#sendOrUpdateEventMessage
+     */
+    @Column(name = "is_my_events_header")
+    @Builder.Default
+    private Boolean isMyEventsHeader = false;
+
+    /**
      * Дата и время создания записи о событии.
      * Устанавливается автоматически при создании записи.
      */

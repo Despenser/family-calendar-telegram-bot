@@ -44,6 +44,7 @@ public class TrashService {
     private final EventRepository eventRepository;
     private final EventHistoryService eventHistoryService;
     private final ReminderService reminderService;
+    private final TelegramMessageService messageService;
     
     private static final int TRASH_RETENTION_DAYS = 30;
     
@@ -123,9 +124,21 @@ public class TrashService {
             );
         }
         
+        // Удаляем старое сообщение события перед восстановлением
+        if (event.getMessageId() != null) {
+            Long chatId = event.getUser().getTelegramId();
+            messageService.deleteMessage(chatId, event.getMessageId().intValue());
+            log.debug("Старое сообщение события удалено при восстановлении: eventId={}, messageId={}", 
+                     eventId, event.getMessageId());
+        }
+        
         // Восстановление события
         event.setStatus(Event.EventStatus.ACTIVE);
         event.setDeletedAt(null);
+        // Сбрасываем messageId, чтобы при восстановлении создалось новое сообщение
+        event.setMessageId(null);
+        // ВАЖНО: Сбрасываем флаг isMyEventsHeader, он будет установлен заново при вызове /my_events
+        event.setIsMyEventsHeader(false);
         
         Event restoredEvent = eventRepository.save(event);
         
@@ -202,6 +215,14 @@ public class TrashService {
             );
         }
         
+        // Удаляем сообщение события перед окончательным удалением
+        if (event.getMessageId() != null) {
+            Long chatId = event.getUser().getTelegramId();
+            messageService.deleteMessage(chatId, event.getMessageId().intValue());
+            log.debug("Сообщение события удалено при окончательном удалении: eventId={}, messageId={}", 
+                     eventId, event.getMessageId());
+        }
+        
         // Окончательное удаление
         eventRepository.delete(event);
         
@@ -240,6 +261,14 @@ public class TrashService {
         int deletedCount = 0;
         for (Event event : oldEvents) {
             try {
+                // Удаляем сообщение события перед окончательным удалением
+                if (event.getMessageId() != null) {
+                    Long chatId = event.getUser().getTelegramId();
+                    messageService.deleteMessage(chatId, event.getMessageId().intValue());
+                    log.debug("Сообщение события удалено при автоматической очистке: eventId={}, messageId={}", 
+                             event.getId(), event.getMessageId());
+                }
+                
                 eventRepository.delete(event);
                 deletedCount++;
                 log.debug("Событие ID={} окончательно удалено (в корзине с {})", 

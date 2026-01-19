@@ -16,23 +16,27 @@ import java.util.Locale;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
- * Обработчик команды /stats для отображения статистики событий.
+ * Обработчик команды /stats для отображения статистики активных событий.
  * 
- * <p>Этот обработчик показывает статистику событий семьи за текущий месяц:</p>
+ * <p>Этот обработчик показывает статистику только активных событий семьи за текущий месяц.
+ * Завершенные, удаленные и черновики исключаются из подсчета "Всего событий".</p>
+ * 
+ * <p>Отображаемая статистика:</p>
  * <ul>
- *   <li>Общее количество событий</li>
- *   <li>Количество завершенных событий</li>
- *   <li>Количество активных событий</li>
- *   <li>Количество семейных событий</li>
- *   <li>Количество персональных событий пользователя</li>
+ *   <li>Общее количество активных событий (статус ACTIVE)</li>
+ *   <li>Количество завершенных событий (статус COMPLETED)</li>
+ *   <li>Количество активных событий (статус ACTIVE)</li>
+ *   <li>Количество семейных активных событий</li>
+ *   <li>Количество персональных активных событий пользователя</li>
+ *   <li>Процент завершения (завершенные / (активные + завершенные))</li>
  * </ul>
  * 
- * <p><b>Требования:</b> 31.3</p>
+ * <p><b>Требования:</b> 1.1 - статистика показывает только активные события</p>
  * 
  * @see CommandHandler
  * @see StatisticsService
  * @author Family Calendar Bot Team
- * @version 1.0.0
+ * @version 2.0.0
  * @since 2026-01-08
  */
 @Component
@@ -49,8 +53,9 @@ public class StatsCommandHandler implements CommandHandler {
     /**
      * Обрабатывает команду /stats.
      * 
-     * <p>Получает статистику событий за текущий месяц и отправляет
-     * отформатированный отчет пользователю.</p>
+     * <p>Получает статистику только активных событий за текущий месяц и отправляет
+     * отформатированный отчет пользователю. События со статусами COMPLETED, DELETED
+     * и DRAFT исключаются из подсчета "Всего событий".</p>
      * 
      * @param message сообщение от пользователя с командой
      * @param user пользователь, отправивший команду
@@ -75,7 +80,7 @@ public class StatsCommandHandler implements CommandHandler {
             // Формирование сообщения со статистикой
             StringBuilder messageBuilder = new StringBuilder();
             messageBuilder.append(escape("📊 "))
-                          .append(bold("Статистика событий"))
+                          .append(bold("Статистика активных событий"))
                           .append(escape("\n"))
                           .append(italic(currentMonth.atDay(1).format(MONTH_FORMATTER)))
                           .append(escape("\n\n"));
@@ -86,6 +91,7 @@ public class StatsCommandHandler implements CommandHandler {
                           .append(escape("\n"));
             messageBuilder.append(escape("• Всего событий: "))
                           .append(bold(String.valueOf(stats.getTotalEvents())))
+                          .append(escape(" (только активные)"))
                           .append(escape("\n"));
             messageBuilder.append(escape("• Завершено: "))
                           .append(bold(String.valueOf(stats.getCompletedEvents())))
@@ -117,7 +123,7 @@ public class StatsCommandHandler implements CommandHandler {
             
             // Дополнительная информация
             if (stats.getTotalEvents() == 0) {
-                messageBuilder.append(italic("В этом месяце пока нет событий. Создайте первое событие с помощью /add_event"));
+                messageBuilder.append(italic("В этом месяце нет активных событий. Создайте первое событие с помощью /add_event"));
             } else if (stats.getActiveEvents() > 0) {
                 messageBuilder.append(italic(String.format("У вас %d активных событий в этом месяце", stats.getActiveEvents())));
             } else {

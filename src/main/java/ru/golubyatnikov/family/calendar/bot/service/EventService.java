@@ -19,6 +19,10 @@ import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
+import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -61,6 +65,9 @@ public class EventService {
     private final UserRepository userRepository;
     private final EventHistoryService eventHistoryService;
     private final ReminderService reminderService;
+    private final TelegramMessageService telegramMessageService;
+    private final KeyboardService keyboardService;
+    private final BotMessageBuilder botMessageBuilder;
     
     /**
      * Создает новое событие в календаре.
@@ -275,6 +282,25 @@ public class EventService {
     }
     
     /**
+     * Сохраняет событие в базе данных.
+     * 
+     * <p>Этот метод используется для сохранения изменений в существующем событии
+     * без дополнительных проверок прав доступа. Используйте его только когда
+     * проверки уже выполнены или не требуются (например, при обновлении служебных полей).</p>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.4, 3.1</p>
+     * 
+     * @param event событие для сохранения
+     * @return сохраненное событие
+     */
+    public Event saveEvent(@NotNull(message = "event не может быть null") Event event) {
+        log.debug("Сохранение события ID={}", event.getId());
+        Event savedEvent = eventRepository.save(event);
+        log.debug("Событие ID={} успешно сохранено", savedEvent.getId());
+        return savedEvent;
+    }
+    
+    /**
      * Обновляет существующее событие.
      * 
      * <p>Метод выполняет следующие проверки перед обновлением:</p>
@@ -425,6 +451,7 @@ public class EventService {
      * <ol>
      *   <li>Проверяет существование события</li>
      *   <li>Проверяет права доступа (только создатель может удалять)</li>
+     *   <li>Если удаляется первое событие (isMyEventsHeader = true), передает флаг следующему событию</li>
      *   <li>Изменяет статус события на DELETED</li>
      *   <li>Устанавливает дату удаления</li>
      *   <li>Записывает действие в историю</li>
@@ -432,7 +459,7 @@ public class EventService {
      * 
      * <p>Событие хранится в корзине 30 дней, после чего автоматически удаляется.</p>
      * 
-     * <p><b>Требования:</b> 7.3, 7.5, 19.1, 18.5</p>
+     * <p><b>Требования:</b> 7.3, 7.5, 19.1, 18.5, 2.3, 4.1, 4.2, 4.3</p>
      * 
      * @param eventId идентификатор события для удаления
      * @param userId идентификатор пользователя, выполняющего удаление
@@ -457,7 +484,11 @@ public class EventService {
                 "Только создатель события может его удалить");
         }
         
-        // Перемещение в корзину
+        // Сохраняем информацию о том, было ли это первое событие
+        boolean wasFirstEvent = Boolean.TRUE.equals(event.getIsMyEventsHeader());
+        Long chatId = event.getUser().getTelegramId();
+        
+        // Перемещение в корзину (делаем это СНАЧАЛА)
         event.setStatus(Event.EventStatus.DELETED);
         event.setDeletedAt(LocalDateTime.now());
         eventRepository.save(event);
@@ -466,6 +497,104 @@ public class EventService {
         
         // Запись в историю изменений
         eventHistoryService.recordDeletion(eventId, userId);
+        
+        // Если удалили первое событие в списке "Мои события", передаем флаг следующему
+        if (wasFirstEvent) {
+            log.debug("Удалено первое событие в списке 'Мои события', ищем следующее событие");
+            
+            // ВАЖНО: Получаем список активных событий ПОСЛЕ удаления текущего
+            List<Event> userEvents = getUserEvents(event.getUser().getId());
+            
+            if (!userEvents.isEmpty()) {
+                // Первое событие в списке становится новым первым
+                Event nextEvent = userEvents.get(0);
+                
+                log.debug("Найдено следующее событие ID={}, передаем флаг isMyEventsHeader", nextEvent.getId());
+                
+                // Устанавливаем флаг для следующего события
+                nextEvent.setIsMyEventsHeader(true);
+                saveEvent(nextEvent);
+                
+                log.info("Флаг isMyEventsHeader передан следующему событию ID={}", nextEvent.getId());
+            } else {
+                log.debug("Следующее событие не найдено, это было последнее событие пользователя");
+            }
+        }
+    }
+    
+    /**
+     * Завершает событие вручную.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Проверяет существование события</li>
+     *   <li>Проверяет права доступа (только создатель может завершить)</li>
+     *   <li>Проверяет статус события (должно быть ACTIVE)</li>
+     *   <li>Изменяет статус на COMPLETED</li>
+     *   <li>Устанавливает completedAt в текущее время</li>
+     *   <li>Записывает действие в историю изменений</li>
+     *   <li>Отмечает все неотправленные напоминания как отправленные</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 1.2, 1.3, 1.4, 1.5, 3.1, 3.2, 3.3, 5.1</p>
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя, завершающего событие
+     * @return завершенное событие
+     * @throws EventNotFoundException если событие не найдено
+     * @throws UnauthorizedAccessException если пользователь не является создателем
+     * @throws IllegalStateException если событие не в статусе ACTIVE
+     */
+    public Event completeEvent(
+            @NotNull(message = "eventId не может быть null") Long eventId,
+            @NotNull(message = "userId не может быть null") Long userId) {
+        log.debug("Завершение события ID={} пользователем ID={}", eventId, userId);
+        
+        // Поиск события
+        Event event = eventRepository.findById(eventId)
+            .orElseThrow(() -> {
+                log.error("Событие с ID={} не найдено при попытке завершения", eventId);
+                return new EventNotFoundException(eventId);
+            });
+        
+        // Проверка прав доступа - только создатель может завершить
+        if (!event.belongsToUser(userId)) {
+            log.warn("Пользователь ID={} попытался завершить чужое событие ID={} (владелец: ID={})", 
+                     userId, eventId, event.getUser().getId());
+            throw new UnauthorizedAccessException(
+                "Только создатель события может его завершить");
+        }
+        
+        // Проверка статуса события - должно быть ACTIVE
+        if (event.getStatus() != Event.EventStatus.ACTIVE) {
+            log.warn("Попытка завершить неактивное событие ID={} (статус: {})", 
+                     eventId, event.getStatus());
+            throw new IllegalStateException(
+                String.format("Можно завершить только активное событие (текущий статус: %s)", 
+                             event.getStatus()));
+        }
+        
+        // Установка статуса COMPLETED и completedAt
+        event.setStatus(Event.EventStatus.COMPLETED);
+        event.setCompletedAt(LocalDateTime.now());
+        
+        Event completedEvent = eventRepository.save(event);
+        log.info("Событие ID={} успешно завершено вручную пользователем ID={}", eventId, userId);
+        
+        // Запись в историю изменений
+        eventHistoryService.recordChange(
+            eventId,
+            userId,
+            EventHistory.ActionType.UPDATED,
+            "status",
+            "ACTIVE",
+            "COMPLETED"
+        );
+        
+        // Обработка напоминаний
+        handleEventCompletion(eventId);
+        
+        return completedEvent;
     }
     
     /**
@@ -918,5 +1047,144 @@ public class EventService {
         }
         
         return events;
+    }
+    
+    /**
+     * Получает количество активных событий пользователя.
+     * 
+     * <p>Подсчитывает только события со статусом ACTIVE, исключая:</p>
+     * <ul>
+     *   <li>Удаленные события (DELETED)</li>
+     *   <li>Черновики (DRAFT)</li>
+     *   <li>Завершенные события (COMPLETED)</li>
+     * </ul>
+     * 
+     * <p>Используется для отображения количества событий в шапке списка "Мои события".
+     * Количество должно соответствовать фактическому количеству отображаемых событий.</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4, 1.5</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @return количество активных событий пользователя со статусом ACTIVE
+     */
+    public int getActiveEventsCount(Long userId) {
+        int count = eventRepository.countByUserIdAndStatus(userId, Event.EventStatus.ACTIVE);
+        log.debug("Подсчитано активных событий (статус ACTIVE) для пользователя ID={}: {}", userId, count);
+        return count;
+    }
+    
+    /**
+     * Отправляет или обновляет сообщение о событии в Telegram.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Форматирует текст сообщения о событии</li>
+     *   <li>Создает inline клавиатуру для управления событием</li>
+     *   <li>Если событие имеет messageId, пытается обновить существующее сообщение</li>
+     *   <li>Если обновление не удалось или messageId отсутствует, отправляет новое сообщение</li>
+     *   <li>Сохраняет полученный messageId в событие</li>
+     *   <li>Сохраняет событие в базе данных</li>
+     * </ol>
+     * 
+     * <p><b>Обработка ошибок:</b></p>
+     * <ul>
+     *   <li>Если сообщение удалено пользователем - отправляет новое сообщение</li>
+     *   <li>Если сообщение слишком старое (>48 часов) - отправляет новое сообщение</li>
+     *   <li>Если произошла ошибка редактирования - отправляет новое сообщение</li>
+     *   <li>Все операции детально логируются</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.3, 1.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 4.3, 4.5, 5.1, 5.2, 5.3, 5.4</p>
+     * 
+     * @param event событие для отправки/обновления
+     * @param chatId ID чата для отправки
+     * @return обновленное событие с актуальным messageId
+     * @throws TelegramApiException при критических ошибках отправки
+     * @throws IllegalArgumentException если event или chatId равны null
+     */
+    public Event sendOrUpdateEventMessage(
+            @NotNull(message = "event не может быть null") Event event,
+            @NotNull(message = "chatId не может быть null") Long chatId) throws TelegramApiException {
+        
+        if (event == null) {
+            log.error("Попытка отправить/обновить сообщение для null события");
+            throw new IllegalArgumentException("Event не может быть null");
+        }
+        
+        if (chatId == null) {
+            log.error("Попытка отправить/обновить сообщение с null chatId для события ID={}", 
+                    event.getId());
+            throw new IllegalArgumentException("ChatId не может быть null");
+        }
+        
+        log.debug("Отправка/обновление сообщения о событии: eventId={}, chatId={}, messageId={}, isMyEventsHeader={}", 
+                event.getId(), chatId, event.getMessageId(), event.getIsMyEventsHeader());
+        
+        // Форматирование текста сообщения
+        String messageText = botMessageBuilder.buildEventMessage(event);
+        log.debug("Текст сообщения сформирован: eventId={}, textLength={}", 
+                event.getId(), messageText.length());
+        
+        // Если это первое событие в списке "Мои события", добавляем шапку
+        if (Boolean.TRUE.equals(event.getIsMyEventsHeader())) {
+            int eventCount = getActiveEventsCount(event.getUser().getId());
+            String header = botMessageBuilder.buildMyEventsHeader(eventCount);
+            messageText = header + "\n" + messageText;
+            log.debug("Добавлена шапка 'Мои события' к сообщению: eventId={}, eventCount={}", 
+                    event.getId(), eventCount);
+        }
+        
+        // Создание inline клавиатуры в зависимости от статуса события
+        InlineKeyboardMarkup keyboard;
+        if (event.getStatus() == Event.EventStatus.DRAFT) {
+            // Для черновиков используем специальную клавиатуру редактирования
+            keyboard = keyboardService.createEditFieldSelectionKeyboard(event.getId());
+            log.debug("Клавиатура для черновика создана для события ID={}", event.getId());
+        } else {
+            // Для активных, завершённых и удалённых событий используем клавиатуру с учетом статуса и прав
+            // Получаем ID пользователя из события
+            Long userId = event.getUser().getId();
+            keyboard = keyboardService.createEventActionsKeyboard(event, userId);
+            log.debug("Клавиатура для события создана: eventId={}, status={}, userId={}", 
+                    event.getId(), event.getStatus(), userId);
+        }
+        
+        // Если есть messageId, пытаемся обновить существующее сообщение
+        if (event.getMessageId() != null) {
+            log.debug("Попытка обновления существующего сообщения: eventId={}, messageId={}", 
+                    event.getId(), event.getMessageId());
+            
+            boolean updated = telegramMessageService.tryEditMessageText(
+                    chatId, 
+                    event.getMessageId().intValue(), 
+                    messageText, 
+                    keyboard
+            );
+            
+            if (updated) {
+                log.info("Сообщение о событии успешно обновлено: eventId={}, messageId={}", 
+                        event.getId(), event.getMessageId());
+                return event;
+            }
+            
+            // Если обновление не удалось, отправляем новое сообщение
+            log.info("Не удалось обновить сообщение, отправляем новое: eventId={}, oldMessageId={}", 
+                    event.getId(), event.getMessageId());
+        } else {
+            log.debug("MessageId отсутствует, отправляем новое сообщение: eventId={}", event.getId());
+        }
+        
+        // Отправляем новое сообщение
+        Message sentMessage = telegramMessageService.sendMessageAndGet(chatId, messageText, keyboard);
+        
+        // Сохраняем новый messageId
+        Long oldMessageId = event.getMessageId();
+        event.setMessageId((long) sentMessage.getMessageId());
+        Event savedEvent = eventRepository.save(event);
+        
+        log.info("Новое сообщение о событии отправлено и messageId сохранён: eventId={}, oldMessageId={}, newMessageId={}", 
+                event.getId(), oldMessageId, sentMessage.getMessageId());
+        
+        return savedEvent;
     }
 }

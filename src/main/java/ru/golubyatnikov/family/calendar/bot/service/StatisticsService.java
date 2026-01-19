@@ -43,9 +43,11 @@ public class StatisticsService {
     /**
      * Получает статистику по событиям семьи за указанный месяц.
      * 
-     * <p>Подсчитывает различные метрики: общее количество событий,
-     * активные, завершенные, семейные, персональные и повторяющиеся события.
-     * Включает семейные события и персональные события пользователя.</p>
+     * <p>Подсчитывает различные метрики только для активных событий:
+     * общее количество активных событий, завершенные события,
+     * семейные и персональные активные события.
+     * Включает семейные события и персональные события пользователя.
+     * Исключает из подсчета события со статусами COMPLETED, DELETED и DRAFT.</p>
      * 
      * @param familyId идентификатор семьи
      * @param userId идентификатор пользователя
@@ -67,27 +69,27 @@ public class StatisticsService {
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
         
-        // Подсчет общего количества событий за месяц (семейные + персональные пользователя)
-        long totalEvents = eventRepository.countByFamilyIdAndEventDateBetween(familyId, startDate, endDate);
-        
-        // Подсчет активных событий
-        long activeEvents = eventRepository.countByFamilyIdAndEventDateBetweenAndStatus(
+        // Подсчет только активных событий за месяц (исключая COMPLETED, DELETED, DRAFT)
+        long totalEvents = eventRepository.countByFamilyIdAndEventDateBetweenAndStatus(
             familyId, startDate, endDate, Event.EventStatus.ACTIVE
         );
+        
+        // Подсчет активных событий (для обратной совместимости, равен totalEvents)
+        long activeEvents = totalEvents;
         
         // Подсчет завершенных событий
         long completedEvents = eventRepository.countByFamilyIdAndEventDateBetweenAndStatus(
             familyId, startDate, endDate, Event.EventStatus.COMPLETED
         );
         
-        // Подсчет семейных событий
-        long familyEvents = eventRepository.countByUserIdAndEventDateBetweenAndIsPersonal(
-            userId, startDate, endDate, false
+        // Подсчет семейных активных событий
+        long familyEvents = eventRepository.countByUserIdAndEventDateBetweenAndIsPersonalAndStatus(
+            userId, startDate, endDate, false, Event.EventStatus.ACTIVE
         );
         
-        // Подсчет персональных событий
-        long personalEvents = eventRepository.countByUserIdAndEventDateBetweenAndIsPersonal(
-            userId, startDate, endDate, true
+        // Подсчет персональных активных событий
+        long personalEvents = eventRepository.countByUserIdAndEventDateBetweenAndIsPersonalAndStatus(
+            userId, startDate, endDate, true, Event.EventStatus.ACTIVE
         );
         
         // Подсчет повторяющихся событий (имеют series_id)
@@ -105,8 +107,8 @@ public class StatisticsService {
             .recurringEvents(recurringEvents)
             .build();
         
-        log.info("Статистика для семьи ID {} и пользователя ID {} за {}/{}: всего={}, активных={}, завершенных={}", 
-                 familyId, userId, month, year, totalEvents, activeEvents, completedEvents);
+        log.info("Статистика для семьи ID {} и пользователя ID {} за {}/{}: всего активных={}, завершенных={}", 
+                 familyId, userId, month, year, totalEvents, completedEvents);
         
         return statistics;
     }
@@ -165,14 +167,17 @@ public class StatisticsService {
         
         /**
          * Возвращает процент завершенных событий.
+         * Рассчитывается как отношение завершенных событий к сумме активных и завершенных событий.
+         * Исключает из расчета события со статусами DELETED и DRAFT.
          * 
          * @return процент завершенных событий (0-100)
          */
         public double getCompletionRate() {
-            if (totalEvents == 0) {
+            long totalRelevantEvents = activeEvents + completedEvents;
+            if (totalRelevantEvents == 0) {
                 return 0.0;
             }
-            return (completedEvents * 100.0) / totalEvents;
+            return (completedEvents * 100.0) / totalRelevantEvents;
         }
         
         /**

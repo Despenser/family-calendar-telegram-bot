@@ -8,8 +8,13 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.handler.MyEventsCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+
+import java.util.List;
+
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
  * Обработчик callback queries для операций с событиями.
@@ -19,13 +24,14 @@ import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
  *   <li>view_event_ - просмотр деталей события</li>
  *   <li>edit_event_ - редактирование события</li>
  *   <li>delete_event_ - удаление события</li>
+ *   <li>complete_event_ - завершение события</li>
  *   <li>edit_field_ - редактирование конкретного поля события</li>
  * </ul>
  * 
- * <p><b>Требования:</b> 1.3, 2.5</p>
+ * <p><b>Требования:</b> 1.2, 1.3, 2.1, 2.2, 2.5</p>
  * 
  * @author Family Calendar Bot Team
- * @version 1.0.0
+ * @version 1.1.0
  * @since 2026-01-16
  */
 @Component
@@ -37,6 +43,8 @@ public class EventCallbackHandler implements CallbackHandler {
     private final TelegramMessageService messageService;
     private final ru.golubyatnikov.family.calendar.bot.service.ConversationStateService conversationStateService;
     private final ru.golubyatnikov.family.calendar.bot.service.KeyboardService keyboardService;
+    private final ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
+    private final ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder botMessageBuilder;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -52,7 +60,11 @@ public class EventCallbackHandler implements CallbackHandler {
         return CallbackPrefix.VIEW_EVENT.matches(callbackData) ||
                CallbackPrefix.EDIT_EVENT.matches(callbackData) ||
                CallbackPrefix.DELETE_EVENT.matches(callbackData) ||
-               CallbackPrefix.EDIT_FIELD.matches(callbackData);
+               CallbackPrefix.EDIT_FIELD.matches(callbackData) ||
+               CallbackPrefix.COMPLETE_EVENT.matches(callbackData) ||
+               CallbackPrefix.ADD_COMPLETION_NOTE.matches(callbackData) ||
+               CallbackPrefix.SKIP_COMPLETION_NOTE.matches(callbackData) ||
+               CallbackPrefix.EDIT_CANCEL.matches(callbackData);
     }
     
     @Override
@@ -69,11 +81,19 @@ public class EventCallbackHandler implements CallbackHandler {
         if (CallbackPrefix.VIEW_EVENT.matches(callbackData)) {
             handleViewEvent(callbackData, user.getId(), chatId, callbackQueryId);
         } else if (CallbackPrefix.EDIT_EVENT.matches(callbackData)) {
-            handleEditEvent(callbackData, user.getId(), chatId, callbackQueryId);
+            handleEditEvent(callbackData, user, chatId, messageId, callbackQueryId);
         } else if (CallbackPrefix.DELETE_EVENT.matches(callbackData)) {
-            handleDeleteEvent(callbackData, user.getId(), chatId, callbackQueryId);
+            handleDeleteEvent(callbackData, user.getId(), chatId, messageId, callbackQueryId);
         } else if (CallbackPrefix.EDIT_FIELD.matches(callbackData)) {
             handleEditField(callbackData, user, chatId, messageId, callbackQueryId);
+        } else if (CallbackPrefix.COMPLETE_EVENT.matches(callbackData)) {
+            handleCompleteEvent(callbackData, user.getId(), chatId, messageId, callbackQueryId);
+        } else if (CallbackPrefix.ADD_COMPLETION_NOTE.matches(callbackData)) {
+            handleAddCompletionNote(callbackData, user.getId(), chatId, callbackQueryId);
+        } else if (CallbackPrefix.SKIP_COMPLETION_NOTE.matches(callbackData)) {
+            handleSkipCompletionNote(user.getId(), chatId, callbackQueryId);
+        } else if (CallbackPrefix.EDIT_CANCEL.matches(callbackData)) {
+            handleEditCancel(callbackData, user.getId(), chatId, callbackQueryId);
         }
     }
     
@@ -105,49 +125,196 @@ public class EventCallbackHandler implements CallbackHandler {
     /**
      * Обрабатывает редактирование события.
      * 
+     * <p>Обновляет текущее сообщение, показывая меню выбора поля для редактирования.</p>
+     * 
      * @param callbackData данные callback (формат: edit_event_{eventId})
-     * @param userId идентификатор пользователя
+     * @param user объект пользователя
      * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения
      * @param callbackQueryId идентификатор callback query
      */
-    private void handleEditEvent(String callbackData, Long userId, Long chatId, 
-                                 String callbackQueryId) {
+    private void handleEditEvent(String callbackData, User user, Long chatId, 
+                                 Integer messageId, String callbackQueryId) {
+        Long userId = user.getId();
         Long eventId = extractEventId(callbackData, CallbackPrefix.EDIT_EVENT);
         
         log.info("Редактирование события ID={} пользователем ID={}", eventId, userId);
         
         try {
-            // Сообщение уже отправлено внутри handleEditCallback с клавиатурой
-            myEventsCommandHandler.handleEditCallback(eventId, userId, chatId);
-            messageService.answerCallbackQuery(callbackQueryId, "Обработано");
+            // Получаем событие и проверяем права доступа
+            var event = eventService.getEventById(eventId);
+            
+            // Проверяем права доступа
+            if (!event.getUser().getId().equals(userId)) {
+                log.warn("Пользователь ID={} не имеет прав для редактирования события ID={}", 
+                        userId, eventId);
+                messageService.answerCallbackQuery(callbackQueryId, 
+                    "У вас нет прав для редактирования этого события");
+                return;
+            }
+            
+            // ИЗМЕНЕНИЕ: Сохраняем messageId в контексте редактирования
+            conversationStateService.startEventEditing(userId, eventId, chatId, messageId);
+            
+            // Формируем сообщение с текущими данными события и клавиатурой выбора поля
+            String message = buildEditFieldSelectionMessage(event);
+            InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId);
+            
+            // ИЗМЕНЕНИЕ: Обновляем ТЕКУЩЕЕ сообщение вместо отправки нового
+            messageService.editMessageText(chatId, messageId, message, keyboard);
+            messageService.answerCallbackQuery(callbackQueryId, "");
+            
+            log.debug("Начато редактирование события ID={} в сообщении ID={} пользователем ID={}", 
+                     eventId, messageId, userId);
+            
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при редактировании события: eventId={}, userId={}, error={}", 
-                     eventId, userId, e.getMessage());
+                     eventId, userId, e.getMessage(), e);
             throw new RuntimeException("Ошибка при редактировании события", e);
         }
     }
     
     /**
+     * Формирует сообщение с текущими данными события для выбора поля редактирования.
+     * 
+     * @param event событие для редактирования
+     * @return отформатированное сообщение
+     */
+    private String buildEditFieldSelectionMessage(ru.golubyatnikov.family.calendar.bot.model.Event event) {
+        StringBuilder message = new StringBuilder();
+        message.append("📝 ").append(bold("Редактирование события")).append("\n\n");
+        message.append(botMessageBuilder.buildEventMessage(event));
+        message.append("\n\n").append("Выберите поле для редактирования:");
+        return message.toString();
+    }
+    
+    /**
      * Обрабатывает удаление события.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Выполняет удаление события (перемещение в корзину)</li>
+     *   <li>Удаляет сообщение из чата, из которого был вызван callback</li>
+     *   <li>Отвечает на callback query с текстом "Событие удалено"</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.2, 2.3, 2.4, 4.1, 4.2, 4.3</p>
      * 
      * @param callbackData данные callback (формат: delete_event_{eventId})
      * @param userId идентификатор пользователя
      * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения, из которого был вызван callback
      * @param callbackQueryId идентификатор callback query
      */
     private void handleDeleteEvent(String callbackData, Long userId, Long chatId, 
-                                   String callbackQueryId) {
+                                   Integer messageId, String callbackQueryId) {
         Long eventId = extractEventId(callbackData, CallbackPrefix.DELETE_EVENT);
         
         log.info("Удаление события ID={} пользователем ID={}", eventId, userId);
         
         try {
-            String response = myEventsCommandHandler.handleDeleteCallback(eventId, userId);
-            messageService.sendMessage(chatId, response);
-            messageService.answerCallbackQuery(callbackQueryId, "Обработано");
+            // Получаем событие ДО удаления, чтобы проверить флаг isMyEventsHeader
+            var event = eventService.getEventById(eventId);
+            boolean wasFirstEvent = Boolean.TRUE.equals(event.getIsMyEventsHeader());
+            
+            // Выполняем удаление события (перемещение в корзину)
+            // Это обновит флаги в базе данных
+            myEventsCommandHandler.handleDeleteCallback(eventId, userId);
+            
+            // Удаляем сообщение, из которого был вызван callback
+            messageService.deleteMessage(chatId, messageId);
+            log.debug("Сообщение события удалено после удаления: eventId={}, messageId={}", 
+                     eventId, messageId);
+            
+            // Если удалили первое событие, нужно обновить второе событие с заголовком
+            if (wasFirstEvent) {
+                log.debug("Удалено первое событие, обновляем следующее событие с заголовком");
+                
+                // Получаем список оставшихся событий
+                List<Event> userEvents = eventService.getUserEvents(userId);
+                
+                if (!userEvents.isEmpty()) {
+                    // Первое событие в списке - это новое первое событие
+                    var nextEvent = userEvents.get(0);
+                    
+                    log.debug("Найдено следующее событие ID={}, обновляем его сообщение с заголовком", 
+                             nextEvent.getId());
+                    
+                    // Пытаемся обновить существующее сообщение с заголовком
+                    if (nextEvent.getMessageId() != null) {
+                        try {
+                            // Формируем текст с заголовком
+                            int eventCount = userEvents.size();
+                            String header = botMessageBuilder.buildMyEventsHeader(eventCount);
+                            String eventText = botMessageBuilder.buildEventMessage(nextEvent);
+                            String combinedMessage = header + "\n" + eventText;
+                            
+                            // Создаем клавиатуру
+                            var keyboard = keyboardService.createEventActionsKeyboard(nextEvent, userId);
+                            
+                            // Пытаемся обновить существующее сообщение
+                            boolean updated = messageService.tryEditMessageText(
+                                chatId, 
+                                nextEvent.getMessageId().intValue(), 
+                                combinedMessage, 
+                                keyboard
+                            );
+                            
+                            if (updated) {
+                                log.info("Сообщение следующего события ID={} успешно обновлено с заголовком", 
+                                        nextEvent.getId());
+                            } else {
+                                // Если не удалось обновить (сообщение удалено пользователем), создаем новое
+                                log.warn("Не удалось обновить сообщение следующего события ID={}, создаем новое", 
+                                        nextEvent.getId());
+                                nextEvent.setMessageId(null);
+                                eventService.saveEvent(nextEvent);
+                                eventService.sendOrUpdateEventMessage(nextEvent, chatId);
+                            }
+                        } catch (Exception e) {
+                            log.error("Ошибка при обновлении сообщения следующего события ID={}: {}", 
+                                     nextEvent.getId(), e.getMessage());
+                            // Пытаемся создать новое сообщение
+                            try {
+                                nextEvent.setMessageId(null);
+                                eventService.saveEvent(nextEvent);
+                                eventService.sendOrUpdateEventMessage(nextEvent, chatId);
+                            } catch (Exception ex) {
+                                log.error("Не удалось создать новое сообщение для события ID={}: {}", 
+                                         nextEvent.getId(), ex.getMessage());
+                            }
+                        }
+                    } else {
+                        // Если messageId нет, отправляем новое сообщение
+                        try {
+                            eventService.sendOrUpdateEventMessage(nextEvent, chatId);
+                            log.info("Новое сообщение для следующего события ID={} отправлено с заголовком", 
+                                    nextEvent.getId());
+                        } catch (Exception e) {
+                            log.error("Не удалось отправить сообщение для события ID={}: {}", 
+                                     nextEvent.getId(), e.getMessage());
+                        }
+                    }
+                } else {
+                    log.debug("Следующее событие не найдено, это было последнее событие пользователя");
+                }
+            }
+            
+            // Отвечаем на callback query с подтверждением
+            messageService.answerCallbackQuery(callbackQueryId, "Событие удалено");
+            
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при удалении события: eventId={}, userId={}, error={}", 
                      eventId, userId, e.getMessage());
+            
+            // При ошибке отправляем сообщение об ошибке
+            try {
+                messageService.sendMessage(chatId, "❌ Не удалось удалить событие. Попробуйте позже.");
+                messageService.answerCallbackQuery(callbackQueryId, "Ошибка удаления");
+            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: {}", ex.getMessage());
+            }
+            
             throw new RuntimeException("Ошибка при удалении события", e);
         }
     }
@@ -206,13 +373,15 @@ public class EventCallbackHandler implements CallbackHandler {
             log.info("Пользователь ID={} начал редактирование поля '{}' события ID={}", 
                     userId, field, eventId);
             
-            // Устанавливаем состояние редактирования
+            // ИЗМЕНЕНИЕ: Сохраняем messageId в контексте редактирования
+            conversationStateService.startEventEditing(userId, eventId, chatId, messageId);
+            
+            // Устанавливаем редактируемое поле
             ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditField editField = mapToEditField(field);
             if (editField != null) {
-                conversationStateService.startEventEditing(userId, eventId, chatId);
                 conversationStateService.setEditingField(userId, editField);
-                log.debug("Установлено состояние редактирования: userId={}, eventId={}, field={}", 
-                         userId, eventId, editField);
+                log.debug("Установлено состояние редактирования: userId={}, eventId={}, field={}, messageId={}", 
+                         userId, eventId, editField, messageId);
             }
             
             // Формируем сообщение и клавиатуру в зависимости от поля
@@ -234,20 +403,28 @@ public class EventCallbackHandler implements CallbackHandler {
                             familyId
                         );
                     }
+                    // Добавляем кнопку "Отменить"
+                    keyboard = addCancelButton(keyboard, eventId);
                 }
                 case "time" -> {
                     log.debug("Выбрано поле для редактирования: TIME, userId={}", userId);
                     message = "🕐 Редактирование времени\n\nВыберите новое время:";
                     // Показываем выбор часа
                     keyboard = keyboardService.createHourSelectionKeyboard();
+                    // Добавляем кнопку "Отменить"
+                    keyboard = addCancelButton(keyboard, eventId);
                 }
                 case "title" -> {
                     log.debug("Выбрано поле для редактирования: TITLE, userId={}", userId);
                     message = "📝 Редактирование названия\n\nОтправьте новое название события:";
+                    // Создаем клавиатуру только с кнопкой "Отменить"
+                    keyboard = createCancelOnlyKeyboard(eventId);
                 }
                 case "description" -> {
                     log.debug("Выбрано поле для редактирования: DESCRIPTION, userId={}", userId);
                     message = "📄 Редактирование описания\n\nОтправьте новое описание события:";
+                    // Создаем клавиатуру только с кнопкой "Отменить"
+                    keyboard = createCancelOnlyKeyboard(eventId);
                 }
                 default -> {
                     log.warn("Неизвестное поле для редактирования: field='{}', userId={}", field, userId);
@@ -255,6 +432,7 @@ public class EventCallbackHandler implements CallbackHandler {
                 }
             }
             
+            // ИЗМЕНЕНИЕ: Обновляем ТЕКУЩЕЕ сообщение вместо отправки нового
             messageService.editMessageText(chatId, messageId, message, keyboard);
             messageService.answerCallbackQuery(callbackQueryId, "");
             
@@ -263,6 +441,63 @@ public class EventCallbackHandler implements CallbackHandler {
                      userId, callbackData, e.getMessage(), e);
             throw new RuntimeException("Ошибка при редактировании поля", e);
         }
+    }
+    
+    /**
+     * Добавляет кнопку "Отменить" к существующей клавиатуре.
+     * 
+     * <p>Если клавиатура null, создает новую клавиатуру только с кнопкой "Отменить".</p>
+     * 
+     * @param keyboard существующая клавиатура или null
+     * @param eventId идентификатор события для callback data
+     * @return клавиатура с добавленной кнопкой "Отменить"
+     */
+    private InlineKeyboardMarkup addCancelButton(InlineKeyboardMarkup keyboard, Long eventId) {
+        if (keyboard == null) {
+            return createCancelOnlyKeyboard(eventId);
+        }
+        
+        java.util.List<java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton>> rows = 
+            new java.util.ArrayList<>(keyboard.getKeyboard());
+        
+        // Добавляем кнопку "Отменить" в последнюю строку
+        java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton> cancelRow = 
+            new java.util.ArrayList<>();
+        org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton cancelButton = 
+            new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton();
+        cancelButton.setText("❌ Отменить");
+        cancelButton.setCallbackData(CallbackPrefix.EDIT_CANCEL.withPayload(eventId.toString()));
+        cancelRow.add(cancelButton);
+        rows.add(cancelRow);
+        
+        keyboard.setKeyboard(rows);
+        return keyboard;
+    }
+    
+    /**
+     * Создает клавиатуру только с кнопкой "Отменить".
+     * 
+     * <p>Используется для режимов ожидания текстового ввода (название, описание).</p>
+     * 
+     * @param eventId идентификатор события для callback data
+     * @return клавиатура с кнопкой "Отменить"
+     */
+    private InlineKeyboardMarkup createCancelOnlyKeyboard(Long eventId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        java.util.List<java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton>> keyboard = 
+            new java.util.ArrayList<>();
+        
+        java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton> row = 
+            new java.util.ArrayList<>();
+        org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton cancelButton = 
+            new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton();
+        cancelButton.setText("❌ Отменить");
+        cancelButton.setCallbackData(CallbackPrefix.EDIT_CANCEL.withPayload(eventId.toString()));
+        row.add(cancelButton);
+        keyboard.add(row);
+        
+        markup.setKeyboard(keyboard);
+        return markup;
     }
     
     /**
@@ -294,5 +529,253 @@ public class EventCallbackHandler implements CallbackHandler {
             case "description" -> ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditField.DESCRIPTION;
             default -> null;
         };
+    }
+    
+    /**
+     * Обрабатывает завершение события.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Извлекает eventId из callback data</li>
+     *   <li>Вызывает EventService.completeEvent() для завершения события</li>
+     *   <li>Удаляет сообщение из чата, из которого был вызван callback</li>
+     *   <li>Отправляет подтверждающее сообщение с предложением добавить заметку</li>
+     *   <li>Создает клавиатуру с кнопкой "Добавить заметку"</li>
+     *   <li>Отвечает на callback query</li>
+     * </ol>
+     * 
+     * <p>Все ошибки обрабатываются через аннотацию @HandleCallbackErrors.</p>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.2, 2.3, 2.4, 2.5, 4.1, 4.2, 4.3, 4.4</p>
+     * 
+     * @param callbackData данные callback (формат: complete_event_{eventId})
+     * @param userId идентификатор пользователя
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения, из которого был вызван callback
+     * @param callbackQueryId идентификатор callback query
+     */
+    private void handleCompleteEvent(String callbackData, Long userId, Long chatId, 
+                                     Integer messageId, String callbackQueryId) {
+        Long eventId = extractEventId(callbackData, CallbackPrefix.COMPLETE_EVENT);
+        
+        log.debug("Начало обработки завершения события: eventId={}, userId={}", eventId, userId);
+        
+        try {
+            // Завершаем событие
+            ru.golubyatnikov.family.calendar.bot.model.Event completedEvent = 
+                eventService.completeEvent(eventId, userId);
+            
+            log.info("Событие ID={} успешно завершено вручную пользователем ID={}", 
+                    eventId, userId);
+            
+            // Удаляем сообщение, из которого был вызван callback
+            messageService.deleteMessage(chatId, messageId);
+            log.debug("Сообщение события удалено после завершения: eventId={}, messageId={}", 
+                     eventId, messageId);
+            
+            // Формируем подтверждающее сообщение
+            String message = formatMessage(
+                "✅ Событие \"%s\" успешно завершено!\n\n" +
+                "Хотите добавить заметку о том, как прошло событие?",
+                completedEvent.getTitle()
+            );
+            
+            // Создаем клавиатуру с кнопкой "Добавить заметку"
+            InlineKeyboardMarkup keyboard = createCompletionNoteKeyboard(eventId);
+            
+            // Отправляем сообщение с клавиатурой
+            messageService.sendMessage(chatId, message, keyboard);
+            
+            // Отвечаем на callback query
+            messageService.answerCallbackQuery(callbackQueryId, "Событие завершено");
+            
+        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+            log.error("Ошибка Telegram API при завершении события: eventId={}, userId={}, error={}", 
+                     eventId, userId, e.getMessage(), e);
+            throw new RuntimeException("Ошибка при завершении события", e);
+        }
+    }
+    
+    /**
+     * Создает клавиатуру с кнопками "Добавить заметку" и "Пропустить" для завершенного события.
+     * 
+     * @param eventId идентификатор завершенного события
+     * @return клавиатура с кнопками добавления заметки и пропуска
+     */
+    private InlineKeyboardMarkup createCompletionNoteKeyboard(Long eventId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        java.util.List<java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton>> keyboard = 
+            new java.util.ArrayList<>();
+        
+        // Первая строка: кнопка "Добавить заметку"
+        java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton> row1 = 
+            new java.util.ArrayList<>();
+        org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton addNoteButton = 
+            new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton();
+        addNoteButton.setText("📝 Добавить заметку");
+        addNoteButton.setCallbackData(
+            CallbackPrefix.ADD_COMPLETION_NOTE.withPayload(eventId.toString())
+        );
+        row1.add(addNoteButton);
+        keyboard.add(row1);
+        
+        // Вторая строка: кнопка "Пропустить"
+        java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton> row2 = 
+            new java.util.ArrayList<>();
+        org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton skipButton = 
+            new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton();
+        skipButton.setText("⏭️ Пропустить");
+        skipButton.setCallbackData(CallbackPrefix.SKIP_COMPLETION_NOTE.withPayload(""));
+        row2.add(skipButton);
+        keyboard.add(row2);
+        
+        markup.setKeyboard(keyboard);
+        return markup;
+    }
+    
+    /**
+     * Обрабатывает нажатие кнопки "Добавить заметку" к завершенному событию.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Извлекает eventId из callback data</li>
+     *   <li>Устанавливает состояние ожидания заметки в ConversationStateService</li>
+     *   <li>Отправляет сообщение с просьбой ввести текст заметки</li>
+     *   <li>Отвечает на callback query</li>
+     * </ol>
+     * 
+     * @param callbackData данные callback (формат: add_completion_note_{eventId})
+     * @param userId идентификатор пользователя
+     * @param chatId идентификатор чата
+     * @param callbackQueryId идентификатор callback query
+     */
+    private void handleAddCompletionNote(String callbackData, Long userId, Long chatId, 
+                                        String callbackQueryId) {
+        Long eventId = extractEventId(callbackData, CallbackPrefix.ADD_COMPLETION_NOTE);
+        
+        log.debug("Начало обработки добавления заметки к событию: eventId={}, userId={}", 
+                 eventId, userId);
+        
+        try {
+            // Устанавливаем состояние ожидания заметки
+            conversationStateService.setAwaitingCompletionNote(userId, eventId, chatId);
+            
+            log.info("Пользователь ID={} переведен в режим ожидания заметки для события ID={}", 
+                    userId, eventId);
+            
+            // Отправляем сообщение с просьбой ввести заметку
+            String message = formatMessage(
+                "📝 Напишите заметку о том, как прошло событие.\n\n" +
+                "Например, что было сделано, какие были результаты или впечатления."
+            );
+            
+            messageService.sendMessage(chatId, message);
+            
+            // Отвечаем на callback query
+            messageService.answerCallbackQuery(callbackQueryId, "Ожидаю текст заметки");
+            
+        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+            log.error("Ошибка Telegram API при обработке добавления заметки: eventId={}, userId={}, error={}", 
+                     eventId, userId, e.getMessage(), e);
+            throw new RuntimeException("Ошибка при обработке добавления заметки", e);
+        }
+    }
+    
+    /**
+     * Обрабатывает нажатие кнопки "Пропустить" при добавлении заметки к завершенному событию.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Отправляет подтверждающее сообщение о том, что событие завершено без заметки</li>
+     *   <li>Отвечает на callback query</li>
+     * </ol>
+     * 
+     * @param userId идентификатор пользователя
+     * @param chatId идентификатор чата
+     * @param callbackQueryId идентификатор callback query
+     */
+    private void handleSkipCompletionNote(Long userId, Long chatId, String callbackQueryId) {
+        log.debug("Пользователь ID={} пропустил добавление заметки к завершенному событию", userId);
+        
+        try {
+            // Отправляем подтверждающее сообщение
+            String message = formatMessage(
+                "✅ Событие завершено без заметки."
+            );
+            
+            messageService.sendMessage(chatId, message);
+            
+            // Отвечаем на callback query
+            messageService.answerCallbackQuery(callbackQueryId, "Заметка пропущена");
+            
+            log.info("Пользователь ID={} успешно пропустил добавление заметки", userId);
+            
+        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+            log.error("Ошибка Telegram API при пропуске заметки: userId={}, error={}", 
+                     userId, e.getMessage(), e);
+            throw new RuntimeException("Ошибка при пропуске заметки", e);
+        }
+    }
+    
+    /**
+     * Обрабатывает отмену редактирования события.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Получает messageId из EditingContext</li>
+     *   <li>Очищает состояние редактирования</li>
+     *   <li>Получает событие для отображения</li>
+     *   <li>Обновляет то же сообщение через editMessageText с полной информацией о событии</li>
+     *   <li>Если messageId не найден, использует fallback на sendOrUpdateEventMessage</li>
+     * </ol>
+     * 
+     * @param callbackData данные callback (формат: edit_cancel_{eventId})
+     * @param userId идентификатор пользователя
+     * @param chatId идентификатор чата
+     * @param callbackQueryId идентификатор callback query
+     */
+    private void handleEditCancel(String callbackData, Long userId, Long chatId, String callbackQueryId) {
+        String eventIdStr = CallbackPrefix.EDIT_CANCEL.extractPayload(callbackData);
+        Long eventId = Long.parseLong(eventIdStr);
+        
+        log.info("Отмена редактирования события ID={} пользователем ID={}", eventId, userId);
+        
+        try {
+            // Получаем messageId из контекста редактирования
+            Integer messageId = conversationStateService.getEditingMessageId(userId);
+            
+            // Очищаем состояние редактирования
+            conversationStateService.clearEventEditing(userId);
+            
+            // Получаем событие для отображения
+            var event = eventService.getEventById(eventId);
+            
+            if (messageId != null) {
+                // ИЗМЕНЕНИЕ: Обновляем то же сообщение, возвращая его к отображению события
+                // Используем buildEventMessageWithHeader для сохранения шапки, если это первое событие
+                int eventCount = eventService.getActiveEventsCount(event.getUser().getId());
+                String eventMessage = botMessageBuilder.buildEventMessageWithHeader(event, eventCount);
+                InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
+                messageService.editMessageText(chatId, messageId, eventMessage, keyboard);
+                
+                log.debug("Сообщение обновлено при отмене редактирования: eventId={}, messageId={}", 
+                         eventId, messageId);
+            } else {
+                // Fallback: если messageId не найден, отправляем новое сообщение
+                log.warn("MessageId не найден в контексте редактирования, используем sendOrUpdateEventMessage: eventId={}, userId={}", 
+                        eventId, userId);
+                eventService.sendOrUpdateEventMessage(event, chatId);
+            }
+            
+            // Отвечаем на callback query
+            messageService.answerCallbackQuery(callbackQueryId, "Редактирование отменено");
+            
+            log.info("Редактирование события ID={} успешно отменено пользователем ID={}", eventId, userId);
+            
+        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+            log.error("Ошибка Telegram API при отмене редактирования: eventId={}, userId={}, error={}", 
+                     eventId, userId, e.getMessage(), e);
+            throw new RuntimeException("Ошибка при отмене редактирования события", e);
+        }
     }
 }

@@ -187,6 +187,7 @@ class CallbackPrefixPropertyTest {
         return prefix == CallbackPrefix.TIME_BACK ||
                prefix == CallbackPrefix.TIME_CANCEL ||
                prefix == CallbackPrefix.SKIP_DESCRIPTION ||
+               prefix == CallbackPrefix.SKIP_COMPLETION_NOTE ||
                prefix == CallbackPrefix.CANCEL_TEXT_EVENT ||
                prefix == CallbackPrefix.CALENDAR_IGNORE ||
                prefix == CallbackPrefix.TIME_IGNORE;

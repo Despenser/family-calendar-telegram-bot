@@ -17,6 +17,7 @@ import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -65,6 +66,9 @@ class MyEventsCommandHandlerTest {
     private ConversationStateService conversationStateService;
 
     @Mock
+    private BotMessageBuilder botMessageBuilder;
+
+    @Mock
     private Message message;
 
     @Mock
@@ -74,7 +78,7 @@ class MyEventsCommandHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new MyEventsCommandHandler(eventService, keyboardService, messageService, conversationStateService);
+        handler = new MyEventsCommandHandler(eventService, keyboardService, messageService, conversationStateService, botMessageBuilder);
     }
 
     @Test
@@ -123,7 +127,15 @@ class MyEventsCommandHandlerTest {
         when(telegramUser.getUserName()).thenReturn("test_user");
         when(message.getChatId()).thenReturn(123456789L);
         when(eventService.getUserEvents(user.getId())).thenReturn(events);
-        when(keyboardService.createEventActionsKeyboard(anyLong())).thenReturn(keyboard);
+        when(keyboardService.createEventActionsKeyboard(any(Event.class), anyLong())).thenReturn(keyboard);
+        
+        // Мокаем botMessageBuilder
+        when(botMessageBuilder.buildMyEventsHeader(2)).thenReturn("📋 *Мои события*\n\nВсего событий: 2\n");
+        when(botMessageBuilder.buildEventMessage(any(Event.class))).thenAnswer(invocation -> {
+            Event event = invocation.getArgument(0);
+            return "📌 *" + event.getTitle() + "*\n📅 Дата: " + event.getFormattedDate() + "\n🕐 Время: " + event.getFormattedTime();
+        });
+        
         // Мокаем sendMessageWithInlineKeyboard
         willDoNothing().given(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
 
@@ -133,6 +145,10 @@ class MyEventsCommandHandlerTest {
         // Then
         // Метод должен вернуть null, так как все сообщения отправляются внутри метода
         assertNull(response, "Метод должен вернуть null, так как сообщения отправляются внутри");
+        
+        // Проверяем, что botMessageBuilder был вызван
+        verify(botMessageBuilder).buildMyEventsHeader(2);
+        verify(botMessageBuilder, times(2)).buildEventMessage(any(Event.class));
         
         // Проверяем, что для каждого события был вызван метод отправки сообщения
         // Первое сообщение должно содержать заголовок и первое событие
@@ -221,18 +237,9 @@ class MyEventsCommandHandlerTest {
         doNothing().when(eventService).deleteEvent(eventId, userId);
 
         // When
-        String response = handler.handleDeleteCallback(eventId, userId);
+        handler.handleDeleteCallback(eventId, userId);
 
         // Then
-        assertNotNull(response);
-        assertTrue(response.contains("Событие удалено"));
-        assertTrue(response.contains("успешно удалено"));
-        // Проверяем, что команда кликабельна (не в code-форматировании)
-        assertTrue(response.contains("/my_events") || response.contains("/my\\_events"), 
-                  "Должен содержать кликабельную команду /my_events");
-        assertFalse(response.contains("`/my_events`"), 
-                  "НЕ должен содержать команду в code-форматировании");
-        
         verify(eventService).deleteEvent(eventId, userId);
     }
 
@@ -246,13 +253,10 @@ class MyEventsCommandHandlerTest {
         doThrow(new EventNotFoundException(eventId))
                 .when(eventService).deleteEvent(eventId, userId);
 
-        // When
-        String response = handler.handleDeleteCallback(eventId, userId);
-
-        // Then
-        assertNotNull(response);
-        assertTrue(response.contains("Ошибка удаления"));
-        assertTrue(response.contains("Не удалось удалить событие"));
+        // When & Then
+        assertThrows(EventNotFoundException.class, () -> {
+            handler.handleDeleteCallback(eventId, userId);
+        });
         
         verify(eventService).deleteEvent(eventId, userId);
     }
@@ -267,13 +271,10 @@ class MyEventsCommandHandlerTest {
         doThrow(new UnauthorizedAccessException("User cannot delete this event"))
                 .when(eventService).deleteEvent(eventId, userId);
 
-        // When
-        String response = handler.handleDeleteCallback(eventId, userId);
-
-        // Then
-        assertNotNull(response);
-        assertTrue(response.contains("Ошибка удаления"));
-        assertTrue(response.contains("нет прав"));
+        // When & Then
+        assertThrows(UnauthorizedAccessException.class, () -> {
+            handler.handleDeleteCallback(eventId, userId);
+        });
         
         verify(eventService).deleteEvent(eventId, userId);
     }
@@ -328,7 +329,19 @@ class MyEventsCommandHandlerTest {
         when(telegramUser.getUserName()).thenReturn("test_user");
         when(message.getChatId()).thenReturn(123456789L);
         when(eventService.getUserEvents(user.getId())).thenReturn(events);
-        when(keyboardService.createEventActionsKeyboard(anyLong())).thenReturn(keyboard);
+        when(keyboardService.createEventActionsKeyboard(any(Event.class), anyLong())).thenReturn(keyboard);
+        
+        // Мокаем botMessageBuilder
+        when(botMessageBuilder.buildMyEventsHeader(1)).thenReturn("📋 *Мои события*\n\nВсего событий: 1\n");
+        when(botMessageBuilder.buildEventMessage(any(Event.class))).thenAnswer(invocation -> {
+            Event e = invocation.getArgument(0);
+            String result = "📌 *" + e.getTitle() + "*\n📅 Дата: " + e.getFormattedDate() + "\n🕐 Время: " + e.getFormattedTime();
+            if (e.getDescription() != null && !e.getDescription().isBlank()) {
+                result += "\n📝 Описание: " + e.getDescription();
+            }
+            return result;
+        });
+        
         // Мокаем sendMessageWithInlineKeyboard
         willDoNothing().given(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
 
@@ -338,6 +351,11 @@ class MyEventsCommandHandlerTest {
         // Then
         // Метод должен вернуть null, так как сообщение отправляется внутри метода
         assertNull(response, "Метод должен вернуть null, так как сообщение отправляется внутри");
+        
+        // Проверяем, что botMessageBuilder был вызван
+        verify(botMessageBuilder).buildMyEventsHeader(1);
+        verify(botMessageBuilder).buildEventMessage(any(Event.class));
+        
         // Проверяем, что метод отправки был вызван с объединенным сообщением (заголовок + событие)
         verify(messageService).sendMessageWithInlineKeyboard(
                 eq(123456789L), 
@@ -365,7 +383,19 @@ class MyEventsCommandHandlerTest {
         when(telegramUser.getUserName()).thenReturn("test_user");
         when(message.getChatId()).thenReturn(123456789L);
         when(eventService.getUserEvents(user.getId())).thenReturn(events);
-        when(keyboardService.createEventActionsKeyboard(anyLong())).thenReturn(keyboard);
+        when(keyboardService.createEventActionsKeyboard(any(Event.class), anyLong())).thenReturn(keyboard);
+        
+        // Мокаем botMessageBuilder
+        when(botMessageBuilder.buildMyEventsHeader(1)).thenReturn("📋 *Мои события*\n\nВсего событий: 1\n");
+        when(botMessageBuilder.buildEventMessage(any(Event.class))).thenAnswer(invocation -> {
+            Event e = invocation.getArgument(0);
+            String result = "📌 *" + e.getTitle() + "*\n📅 Дата: " + e.getFormattedDate() + "\n🕐 Время: " + e.getFormattedTime();
+            if (e.getDescription() != null && !e.getDescription().isBlank()) {
+                result += "\n📝 Описание: " + e.getDescription();
+            }
+            return result;
+        });
+        
         // Мокаем sendMessageWithInlineKeyboard
         willDoNothing().given(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any(InlineKeyboardMarkup.class));
 
@@ -375,6 +405,11 @@ class MyEventsCommandHandlerTest {
         // Then
         // Метод должен вернуть null, так как сообщение отправляется внутри метода
         assertNull(response, "Метод должен вернуть null, так как сообщение отправляется внутри");
+        
+        // Проверяем, что botMessageBuilder был вызван
+        verify(botMessageBuilder).buildMyEventsHeader(1);
+        verify(botMessageBuilder).buildEventMessage(any(Event.class));
+        
         // Проверяем, что метод отправки был вызван и сообщение не содержит описание
         verify(messageService).sendMessageWithInlineKeyboard(
                 eq(123456789L), 
@@ -522,4 +557,5 @@ class MyEventsCommandHandlerTest {
             "Сообщение должно содержать секцию текущих данных");
     }
 }
+
 

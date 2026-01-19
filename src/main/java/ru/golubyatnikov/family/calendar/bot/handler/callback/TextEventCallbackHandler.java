@@ -45,6 +45,7 @@ public class TextEventCallbackHandler implements CallbackHandler {
     private final ConversationService conversationService;
     private final TelegramMessageService messageService;
     private final BotMessageBuilder messageBuilder;
+    private final ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -195,19 +196,28 @@ public class TextEventCallbackHandler implements CallbackHandler {
                                       Long chatId, Integer messageId, String callbackQueryId) {
         try {
             if (createdEvent != null) {
-                // Успешное создание
-                String response = formatMessage(
-                    "✅ *Событие успешно создано!*\n\n" +
-                    "📅 Дата: %s\n" +
-                    "🕐 Время: %s\n" +
-                    "📝 Название: %s",
-                    createdEvent.getFormattedDate(),
-                    createdEvent.getFormattedTime(),
-                    createdEvent.getTitle()
-                );
-                
-                messageService.editMessageText(chatId, messageId, response, null);
-                messageService.answerCallbackQuery(callbackQueryId, "✅ Событие создано");
+                // Успешное создание - отправляем сообщение о событии и сохраняем messageId
+                try {
+                    eventService.sendOrUpdateEventMessage(createdEvent, chatId);
+                    log.debug("Сообщение о созданном событии отправлено и messageId сохранён: eventId={}", 
+                            createdEvent.getId());
+                    messageService.answerCallbackQuery(callbackQueryId, "✅ Событие создано");
+                } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                    log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
+                            createdEvent.getId(), e.getMessage());
+                    // Отправляем простое подтверждающее сообщение как fallback
+                    String response = formatMessage(
+                        "✅ *Событие успешно создано!*\n\n" +
+                        "📅 Дата: %s\n" +
+                        "🕐 Время: %s\n" +
+                        "📝 Название: %s",
+                        createdEvent.getFormattedDate(),
+                        createdEvent.getFormattedTime(),
+                        createdEvent.getTitle()
+                    );
+                    messageService.editMessageText(chatId, messageId, response, null);
+                    messageService.answerCallbackQuery(callbackQueryId, "✅ Событие создано");
+                }
             } else {
                 // Ошибка создания
                 String response = "❌ " + bold("Произошла ошибка при создании события") + "\\.\n\n" +

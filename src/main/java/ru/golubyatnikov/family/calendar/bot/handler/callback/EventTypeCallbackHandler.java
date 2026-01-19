@@ -45,6 +45,7 @@ public class EventTypeCallbackHandler implements CallbackHandler {
     private final KeyboardService keyboardService;
     private final UserService userService;
     private final BotMessageBuilder messageBuilder;
+    private final ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -126,20 +127,29 @@ public class EventTypeCallbackHandler implements CallbackHandler {
     private void handleSkipDescription(Long userId, Long chatId, String callbackQueryId) {
         Event completedEvent = conversationService.completeEventCreation(userId, null);
         
-        // Формируем подтверждение
-        String response = formatMessage(
-            "✅ *Событие успешно создано!*\n\n" +
-            "📅 Дата: %s\n" +
-            "🕐 Время: %s\n" +
-            "📝 Название: %s",
-            completedEvent.getFormattedDate(),
-            completedEvent.getFormattedTime(),
-            completedEvent.getTitle()
-        );
-        
         try {
-            ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
-            messageService.sendMessage(chatId, response, keyboard);
+            // Отправляем сообщение о созданном событии и сохраняем messageId
+            try {
+                eventService.sendOrUpdateEventMessage(completedEvent, chatId);
+                log.debug("Сообщение о созданном событии отправлено и messageId сохранён: eventId={}", 
+                        completedEvent.getId());
+            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
+                        completedEvent.getId(), e.getMessage());
+                // Отправляем простое подтверждающее сообщение как fallback
+                String response = formatMessage(
+                    "✅ *Событие успешно создано!*\n\n" +
+                    "📅 Дата: %s\n" +
+                    "🕐 Время: %s\n" +
+                    "📝 Название: %s",
+                    completedEvent.getFormattedDate(),
+                    completedEvent.getFormattedTime(),
+                    completedEvent.getTitle()
+                );
+                ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+                messageService.sendMessage(chatId, response, keyboard);
+            }
+            
             messageService.answerCallbackQuery(callbackQueryId, "Событие создано");
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при создании события: userId={}, eventId={}, error={}", 

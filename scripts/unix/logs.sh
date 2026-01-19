@@ -1,10 +1,13 @@
 #!/bin/bash
 
+# Переход в корневую директорию проекта
+cd "$(dirname "$0")/../.." || exit 1
+
 # Скрипт для просмотра логов Docker Compose
 # Использование: 
-#   ./logs.sh           - все логи
-#   ./logs.sh app       - только логи приложения
-#   ./logs.sh postgres  - только логи PostgreSQL
+#   ./scripts/unix/logs.sh           - все логи
+#   ./scripts/unix/logs.sh app       - только логи приложения
+#   ./scripts/unix/logs.sh postgres  - только логи PostgreSQL
 
 set -e
 

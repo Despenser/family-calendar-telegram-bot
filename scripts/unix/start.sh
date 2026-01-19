@@ -1,7 +1,10 @@
 #!/bin/bash
 
+# Переход в корневую директорию проекта
+cd "$(dirname "$0")/../.." || exit 1
+
 # Скрипт для запуска Docker Compose
-# Использование: ./start.sh
+# Использование: ./scripts/unix/start.sh
 
 set -e
 
@@ -56,7 +59,7 @@ echo ""
 echo "✅ Family Calendar Bot успешно запущен!"
 echo ""
 echo "📝 Полезные команды:"
-echo "  - Просмотр логов: ./logs.sh"
-echo "  - Остановка: ./stop.sh"
-echo "  - Очистка данных: ./clean.sh"
+echo "  - Просмотр логов: ./scripts/unix/logs.sh"
+echo "  - Остановка: ./scripts/unix/stop.sh"
+echo "  - Очистка данных: ./scripts/unix/clean.sh"
 echo ""

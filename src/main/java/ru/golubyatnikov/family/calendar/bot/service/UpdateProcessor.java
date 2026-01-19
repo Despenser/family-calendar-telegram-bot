@@ -13,6 +13,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.handler.SearchCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.MessageCategory;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 import ru.golubyatnikov.family.calendar.bot.util.TextEventParser;
 
 import java.util.ArrayList;
@@ -65,6 +66,7 @@ public class UpdateProcessor {
     private final AttachmentService attachmentService;
     private final AuthorizationService authorizationService;
     private final EventService eventService;
+    private final BotMessageBuilder botMessageBuilder;
 
     /**
      * Асинхронно обрабатывает входящее обновление от Telegram Bot API.
@@ -152,15 +154,34 @@ public class UpdateProcessor {
             Long telegramId = message.getFrom().getId();
             Optional<User> userOptional = userService.findByTelegramId(telegramId);
             
-            // Если пользователь ожидает ввода поискового запроса, обрабатываем текст как запрос
-            if (userOptional.isPresent() && conversationStateService.isAwaitingSearchQuery(userOptional.get().getId())) {
-                handleSearchQuery(message, userOptional.get());
-                return;
+            // Логируем состояния пользователя для диагностики
+            if (userOptional.isPresent()) {
+                Long userId = userOptional.get().getId();
+                log.debug("Проверка состояний пользователя: userId={}, telegramId={}, " +
+                         "awaitingCompletionNote={}, awaitingSearchQuery={}, editingEvent={}, hasActiveDraft={}",
+                         userId, telegramId,
+                         conversationStateService.isAwaitingCompletionNote(userId),
+                         conversationStateService.isAwaitingSearchQuery(userId),
+                         conversationStateService.isEditingEvent(userId),
+                         conversationService.hasActiveDraft(userId));
             }
             
             // Если пользователь редактирует событие, обрабатываем текст как редактирование
+            // ВАЖНО: Эта проверка должна быть первой, чтобы редактирование имело приоритет
             if (userOptional.isPresent() && conversationStateService.isEditingEvent(userOptional.get().getId())) {
                 handleEventEditing(message, userOptional.get());
+                return;
+            }
+            
+            // Если пользователь ожидает ввода заметки к завершенному событию, обрабатываем текст как заметку
+            if (userOptional.isPresent() && conversationStateService.isAwaitingCompletionNote(userOptional.get().getId())) {
+                handleCompletionNote(message, userOptional.get(), originalText);
+                return;
+            }
+            
+            // Если пользователь ожидает ввода поискового запроса, обрабатываем текст как запрос
+            if (userOptional.isPresent() && conversationStateService.isAwaitingSearchQuery(userOptional.get().getId())) {
+                handleSearchQuery(message, userOptional.get());
                 return;
             }
             
@@ -232,20 +253,29 @@ public class UpdateProcessor {
                     ru.golubyatnikov.family.calendar.bot.model.Event completedEvent = 
                         conversationService.completeEventCreation(user.getId(), description);
                     
-                    String response = formatMessage(
-                        "✅ *Событие успешно создано!*\n\n" +
-                        "📅 Дата: %s\n" +
-                        "🕐 Время: %s\n" +
-                        "📝 Название: %s\n" +
-                        "%s",
-                        completedEvent.getFormattedDate(),
-                        completedEvent.getFormattedTime(),
-                        completedEvent.getTitle(),
-                        description != null ? "📄 Описание: " + description : ""
-                    );
-                    
-                    ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
-                    messageService.sendMessage(chatId, response, keyboard);
+                    // Отправляем сообщение о созданном событии и сохраняем messageId
+                    try {
+                        eventService.sendOrUpdateEventMessage(completedEvent, chatId);
+                        log.debug("Сообщение о созданном событии отправлено и messageId сохранён: eventId={}", 
+                                completedEvent.getId());
+                    } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                        log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
+                                completedEvent.getId(), e.getMessage());
+                        // Отправляем простое подтверждающее сообщение как fallback
+                        String response = formatMessage(
+                            "✅ *Событие успешно создано!*\n\n" +
+                            "📅 Дата: %s\n" +
+                            "🕐 Время: %s\n" +
+                            "📝 Название: %s\n" +
+                            "%s",
+                            completedEvent.getFormattedDate(),
+                            completedEvent.getFormattedTime(),
+                            completedEvent.getTitle(),
+                            description != null ? "📄 Описание: " + description : ""
+                        );
+                        ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+                        messageService.sendMessage(chatId, response, keyboard);
+                    }
                     
                     log.debug("Событие успешно создано: eventId={}, userId={}, telegramId={}", 
                         completedEvent.getId(), user.getId(), telegramId);
@@ -435,23 +465,25 @@ public class UpdateProcessor {
                 log.warn("Распознанное событие невалидно: parsedEvent={}, telegramId={}", 
                         parsedEvent, telegramId);
                 
-                String response = "❌ *Не удалось создать событие*\n\n";
+                StringBuilder responseBuilder = new StringBuilder();
+                responseBuilder.append("❌ *Не удалось создать событие*\n\n");
                 
                 if (parsedEvent.getTitle() == null || parsedEvent.getTitle().trim().isEmpty()) {
-                    response += "Название события не может быть пустым.\n\n";
+                    responseBuilder.append("Название события не может быть пустым.\n\n");
                 }
                 
                 if (parsedEvent.getDate() != null && 
                     parsedEvent.getDate().isBefore(java.time.LocalDate.now())) {
-                    response += "Дата события не может быть в прошлом.\n\n";
+                    responseBuilder.append("Дата события не может быть в прошлом.\n\n");
                 }
                 
-                response += "Попробуйте использовать один из форматов:\n" +
-                           "• `Событие: Встреча Дата: 15.01.2026 Время: 14:30`\n" +
-                           "• `Встреча 15.01.2026 14:30`\n" +
-                           "• `Встреча завтра в 14:30`\n\n" +
-                           "Или используйте команду " + escape("/add_event") + " для пошагового создания.";
+                responseBuilder.append("Попробуйте использовать один из форматов:\n")
+                              .append("• `Событие: Встреча Дата: 15.01.2026 Время: 14:30`\n")
+                              .append("• `Встреча 15.01.2026 14:30`\n")
+                              .append("• `Встреча завтра в 14:30`\n\n")
+                              .append("Или используйте команду /add_event для пошагового создания.");
                 
+                String response = formatMessage(responseBuilder.toString());
                 ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
                 messageService.sendMessage(chatId, response, keyboard);
                 return;
@@ -482,8 +514,9 @@ public class UpdateProcessor {
                      user.getId(), user.getTelegramId(), e.getMessage(), getStackTraceString(e), e);
             
             try {
-                String response = "❌ " + bold("Произошла ошибка при распознавании события") + "\\.\n\n" +
-                                italic("Используйте команду " + escape("/add_event") + " для пошагового создания\\.");
+                String response = formatMessage(
+                        "❌ *Произошла ошибка при распознавании события*.\n\n" +
+                        "_Используйте команду /add_event для пошагового создания._");
                 ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
                 messageService.sendMessage(message.getChatId(), response, keyboard);
             } catch (Exception ex) {
@@ -563,6 +596,150 @@ public class UpdateProcessor {
         }
     }
 
+    /**
+     * Обрабатывает ввод заметки к завершенному событию.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Получает контекст добавления заметки из ConversationStateService</li>
+     *   <li>Извлекает текст заметки из параметра noteText</li>
+     *   <li>Вызывает EventService.addCompletionNote() для сохранения заметки</li>
+     *   <li>Отправляет подтверждающее сообщение</li>
+     *   <li>Очищает состояние ожидания заметки</li>
+     * </ol>
+     * 
+     * @param message сообщение с текстом заметки
+     * @param user пользователь, добавляющий заметку
+     * @param noteText оригинальный текст заметки (до преобразования кнопок)
+     */
+    private void handleCompletionNote(Message message, User user, String noteText) {
+        try {
+            Long chatId = message.getChatId();
+            Long userId = user.getId();
+            Long telegramId = user.getTelegramId();
+            
+            log.debug("Обработка заметки к завершенному событию от пользователя: userId={}, telegramId={}", 
+                    userId, telegramId);
+            
+            // Получаем контекст добавления заметки
+            ConversationStateService.CompletionNoteContext context = 
+                conversationStateService.getCompletionNoteContext(userId);
+            
+            if (context == null) {
+                log.warn("Контекст добавления заметки не найден для пользователя: userId={}", userId);
+                conversationStateService.clearAwaitingCompletionNote(userId);
+                
+                String response = formatMessage(
+                    "❌ Произошла ошибка. Попробуйте завершить событие заново."
+                );
+                ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+                messageService.sendMessage(chatId, response, keyboard);
+                return;
+            }
+            
+            Long eventId = context.getEventId();
+            
+            // Добавляем заметку к событию
+            ru.golubyatnikov.family.calendar.bot.model.Event event = 
+                eventService.addCompletionNote(eventId, userId, noteText);
+            
+            log.info("Заметка успешно добавлена к событию ID={} пользователем ID={}", 
+                    eventId, userId);
+            
+            // Обновляем сообщение о событии с заметкой
+            try {
+                eventService.sendOrUpdateEventMessage(event, chatId);
+                log.debug("Сообщение о событии с заметкой обновлено: eventId={}", eventId);
+            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                log.warn("Не удалось обновить сообщение о событии с заметкой: eventId={}, error={}", 
+                        eventId, e.getMessage());
+                // Продолжаем выполнение, даже если обновление сообщения не удалось
+            }
+            
+            // Очищаем состояние ожидания заметки
+            conversationStateService.clearAwaitingCompletionNote(userId);
+            
+            // Отправляем подтверждающее сообщение
+            String response = formatMessage(
+                "✅ Заметка успешно добавлена к событию \"%s\"!\n\n" +
+                "📝 Заметка: %s",
+                event.getTitle(),
+                noteText
+            );
+            
+            ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+            messageService.sendMessage(chatId, response, keyboard);
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
+            log.error("Событие не найдено при добавлении заметки: userId={}, error={}", 
+                     user.getId(), e.getMessage());
+            
+            try {
+                conversationStateService.clearAwaitingCompletionNote(user.getId());
+                
+                String response = formatMessage(
+                    "❌ Событие не найдено. Возможно, оно было удалено."
+                );
+                ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+                messageService.sendMessage(message.getChatId(), response, keyboard);
+            } catch (Exception ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
+                        user.getTelegramId(), ex.getMessage(), ex);
+            }
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException e) {
+            log.error("Нет прав для добавления заметки: userId={}, error={}", 
+                     user.getId(), e.getMessage());
+            
+            try {
+                conversationStateService.clearAwaitingCompletionNote(user.getId());
+                
+                String response = formatMessage(
+                    "❌ У вас нет прав для добавления заметки к этому событию."
+                );
+                ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+                messageService.sendMessage(message.getChatId(), response, keyboard);
+            } catch (Exception ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
+                        user.getTelegramId(), ex.getMessage(), ex);
+            }
+            
+        } catch (IllegalStateException e) {
+            log.error("Событие не завершено при добавлении заметки: userId={}, error={}", 
+                     user.getId(), e.getMessage());
+            
+            try {
+                conversationStateService.clearAwaitingCompletionNote(user.getId());
+                
+                String response = formatMessage(
+                    "❌ Заметку можно добавить только к завершенному событию."
+                );
+                ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+                messageService.sendMessage(message.getChatId(), response, keyboard);
+            } catch (Exception ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
+                        user.getTelegramId(), ex.getMessage(), ex);
+            }
+            
+        } catch (Exception e) {
+            log.error("Ошибка при обработке заметки к событию: userId={}, telegramId={}, error={}, stackTrace={}", 
+                     user.getId(), user.getTelegramId(), e.getMessage(), getStackTraceString(e), e);
+            
+            try {
+                conversationStateService.clearAwaitingCompletionNote(user.getId());
+                
+                String response = formatMessage(
+                    "❌ Произошла ошибка при добавлении заметки. Попробуйте еще раз."
+                );
+                ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+                messageService.sendMessage(message.getChatId(), response, keyboard);
+            } catch (Exception ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}, stackTrace={}", 
+                        user.getTelegramId(), ex.getMessage(), getStackTraceString(ex), ex);
+            }
+        }
+    }
+
 
     /**
      * Обрабатывает команду с проверкой авторизации.
@@ -590,8 +767,8 @@ public class UpdateProcessor {
                         ? keyboardService.createAuthorizedUserKeyboard()
                         : keyboardService.createUnauthorizedUserKeyboard();
                 
-                String response = "Команда должна начинаться с символа '/'. Используйте " + 
-                                escape("/help") + " для списка доступных команд.";
+                String response = formatMessage(
+                        "Команда должна начинаться с символа '/'. Используйте /help для списка доступных команд.");
                 messageService.sendMessage(chatId, response, keyboard);
             } catch (Exception e) {
                 log.error("Ошибка при отправке сообщения об ошибке: {}", e.getMessage(), e);
@@ -722,60 +899,150 @@ public class UpdateProcessor {
     }
     
     /**
-     * Обрабатывает ввод текста при редактировании события.
+     * Обрабатывает ввод текста при редактировании поля события.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Получает EditingContext для пользователя</li>
+     *   <li>Определяет редактируемое поле (TITLE или DESCRIPTION)</li>
+     *   <li>Вызывает соответствующий метод EventService для обновления</li>
+     *   <li>Обновляет сообщение о событии через editMessageText с messageId из контекста</li>
+     *   <li>Удаляет текстовое сообщение пользователя через deleteMessage</li>
+     *   <li>Очищает состояние редактирования</li>
+     *   <li>Обрабатывает ошибки с отправкой сообщения пользователю</li>
+     * </ol>
      * 
      * @param message сообщение от пользователя
      * @param user авторизованный пользователь
      */
     private void handleEventEditing(Message message, User user) {
+        Long userId = user.getId();
+        Long chatId = message.getChatId();
+        Integer userMessageId = message.getMessageId();
+        String text = message.getText();
+        
+        handleEventFieldEdit(userId, chatId, userMessageId, text);
+    }
+    
+    /**
+     * Обрабатывает ввод текста при редактировании поля события.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Получает EditingContext для пользователя</li>
+     *   <li>Определяет редактируемое поле (TITLE или DESCRIPTION)</li>
+     *   <li>Вызывает соответствующий метод EventService для обновления</li>
+     *   <li>Обновляет сообщение о событии через editMessageText с messageId из контекста</li>
+     *   <li>Удаляет текстовое сообщение пользователя через deleteMessage</li>
+     *   <li>Очищает состояние редактирования</li>
+     *   <li>Обрабатывает ошибки с отправкой сообщения пользователю</li>
+     * </ol>
+     * 
+     * @param userId идентификатор пользователя
+     * @param chatId идентификатор чата
+     * @param userMessageId идентификатор сообщения пользователя
+     * @param text введенный текст
+     */
+    private void handleEventFieldEdit(Long userId, Long chatId, Integer userMessageId, String text) {
+        ConversationStateService.EditingContext context = conversationStateService.getEditingContext(userId);
+        
+        if (context == null || context.getCurrentField() == null) {
+            log.warn("Контекст редактирования не найден для пользователя ID={}", userId);
+            return;
+        }
+        
+        Long eventId = context.getEventId();
+        ConversationStateService.EditField field = context.getCurrentField();
+        Integer editingMessageId = context.getMessageId();
+        
+        log.info("Обработка ввода текста для поля '{}' события ID={} пользователем ID={}", 
+                field, eventId, userId);
+        
         try {
-            ConversationStateService.EditingContext context = 
-                conversationStateService.getEditingContext(user.getId());
+            ru.golubyatnikov.family.calendar.bot.model.Event updatedEvent = null;
             
-            if (context == null || context.getCurrentField() == null) {
-                log.warn("Контекст редактирования не найден для пользователя: userId={}", user.getId());
-                conversationStateService.clearEventEditing(user.getId());
-                return;
-            }
-            
-            String text = message.getText();
-            Long chatId = message.getChatId();
-            Long eventId = context.getEventId();
-            ConversationStateService.EditField field = context.getCurrentField();
-            
-            log.debug("Обработка редактирования события: userId={}, eventId={}, field={}, text='{}'", 
-                user.getId(), eventId, field, text);
-            
-            // Обновляем поле события
+            // Обновляем соответствующее поле события
             switch (field) {
                 case TITLE -> {
-                    eventService.updateEventTitle(eventId, user.getId(), text);
-                    messageService.sendMessage(chatId, "✅ Название обновлено: " + text);
-                    log.info("Название события обновлено: eventId={}, userId={}", eventId, user.getId());
+                    updatedEvent = eventService.updateEventTitle(eventId, userId, text);
+                    log.debug("Название события обновлено: eventId={}, newTitle='{}'", eventId, text);
                 }
                 case DESCRIPTION -> {
-                    eventService.updateEventDescription(eventId, user.getId(), text);
-                    messageService.sendMessage(chatId, "✅ Описание обновлено");
-                    log.info("Описание события обновлено: eventId={}, userId={}", eventId, user.getId());
+                    updatedEvent = eventService.updateEventDescription(eventId, userId, text);
+                    log.debug("Описание события обновлено: eventId={}", eventId);
                 }
                 default -> {
-                    log.warn("Неподдерживаемое поле для текстового редактирования: field={}", field);
+                    log.warn("Неподдерживаемое поле для текстового ввода: {}", field);
+                    return;
                 }
+            }
+            
+            if (updatedEvent != null && editingMessageId != null) {
+                // Обновляем сообщение о событии
+                try {
+                    // Используем buildEventMessageWithHeader для сохранения шапки, если это первое событие
+                    int eventCount = eventService.getActiveEventsCount(updatedEvent.getUser().getId());
+                    String eventMessage = botMessageBuilder.buildEventMessageWithHeader(updatedEvent, eventCount);
+                    InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(updatedEvent, userId);
+                    messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
+                    
+                    log.info("Поле '{}' события обновлено и сообщение обновлено: eventId={}, messageId={}", 
+                            field, eventId, editingMessageId);
+                } catch (TelegramApiException e) {
+                    log.error("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
+                            eventId, editingMessageId, e.getMessage());
+                    // Продолжаем выполнение, даже если обновление сообщения не удалось
+                }
+                
+                // Удаляем сообщение пользователя с введенным текстом
+                messageService.deleteMessage(chatId, userMessageId);
+                log.debug("Сообщение пользователя удалено: messageId={}", userMessageId);
             }
             
             // Очищаем состояние редактирования
-            conversationStateService.clearEventEditing(user.getId());
+            conversationStateService.clearEventEditing(userId);
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException e) {
+            log.error("Нет прав для редактирования события: userId={}, eventId={}, error={}", 
+                    userId, eventId, e.getMessage());
+            
+            try {
+                String errorMessage = "❌ У вас нет прав для редактирования этого события.";
+                messageService.sendMessage(chatId, errorMessage);
+            } catch (TelegramApiException ex) {
+                log.error("Не удалось отправить сообщение об ошибке: {}", ex.getMessage());
+            }
+            
+            conversationStateService.clearEventEditing(userId);
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
+            log.error("Событие не найдено при редактировании: userId={}, eventId={}, error={}", 
+                    userId, eventId, e.getMessage());
+            
+            try {
+                String errorMessage = "❌ Событие не найдено. Возможно, оно было удалено.";
+                messageService.sendMessage(chatId, errorMessage);
+            } catch (TelegramApiException ex) {
+                log.error("Не удалось отправить сообщение об ошибке: {}", ex.getMessage());
+            }
+            
+            conversationStateService.clearEventEditing(userId);
             
         } catch (Exception e) {
-            log.error("Ошибка при редактировании события: userId={}, error={}", 
-                user.getId(), e.getMessage(), e);
+            log.error("Ошибка при обновлении поля события: userId={}, eventId={}, field={}, error={}", 
+                    userId, eventId, field, e.getMessage(), e);
+            
+            // Отправляем сообщение об ошибке
             try {
-                messageService.sendMessage(message.getChatId(), 
-                    "❌ Произошла ошибка при обновлении события");
+                String errorMessage = "❌ Произошла ошибка при обновлении " + 
+                                    (field == ConversationStateService.EditField.TITLE ? "названия" : "описания") + 
+                                    " события. Попробуйте еще раз.";
+                messageService.sendMessage(chatId, errorMessage);
             } catch (TelegramApiException ex) {
-                log.error("Ошибка при отправке сообщения об ошибке: {}", ex.getMessage());
+                log.error("Не удалось отправить сообщение об ошибке: {}", ex.getMessage());
             }
-            conversationStateService.clearEventEditing(user.getId());
+            
+            conversationStateService.clearEventEditing(userId);
         }
     }
 }

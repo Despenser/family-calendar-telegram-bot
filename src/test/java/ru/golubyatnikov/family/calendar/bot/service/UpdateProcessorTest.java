@@ -463,6 +463,8 @@ class UpdateProcessorTest {
             when(keyboardService.buttonTextToCommand("Название события")).thenReturn("Название события");
             when(userService.findByTelegramId(123456L)).thenReturn(Optional.of(dbUser));
             when(dbUser.getId()).thenReturn(1L);
+            when(conversationStateService.isEditingEvent(1L)).thenReturn(false);
+            when(conversationStateService.isAwaitingCompletionNote(1L)).thenReturn(false);
             when(conversationStateService.isAwaitingSearchQuery(1L)).thenReturn(false);
             when(conversationService.hasActiveDraft(1L)).thenReturn(true);
 
@@ -470,7 +472,8 @@ class UpdateProcessorTest {
             updateProcessor.processUpdate(update);
 
             // Then
-            verify(conversationService).hasActiveDraft(1L);
+            // Метод может быть вызван несколько раз (для логирования и проверки условия)
+            verify(conversationService, atLeastOnce()).hasActiveDraft(1L);
             // Не должен вызывать commandDispatcher, так как есть активный черновик
             verify(commandDispatcher, never()).dispatch(any(Message.class));
         }
@@ -496,13 +499,16 @@ class UpdateProcessorTest {
             when(keyboardService.buttonTextToCommand("поисковый запрос")).thenReturn("поисковый запрос");
             when(userService.findByTelegramId(123456L)).thenReturn(Optional.of(dbUser));
             when(dbUser.getId()).thenReturn(1L);
+            when(conversationStateService.isEditingEvent(1L)).thenReturn(false);
+            when(conversationStateService.isAwaitingCompletionNote(1L)).thenReturn(false);
             when(conversationStateService.isAwaitingSearchQuery(1L)).thenReturn(true);
 
             // When
             updateProcessor.processUpdate(update);
 
             // Then
-            verify(conversationStateService).isAwaitingSearchQuery(1L);
+            // Метод может быть вызван несколько раз (для логирования и проверки условия)
+            verify(conversationStateService, atLeastOnce()).isAwaitingSearchQuery(1L);
             // Не должен вызывать commandDispatcher, так как ожидается поисковый запрос
             verify(commandDispatcher, never()).dispatch(any(Message.class));
         }

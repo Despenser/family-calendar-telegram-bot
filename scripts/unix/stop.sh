@@ -1,7 +1,10 @@
 #!/bin/bash
 
+# Переход в корневую директорию проекта
+cd "$(dirname "$0")/../.." || exit 1
+
 # Скрипт для остановки Docker Compose
-# Использование: ./stop.sh
+# Использование: ./scripts/unix/stop.sh
 
 set -e
 
@@ -21,5 +24,5 @@ echo ""
 echo "✅ Контейнеры успешно остановлены!"
 echo ""
 echo "💡 Примечание: Данные PostgreSQL сохранены в volume"
-echo "   Для полной очистки используйте: ./clean.sh"
+echo "   Для полной очистки используйте: ./scripts/unix/clean.sh"
 echo ""

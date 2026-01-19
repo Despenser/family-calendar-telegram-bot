@@ -332,6 +332,27 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     );
     
     /**
+     * Подсчитывает количество событий пользователя в диапазоне дат по типу и статусу.
+     * Используется для статистики активных событий с разделением на семейные и персональные.
+     * 
+     * @param userId идентификатор пользователя
+     * @param startDate начальная дата диапазона (включительно)
+     * @param endDate конечная дата диапазона (включительно)
+     * @param isPersonal флаг персонального события (true - персональные, false - семейные)
+     * @param status статус события (обычно ACTIVE)
+     *
+     * @return количество событий пользователя с указанным типом и статусом
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    int countByUserIdAndEventDateBetweenAndIsPersonalAndStatus(
+        Long userId,
+        LocalDate startDate,
+        LocalDate endDate,
+        Boolean isPersonal,
+        Event.EventStatus status
+    );
+    
+    /**
      * Находит все события семьи с определенным статусом, отсортированные по дате и времени.
      * Используется для фильтрации событий по типу (ALL).
      * 
@@ -382,4 +403,32 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         Boolean isPersonal, 
         Event.EventStatus status
     );
+    
+    /**
+     * Подсчитывает количество активных событий пользователя (исключая удаленные).
+     * Используется для отображения количества событий в шапке списка "Мои события".
+     * 
+     * @param userId идентификатор пользователя
+     * @param status статус события для исключения (обычно DELETED)
+     *
+     * @return количество активных событий пользователя
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    int countByUserIdAndStatusNot(Long userId, Event.EventStatus status);
+    
+    /**
+     * Подсчитывает количество событий пользователя с определенным статусом.
+     * Используется для точного подсчета событий со статусом ACTIVE для отображения
+     * корректного количества в шапке списка "Мои события".
+     * 
+     * <p>Метод использует Spring Data JPA naming convention для автоматической
+     * генерации запроса вида: {@code SELECT COUNT(e) FROM Event e WHERE e.user.id = :userId AND e.status = :status}</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @param status статус события (обычно ACTIVE)
+     *
+     * @return количество событий пользователя с указанным статусом
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    int countByUserIdAndStatus(Long userId, Event.EventStatus status);
 }

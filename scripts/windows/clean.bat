@@ -1,4 +1,7 @@
 @echo off
+REM Переход в корневую директорию проекта
+cd /d "%~dp0\..\.."
+
 REM Скрипт для полной очистки Docker Compose в Windows (включая volumes)
 REM Использование: clean.bat
 

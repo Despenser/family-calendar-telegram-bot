@@ -58,3 +58,8 @@ management:
     web:
       exposure:
         include: health
+
+# Отключаем очистку черновиков в тестах
+draft:
+  cleanup:
+    enabled: false

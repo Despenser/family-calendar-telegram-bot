@@ -62,6 +62,9 @@ class EventServiceTest {
     @Mock
     private EventHistoryService eventHistoryService;
 
+    @Mock
+    private ReminderService reminderService;
+
     @InjectMocks
     private EventService eventService;
 
@@ -519,5 +522,105 @@ class EventServiceTest {
 
         verify(eventRepository).findById(nonExistentEventId);
         verify(eventRepository, never()).delete(any(Event.class));
+    }
+
+    // ========== Тесты для completeEvent ==========
+
+    @Test
+    @DisplayName("Должен завершить активное событие когда пользователь является создателем")
+    void shouldCompleteActiveEventWhenUserIsCreator() {
+        // Given
+        Long eventId = testEvent.getId();
+        Long userId = testUser.getId();
+        testEvent.setStatus(Event.EventStatus.ACTIVE);
+
+        when(eventRepository.findById(eventId))
+                .thenReturn(Optional.of(testEvent));
+        when(eventRepository.save(any(Event.class)))
+                .thenReturn(testEvent);
+
+        // When
+        Event result = eventService.completeEvent(eventId, userId);
+
+        // Then
+        assertNotNull(result, "Завершенное событие не должно быть null");
+        verify(eventRepository).findById(eventId);
+        verify(eventRepository).save(any(Event.class));
+        verify(eventHistoryService).recordChange(
+                eq(eventId),
+                eq(userId),
+                eq(EventHistory.ActionType.UPDATED),
+                eq("status"),
+                eq("ACTIVE"),
+                eq("COMPLETED")
+        );
+    }
+
+    @Test
+    @DisplayName("Должен выбросить исключение при завершении события не создателем")
+    void shouldThrowExceptionWhenNonCreatorTriesToComplete() {
+        // Given
+        Long eventId = testEvent.getId();
+        Long unauthorizedUserId = anotherUser.getId();
+        testEvent.setStatus(Event.EventStatus.ACTIVE);
+
+        when(eventRepository.findById(eventId))
+                .thenReturn(Optional.of(testEvent));
+
+        // When & Then
+        UnauthorizedAccessException exception = assertThrows(
+                UnauthorizedAccessException.class,
+                () -> eventService.completeEvent(eventId, unauthorizedUserId),
+                "Должно быть выброшено UnauthorizedAccessException"
+        );
+
+        assertEquals("Только создатель события может его завершить",
+                exception.getMessage());
+        verify(eventRepository).findById(eventId);
+        verify(eventRepository, never()).save(any(Event.class));
+    }
+
+    @Test
+    @DisplayName("Должен выбросить исключение при завершении несуществующего события")
+    void shouldThrowExceptionWhenCompletingNonExistentEvent() {
+        // Given
+        Long nonExistentEventId = 999L;
+        Long userId = testUser.getId();
+
+        when(eventRepository.findById(nonExistentEventId))
+                .thenReturn(Optional.empty());
+
+        // When & Then
+        EventNotFoundException exception = assertThrows(
+                EventNotFoundException.class,
+                () -> eventService.completeEvent(nonExistentEventId, userId),
+                "Должно быть выброшено EventNotFoundException"
+        );
+
+        verify(eventRepository).findById(nonExistentEventId);
+        verify(eventRepository, never()).save(any(Event.class));
+    }
+
+    @Test
+    @DisplayName("Должен выбросить исключение при завершении неактивного события")
+    void shouldThrowExceptionWhenCompletingNonActiveEvent() {
+        // Given
+        Long eventId = testEvent.getId();
+        Long userId = testUser.getId();
+        testEvent.setStatus(Event.EventStatus.COMPLETED);
+
+        when(eventRepository.findById(eventId))
+                .thenReturn(Optional.of(testEvent));
+
+        // When & Then
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> eventService.completeEvent(eventId, userId),
+                "Должно быть выброшено IllegalStateException"
+        );
+
+        assertTrue(exception.getMessage().contains("Можно завершить только активное событие"));
+        verify(eventRepository).findById(eventId);
+        verify(eventRepository, never()).save(any(Event.class));
     }
 }

@@ -278,6 +278,107 @@ public class KeyboardService {
     }
 
     /**
+     * Создает inline клавиатуру для управления событием с учетом статуса и прав доступа.
+     * 
+     * <p>Эта перегруженная версия метода добавляет кнопку "Завершить событие" для активных событий,
+     * которые принадлежат текущему пользователю. Кнопка размещается перед кнопкой "Удалить".</p>
+     * 
+     * <p>Клавиатура содержит следующие кнопки:</p>
+     * <ul>
+     *   <li>✏️ Редактировать - для редактирования события</li>
+     *   <li>✅ Завершить событие - только для активных событий создателя</li>
+     *   <li>🗑️ Удалить - для удаления события</li>
+     * </ul>
+     * 
+     * <p>Callback data формируется в формате:</p>
+     * <ul>
+     *   <li>"edit_event_{eventId}" для редактирования</li>
+     *   <li>"complete_event_{eventId}" для завершения</li>
+     *   <li>"delete_event_{eventId}" для удаления</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.1, 4.1, 4.2, 4.3, 4.4</p>
+     * 
+     * @param event событие для создания клавиатуры
+     * @param userId идентификатор пользователя для проверки прав доступа
+     * @return настроенная InlineKeyboardMarkup с кнопками управления
+     * @throws IllegalArgumentException если event или userId равны null, или userId некорректен
+     * @see #createEventActionsKeyboard(Long)
+     */
+    public InlineKeyboardMarkup createEventActionsKeyboard(Event event, Long userId) {
+        // Валидация параметров
+        if (event == null) {
+            log.error("Попытка создать клавиатуру с null event");
+            throw new IllegalArgumentException("Event не может быть null");
+        }
+        
+        if (event.getId() == null) {
+            log.error("Попытка создать клавиатуру для события с null ID");
+            throw new IllegalArgumentException("Event ID не может быть null");
+        }
+        
+        if (userId == null) {
+            log.error("Попытка создать клавиатуру с null userId");
+            throw new IllegalArgumentException("UserId не может быть null");
+        }
+        
+        if (userId <= 0) {
+            log.error("Попытка создать клавиатуру с некорректным userId: {}", userId);
+            throw new IllegalArgumentException("UserId должен быть положительным числом, получено: " + userId);
+        }
+        
+        Long eventId = event.getId();
+        log.debug("Создание inline клавиатуры для события ID={} с учетом прав пользователя ID={}", 
+                eventId, userId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Первый ряд: кнопки редактирования и удаления
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        
+        InlineKeyboardButton editBtn = new InlineKeyboardButton("✏️ Редактировать");
+        String editCallbackData = "edit_event_" + eventId;
+        editBtn.setCallbackData(editCallbackData);
+        row1.add(editBtn);
+        
+        InlineKeyboardButton deleteBtn = new InlineKeyboardButton("🗑️ Удалить");
+        String deleteCallbackData = "delete_event_" + eventId;
+        deleteBtn.setCallbackData(deleteCallbackData);
+        row1.add(deleteBtn);
+        
+        rows.add(row1);
+        
+        // Второй ряд: кнопка "Завершить событие" (только для активных событий создателя)
+        boolean isActive = event.getStatus() == Event.EventStatus.ACTIVE;
+        boolean isOwner = event.belongsToUser(userId);
+        
+        if (isActive && isOwner) {
+            List<InlineKeyboardButton> row2 = new ArrayList<>();
+            
+            InlineKeyboardButton completeBtn = new InlineKeyboardButton("✅ Завершить событие");
+            String completeCallbackData = "complete_event_" + eventId;
+            completeBtn.setCallbackData(completeCallbackData);
+            row2.add(completeBtn);
+            
+            // Вставляем кнопку "Завершить" перед кнопкой "Удалить" (в начало списка)
+            rows.add(0, row2);
+            
+            log.debug("Inline клавиатура для события ID={} создана с кнопкой завершения: " +
+                    "buttonCount={}, editCallback='{}', completeCallback='{}', deleteCallback='{}'", 
+                    eventId, 3, editCallbackData, completeCallbackData, deleteCallbackData);
+        } else {
+            log.debug("Inline клавиатура для события ID={} создана без кнопки завершения " +
+                    "(isActive={}, isOwner={}): buttonCount={}, editCallback='{}', deleteCallback='{}'", 
+                    eventId, isActive, isOwner, 2, editCallbackData, deleteCallbackData);
+        }
+        
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
      * Создает inline клавиатуру для подтверждения удаления события.
      * 
      * <p>Эта клавиатура отображается после нажатия кнопки "Удалить" и требует

@@ -1,4 +1,7 @@
 @echo off
+REM Переход в корневую директорию проекта
+cd /d "%~dp0\..\.."
+
 REM Скрипт для просмотра логов Docker Compose в Windows
 REM Использование: 
 REM   logs.bat           - все логи

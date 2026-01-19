@@ -15,7 +15,6 @@ import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
  * <p>Обрабатывает следующие типы callback:</p>
  * <ul>
  *   <li>comment_ - добавление комментария к событию</li>
- *   <li>add_completion_note_ - добавление заметки к завершенному событию</li>
  * </ul>
  * 
  * <p><b>Требования:</b> 1.3, 2.5</p>
@@ -42,8 +41,7 @@ public class CommentCallbackHandler implements CallbackHandler {
             return false;
         }
         
-        return CallbackPrefix.COMMENT.matches(callbackData) ||
-               CallbackPrefix.ADD_COMPLETION_NOTE.matches(callbackData);
+        return CallbackPrefix.COMMENT.matches(callbackData);
     }
     
     @Override
@@ -59,8 +57,6 @@ public class CommentCallbackHandler implements CallbackHandler {
         
         if (CallbackPrefix.COMMENT.matches(callbackData)) {
             handleComment(callbackData, user.getId(), chatId, messageId, callbackQueryId);
-        } else if (CallbackPrefix.ADD_COMPLETION_NOTE.matches(callbackData)) {
-            handleAddCompletionNote(callbackData, user.getId(), chatId, messageId, callbackQueryId);
         }
     }
     
@@ -88,39 +84,6 @@ public class CommentCallbackHandler implements CallbackHandler {
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при отправке сообщения о комментарии: userId={}, error={}", 
                      userId, e.getMessage());
-            throw new RuntimeException("Ошибка при отправке сообщения", e);
-        }
-    }
-    
-    /**
-     * Обрабатывает добавление заметки к завершенному событию.
-     * 
-     * @param callbackData данные callback (формат: add_completion_note_{eventId})
-     * @param userId идентификатор пользователя
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения
-     * @param callbackQueryId идентификатор callback query
-     */
-    private void handleAddCompletionNote(String callbackData, Long userId, Long chatId, 
-                                        Integer messageId, String callbackQueryId) {
-        // Извлекаем ID события
-        String payload = CallbackPrefix.ADD_COMPLETION_NOTE.extractPayload(callbackData);
-        Long eventId = Long.parseLong(payload);
-        
-        log.info("Пользователь {} начал добавление заметки к завершенному событию ID={}", 
-                 userId, eventId);
-        
-        String message = "📝 Добавление заметки к завершенному событию\n\n" +
-                       "Отправьте текст заметки о том, как прошло событие:";
-        
-        // TODO: Установить контекст ожидания заметки для события
-        
-        try {
-            messageService.editMessageText(chatId, messageId, message, null);
-            messageService.answerCallbackQuery(callbackQueryId, "");
-        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
-            log.error("Ошибка при отправке сообщения о заметке: userId={}, eventId={}, error={}", 
-                     userId, eventId, e.getMessage());
             throw new RuntimeException("Ошибка при отправке сообщения", e);
         }
     }

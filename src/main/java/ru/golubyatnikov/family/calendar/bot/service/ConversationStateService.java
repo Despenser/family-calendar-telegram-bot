@@ -37,6 +37,12 @@ public class ConversationStateService {
     private final Map<Long, EditingContext> usersEditingEvents = new ConcurrentHashMap<>();
     
     /**
+     * Map для отслеживания пользователей, добавляющих заметку к завершенному событию.
+     * Key: userId, Value: CompletionNoteContext (eventId, chatId)
+     */
+    private final Map<Long, CompletionNoteContext> usersAwaitingCompletionNote = new ConcurrentHashMap<>();
+    
+    /**
      * Устанавливает состояние ожидания поискового запроса для пользователя.
      * 
      * @param userId идентификатор пользователя
@@ -85,9 +91,24 @@ public class ConversationStateService {
      * @param chatId идентификатор чата
      */
     public void startEventEditing(Long userId, Long eventId, Long chatId) {
-        EditingContext context = new EditingContext(eventId, chatId, null);
+        EditingContext context = new EditingContext(eventId, chatId, null, null);
         usersEditingEvents.put(userId, context);
         log.info("Пользователь ID={} начал редактирование события ID={}", userId, eventId);
+    }
+    
+    /**
+     * Начинает процесс редактирования события для пользователя с сохранением messageId.
+     * 
+     * @param userId идентификатор пользователя
+     * @param eventId идентификатор редактируемого события
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для редактирования
+     */
+    public void startEventEditing(Long userId, Long eventId, Long chatId, Integer messageId) {
+        EditingContext context = new EditingContext(eventId, chatId, null, messageId);
+        usersEditingEvents.put(userId, context);
+        log.info("Пользователь ID={} начал редактирование события ID={} в сообщении ID={}", 
+                userId, eventId, messageId);
     }
     
     /**
@@ -108,6 +129,17 @@ public class ConversationStateService {
      */
     public EditingContext getEditingContext(Long userId) {
         return usersEditingEvents.get(userId);
+    }
+    
+    /**
+     * Получает messageId для текущего редактирования.
+     * 
+     * @param userId идентификатор пользователя
+     * @return messageId или null, если пользователь не редактирует событие
+     */
+    public Integer getEditingMessageId(Long userId) {
+        EditingContext context = usersEditingEvents.get(userId);
+        return context != null ? context.getMessageId() : null;
     }
     
     /**
@@ -135,8 +167,51 @@ public class ConversationStateService {
     }
     
     /**
+     * Устанавливает состояние ожидания заметки к завершенному событию.
+     * 
+     * @param userId идентификатор пользователя
+     * @param eventId идентификатор завершенного события
+     * @param chatId идентификатор чата
+     */
+    public void setAwaitingCompletionNote(Long userId, Long eventId, Long chatId) {
+        CompletionNoteContext context = new CompletionNoteContext(eventId, chatId);
+        usersAwaitingCompletionNote.put(userId, context);
+        log.info("Пользователь ID={} переведен в режим ожидания заметки для события ID={}", userId, eventId);
+    }
+    
+    /**
+     * Проверяет, ожидает ли пользователь ввода заметки к завершенному событию.
+     * 
+     * @param userId идентификатор пользователя
+     * @return true, если пользователь ожидает ввода заметки
+     */
+    public boolean isAwaitingCompletionNote(Long userId) {
+        return usersAwaitingCompletionNote.containsKey(userId);
+    }
+    
+    /**
+     * Получает контекст добавления заметки для пользователя.
+     * 
+     * @param userId идентификатор пользователя
+     * @return контекст добавления заметки или null, если пользователь не ожидает ввода
+     */
+    public CompletionNoteContext getCompletionNoteContext(Long userId) {
+        return usersAwaitingCompletionNote.get(userId);
+    }
+    
+    /**
+     * Очищает состояние ожидания заметки к завершенному событию.
+     * 
+     * @param userId идентификатор пользователя
+     */
+    public void clearAwaitingCompletionNote(Long userId) {
+        usersAwaitingCompletionNote.remove(userId);
+        log.debug("Состояние ожидания заметки очищено для пользователя ID={}", userId);
+    }
+    
+    /**
      * Контекст редактирования события.
-     * Содержит информацию о редактируемом событии, чате и текущем поле.
+     * Содержит информацию о редактируемом событии, чате, текущем поле и сообщении.
      */
     @Data
     @AllArgsConstructor
@@ -155,6 +230,12 @@ public class ConversationStateService {
          * Текущее редактируемое поле
          */
         private EditField currentField;
+        
+        /**
+         * Идентификатор сообщения, в котором происходит редактирование.
+         * Используется для обновления того же сообщения при изменениях.
+         */
+        private Integer messageId;
     }
     
     /**
@@ -180,5 +261,23 @@ public class ConversationStateService {
          * Описание события
          */
         DESCRIPTION
+    }
+    
+    /**
+     * Контекст добавления заметки к завершенному событию.
+     * Содержит информацию о событии и чате.
+     */
+    @Data
+    @AllArgsConstructor
+    public static class CompletionNoteContext {
+        /**
+         * Идентификатор завершенного события
+         */
+        private Long eventId;
+        
+        /**
+         * Идентификатор чата
+         */
+        private Long chatId;
     }
 }
