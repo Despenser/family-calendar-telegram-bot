@@ -183,28 +183,21 @@ class EventCallbackHandlerTest {
         
         setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
         
-        // Создаем мок события для getEventById
+        // Создаем мок события для возврата из deleteEvent
         ru.golubyatnikov.family.calendar.bot.model.Event event = 
             new ru.golubyatnikov.family.calendar.bot.model.Event();
         event.setId(789L);
         event.setTitle("Тестовое событие");
         event.setUser(user);
-        event.setIsMyEventsHeader(false); // Не первое событие
         
-        when(eventService.getEventById(789L)).thenReturn(event);
-        
-        // Мокируем handleDeleteCallback - он вызывает eventService.deleteEvent,
-        // который в свою очередь вызывает myEventsCommandHandler.updateMyEventsHeaderCount
-        doNothing().when(myEventsCommandHandler).handleDeleteCallback(789L, user.getId());
+        // Мокируем deleteEvent - он автоматически удаляет сообщение и обновляет шапку
+        when(eventService.deleteEvent(789L, user.getId())).thenReturn(event);
 
         // When
         handler.handle(callbackQuery, user);
 
         // Then
-        verify(eventService).getEventById(789L);
-        verify(myEventsCommandHandler).handleDeleteCallback(789L, user.getId());
-        verify(messageService).deleteMessage(eq(chatId), eq(messageId));
-        verify(messageService, never()).sendMessage(eq(chatId), anyString());
+        verify(eventService).deleteEvent(789L, user.getId());
         verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Событие удалено"));
     }
 

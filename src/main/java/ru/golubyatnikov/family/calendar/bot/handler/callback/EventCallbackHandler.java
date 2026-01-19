@@ -62,8 +62,6 @@ public class EventCallbackHandler implements CallbackHandler {
                CallbackPrefix.DELETE_EVENT.matches(callbackData) ||
                CallbackPrefix.EDIT_FIELD.matches(callbackData) ||
                CallbackPrefix.COMPLETE_EVENT.matches(callbackData) ||
-               CallbackPrefix.ADD_COMPLETION_NOTE.matches(callbackData) ||
-               CallbackPrefix.SKIP_COMPLETION_NOTE.matches(callbackData) ||
                CallbackPrefix.EDIT_CANCEL.matches(callbackData);
     }
     
@@ -88,10 +86,6 @@ public class EventCallbackHandler implements CallbackHandler {
             handleEditField(callbackData, user, chatId, messageId, callbackQueryId);
         } else if (CallbackPrefix.COMPLETE_EVENT.matches(callbackData)) {
             handleCompleteEvent(callbackData, user.getId(), chatId, messageId, callbackQueryId);
-        } else if (CallbackPrefix.ADD_COMPLETION_NOTE.matches(callbackData)) {
-            handleAddCompletionNote(callbackData, user.getId(), chatId, callbackQueryId);
-        } else if (CallbackPrefix.SKIP_COMPLETION_NOTE.matches(callbackData)) {
-            handleSkipCompletionNote(user.getId(), chatId, callbackQueryId);
         } else if (CallbackPrefix.EDIT_CANCEL.matches(callbackData)) {
             handleEditCancel(callbackData, user.getId(), chatId, callbackQueryId);
         }
@@ -193,12 +187,19 @@ public class EventCallbackHandler implements CallbackHandler {
      * 
      * <p>Метод выполняет следующие действия:</p>
      * <ol>
-     *   <li>Выполняет удаление события (перемещение в корзину)</li>
-     *   <li>Удаляет сообщение из чата, из которого был вызван callback</li>
+     *   <li>Вызывает eventService.deleteEvent() для удаления события</li>
      *   <li>Отвечает на callback query с текстом "Событие удалено"</li>
      * </ol>
      * 
-     * <p><b>Требования:</b> 2.1, 2.2, 2.3, 2.4, 4.1, 4.2, 4.3</p>
+     * <p>EventService.deleteEvent() автоматически:</p>
+     * <ul>
+     *   <li>Удаляет сообщение события из чата</li>
+     *   <li>Обновляет статус события на DELETED</li>
+     *   <li>Сбрасывает messageId и isMyEventsHeader</li>
+     *   <li>Вызывает updateMyEventsHeaderAfterRemoval для обновления шапки</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.4</p>
      * 
      * @param callbackData данные callback (формат: delete_event_{eventId})
      * @param userId идентификатор пользователя
@@ -213,109 +214,25 @@ public class EventCallbackHandler implements CallbackHandler {
         log.info("Удаление события ID={} пользователем ID={}", eventId, userId);
         
         try {
-            // Получаем событие ДО удаления, чтобы проверить флаг isMyEventsHeader
-            var event = eventService.getEventById(eventId);
-            boolean wasFirstEvent = Boolean.TRUE.equals(event.getIsMyEventsHeader());
-            
-            // Выполняем удаление события (перемещение в корзину)
-            // Это обновит флаги в базе данных
-            myEventsCommandHandler.handleDeleteCallback(eventId, userId);
-            
-            // Удаляем сообщение, из которого был вызван callback
-            messageService.deleteMessage(chatId, messageId);
-            log.debug("Сообщение события удалено после удаления: eventId={}, messageId={}", 
-                     eventId, messageId);
-            
-            // Если удалили первое событие, нужно обновить второе событие с заголовком
-            if (wasFirstEvent) {
-                log.debug("Удалено первое событие, обновляем следующее событие с заголовком");
-                
-                // Получаем список оставшихся событий
-                List<Event> userEvents = eventService.getUserEvents(userId);
-                
-                if (!userEvents.isEmpty()) {
-                    // Первое событие в списке - это новое первое событие
-                    var nextEvent = userEvents.get(0);
-                    
-                    log.debug("Найдено следующее событие ID={}, обновляем его сообщение с заголовком", 
-                             nextEvent.getId());
-                    
-                    // Пытаемся обновить существующее сообщение с заголовком
-                    if (nextEvent.getMessageId() != null) {
-                        try {
-                            // Формируем текст с заголовком
-                            int eventCount = userEvents.size();
-                            String header = botMessageBuilder.buildMyEventsHeader(eventCount);
-                            String eventText = botMessageBuilder.buildEventMessage(nextEvent);
-                            String combinedMessage = header + "\n" + eventText;
-                            
-                            // Создаем клавиатуру
-                            var keyboard = keyboardService.createEventActionsKeyboard(nextEvent, userId);
-                            
-                            // Пытаемся обновить существующее сообщение
-                            boolean updated = messageService.tryEditMessageText(
-                                chatId, 
-                                nextEvent.getMessageId().intValue(), 
-                                combinedMessage, 
-                                keyboard
-                            );
-                            
-                            if (updated) {
-                                log.info("Сообщение следующего события ID={} успешно обновлено с заголовком", 
-                                        nextEvent.getId());
-                            } else {
-                                // Если не удалось обновить (сообщение удалено пользователем), создаем новое
-                                log.warn("Не удалось обновить сообщение следующего события ID={}, создаем новое", 
-                                        nextEvent.getId());
-                                nextEvent.setMessageId(null);
-                                eventService.saveEvent(nextEvent);
-                                eventService.sendOrUpdateEventMessage(nextEvent, chatId);
-                            }
-                        } catch (Exception e) {
-                            log.error("Ошибка при обновлении сообщения следующего события ID={}: {}", 
-                                     nextEvent.getId(), e.getMessage());
-                            // Пытаемся создать новое сообщение
-                            try {
-                                nextEvent.setMessageId(null);
-                                eventService.saveEvent(nextEvent);
-                                eventService.sendOrUpdateEventMessage(nextEvent, chatId);
-                            } catch (Exception ex) {
-                                log.error("Не удалось создать новое сообщение для события ID={}: {}", 
-                                         nextEvent.getId(), ex.getMessage());
-                            }
-                        }
-                    } else {
-                        // Если messageId нет, отправляем новое сообщение
-                        try {
-                            eventService.sendOrUpdateEventMessage(nextEvent, chatId);
-                            log.info("Новое сообщение для следующего события ID={} отправлено с заголовком", 
-                                    nextEvent.getId());
-                        } catch (Exception e) {
-                            log.error("Не удалось отправить сообщение для события ID={}: {}", 
-                                     nextEvent.getId(), e.getMessage());
-                        }
-                    }
-                } else {
-                    log.debug("Следующее событие не найдено, это было последнее событие пользователя");
-                }
-            }
+            // Удаляем событие (перемещаем в корзину)
+            // EventService автоматически удалит сообщение и обновит шапку /my_events
+            eventService.deleteEvent(eventId, userId);
             
             // Отвечаем на callback query с подтверждением
             messageService.answerCallbackQuery(callbackQueryId, "Событие удалено");
             
-        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+            log.debug("Событие ID={} успешно удалено пользователем ID={}", eventId, userId);
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
+            // Обработка ошибок без отправки сообщений
+            log.error("Событие не найдено: eventId={}, userId={}", eventId, userId, e);
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException e) {
+            // Обработка ошибок без отправки сообщений
+            log.error("Нет прав на удаление события: eventId={}, userId={}", eventId, userId, e);
+        } catch (Exception e) {
+            // Обработка других ошибок без отправки сообщений
             log.error("Ошибка при удалении события: eventId={}, userId={}, error={}", 
-                     eventId, userId, e.getMessage());
-            
-            // При ошибке отправляем сообщение об ошибке
-            try {
-                messageService.sendMessage(chatId, "❌ Не удалось удалить событие. Попробуйте позже.");
-                messageService.answerCallbackQuery(callbackQueryId, "Ошибка удаления");
-            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
-                log.error("Ошибка при отправке сообщения об ошибке: {}", ex.getMessage());
-            }
-            
-            throw new RuntimeException("Ошибка при удалении события", e);
+                     eventId, userId, e.getMessage(), e);
         }
     }
     
@@ -538,15 +455,20 @@ public class EventCallbackHandler implements CallbackHandler {
      * <ol>
      *   <li>Извлекает eventId из callback data</li>
      *   <li>Вызывает EventService.completeEvent() для завершения события</li>
-     *   <li>Удаляет сообщение из чата, из которого был вызван callback</li>
-     *   <li>Отправляет подтверждающее сообщение с предложением добавить заметку</li>
-     *   <li>Создает клавиатуру с кнопкой "Добавить заметку"</li>
      *   <li>Отвечает на callback query</li>
      * </ol>
      * 
+     * <p>EventService.completeEvent() автоматически:</p>
+     * <ul>
+     *   <li>Удаляет сообщение события из чата</li>
+     *   <li>Изменяет статус события на COMPLETED</li>
+     *   <li>Сбрасывает messageId и isMyEventsHeader</li>
+     *   <li>Вызывает updateMyEventsHeaderAfterRemoval для обновления шапки</li>
+     * </ul>
+     * 
      * <p>Все ошибки обрабатываются через аннотацию @HandleCallbackErrors.</p>
      * 
-     * <p><b>Требования:</b> 2.1, 2.2, 2.3, 2.4, 2.5, 4.1, 4.2, 4.3, 4.4</p>
+     * <p><b>Требования:</b> 1.1, 1.2, 1.4</p>
      * 
      * @param callbackData данные callback (формат: complete_event_{eventId})
      * @param userId идентификатор пользователя
@@ -562,37 +484,28 @@ public class EventCallbackHandler implements CallbackHandler {
         
         try {
             // Завершаем событие
-            ru.golubyatnikov.family.calendar.bot.model.Event completedEvent = 
-                eventService.completeEvent(eventId, userId);
+            // EventService автоматически удалит сообщение и обновит шапку /my_events
+            eventService.completeEvent(eventId, userId);
             
             log.info("Событие ID={} успешно завершено вручную пользователем ID={}", 
                     eventId, userId);
             
-            // Удаляем сообщение, из которого был вызван callback
-            messageService.deleteMessage(chatId, messageId);
-            log.debug("Сообщение события удалено после завершения: eventId={}, messageId={}", 
-                     eventId, messageId);
-            
-            // Формируем подтверждающее сообщение
-            String message = formatMessage(
-                "✅ Событие \"%s\" успешно завершено!\n\n" +
-                "Хотите добавить заметку о том, как прошло событие?",
-                completedEvent.getTitle()
-            );
-            
-            // Создаем клавиатуру с кнопкой "Добавить заметку"
-            InlineKeyboardMarkup keyboard = createCompletionNoteKeyboard(eventId);
-            
-            // Отправляем сообщение с клавиатурой
-            messageService.sendMessage(chatId, message, keyboard);
-            
             // Отвечаем на callback query
             messageService.answerCallbackQuery(callbackQueryId, "Событие завершено");
             
-        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
-            log.error("Ошибка Telegram API при завершении события: eventId={}, userId={}, error={}", 
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
+            // Обработка ошибок без отправки сообщений
+            log.error("Событие не найдено: eventId={}, userId={}", eventId, userId, e);
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException e) {
+            // Обработка ошибок без отправки сообщений
+            log.error("Нет прав на завершение события: eventId={}, userId={}", eventId, userId, e);
+        } catch (IllegalStateException e) {
+            // Обработка ошибок без отправки сообщений
+            log.error("Неверное состояние события: eventId={}, userId={}", eventId, userId, e);
+        } catch (Exception e) {
+            // Обработка других ошибок без отправки сообщений
+            log.error("Ошибка при завершении события: eventId={}, userId={}, error={}", 
                      eventId, userId, e.getMessage(), e);
-            throw new RuntimeException("Ошибка при завершении события", e);
         }
     }
     

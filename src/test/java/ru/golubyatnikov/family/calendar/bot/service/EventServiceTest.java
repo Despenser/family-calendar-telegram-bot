@@ -484,6 +484,10 @@ class EventServiceTest {
         when(eventRepository.findById(eventId))
                 .thenReturn(Optional.of(testEvent));
         when(eventRepository.save(any(Event.class))).thenReturn(testEvent);
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(testUser));
+        when(eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE))
+                .thenReturn(List.of());
 
         // When
         eventService.deleteEvent(eventId, userId);
@@ -552,6 +556,10 @@ class EventServiceTest {
                 .thenReturn(Optional.of(testEvent));
         when(eventRepository.save(any(Event.class)))
                 .thenReturn(testEvent);
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(testUser));
+        when(eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE))
+                .thenReturn(List.of());
 
         // When
         Event result = eventService.completeEvent(eventId, userId);

@@ -31,6 +31,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
+
 /**
  * Сервис для управления событиями в семейном календаре.
  * 
@@ -476,22 +479,25 @@ public class EventService {
      * <ol>
      *   <li>Проверяет существование события</li>
      *   <li>Проверяет права доступа (только создатель может удалять)</li>
-     *   <li>Если удаляется первое событие (isMyEventsHeader = true), передает флаг следующему событию</li>
+     *   <li>Удаляет сообщение события из чата</li>
      *   <li>Изменяет статус события на DELETED</li>
+     *   <li>Сбрасывает messageId и isMyEventsHeader</li>
      *   <li>Устанавливает дату удаления</li>
      *   <li>Записывает действие в историю</li>
+     *   <li>Обновляет шапку /my_events</li>
      * </ol>
      * 
      * <p>Событие хранится в корзине 30 дней, после чего автоматически удаляется.</p>
      * 
-     * <p><b>Требования:</b> 7.3, 7.5, 19.1, 18.5, 2.3, 4.1, 4.2, 4.3</p>
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4, 7.3, 7.5, 19.1, 18.5, 2.3, 4.1, 4.2, 4.3</p>
      * 
      * @param eventId идентификатор события для удаления
      * @param userId идентификатор пользователя, выполняющего удаление
+     * @return удаленное событие
      * @throws EventNotFoundException если событие с указанным ID не найдено
      * @throws UnauthorizedAccessException если пользователь не является создателем события
      */
-    public void deleteEvent(Long eventId, Long userId) {
+    public Event deleteEvent(Long eventId, Long userId) {
         log.debug("Перемещение события ID={} в корзину пользователем ID={}", eventId, userId);
         
         // Поиск события
@@ -509,45 +515,40 @@ public class EventService {
                 "Только создатель события может его удалить");
         }
         
-        // Сохраняем информацию о том, было ли это первое событие
-        boolean wasFirstEvent = Boolean.TRUE.equals(event.getIsMyEventsHeader());
-        Long chatId = event.getUser().getTelegramId();
+        // Удаляем сообщение события из чата
+        if (event.getMessageId() != null) {
+            Long chatId = event.getUser().getTelegramId();
+            if (chatId != null) {
+                try {
+                    telegramMessageService.deleteMessage(chatId, event.getMessageId().intValue());
+                    log.debug("Сообщение события удалено при удалении: eventId={}, messageId={}", 
+                             eventId, event.getMessageId());
+                } catch (Exception e) {
+                    log.warn("Не удалось удалить сообщение события при удалении: eventId={}, messageId={}, error={}", 
+                             eventId, event.getMessageId(), e.getMessage());
+                }
+            } else {
+                log.warn("Не удалось получить chatId для удаления сообщения события ID={}", eventId);
+            }
+        }
         
-        // Перемещение в корзину (делаем это СНАЧАЛА)
+        // Перемещение в корзину
         event.setStatus(Event.EventStatus.DELETED);
         event.setDeletedAt(LocalDateTime.now());
-        eventRepository.save(event);
+        event.setMessageId(null);
+        event.setIsMyEventsHeader(false);
+        
+        Event deletedEvent = eventRepository.save(event);
         
         log.info("Событие ID={} успешно перемещено в корзину пользователем ID={}", eventId, userId);
         
         // Запись в историю изменений
         eventHistoryService.recordDeletion(eventId, userId);
         
-        // Если удалили первое событие в списке "Мои события", передаем флаг следующему
-        if (wasFirstEvent) {
-            log.debug("Удалено первое событие в списке 'Мои события', ищем следующее событие");
-            
-            // ВАЖНО: Получаем список активных событий ПОСЛЕ удаления текущего
-            List<Event> userEvents = getUserEvents(event.getUser().getId());
-            
-            if (!userEvents.isEmpty()) {
-                // Первое событие в списке становится новым первым
-                Event nextEvent = userEvents.get(0);
-                
-                log.debug("Найдено следующее событие ID={}, передаем флаг isMyEventsHeader", nextEvent.getId());
-                
-                // Устанавливаем флаг для следующего события
-                nextEvent.setIsMyEventsHeader(true);
-                saveEvent(nextEvent);
-                
-                log.info("Флаг isMyEventsHeader передан следующему событию ID={}", nextEvent.getId());
-            } else {
-                log.debug("Следующее событие не найдено, это было последнее событие пользователя");
-            }
-        }
+        // Обновляем шапку /my_events после удаления события
+        updateMyEventsHeaderAfterRemoval(userId);
         
-        // Обновляем счетчик событий в шапке
-        myEventsCommandHandler.updateMyEventsHeaderCount(userId);
+        return deletedEvent;
     }
     
     /**
@@ -558,13 +559,16 @@ public class EventService {
      *   <li>Проверяет существование события</li>
      *   <li>Проверяет права доступа (только создатель может завершить)</li>
      *   <li>Проверяет статус события (должно быть ACTIVE)</li>
+     *   <li>Удаляет сообщение события из чата</li>
      *   <li>Изменяет статус на COMPLETED</li>
+     *   <li>Сбрасывает messageId и isMyEventsHeader</li>
      *   <li>Устанавливает completedAt в текущее время</li>
      *   <li>Записывает действие в историю изменений</li>
      *   <li>Отмечает все неотправленные напоминания как отправленные</li>
+     *   <li>Обновляет шапку /my_events</li>
      * </ol>
      * 
-     * <p><b>Требования:</b> 1.2, 1.3, 1.4, 1.5, 3.1, 3.2, 3.3, 5.1</p>
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4, 1.5, 3.1, 3.2, 3.3, 5.1</p>
      * 
      * @param eventId идентификатор события
      * @param userId идентификатор пользователя, завершающего событие
@@ -602,9 +606,28 @@ public class EventService {
                              event.getStatus()));
         }
         
+        // Удаляем сообщение события из чата
+        if (event.getMessageId() != null) {
+            Long chatId = event.getUser().getTelegramId();
+            if (chatId != null) {
+                try {
+                    telegramMessageService.deleteMessage(chatId, event.getMessageId().intValue());
+                    log.debug("Сообщение события удалено при завершении: eventId={}, messageId={}", 
+                             eventId, event.getMessageId());
+                } catch (Exception e) {
+                    log.warn("Не удалось удалить сообщение события при завершении: eventId={}, messageId={}, error={}", 
+                             eventId, event.getMessageId(), e.getMessage());
+                }
+            } else {
+                log.warn("Не удалось получить chatId для удаления сообщения события ID={}", eventId);
+            }
+        }
+        
         // Установка статуса COMPLETED и completedAt
         event.setStatus(Event.EventStatus.COMPLETED);
         event.setCompletedAt(LocalDateTime.now());
+        event.setMessageId(null);
+        event.setIsMyEventsHeader(false);
         
         Event completedEvent = eventRepository.save(event);
         log.info("Событие ID={} успешно завершено вручную пользователем ID={}", eventId, userId);
@@ -622,8 +645,8 @@ public class EventService {
         // Обработка напоминаний
         handleEventCompletion(eventId);
         
-        // Обновляем счетчик событий в шапке
-        myEventsCommandHandler.updateMyEventsHeaderCount(userId);
+        // Обновляем шапку /my_events после удаления события
+        updateMyEventsHeaderAfterRemoval(userId);
         
         return completedEvent;
     }
@@ -1004,6 +1027,106 @@ public class EventService {
             log.error("Ошибка при отметке напоминаний для события ID={}: {}", 
                      eventId, e.getMessage(), e);
         }
+    }
+    
+    /**
+     * Обновляет шапку /my_events после удаления или завершения события.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Получает актуальный список активных событий пользователя</li>
+     *   <li>Если список пуст - отправляет сообщение о пустом состоянии</li>
+     *   <li>Если есть события - устанавливает isMyEventsHeader для первого события</li>
+     *   <li>Обновляет счетчик в шапке через updateMyEventsHeaderCount</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3</p>
+     * 
+     * @param userId идентификатор пользователя
+     */
+    @Transactional
+    public void updateMyEventsHeaderAfterRemoval(Long userId) {
+        log.debug("Обновление шапки /my_events после удаления события для пользователя ID={}", userId);
+        
+        // Получаем актуальный список активных событий
+        List<Event> activeEvents = getUserEvents(userId);
+        
+        // Получаем пользователя для доступа к chatId
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> {
+                log.error("Пользователь с ID={} не найден при обновлении шапки /my_events", userId);
+                return new UserNotFoundException(userId);
+            });
+        
+        Long chatId = user.getTelegramId();
+        
+        if (chatId == null) {
+            log.warn("Не удалось получить chatId для пользователя ID={}", userId);
+            return;
+        }
+        
+        if (activeEvents.isEmpty()) {
+            // Отправляем сообщение о пустом состоянии
+            String emptyMessage = buildEmptyStateMessage();
+            try {
+                telegramMessageService.sendMessage(chatId, emptyMessage);
+                log.info("Сообщение о пустом состоянии отправлено пользователю ID={}", userId);
+            } catch (Exception e) {
+                log.error("Ошибка при отправке сообщения о пустом состоянии пользователю ID={}: {}", 
+                         userId, e.getMessage(), e);
+            }
+            return;
+        }
+        
+        // Находим новое первое событие
+        Event newFirstEvent = activeEvents.get(0);
+        
+        // Устанавливаем флаг isMyEventsHeader для нового первого события
+        if (!Boolean.TRUE.equals(newFirstEvent.getIsMyEventsHeader())) {
+            newFirstEvent.setIsMyEventsHeader(true);
+            eventRepository.save(newFirstEvent);
+            log.debug("Флаг isMyEventsHeader установлен для события ID={}", newFirstEvent.getId());
+        }
+        
+        // Сбрасываем флаг isMyEventsHeader для остальных событий (если он был установлен)
+        // Это обеспечивает уникальность флага (Требование 2.2)
+        for (int i = 1; i < activeEvents.size(); i++) {
+            Event event = activeEvents.get(i);
+            if (Boolean.TRUE.equals(event.getIsMyEventsHeader())) {
+                log.debug("Сброс флага isMyEventsHeader=false для события ID={}", event.getId());
+                event.setIsMyEventsHeader(false);
+                eventRepository.save(event);
+            }
+        }
+        
+        // Обновляем счетчик в шапке
+        myEventsCommandHandler.updateMyEventsHeaderCount(userId);
+        
+        log.debug("Шапка /my_events успешно обновлена для пользователя ID={}", userId);
+    }
+    
+    /**
+     * Формирует сообщение о пустом состоянии /my_events.
+     * 
+     * <p>Сообщение включает:</p>
+     * <ul>
+     *   <li>Заголовок "Мои события"</li>
+     *   <li>Информацию об отсутствии событий</li>
+     *   <li>Подсказку о добавлении нового события</li>
+     * </ul>
+     * 
+     * <p>Все специальные символы MarkdownV2 корректно экранированы.</p>
+     * 
+     * <p><b>Требования:</b> 3.1, 3.2, 3.3</p>
+     * 
+     * @return отформатированное сообщение о пустом состоянии
+     */
+    private String buildEmptyStateMessage() {
+        StringBuilder message = new StringBuilder();
+        message.append("📋 ").append(bold("Мои события")).append("\n\n");
+        message.append(escape("У вас пока нет созданных событий.\n\n"));
+        message.append(escape("Используйте ")).append(escape("/add_event")).append(escape(" для добавления нового события."));
+        return message.toString();
     }
     
     /**
