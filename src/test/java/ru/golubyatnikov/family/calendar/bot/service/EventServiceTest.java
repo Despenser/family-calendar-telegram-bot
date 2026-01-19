@@ -258,7 +258,8 @@ class EventServiceTest {
 
         List<Event> expectedEvents = Arrays.asList(event1, event2);
 
-        when(eventRepository.findByFamilyIdAndEventDateBetween(familyId, startDate, endDate))
+        when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
+                familyId, startDate, endDate, Event.EventStatus.ACTIVE))
                 .thenReturn(expectedEvents);
 
         // When
@@ -269,7 +270,8 @@ class EventServiceTest {
         assertEquals(2, result.size(), "Должно быть найдено 2 события");
         assertEquals("Event 1", result.get(0).getTitle());
         assertEquals("Event 2", result.get(1).getTitle());
-        verify(eventRepository).findByFamilyIdAndEventDateBetween(familyId, startDate, endDate);
+        verify(eventRepository).findByFamilyIdAndEventDateBetweenAndStatus(
+                familyId, startDate, endDate, Event.EventStatus.ACTIVE);
     }
 
     @Test
@@ -281,7 +283,8 @@ class EventServiceTest {
         LocalDate startDate = LocalDate.now();
         LocalDate endDate = startDate.plusDays(days);
 
-        when(eventRepository.findByFamilyIdAndEventDateBetween(familyId, startDate, endDate))
+        when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
+                familyId, startDate, endDate, Event.EventStatus.ACTIVE))
                 .thenReturn(List.of());
 
         // When
@@ -290,7 +293,8 @@ class EventServiceTest {
         // Then
         assertNotNull(result, "Результат не должен быть null");
         assertTrue(result.isEmpty(), "Список должен быть пустым");
-        verify(eventRepository).findByFamilyIdAndEventDateBetween(familyId, startDate, endDate);
+        verify(eventRepository).findByFamilyIdAndEventDateBetweenAndStatus(
+                familyId, startDate, endDate, Event.EventStatus.ACTIVE);
     }
 
     @Test

@@ -224,22 +224,29 @@ public class EventService {
     }
     
     /**
-     * Получает предстоящие события семьи на указанное количество дней.
+     * Получает предстоящие активные события семьи на указанное количество дней.
      * 
-     * <p>Метод возвращает все события семьи, которые запланированы в диапазоне
-     * от текущей даты до указанного количества дней в будущем. События
-     * автоматически сортируются по дате и времени.</p>
+     * <p>Метод возвращает только активные события семьи (со статусом ACTIVE), 
+     * которые запланированы в диапазоне от текущей даты до указанного количества 
+     * дней в будущем. События автоматически сортируются по дате и времени.</p>
      * 
-     * <p><b>Требования:</b> 5.1, 5.4</p>
+     * <p>Исключаются события со статусами:</p>
+     * <ul>
+     *   <li>COMPLETED - завершенные события</li>
+     *   <li>DELETED - удаленные события (в корзине)</li>
+     *   <li>DRAFT - черновики событий</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 5.1, 5.4</p>
      * 
      * @param familyId идентификатор семьи
      * @param days количество дней для поиска событий (от текущей даты)
-     * @return список предстоящих событий, отсортированный по дате и времени
+     * @return список активных предстоящих событий, отсортированный по дате и времени
      * @throws IllegalArgumentException если days меньше или равно 0
      */
     @Transactional(readOnly = true)
     public List<Event> getUpcomingEvents(Long familyId, int days) {
-        log.debug("Получение предстоящих событий для семьи ID={} на {} дней", familyId, days);
+        log.debug("Получение активных предстоящих событий для семьи ID={} на {} дней", familyId, days);
         
         if (days <= 0) {
             throw new IllegalArgumentException("Количество дней должно быть больше 0");
@@ -248,10 +255,10 @@ public class EventService {
         LocalDate startDate = LocalDate.now();
         LocalDate endDate = startDate.plusDays(days);
         
-        List<Event> events = eventRepository.findByFamilyIdAndEventDateBetween(
-            familyId, startDate, endDate);
+        List<Event> events = eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
+            familyId, startDate, endDate, Event.EventStatus.ACTIVE);
         
-        log.debug("Найдено {} предстоящих событий для семьи ID={}", events.size(), familyId);
+        log.debug("Найдено {} активных предстоящих событий для семьи ID={}", events.size(), familyId);
         return events;
     }
     
