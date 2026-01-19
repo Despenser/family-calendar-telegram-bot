@@ -246,7 +246,7 @@ public class EventService {
     public List<Event> getUserEvents(Long userId) {
         log.debug("Получение активных событий пользователя ID={}", userId);
         
-        List<Event> events = eventRepository.findByUserIdAndStatusOrderByEventDateAsc(
+        List<Event> events = eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(
             userId, 
             Event.EventStatus.ACTIVE
         );

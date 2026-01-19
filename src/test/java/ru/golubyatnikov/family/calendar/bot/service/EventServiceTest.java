@@ -320,7 +320,7 @@ class EventServiceTest {
 
         List<Event> expectedEvents = Arrays.asList(event1, event2);
 
-        when(eventRepository.findByUserIdAndStatusOrderByEventDateAsc(userId, Event.EventStatus.ACTIVE))
+        when(eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE))
                 .thenReturn(expectedEvents);
 
         // When
@@ -331,7 +331,7 @@ class EventServiceTest {
         assertEquals(2, result.size(), "Должно быть найдено 2 события");
         assertEquals("User Event 1", result.get(0).getTitle());
         assertEquals("User Event 2", result.get(1).getTitle());
-        verify(eventRepository).findByUserIdAndStatusOrderByEventDateAsc(userId, Event.EventStatus.ACTIVE);
+        verify(eventRepository).findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE);
     }
 
     @Test
@@ -340,7 +340,7 @@ class EventServiceTest {
         // Given
         Long userId = testUser.getId();
 
-        when(eventRepository.findByUserIdAndStatusOrderByEventDateAsc(userId, Event.EventStatus.ACTIVE))
+        when(eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE))
                 .thenReturn(List.of());
 
         // When
@@ -349,7 +349,7 @@ class EventServiceTest {
         // Then
         assertNotNull(result, "Результат не должен быть null");
         assertTrue(result.isEmpty(), "Список должен быть пустым");
-        verify(eventRepository).findByUserIdAndStatusOrderByEventDateAsc(userId, Event.EventStatus.ACTIVE);
+        verify(eventRepository).findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE);
     }
 
     // ========== Тесты для updateEvent ==========

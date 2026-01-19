@@ -70,16 +70,16 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByUserIdOrderByEventDateAsc(Long userId);
     
     /**
-     * Находит все события пользователя с определенным статусом, отсортированные по дате в порядке возрастания.
+     * Находит все события пользователя с определенным статусом, отсортированные по дате и времени в порядке возрастания.
      * 
      * @param userId идентификатор пользователя
      * @param status статус события (ACTIVE, DELETED, COMPLETED, DRAFT)
      *
-     * @return список событий пользователя с указанным статусом, отсортированный по дате возрастания
+     * @return список событий пользователя с указанным статусом, отсортированный по дате и времени возрастания
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findByUserIdAndStatusOrderByEventDateAsc(Long userId, Event.EventStatus status);
+    List<Event> findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(Long userId, Event.EventStatus status);
     
     /**
      * Находит события, для которых нужно отправить уведомления.
