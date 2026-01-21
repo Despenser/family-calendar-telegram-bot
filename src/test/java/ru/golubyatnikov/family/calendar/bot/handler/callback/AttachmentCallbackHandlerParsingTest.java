@@ -248,6 +248,107 @@ class AttachmentCallbackHandlerParsingTest {
         verify(messageService).answerCallbackQuery(eq("callback-123"), eq("❌ Ошибка: некорректный формат данных"));
     }
 
+    /**
+     * Тест для проверки корректного парсинга callback-данных для отмены добавления файла.
+     * 
+     * <p>Формат: attach_file_cancel_add_{eventId}</p>
+     * <p>После извлечения префикса: cancel_add_{eventId}</p>
+     * <p>parts = ["cancel", "add", "{eventId}"]</p>
+     * 
+     * <p><b>Требования:</b> 6.2, 6.3</p>
+     */
+    @Test
+    @DisplayName("Корректный парсинг callback-данных для отмены добавления файла")
+    void cancelAddFileCallbackParsingIsCorrect() throws Exception {
+        // Arrange
+        Long eventId = 10L;
+        String callbackData = "attach_file_cancel_add_" + eventId;
+        
+        CallbackQuery callbackQuery = createCallbackQuery(callbackData);
+        User user = createUser(1L);
+        Event event = createEvent(eventId, user);
+        
+        when(eventService.getEventById(eventId)).thenReturn(event);
+        when(botMessageBuilder.buildEventMessage(any())).thenReturn("Event message");
+        when(keyboardService.createEventActionsKeyboard(any(), anyLong())).thenReturn(null);
+        when(messageService.tryEditMessageText(anyLong(), anyInt(), anyString(), any()))
+                .thenReturn(true);
+        
+        // Act
+        handler.handle(callbackQuery, user);
+        
+        // Assert
+        // Проверяем, что состояние ожидания файла было очищено
+        verify(conversationStateService).clearAwaitingFile(eq(user.getId()));
+        
+        // Проверяем, что метод answerCallbackQuery был вызван с правильным сообщением
+        verify(messageService).answerCallbackQuery(eq("callback-123"), eq("Отменено"));
+        
+        // Проверяем, что eventService.getEventById был вызван с правильным eventId
+        verify(eventService).getEventById(eq(eventId));
+        
+        // Проверяем, что сообщение было восстановлено к стандартному виду события
+        verify(botMessageBuilder).buildEventMessage(eq(event));
+        verify(keyboardService).createEventActionsKeyboard(eq(event), eq(user.getId()));
+        
+        // Проверяем, что не было ошибок парсинга
+        verify(messageService, never()).answerCallbackQuery(anyString(), contains("❌ Ошибка"));
+    }
+
+    /**
+     * Тест для проверки обработки ошибок при некорректном subAction для cancel_add.
+     */
+    @Test
+    @DisplayName("Обработка ошибок при некорректном subAction для cancel (не add и не delete)")
+    void errorHandlingForInvalidCancelAddSubAction() throws Exception {
+        // Arrange
+        String callbackData = "attach_file_cancel_upload_10"; // Некорректный subAction
+        CallbackQuery callbackQuery = createCallbackQuery(callbackData);
+        User user = createUser(1L);
+        
+        // Act
+        handler.handle(callbackQuery, user);
+        
+        // Assert
+        verify(messageService).answerCallbackQuery(eq("callback-123"), eq("❌ Ошибка: неподдерживаемое действие"));
+    }
+
+    /**
+     * Тест для проверки обработки ошибок при недостаточном количестве частей для cancel_add.
+     */
+    @Test
+    @DisplayName("Обработка ошибок при недостаточном количестве частей для cancel_add")
+    void errorHandlingForInsufficientPartsCancelAdd() throws Exception {
+        // Arrange
+        String callbackData = "attach_file_cancel_add"; // Нет eventId
+        CallbackQuery callbackQuery = createCallbackQuery(callbackData);
+        User user = createUser(1L);
+        
+        // Act
+        handler.handle(callbackQuery, user);
+        
+        // Assert
+        verify(messageService).answerCallbackQuery(eq("callback-123"), eq("❌ Ошибка: некорректный формат данных"));
+    }
+
+    /**
+     * Тест для проверки обработки ошибок парсинга eventId для cancel_add.
+     */
+    @Test
+    @DisplayName("Обработка ошибок парсинга eventId для cancel_add")
+    void errorHandlingForInvalidEventIdCancelAdd() throws Exception {
+        // Arrange
+        String callbackData = "attach_file_cancel_add_abc"; // Некорректный eventId
+        CallbackQuery callbackQuery = createCallbackQuery(callbackData);
+        User user = createUser(1L);
+        
+        // Act
+        handler.handle(callbackQuery, user);
+        
+        // Assert
+        verify(messageService).answerCallbackQuery(eq("callback-123"), eq("❌ Ошибка: некорректный формат ID"));
+    }
+
     // Вспомогательные методы
 
     private CallbackQuery createCallbackQuery(String callbackData) {

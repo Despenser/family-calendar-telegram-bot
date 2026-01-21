@@ -463,10 +463,12 @@ public class UpdateProcessor {
      *   <li>Получает контекст ожидания файла</li>
      *   <li>Извлекает информацию о файле из сообщения</li>
      *   <li>Сохраняет вложение через AttachmentService</li>
-     *   <li>Отправляет подтверждающее сообщение</li>
+     *   <li>Удаляет сообщение пользователя с файлом для чистоты чата</li>
      *   <li>Обновляет список вложений</li>
      *   <li>Очищает состояние ожидания файла</li>
      * </ol>
+     * 
+     * <p><b>Требования:</b> 9.1, 9.2, 9.3, 9.4, 9.5</p>
      * 
      * @param message сообщение с файлом
      * @param user авторизованный пользователь
@@ -559,6 +561,11 @@ public class UpdateProcessor {
             log.info("Вложение успешно сохранено: attachmentId={}, eventId={}, userId={}", 
                     attachment.getId(), eventId, userId);
             
+            // Удаляем сообщение пользователя с файлом
+            messageService.deleteMessage(chatId, message.getMessageId());
+            log.debug("Запрос на удаление сообщения пользователя с файлом отправлен: chatId={}, messageId={}, userId={}", 
+                    chatId, message.getMessageId(), userId);
+            
             // Обновляем список вложений с использованием editOrSendMessage
             try {
                 ru.golubyatnikov.family.calendar.bot.model.Event event = eventService.getEventById(eventId);
@@ -570,7 +577,7 @@ public class UpdateProcessor {
                 // Формируем сообщение со списком вложений
                 StringBuilder messageBuilder = new StringBuilder();
                 messageBuilder.append(bold("📎 Вложения события")).append("\n\n");
-                messageBuilder.append(bold(escape(event.getTitle()))).append("\n\n");
+                messageBuilder.append(bold(event.getTitle())).append("\n\n");
                 
                 if (attachments.isEmpty()) {
                     messageBuilder.append(italic("У этого события пока нет вложений\\."));
@@ -594,12 +601,12 @@ public class UpdateProcessor {
                             sizeStr = String.format("%.2f КБ", att.getFileSize() / 1024.0);
                         }
                         
-                        // Форматирование даты
+                        // Форматирование даты (без двоеточия для избежания проблем с экранированием)
                         String dateStr = att.getUploadedAt()
-                            .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+                            .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH-mm"));
                         
                         messageBuilder.append(emoji).append(" ")
-                                     .append(bold(escape(att.getFileName()))).append("\n")
+                                     .append(bold(att.getFileName())).append("\n")
                                      .append("   Размер: ").append(escape(sizeStr)).append("\n")
                                      .append("   Загружено: ").append(escape(dateStr)).append("\n");
                         
@@ -612,8 +619,18 @@ public class UpdateProcessor {
                 InlineKeyboardMarkup keyboard = keyboardService.createAttachmentsListKeyboard(
                     eventId, attachments, isCreator);
                 
+                String fullText = messageBuilder.toString();
+                
+                // Детальное логирование для диагностики
+                log.debug("Полный текст сообщения перед отправкой: chatId={}, messageId={}, textLength={}", 
+                        chatId, messageId, fullText.length());
+                log.debug("Текст сообщения (первые 500 символов): '{}'", 
+                        fullText.length() > 500 ? fullText.substring(0, 500) : fullText);
+                log.debug("Текст сообщения (последние 200 символов): '{}'", 
+                        fullText.length() > 200 ? fullText.substring(fullText.length() - 200) : fullText);
+                
                 // Используем editOrSendMessage для редактирования или отправки нового сообщения
-                Integer resultMessageId = editOrSendMessage(chatId, messageId, messageBuilder.toString(), 
+                Integer resultMessageId = editOrSendMessage(chatId, messageId, fullText, 
                         keyboard, userId, eventId);
                 
                 log.debug("Список вложений обновлен: eventId={}, messageId={}", eventId, resultMessageId);

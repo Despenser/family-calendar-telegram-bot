@@ -103,7 +103,7 @@ class AttachmentCallbackHandlerBackwardCompatibilityTest {
      * <p><b>Требования:</b> 4.1, 4.3, 4.4</p>
      */
     @Test
-    @DisplayName("Простое действие 'add' работает корректно")
+    @DisplayName("Простое действие 'add' работает корректно с редактированием сообщения")
     void simpleActionAddWorksCorrectly() throws Exception {
         // Arrange
         Long eventId = 10L;
@@ -114,17 +114,20 @@ class AttachmentCallbackHandlerBackwardCompatibilityTest {
         Event event = createEvent(eventId, user);
         
         when(eventService.getEventById(eventId)).thenReturn(event);
+        when(keyboardService.createAttachmentUploadKeyboard(eventId)).thenReturn(null);
+        when(messageService.tryEditMessageText(anyLong(), anyInt(), anyString(), any())).thenReturn(true);
         
         // Act
         handler.handle(callbackQuery, user);
         
         // Assert
         verify(eventService).getEventById(eq(eventId));
-        verify(conversationStateService).saveAttachmentMessageId(eq(user.getId()), eq(eventId), anyLong(), anyInt());
+        verify(keyboardService).createAttachmentUploadKeyboard(eq(eventId));
+        verify(messageService).tryEditMessageText(anyLong(), anyInt(), anyString(), any());
         verify(conversationStateService).setAwaitingFile(eq(user.getId()), eq(eventId), anyLong(), anyInt());
-        verify(messageService).sendMessage(anyLong(), anyString());
         verify(messageService).answerCallbackQuery(eq("callback-123"), eq(""));
         verify(messageService, never()).answerCallbackQuery(anyString(), contains("❌ Ошибка"));
+        verify(messageService, never()).sendMessageAndGet(anyLong(), anyString(), any());
     }
 
     /**

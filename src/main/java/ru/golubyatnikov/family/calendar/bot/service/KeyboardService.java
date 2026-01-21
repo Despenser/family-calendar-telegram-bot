@@ -1810,4 +1810,53 @@ public class KeyboardService {
         
         return keyboard;
     }
+    
+    /**
+     * Создает inline клавиатуру для режима загрузки вложения.
+     * 
+     * <p>Клавиатура содержит единственную кнопку "Отмена", которая позволяет
+     * пользователю прервать процесс загрузки файла и вернуться к стандартному
+     * виду карточки события.</p>
+     * 
+     * <p>Callback data формируется в формате "attach_file_cancel_add_{eventId}".</p>
+     * 
+     * <p><b>Требования:</b> 2.1, 6.1</p>
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup с кнопкой "Отмена"
+     * @throws IllegalArgumentException если eventId равен null или не является положительным числом
+     */
+    public InlineKeyboardMarkup createAttachmentUploadKeyboard(Long eventId) {
+        // Валидация eventId
+        if (eventId == null) {
+            log.error("Попытка создать клавиатуру с null eventId");
+            throw new IllegalArgumentException("EventId не может быть null");
+        }
+        
+        if (eventId <= 0) {
+            log.error("Попытка создать клавиатуру с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом, получено: " + eventId);
+        }
+        
+        log.debug("Создание inline клавиатуры для загрузки вложения к событию ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Единственная кнопка "Отмена"
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        String cancelCallbackData = "attach_file_cancel_add_" + eventId;
+        cancelBtn.setCallbackData(cancelCallbackData);
+        row.add(cancelBtn);
+        
+        rows.add(row);
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline клавиатура для загрузки вложения создана: eventId={}, cancelCallback='{}'", 
+                eventId, cancelCallbackData);
+        
+        return keyboard;
+    }
 }

@@ -59,6 +59,26 @@
   - Запустить существующие тесты для проверки отсутствия регрессий
   - Проверить что метод handleBackToEvent корректно обрабатывает все случаи
 
+- [x] 3.1 Модифицировать AttachmentCallbackHandler.handleCancelAddFile()
+  - [x] 3.1.1 Добавить получение контекста шапки (аналогично handleBackToEvent)
+    - Добавить вызов `conversationStateService.getEventHeaderContext(user.getId())`
+    - Сохранить результат в переменную `headerContext`
+    - Добавить логирование на уровне DEBUG
+    - _Requirements: 2.1, 2.2, 3.1_
+  
+  - [x] 3.1.2 Добавить условную логику выбора метода формирования сообщения
+    - Проверить `if (headerContext != null && headerContext.isHasMyEventsHeader())`
+    - При true: вызвать `buildEventMessageWithHeader(event, headerContext.getEventCount())`
+    - При false или null: вызвать `buildEventMessage(event)`
+    - Добавить логирование выбранного пути на уровне DEBUG
+    - _Requirements: 2.1, 2.2, 2.3_
+  
+  - [x] 3.1.3 Добавить обработку ошибок
+    - Обернуть логику получения контекста в try-catch
+    - При исключении: залогировать ERROR и использовать `buildEventMessage()`
+    - Убедиться что пользовательский flow не прерывается
+    - _Requirements: 3.2, 4.4_
+
 - [ ]* 4. Написать property-тесты для ConversationStateService
   - [ ]* 4.1 Написать property-тест для round-trip контекста
     - **Property 1: Round-trip сохранения контекста шапки**
