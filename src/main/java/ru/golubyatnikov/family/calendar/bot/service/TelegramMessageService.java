@@ -785,6 +785,378 @@ public class TelegramMessageService extends DefaultAbsSender {
     }
 
     /**
+     * Отправляет файл пользователю по Telegram file_id с inline клавиатурой.
+     * 
+     * <p>Этот метод используется для отправки файлов с кнопками навигации,
+     * например, кнопкой "Назад к вложениям" при просмотре файла.</p>
+     * 
+     * <p><b>Поддерживаемые типы файлов:</b></p>
+     * <ul>
+     *   <li>document - отправляется через sendDocument</li>
+     *   <li>photo - отправляется через sendPhoto</li>
+     *   <li>video - отправляется через sendVideo</li>
+     *   <li>audio - отправляется через sendAudio</li>
+     * </ul>
+     * 
+     * <p>Метод автоматически повторяет попытки отправки при ошибках
+     * с экспоненциальной задержкой. Максимум 3 попытки.</p>
+     * 
+     * <p><b>Требования:</b> 3.1</p>
+     * 
+     * @param chatId идентификатор чата для отправки файла
+     * @param fileId Telegram file_id файла
+     * @param fileType тип файла (document, photo, video, audio)
+     * @param caption подпись к файлу (может быть null)
+     * @param keyboard inline клавиатура с кнопками (может быть null)
+     * @throws TelegramApiException если все попытки отправки не удались
+     * @throws IllegalArgumentException если chatId, fileId или fileType null/пустые, или fileType неподдерживаемый
+     */
+    @Retryable(
+        retryFor = TelegramApiException.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 1000, multiplier = 2.0)
+    )
+    public void sendFileWithKeyboard(Long chatId, String fileId, String fileType, String caption, 
+                                     InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        // Валидация параметров
+        if (chatId == null) {
+            log.error("Попытка отправить файл с null chatId");
+            throw new IllegalArgumentException("ChatId не может быть null");
+        }
+        
+        if (fileId == null || fileId.isBlank()) {
+            log.error("Попытка отправить файл с пустым fileId: chatId={}", chatId);
+            throw new IllegalArgumentException("FileId не может быть пустым");
+        }
+        
+        if (fileType == null || fileType.isBlank()) {
+            log.error("Попытка отправить файл с пустым fileType: chatId={}, fileId={}", 
+                    chatId, fileId);
+            throw new IllegalArgumentException("FileType не может быть пустым");
+        }
+        
+        log.debug("Отправка файла с клавиатурой: chatId={}, fileId={}, fileType={}, caption='{}', hasKeyboard={}", 
+                chatId, fileId, fileType, caption, keyboard != null);
+        
+        try {
+            // Выбираем метод отправки в зависимости от типа файла
+            switch (fileType.toLowerCase()) {
+                case "document" -> sendDocumentWithKeyboard(chatId, fileId, caption, keyboard);
+                case "photo" -> sendPhotoWithKeyboard(chatId, fileId, caption, keyboard);
+                case "video" -> sendVideoWithKeyboard(chatId, fileId, caption, keyboard);
+                case "audio" -> sendAudioWithKeyboard(chatId, fileId, caption, keyboard);
+                default -> {
+                    log.error("Неподдерживаемый тип файла: chatId={}, fileType={}", 
+                            chatId, fileType);
+                    throw new IllegalArgumentException(
+                            "Неподдерживаемый тип файла: " + fileType + 
+                            ". Поддерживаются: document, photo, video, audio");
+                }
+            }
+            
+            log.debug("Файл с клавиатурой успешно отправлен: chatId={}, fileId={}, fileType={}", 
+                    chatId, fileId, fileType);
+            
+        } catch (TelegramApiRequestException e) {
+            recordMetricForTelegramError(e);
+            log.error("Ошибка при отправке файла с клавиатурой: chatId={}, fileId={}, fileType={}, " +
+                     "errorCode={}, error={}", 
+                     chatId, fileId, fileType, e.getErrorCode(), e.getMessage());
+            throw e;
+            
+        } catch (TelegramApiException e) {
+            recordMetric("network_error");
+            log.error("Сетевая ошибка при отправке файла с клавиатурой: chatId={}, fileId={}, fileType={}, error={}", 
+                    chatId, fileId, fileType, e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
+     * Отправляет файл пользователю по Telegram file_id.
+     * 
+     * <p>Этот метод используется для отправки файлов, которые уже загружены в Telegram
+     * и имеют file_id. Метод автоматически выбирает правильный метод отправки
+     * в зависимости от типа файла.</p>
+     * 
+     * <p><b>Поддерживаемые типы файлов:</b></p>
+     * <ul>
+     *   <li>document - отправляется через sendDocument</li>
+     *   <li>photo - отправляется через sendPhoto</li>
+     *   <li>video - отправляется через sendVideo</li>
+     *   <li>audio - отправляется через sendAudio</li>
+     * </ul>
+     * 
+     * <p>Метод автоматически повторяет попытки отправки при ошибках
+     * с экспоненциальной задержкой. Максимум 3 попытки.</p>
+     * 
+     * <p><b>Требования:</b> 5.1, 5.2, 5.3, 5.4, 5.5</p>
+     * 
+     * @param chatId идентификатор чата для отправки файла
+     * @param fileId Telegram file_id файла
+     * @param fileType тип файла (document, photo, video, audio)
+     * @param caption подпись к файлу (может быть null)
+     * @throws TelegramApiException если все попытки отправки не удались
+     * @throws IllegalArgumentException если chatId, fileId или fileType null/пустые, или fileType неподдерживаемый
+     */
+    @Retryable(
+        retryFor = TelegramApiException.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 1000, multiplier = 2.0)
+    )
+    public void sendFile(Long chatId, String fileId, String fileType, String caption) 
+            throws TelegramApiException {
+        // Валидация параметров
+        if (chatId == null) {
+            log.error("Попытка отправить файл с null chatId");
+            throw new IllegalArgumentException("ChatId не может быть null");
+        }
+        
+        if (fileId == null || fileId.isBlank()) {
+            log.error("Попытка отправить файл с пустым fileId: chatId={}", chatId);
+            throw new IllegalArgumentException("FileId не может быть пустым");
+        }
+        
+        if (fileType == null || fileType.isBlank()) {
+            log.error("Попытка отправить файл с пустым fileType: chatId={}, fileId={}", 
+                    chatId, fileId);
+            throw new IllegalArgumentException("FileType не может быть пустым");
+        }
+        
+        log.debug("Отправка файла: chatId={}, fileId={}, fileType={}, caption='{}'", 
+                chatId, fileId, fileType, caption);
+        
+        try {
+            // Выбираем метод отправки в зависимости от типа файла
+            switch (fileType.toLowerCase()) {
+                case "document" -> sendDocument(chatId, fileId, caption);
+                case "photo" -> sendPhoto(chatId, fileId, caption);
+                case "video" -> sendVideo(chatId, fileId, caption);
+                case "audio" -> sendAudio(chatId, fileId, caption);
+                default -> {
+                    log.error("Неподдерживаемый тип файла: chatId={}, fileType={}", 
+                            chatId, fileType);
+                    throw new IllegalArgumentException(
+                            "Неподдерживаемый тип файла: " + fileType + 
+                            ". Поддерживаются: document, photo, video, audio");
+                }
+            }
+            
+            log.debug("Файл успешно отправлен: chatId={}, fileId={}, fileType={}", 
+                    chatId, fileId, fileType);
+            
+        } catch (TelegramApiRequestException e) {
+            recordMetricForTelegramError(e);
+            log.error("Ошибка при отправке файла: chatId={}, fileId={}, fileType={}, " +
+                     "errorCode={}, error={}", 
+                     chatId, fileId, fileType, e.getErrorCode(), e.getMessage());
+            throw e;
+            
+        } catch (TelegramApiException e) {
+            recordMetric("network_error");
+            log.error("Сетевая ошибка при отправке файла: chatId={}, fileId={}, fileType={}, error={}", 
+                    chatId, fileId, fileType, e.getMessage());
+            throw e;
+        }
+    }
+    
+    /**
+     * Отправляет документ пользователю.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id документа
+     * @param caption подпись к документу
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private void sendDocument(Long chatId, String fileId, String caption) 
+            throws TelegramApiException {
+        var sendDocument = new org.telegram.telegrambots.meta.api.methods.send.SendDocument();
+        sendDocument.setChatId(chatId.toString());
+        sendDocument.setDocument(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendDocument.setCaption(caption);
+            sendDocument.setParseMode("MarkdownV2");
+        }
+        
+        execute(sendDocument);
+    }
+    
+    /**
+     * Отправляет фотографию пользователю.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id фотографии
+     * @param caption подпись к фотографии
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private void sendPhoto(Long chatId, String fileId, String caption) 
+            throws TelegramApiException {
+        var sendPhoto = new org.telegram.telegrambots.meta.api.methods.send.SendPhoto();
+        sendPhoto.setChatId(chatId.toString());
+        sendPhoto.setPhoto(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendPhoto.setCaption(caption);
+            sendPhoto.setParseMode("MarkdownV2");
+        }
+        
+        execute(sendPhoto);
+    }
+    
+    /**
+     * Отправляет видео пользователю.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id видео
+     * @param caption подпись к видео
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private void sendVideo(Long chatId, String fileId, String caption) 
+            throws TelegramApiException {
+        var sendVideo = new org.telegram.telegrambots.meta.api.methods.send.SendVideo();
+        sendVideo.setChatId(chatId.toString());
+        sendVideo.setVideo(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendVideo.setCaption(caption);
+            sendVideo.setParseMode("MarkdownV2");
+        }
+        
+        execute(sendVideo);
+    }
+    
+    /**
+     * Отправляет аудио пользователю.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id аудио
+     * @param caption подпись к аудио
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private void sendAudio(Long chatId, String fileId, String caption) 
+            throws TelegramApiException {
+        var sendAudio = new org.telegram.telegrambots.meta.api.methods.send.SendAudio();
+        sendAudio.setChatId(chatId.toString());
+        sendAudio.setAudio(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendAudio.setCaption(caption);
+            sendAudio.setParseMode("MarkdownV2");
+        }
+        
+        execute(sendAudio);
+    }
+
+    /**
+     * Отправляет документ пользователю с inline клавиатурой.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id документа
+     * @param caption подпись к документу
+     * @param keyboard inline клавиатура
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private void sendDocumentWithKeyboard(Long chatId, String fileId, String caption, 
+                                          InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        var sendDocument = new org.telegram.telegrambots.meta.api.methods.send.SendDocument();
+        sendDocument.setChatId(chatId.toString());
+        sendDocument.setDocument(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendDocument.setCaption(caption);
+            sendDocument.setParseMode("MarkdownV2");
+        }
+        
+        if (keyboard != null) {
+            sendDocument.setReplyMarkup(keyboard);
+        }
+        
+        execute(sendDocument);
+    }
+    
+    /**
+     * Отправляет фотографию пользователю с inline клавиатурой.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id фотографии
+     * @param caption подпись к фотографии
+     * @param keyboard inline клавиатура
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private void sendPhotoWithKeyboard(Long chatId, String fileId, String caption, 
+                                       InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        var sendPhoto = new org.telegram.telegrambots.meta.api.methods.send.SendPhoto();
+        sendPhoto.setChatId(chatId.toString());
+        sendPhoto.setPhoto(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendPhoto.setCaption(caption);
+            sendPhoto.setParseMode("MarkdownV2");
+        }
+        
+        if (keyboard != null) {
+            sendPhoto.setReplyMarkup(keyboard);
+        }
+        
+        execute(sendPhoto);
+    }
+    
+    /**
+     * Отправляет видео пользователю с inline клавиатурой.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id видео
+     * @param caption подпись к видео
+     * @param keyboard inline клавиатура
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private void sendVideoWithKeyboard(Long chatId, String fileId, String caption, 
+                                       InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        var sendVideo = new org.telegram.telegrambots.meta.api.methods.send.SendVideo();
+        sendVideo.setChatId(chatId.toString());
+        sendVideo.setVideo(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendVideo.setCaption(caption);
+            sendVideo.setParseMode("MarkdownV2");
+        }
+        
+        if (keyboard != null) {
+            sendVideo.setReplyMarkup(keyboard);
+        }
+        
+        execute(sendVideo);
+    }
+    
+    /**
+     * Отправляет аудио пользователю с inline клавиатурой.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id аудио
+     * @param caption подпись к аудио
+     * @param keyboard inline клавиатура
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private void sendAudioWithKeyboard(Long chatId, String fileId, String caption, 
+                                       InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        var sendAudio = new org.telegram.telegrambots.meta.api.methods.send.SendAudio();
+        sendAudio.setChatId(chatId.toString());
+        sendAudio.setAudio(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendAudio.setCaption(caption);
+            sendAudio.setParseMode("MarkdownV2");
+        }
+        
+        if (keyboard != null) {
+            sendAudio.setReplyMarkup(keyboard);
+        }
+        
+        execute(sendAudio);
+    }
+
+    /**
      * Удаляет сообщение из чата.
      * 
      * <p>Этот метод используется для удаления промежуточных сообщений пользователя,
@@ -946,6 +1318,41 @@ public class TelegramMessageService extends DefaultAbsSender {
     public void recoverAnswerCallbackQuery(TelegramApiException e, String callbackQueryId, String text) {
         log.error("Все попытки ответа на callback query исчерпаны: callbackQueryId={}, error={}", 
                 callbackQueryId, e.getMessage());
+    }
+
+    /**
+     * Метод восстановления после неудачных попыток отправки файла.
+     * 
+     * @param e исключение, вызвавшее сбой всех попыток
+     * @param chatId ID чата
+     * @param fileId Telegram file_id
+     * @param fileType тип файла
+     * @param caption подпись к файлу
+     * @see Recover
+     */
+    @Recover
+    public void recoverSendFile(TelegramApiException e, Long chatId, String fileId, 
+                               String fileType, String caption) {
+        log.error("Все попытки отправки файла исчерпаны: chatId={}, fileId={}, fileType={}, error={}", 
+                chatId, fileId, fileType, e.getMessage());
+    }
+
+    /**
+     * Метод восстановления после неудачных попыток отправки файла с клавиатурой.
+     * 
+     * @param e исключение, вызвавшее сбой всех попыток
+     * @param chatId ID чата
+     * @param fileId Telegram file_id
+     * @param fileType тип файла
+     * @param caption подпись к файлу
+     * @param keyboard inline клавиатура
+     * @see Recover
+     */
+    @Recover
+    public void recoverSendFileWithKeyboard(TelegramApiException e, Long chatId, String fileId, 
+                                           String fileType, String caption, InlineKeyboardMarkup keyboard) {
+        log.error("Все попытки отправки файла с клавиатурой исчерпаны: chatId={}, fileId={}, fileType={}, error={}", 
+                chatId, fileId, fileType, e.getMessage());
     }
 
     /**

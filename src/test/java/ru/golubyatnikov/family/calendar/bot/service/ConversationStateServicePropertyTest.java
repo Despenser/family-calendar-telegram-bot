@@ -3,6 +3,10 @@ package ru.golubyatnikov.family.calendar.bot.service;
 import net.jqwik.api.*;
 import net.jqwik.api.constraints.IntRange;
 import net.jqwik.api.constraints.LongRange;
+import org.mockito.Mockito;
+import ru.golubyatnikov.family.calendar.bot.repository.ConversationStateRepository;
+import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
+import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditField;
 import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditingContext;
 
@@ -23,7 +27,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ConversationStateServicePropertyTest {
     
-    private final ConversationStateService service = new ConversationStateService();
+    private final ConversationStateService service;
+    
+    public ConversationStateServicePropertyTest() {
+        // Создаем моки для зависимостей
+        ConversationStateRepository conversationStateRepository = Mockito.mock(ConversationStateRepository.class);
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+        EventRepository eventRepository = Mockito.mock(EventRepository.class);
+        
+        this.service = new ConversationStateService(conversationStateRepository, userRepository, eventRepository);
+    }
     
     /**
      * Property 1: Редактирование в одном сообщении

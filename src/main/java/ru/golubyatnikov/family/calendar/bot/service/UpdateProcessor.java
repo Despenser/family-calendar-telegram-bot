@@ -173,6 +173,19 @@ public class UpdateProcessor {
                 return;
             }
             
+            // Если пользователь ожидает загрузки файла, отправляем подсказку
+            if (userOptional.isPresent() && conversationStateService.isAwaitingFile(userOptional.get().getId())) {
+                Long chatId = message.getChatId();
+                String hintMessage = formatMessage(
+                    "📎 Пожалуйста, отправьте файл \\(документ, фото, видео или аудио\\)\n\n" +
+                    "_Для отмены нажмите кнопку 'Отмена' в списке вложений_"
+                );
+                messageService.sendMessage(chatId, hintMessage);
+                log.debug("Отправлена подсказка пользователю в режиме ожидания файла: userId={}", 
+                        userOptional.get().getId());
+                return;
+            }
+            
             // Если пользователь ожидает ввода заметки к завершенному событию, обрабатываем текст как заметку
             if (userOptional.isPresent() && conversationStateService.isAwaitingCompletionNote(userOptional.get().getId())) {
                 handleCompletionNote(message, userOptional.get(), originalText);
@@ -329,6 +342,12 @@ public class UpdateProcessor {
             
             User user = userOptional.get();
             
+            // Проверяем, ожидает ли пользователь загрузки файла для вложения
+            if (conversationStateService.isAwaitingFile(user.getId())) {
+                handleAttachmentFileUpload(message, user);
+                return;
+            }
+            
             if (!conversationService.hasActiveDraft(user.getId())) {
                 log.debug("Пользователь отправил файл без активного черновика: userId={}, telegramId={}", 
                         user.getId(), telegramId);
@@ -431,6 +450,234 @@ public class UpdateProcessor {
             } catch (Exception ex) {
                 log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}, stackTrace={}", 
                         telegramId, ex.getMessage(), getStackTraceString(ex), ex);
+            }
+        }
+    }
+
+
+    /**
+     * Обрабатывает загрузку файла для вложения к событию.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Получает контекст ожидания файла</li>
+     *   <li>Извлекает информацию о файле из сообщения</li>
+     *   <li>Сохраняет вложение через AttachmentService</li>
+     *   <li>Отправляет подтверждающее сообщение</li>
+     *   <li>Обновляет список вложений</li>
+     *   <li>Очищает состояние ожидания файла</li>
+     * </ol>
+     * 
+     * @param message сообщение с файлом
+     * @param user авторизованный пользователь
+     */
+    private void handleAttachmentFileUpload(Message message, User user) {
+        Long chatId = message.getChatId();
+        Long userId = user.getId();
+        Long telegramId = user.getTelegramId();
+        
+        log.debug("Обработка загрузки файла для вложения: userId={}, telegramId={}", userId, telegramId);
+        
+        try {
+            // Получаем контекст ожидания файла
+            ConversationStateService.AwaitingFileContext context = 
+                conversationStateService.getAwaitingFileContext(userId);
+            
+            if (context == null) {
+                log.warn("Контекст ожидания файла не найден для пользователя: userId={}", userId);
+                conversationStateService.clearAwaitingFile(userId);
+                messageService.sendMessage(chatId, 
+                    "❌ Произошла ошибка. Попробуйте добавить файл заново.");
+                return;
+            }
+            
+            Long eventId = context.getEventId();
+            Integer messageId = context.getMessageId();
+            
+            // Извлекаем информацию о файле из сообщения
+            String fileId;
+            String fileName;
+            String fileType;
+            Long fileSize;
+            
+            if (message.hasDocument()) {
+                org.telegram.telegrambots.meta.api.objects.Document document = message.getDocument();
+                fileId = document.getFileId();
+                fileName = document.getFileName();
+                fileType = "document";
+                fileSize = document.getFileSize();
+                
+                log.debug("Получен документ для вложения: fileId={}, fileName='{}', size={}, eventId={}", 
+                        fileId, fileName, fileSize, eventId);
+                
+            } else if (message.hasPhoto()) {
+                // Выбираем самое большое разрешение
+                List<org.telegram.telegrambots.meta.api.objects.PhotoSize> photos = message.getPhoto();
+                org.telegram.telegrambots.meta.api.objects.PhotoSize photo = photos.get(photos.size() - 1);
+                
+                fileId = photo.getFileId();
+                fileName = "photo_" + System.currentTimeMillis() + ".jpg";
+                fileType = "photo";
+                fileSize = photo.getFileSize().longValue();
+                
+                log.debug("Получено фото для вложения: fileId={}, size={}, eventId={}", 
+                        fileId, fileSize, eventId);
+                
+            } else if (message.hasVideo()) {
+                org.telegram.telegrambots.meta.api.objects.Video video = message.getVideo();
+                fileId = video.getFileId();
+                fileName = video.getFileName() != null ? video.getFileName() : "video_" + System.currentTimeMillis() + ".mp4";
+                fileType = "video";
+                fileSize = video.getFileSize().longValue();
+                
+                log.debug("Получено видео для вложения: fileId={}, fileName='{}', size={}, eventId={}", 
+                        fileId, fileName, fileSize, eventId);
+                
+            } else if (message.hasAudio()) {
+                org.telegram.telegrambots.meta.api.objects.Audio audio = message.getAudio();
+                fileId = audio.getFileId();
+                fileName = audio.getFileName() != null ? audio.getFileName() : "audio_" + System.currentTimeMillis() + ".mp3";
+                fileType = "audio";
+                fileSize = audio.getFileSize().longValue();
+                
+                log.debug("Получено аудио для вложения: fileId={}, fileName='{}', size={}, eventId={}", 
+                        fileId, fileName, fileSize, eventId);
+                
+            } else {
+                log.warn("Сообщение не содержит поддерживаемого типа файла: userId={}, eventId={}", 
+                        userId, eventId);
+                conversationStateService.clearAwaitingFile(userId);
+                messageService.sendMessage(chatId, 
+                    "❌ Неподдерживаемый тип файла. Отправьте документ, фото, видео или аудио.");
+                return;
+            }
+            
+            // Сохраняем вложение
+            ru.golubyatnikov.family.calendar.bot.model.Attachment attachment = 
+                attachmentService.saveAttachment(eventId, fileId, fileName, fileType, fileSize);
+            
+            log.info("Вложение успешно сохранено: attachmentId={}, eventId={}, userId={}", 
+                    attachment.getId(), eventId, userId);
+            
+            // Обновляем список вложений с использованием editOrSendMessage
+            try {
+                ru.golubyatnikov.family.calendar.bot.model.Event event = eventService.getEventById(eventId);
+                List<ru.golubyatnikov.family.calendar.bot.model.Attachment> attachments = 
+                    attachmentService.getEventAttachments(eventId);
+                
+                boolean isCreator = event.belongsToUser(userId);
+                
+                // Формируем сообщение со списком вложений
+                StringBuilder messageBuilder = new StringBuilder();
+                messageBuilder.append(bold("📎 Вложения события")).append("\n\n");
+                messageBuilder.append(bold(escape(event.getTitle()))).append("\n\n");
+                
+                if (attachments.isEmpty()) {
+                    messageBuilder.append(italic("У этого события пока нет вложений\\."));
+                } else {
+                    for (int i = 0; i < attachments.size(); i++) {
+                        ru.golubyatnikov.family.calendar.bot.model.Attachment att = attachments.get(i);
+                        
+                        // Эмодзи для типа файла
+                        String emoji = switch (att.getFileType()) {
+                            case "photo" -> "🖼️";
+                            case "video" -> "🎥";
+                            case "audio" -> "🎵";
+                            default -> "📄";
+                        };
+                        
+                        // Форматирование размера
+                        String sizeStr;
+                        if (att.getFileSize() >= 1024 * 1024) {
+                            sizeStr = String.format("%.2f МБ", att.getFileSize() / (1024.0 * 1024.0));
+                        } else {
+                            sizeStr = String.format("%.2f КБ", att.getFileSize() / 1024.0);
+                        }
+                        
+                        // Форматирование даты
+                        String dateStr = att.getUploadedAt()
+                            .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+                        
+                        messageBuilder.append(emoji).append(" ")
+                                     .append(bold(escape(att.getFileName()))).append("\n")
+                                     .append("   Размер: ").append(escape(sizeStr)).append("\n")
+                                     .append("   Загружено: ").append(escape(dateStr)).append("\n");
+                        
+                        if (i < attachments.size() - 1) {
+                            messageBuilder.append("\n");
+                        }
+                    }
+                }
+                
+                InlineKeyboardMarkup keyboard = keyboardService.createAttachmentsListKeyboard(
+                    eventId, attachments, isCreator);
+                
+                // Используем editOrSendMessage для редактирования или отправки нового сообщения
+                Integer resultMessageId = editOrSendMessage(chatId, messageId, messageBuilder.toString(), 
+                        keyboard, userId, eventId);
+                
+                log.debug("Список вложений обновлен: eventId={}, messageId={}", eventId, resultMessageId);
+                
+            } catch (TelegramApiException e) {
+                log.warn("Не удалось обновить список вложений: eventId={}, messageId={}, error={}", 
+                        eventId, messageId, e.getMessage());
+                // Продолжаем выполнение, даже если обновление не удалось
+            }
+            
+            // Очищаем состояние ожидания файла
+            conversationStateService.clearAwaitingFile(userId);
+            log.debug("Состояние ожидания файла очищено: userId={}", userId);
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.FileSizeExceededException e) {
+            log.warn("Размер файла превышает лимит: userId={}, error={}", userId, e.getMessage());
+            conversationStateService.clearAwaitingFile(userId);
+            
+            try {
+                messageService.sendMessage(chatId, 
+                    formatMessage("❌ Размер файла превышает максимально допустимый \\(20 МБ\\)\\."));
+            } catch (TelegramApiException ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
+                        telegramId, ex.getMessage(), ex);
+            }
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
+            log.error("Событие не найдено при добавлении вложения: userId={}, error={}", 
+                    userId, e.getMessage());
+            conversationStateService.clearAwaitingFile(userId);
+            
+            try {
+                messageService.sendMessage(chatId, 
+                    "❌ Событие не найдено. Возможно, оно было удалено.");
+            } catch (TelegramApiException ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
+                        telegramId, ex.getMessage(), ex);
+            }
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException e) {
+            log.error("Нет прав для добавления вложения: userId={}, error={}", 
+                    userId, e.getMessage());
+            conversationStateService.clearAwaitingFile(userId);
+            
+            try {
+                messageService.sendMessage(chatId, 
+                    "❌ У вас нет прав для добавления вложений к этому событию.");
+            } catch (TelegramApiException ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
+                        telegramId, ex.getMessage(), ex);
+            }
+            
+        } catch (Exception e) {
+            log.error("Ошибка при обработке загрузки файла для вложения: userId={}, telegramId={}, error={}, stackTrace={}", 
+                    userId, telegramId, e.getMessage(), getStackTraceString(e), e);
+            conversationStateService.clearAwaitingFile(userId);
+            
+            try {
+                messageService.sendMessage(chatId, 
+                    "❌ " + bold("Произошла ошибка при сохранении файла") + "\\. " + 
+                    italic("Попробуйте еще раз\\."));
+            } catch (Exception ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
+                        telegramId, ex.getMessage(), ex);
             }
         }
     }
@@ -1043,6 +1290,85 @@ public class UpdateProcessor {
             }
             
             conversationStateService.clearEventEditing(userId);
+        }
+    }
+    
+    /**
+     * Редактирует существующее сообщение или отправляет новое при невозможности редактирования.
+     * 
+     * <p>Метод реализует паттерн "edit-or-send" для обеспечения надежной доставки обновлений:</p>
+     * <ol>
+     *   <li>Пытается отредактировать существующее сообщение через {@link TelegramMessageService#tryEditMessageText}</li>
+     *   <li>При успехе сохраняет messageId в {@link ConversationStateService}</li>
+     *   <li>При неудаче (сообщение удалено/старое) отправляет новое сообщение</li>
+     *   <li>Сохраняет новый messageId для последующих операций</li>
+     * </ol>
+     * 
+     * <p>Этот подход обеспечивает:</p>
+     * <ul>
+     *   <li>Чистоту чата (редактирование вместо новых сообщений)</li>
+     *   <li>Надежность (fallback на новое сообщение при ошибках)</li>
+     *   <li>Сохранение контекста (messageId для следующих операций)</li>
+     * </ul>
+     * 
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для редактирования
+     * @param text новый текст сообщения (с MarkdownV2 форматированием)
+     * @param keyboard inline-клавиатура для сообщения
+     * @param userId идентификатор пользователя
+     * @param eventId идентификатор события
+     * @return messageId отредактированного или нового сообщения
+     * @throws TelegramApiException при критических ошибках отправки
+     */
+    private Integer editOrSendMessage(Long chatId, Integer messageId, String text, 
+                                     InlineKeyboardMarkup keyboard, 
+                                     Long userId, Long eventId) 
+            throws TelegramApiException {
+        
+        log.debug("Попытка редактирования сообщения: chatId={}, messageId={}, userId={}, eventId={}", 
+                chatId, messageId, userId, eventId);
+        
+        try {
+            // Попытка отредактировать существующее сообщение
+            boolean edited = messageService.tryEditMessageText(chatId, messageId, text, keyboard);
+            
+            if (edited) {
+                log.info("Сообщение успешно отредактировано: chatId={}, messageId={}, userId={}, eventId={}", 
+                        chatId, messageId, userId, eventId);
+                
+                // Сохраняем messageId в ConversationState
+                conversationStateService.saveAttachmentMessageId(userId, eventId, chatId, messageId);
+                
+                return messageId;
+            } else {
+                // Редактирование не удалось - переключаемся на fallback режим
+                log.info("Редактирование не удалось (сообщение удалено/старое), отправка нового сообщения: " +
+                        "chatId={}, oldMessageId={}, userId={}, eventId={}", 
+                        chatId, messageId, userId, eventId);
+                
+                // Отправляем новое сообщение
+                org.telegram.telegrambots.meta.api.objects.Message sentMessage = 
+                        messageService.sendMessageAndGet(chatId, text, keyboard);
+                
+                Integer newMessageId = sentMessage.getMessageId();
+                
+                log.info("Новое сообщение успешно отправлено (fallback): chatId={}, newMessageId={}, userId={}, eventId={}", 
+                        chatId, newMessageId, userId, eventId);
+                
+                // Сохраняем новый messageId в ConversationState
+                conversationStateService.saveAttachmentMessageId(userId, eventId, chatId, newMessageId);
+                
+                log.debug("Новый messageId сохранен в ConversationState: userId={}, eventId={}, messageId={}", 
+                        userId, eventId, newMessageId);
+                
+                return newMessageId;
+            }
+            
+        } catch (TelegramApiException e) {
+            log.error("Критическая ошибка при редактировании/отправке сообщения: " +
+                     "chatId={}, messageId={}, userId={}, eventId={}, error={}", 
+                     chatId, messageId, userId, eventId, e.getMessage(), e);
+            throw e;
         }
     }
 }

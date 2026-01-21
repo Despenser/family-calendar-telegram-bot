@@ -2,9 +2,18 @@ package ru.golubyatnikov.family.calendar.bot.service;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.golubyatnikov.family.calendar.bot.model.ConversationState;
+import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.repository.ConversationStateRepository;
+import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
+import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,7 +31,12 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class ConversationStateService {
+    
+    private final ConversationStateRepository conversationStateRepository;
+    private final UserRepository userRepository;
+    private final EventRepository eventRepository;
     
     /**
      * Map для отслеживания пользователей, ожидающих ввода поискового запроса.
@@ -41,6 +55,12 @@ public class ConversationStateService {
      * Key: userId, Value: CompletionNoteContext (eventId, chatId)
      */
     private final Map<Long, CompletionNoteContext> usersAwaitingCompletionNote = new ConcurrentHashMap<>();
+    
+    /**
+     * Map для отслеживания пользователей, ожидающих загрузки файла для вложения.
+     * Key: userId, Value: AwaitingFileContext (eventId, chatId, messageId)
+     */
+    private final Map<Long, AwaitingFileContext> usersAwaitingFile = new ConcurrentHashMap<>();
     
     /**
      * Устанавливает состояние ожидания поискового запроса для пользователя.
@@ -210,6 +230,318 @@ public class ConversationStateService {
     }
     
     /**
+     * Устанавливает состояние ожидания файла для пользователя.
+     * 
+     * @param userId идентификатор пользователя
+     * @param eventId идентификатор события
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения со списком вложений
+     */
+    public void setAwaitingFile(Long userId, Long eventId, Long chatId, Integer messageId) {
+        AwaitingFileContext context = new AwaitingFileContext(eventId, chatId, messageId);
+        usersAwaitingFile.put(userId, context);
+        log.info("Пользователь ID={} переведен в режим ожидания файла для события ID={}", userId, eventId);
+    }
+    
+    /**
+     * Проверяет, ожидает ли пользователь загрузки файла.
+     * 
+     * @param userId идентификатор пользователя
+     * @return true, если пользователь ожидает загрузки файла
+     */
+    public boolean isAwaitingFile(Long userId) {
+        return usersAwaitingFile.containsKey(userId);
+    }
+    
+    /**
+     * Получает контекст ожидания файла для пользователя.
+     * 
+     * @param userId идентификатор пользователя
+     * @return контекст ожидания файла или null
+     */
+    public AwaitingFileContext getAwaitingFileContext(Long userId) {
+        return usersAwaitingFile.get(userId);
+    }
+    
+    /**
+     * Очищает состояние ожидания файла для пользователя.
+     * 
+     * @param userId идентификатор пользователя
+     */
+    public void clearAwaitingFile(Long userId) {
+        usersAwaitingFile.remove(userId);
+        log.debug("Состояние ожидания файла очищено для пользователя ID={}", userId);
+    }
+    
+    /**
+     * Сохраняет messageId сообщения с вложениями для пользователя.
+     * 
+     * <p>Метод сохраняет контекст сообщения в базе данных, чтобы система могла
+     * редактировать это сообщение при последующих операциях с вложениями.
+     * Если состояние диалога для пользователя не существует, оно будет создано.</p>
+     * 
+     * <p>Метод выполняется в транзакции для обеспечения атомарности операции.</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @param eventId идентификатор события
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для редактирования
+     * @throws IllegalArgumentException если userId, eventId, chatId или messageId равны null
+     * @see AttachmentMessageContext
+     * @see ConversationState
+     */
+    @Transactional
+    public void saveAttachmentMessageId(Long userId, Long eventId, Long chatId, Integer messageId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        if (eventId == null) {
+            throw new IllegalArgumentException("eventId не может быть null");
+        }
+        if (chatId == null) {
+            throw new IllegalArgumentException("chatId не может быть null");
+        }
+        if (messageId == null) {
+            throw new IllegalArgumentException("messageId не может быть null");
+        }
+        
+        log.debug("Сохранение attachment messageId={} для пользователя ID={}, события ID={}, чата ID={}", 
+                messageId, userId, eventId, chatId);
+        
+        // Получаем или создаем состояние диалога
+        ConversationState state = conversationStateRepository.findByUserId(userId)
+                .orElseGet(() -> {
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new IllegalArgumentException("Пользователь с ID=" + userId + " не найден"));
+                    
+                    ConversationState newState = ConversationState.builder()
+                            .user(user)
+                            .build();
+                    
+                    log.debug("Создано новое состояние диалога для пользователя ID={}", userId);
+                    return newState;
+                });
+        
+        // Получаем событие
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new IllegalArgumentException("Событие с ID=" + eventId + " не найдено"));
+        
+        // Сохраняем контекст
+        state.setAttachmentEvent(event);
+        state.setAttachmentChatId(chatId);
+        state.setAttachmentMessageId(messageId);
+        state.setAttachmentContextCreatedAt(Instant.now());
+        
+        conversationStateRepository.save(state);
+        
+        log.info("Сохранен attachment messageId={} для пользователя ID={}, события ID={}", 
+                messageId, userId, eventId);
+    }
+    
+    /**
+     * Получает сохраненный контекст сообщения с вложениями для пользователя.
+     * 
+     * <p>Метод извлекает сохраненный контекст из базы данных и проверяет его валидность.
+     * Если контекст истек (прошло более 47 часов), метод вернет null и очистит
+     * истекший контекст из базы данных.</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @return AttachmentMessageContext с chatId и messageId, или null если контекст не найден или истек
+     * @throws IllegalArgumentException если userId равен null
+     * @see AttachmentMessageContext
+     * @see ConversationState
+     */
+    @Transactional
+    public AttachmentMessageContext getAttachmentMessageContext(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        
+        log.debug("Получение attachment message context для пользователя ID={}", userId);
+        
+        return conversationStateRepository.findByUserId(userId)
+                .filter(ConversationState::hasAttachmentMessageContext)
+                .map(state -> {
+                    AttachmentMessageContext context = new AttachmentMessageContext(
+                            state.getAttachmentEvent().getId(),
+                            state.getAttachmentChatId(),
+                            state.getAttachmentMessageId(),
+                            state.getAttachmentContextCreatedAt()
+                    );
+                    
+                    // Проверяем истечение контекста
+                    if (context.isExpired()) {
+                        log.info("Attachment message context истек для пользователя ID={}, очистка контекста", userId);
+                        state.clearAttachmentMessageContext();
+                        conversationStateRepository.save(state);
+                        return null;
+                    }
+                    
+                    log.debug("Найден валидный attachment message context для пользователя ID={}: eventId={}, chatId={}, messageId={}", 
+                            userId, context.getEventId(), context.getChatId(), context.getMessageId());
+                    return context;
+                })
+                .orElse(null);
+    }
+    
+    /**
+     * Очищает сохраненный контекст сообщения с вложениями для пользователя.
+     * 
+     * <p>Метод удаляет все поля attachment context из состояния диалога пользователя.
+     * Используется при возврате к карточке события или при завершении работы с вложениями.</p>
+     * 
+     * <p>Метод выполняется в транзакции для обеспечения атомарности операции.</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @throws IllegalArgumentException если userId равен null
+     * @see ConversationState
+     */
+    @Transactional
+    public void clearAttachmentMessageContext(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        
+        log.debug("Очистка attachment message context для пользователя ID={}", userId);
+        
+        conversationStateRepository.findByUserId(userId)
+                .ifPresent(state -> {
+                    if (state.hasAttachmentMessageContext()) {
+                        state.clearAttachmentMessageContext();
+                        conversationStateRepository.save(state);
+                        log.info("Attachment message context очищен для пользователя ID={}", userId);
+                    } else {
+                        log.debug("Attachment message context не найден для пользователя ID={}, очистка не требуется", userId);
+                    }
+                });
+    }
+    
+    /**
+     * Сохраняет контекст шапки события для пользователя.
+     * 
+     * <p>Метод сохраняет информацию о том, что событие было открыто с шапкой "Мои события",
+     * чтобы при возврате к событию из списка вложений можно было восстановить эту шапку.
+     * Если состояние диалога для пользователя не существует, оно будет создано.</p>
+     * 
+     * <p>Метод выполняется в транзакции для обеспечения атомарности операции.</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @param hasMyEventsHeader флаг наличия шапки "Мои события"
+     * @param eventCount количество событий пользователя для формирования шапки
+     * @throws IllegalArgumentException если userId равен null
+     * @see EventHeaderContext
+     * @see ConversationState
+     */
+    @Transactional
+    public void saveEventHeaderContext(Long userId, boolean hasMyEventsHeader, int eventCount) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        
+        try {
+            log.debug("Сохранение контекста шапки для пользователя ID={}: hasMyEventsHeader={}, eventCount={}", 
+                    userId, hasMyEventsHeader, eventCount);
+            
+            // Получаем или создаем состояние диалога
+            ConversationState state = conversationStateRepository.findByUserId(userId)
+                    .orElseGet(() -> {
+                        User user = userRepository.findById(userId)
+                                .orElseThrow(() -> new IllegalArgumentException("Пользователь с ID=" + userId + " не найден"));
+                        
+                        ConversationState newState = ConversationState.builder()
+                                .user(user)
+                                .build();
+                        
+                        log.debug("Создано новое состояние диалога для пользователя ID={}", userId);
+                        return newState;
+                    });
+            
+            // Сохраняем контекст шапки
+            state.setEventHasMyEventsHeader(hasMyEventsHeader);
+            state.setEventCountForHeader(eventCount);
+            
+            conversationStateRepository.save(state);
+            
+            log.info("Сохранен контекст шапки для пользователя ID={}: hasMyEventsHeader={}, eventCount={}", 
+                    userId, hasMyEventsHeader, eventCount);
+        } catch (Exception e) {
+            log.error("Ошибка при сохранении контекста шапки: userId={}, error={}", 
+                    userId, e.getMessage(), e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Получает сохраненный контекст шапки события для пользователя.
+     * 
+     * <p>Метод извлекает сохраненный контекст из базы данных.
+     * Если контекст не найден или не полный, метод вернет null.</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @return EventHeaderContext с флагом hasMyEventsHeader и eventCount, или null если контекст не найден
+     * @throws IllegalArgumentException если userId равен null
+     * @see EventHeaderContext
+     * @see ConversationState
+     */
+    @Transactional(readOnly = true)
+    public EventHeaderContext getEventHeaderContext(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        
+        log.debug("Получение контекста шапки для пользователя ID={}", userId);
+        
+        return conversationStateRepository.findByUserId(userId)
+                .filter(ConversationState::hasEventHeaderContext)
+                .map(state -> {
+                    EventHeaderContext context = new EventHeaderContext(
+                            state.getEventHasMyEventsHeader(),
+                            state.getEventCountForHeader()
+                    );
+                    
+                    log.debug("Найден контекст шапки для пользователя ID={}: hasMyEventsHeader={}, eventCount={}", 
+                            userId, context.isHasMyEventsHeader(), context.getEventCount());
+                    return context;
+                })
+                .orElseGet(() -> {
+                    log.debug("Контекст шапки не найден для пользователя ID={}", userId);
+                    return null;
+                });
+    }
+    
+    /**
+     * Очищает сохраненный контекст шапки события для пользователя.
+     * 
+     * <p>Метод удаляет поля контекста шапки из состояния диалога пользователя.
+     * Используется при завершении работы с событием или при переходе к другому событию.</p>
+     * 
+     * <p>Метод выполняется в транзакции для обеспечения атомарности операции.</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @throws IllegalArgumentException если userId равен null
+     * @see ConversationState
+     */
+    @Transactional
+    public void clearEventHeaderContext(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        
+        log.debug("Очистка контекста шапки для пользователя ID={}", userId);
+        
+        conversationStateRepository.findByUserId(userId)
+                .ifPresent(state -> {
+                    if (state.hasEventHeaderContext()) {
+                        state.clearEventHeaderContext();
+                        conversationStateRepository.save(state);
+                        log.info("Контекст шапки очищен для пользователя ID={}", userId);
+                    } else {
+                        log.debug("Контекст шапки не найден для пользователя ID={}, очистка не требуется", userId);
+                    }
+                });
+    }
+    
+    /**
      * Контекст редактирования события.
      * Содержит информацию о редактируемом событии, чате, текущем поле и сообщении.
      */
@@ -279,5 +611,46 @@ public class ConversationStateService {
          * Идентификатор чата
          */
         private Long chatId;
+    }
+    
+    /**
+     * Контекст ожидания файла для вложения.
+     * Содержит информацию о событии, чате и сообщении со списком вложений.
+     */
+    @Data
+    @AllArgsConstructor
+    public static class AwaitingFileContext {
+        /**
+         * Идентификатор события, к которому добавляется вложение
+         */
+        private Long eventId;
+        
+        /**
+         * Идентификатор чата
+         */
+        private Long chatId;
+        
+        /**
+         * Идентификатор сообщения со списком вложений для обновления
+         */
+        private Integer messageId;
+    }
+    
+    /**
+     * Контекст шапки события.
+     * Содержит информацию о наличии шапки "Мои события" и количестве событий.
+     */
+    @Data
+    @AllArgsConstructor
+    public static class EventHeaderContext {
+        /**
+         * Флаг наличия шапки "Мои события"
+         */
+        private boolean hasMyEventsHeader;
+        
+        /**
+         * Количество событий для формирования шапки
+         */
+        private int eventCount;
     }
 }
