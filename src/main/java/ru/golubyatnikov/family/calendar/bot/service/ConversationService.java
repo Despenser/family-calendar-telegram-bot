@@ -152,6 +152,55 @@ public class ConversationService {
     }
     
     /**
+     * Сохраняет messageId сообщения создания в черновике события.
+     * 
+     * <p>MessageId используется для обновления одного и того же сообщения бота
+     * на протяжении всего процесса создания события, вместо отправки новых сообщений.
+     * Это делает чат более чистым и удобным для пользователя.</p>
+     * 
+     * <p><b>Использование:</b></p>
+     * <p>Метод должен вызываться сразу после отправки начального сообщения
+     * создания события (после команды /add_event). Сохраненный messageId затем
+     * используется для обновления сообщения на каждом шаге диалога:</p>
+     * <ul>
+     *   <li>При выборе типа события (персональное/семейное)</li>
+     *   <li>При выборе даты через inline-календарь</li>
+     *   <li>При выборе времени через inline-кнопки</li>
+     *   <li>При вводе названия события</li>
+     *   <li>При вводе описания события</li>
+     * </ul>
+     * 
+     * <p><b>Пример использования:</b></p>
+     * <pre>{@code
+     * // В AddEventCommandHandler после отправки сообщения
+     * Message sentMessage = messageService.sendMessageWithInlineKeyboardAndGet(
+     *     chatId, "Выберите тип события:", keyboard);
+     * conversationService.setCreationMessageId(userId, sentMessage.getMessageId().longValue());
+     * }</pre>
+     * 
+     * <p><b>Требования:</b> 4.1</p>
+     * 
+     * @param userId идентификатор пользователя, создающего событие
+     * @param messageId идентификатор сообщения Telegram, которое будет обновляться
+     * @throws IllegalStateException если активный черновик не найден для пользователя
+     * @throws IllegalArgumentException если userId или messageId равны null
+     * 
+     * @see Event#getMessageId()
+     * @see Event#setMessageId(Long)
+     * @see ru.golubyatnikov.family.calendar.bot.handler.AddEventCommandHandler#handle
+     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#sendMessageWithInlineKeyboardAndGet
+     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#editMessageText
+     */
+    public void setCreationMessageId(Long userId, Long messageId) {
+        Event draft = getActiveDraft(userId);
+        draft.setMessageId(messageId);
+        
+        eventRepository.save(draft);
+        log.debug("MessageId сообщения создания сохранен: userId={}, draftId={}, messageId={}", 
+            userId, draft.getId(), messageId);
+    }
+    
+    /**
      * Завершает создание события, обновляя описание и меняя статус на ACTIVE.
      * После этого событие становится полноценным и доступным для отображения.
      * 

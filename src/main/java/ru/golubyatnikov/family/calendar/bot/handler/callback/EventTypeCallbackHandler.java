@@ -107,7 +107,10 @@ public class EventTypeCallbackHandler implements CallbackHandler {
         String message = messageBuilder.buildEventTypeSelectedMessage(isPersonal);
         
         try {
+            // Обновляем сообщение создания через editMessageText
             messageService.editMessageText(chatId, messageId, message, calendar);
+            log.debug("Сообщение создания обновлено после выбора типа: userId={}, messageId={}, type={}", 
+                     user.getId(), messageId, eventType);
             messageService.answerCallbackQuery(callbackQueryId, "Тип события выбран");
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при выборе типа события: userId={}, type={}, error={}", 

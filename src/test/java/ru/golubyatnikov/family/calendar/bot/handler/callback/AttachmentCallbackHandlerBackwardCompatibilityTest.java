@@ -151,14 +151,23 @@ class AttachmentCallbackHandlerBackwardCompatibilityTest {
         User user = createUser(1L);
         Attachment attachment = createAttachment(attachmentId, eventId);
         
+        // Создаем мок Message для возврата из sendFileWithKeyboardAndGet
+        Message sentMessage = mock(Message.class);
+        when(sentMessage.getMessageId()).thenReturn(300);
+        
         when(attachmentService.getAttachment(attachmentId)).thenReturn(attachment);
+        when(messageService.deleteMessage(anyLong(), anyInt())).thenReturn(true);
+        when(messageService.sendFileWithKeyboardAndGet(anyLong(), anyString(), anyString(), anyString(), any()))
+                .thenReturn(sentMessage);
         
         // Act
         handler.handle(callbackQuery, user);
         
         // Assert
+        verify(messageService).deleteMessage(anyLong(), anyInt());
         verify(attachmentService).getAttachment(eq(attachmentId));
-        verify(messageService).sendFileWithKeyboard(anyLong(), anyString(), anyString(), anyString(), any());
+        verify(messageService).sendFileWithKeyboardAndGet(anyLong(), anyString(), anyString(), anyString(), any());
+        verify(conversationStateService).saveAttachmentMessageId(eq(user.getId()), eq(eventId), anyLong(), eq(300));
         verify(messageService).answerCallbackQuery(eq("callback-123"), eq(""));
         verify(messageService, never()).answerCallbackQuery(anyString(), contains("❌ Ошибка"));
     }

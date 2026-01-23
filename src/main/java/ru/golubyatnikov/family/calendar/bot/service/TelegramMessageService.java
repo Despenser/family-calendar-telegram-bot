@@ -440,6 +440,65 @@ public class TelegramMessageService extends DefaultAbsSender {
     }
 
     /**
+     * Отправляет текстовое сообщение с inline кнопками и возвращает отправленное сообщение.
+     * 
+     * <p>Этот метод отправляет сообщение с inline-клавиатурой и возвращает объект Message,
+     * содержащий messageId и другую информацию об отправленном сообщении. Основное назначение -
+     * сохранение messageId для последующих обновлений сообщения через 
+     * {@link #editMessageText(Long, Integer, String, InlineKeyboardMarkup)}.</p>
+     * 
+     * <p><b>Использование в процессе создания события:</b></p>
+     * <p>Метод используется в начале процесса создания события для отправки первого сообщения
+     * с выбором типа события. Полученный messageId сохраняется в черновике события и затем
+     * используется для обновления этого же сообщения на всех последующих шагах диалога,
+     * что позволяет весь процесс создания отображать в одном сообщении.</p>
+     * 
+     * <p><b>Пример использования:</b></p>
+     * <pre>{@code
+     * // Отправляем сообщение и получаем объект Message
+     * InlineKeyboardMarkup keyboard = keyboardService.createEventTypeSelectionKeyboard();
+     * Message sentMessage = messageService.sendMessageWithInlineKeyboardAndGet(
+     *     chatId, 
+     *     "📋 Создание нового события\n\nВыберите тип события:", 
+     *     keyboard
+     * );
+     * 
+     * // Сохраняем messageId для последующих обновлений
+     * Long messageId = sentMessage.getMessageId().longValue();
+     * conversationService.setCreationMessageId(userId, messageId);
+     * 
+     * // Теперь можно обновлять это сообщение на каждом шаге
+     * messageService.editMessageText(chatId, messageId.intValue(), updatedText, updatedKeyboard);
+     * }</pre>
+     * 
+     * <p><b>Обработка ошибок парсинга:</b></p>
+     * <ul>
+     *   <li>При ошибке парсинга MarkdownV2 (400 Bad Request) автоматически переключается на plain text</li>
+     *   <li>Детальное логирование для диагностики проблем с экранированием</li>
+     *   <li>Метрика "markdown_parse_error_fallback" для мониторинга</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 3.1, 4.1</p>
+     * 
+     * @param chatId Telegram ID пользователя-получателя
+     * @param text текст сообщения (поддерживает MarkdownV2, требует экранирования)
+     * @param keyboard inline клавиатура с кнопками
+     * @return отправленное сообщение с messageId и другой информацией
+     * @throws TelegramApiException если все попытки отправки не удались
+     * @throws IllegalArgumentException если chatId null, text пустой или keyboard null
+     * 
+     * @see #sendMessageAndGet(Long, String, InlineKeyboardMarkup)
+     * @see #editMessageText(Long, Integer, String, InlineKeyboardMarkup)
+     * @see ru.golubyatnikov.family.calendar.bot.service.ConversationService#setCreationMessageId
+     * @see ru.golubyatnikov.family.calendar.bot.handler.AddEventCommandHandler#handle
+     * @see ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter
+     */
+    public Message sendMessageWithInlineKeyboardAndGet(Long chatId, String text, InlineKeyboardMarkup keyboard) 
+            throws TelegramApiException {
+        return sendMessageAndGet(chatId, text, keyboard);
+    }
+
+    /**
      * Отправляет текстовое сообщение с inline кнопками без форматирования.
      * 
      * <p>Этот метод используется как fallback механизм, когда отправка
@@ -873,6 +932,97 @@ public class TelegramMessageService extends DefaultAbsSender {
     }
 
     /**
+     * Отправляет файл пользователю по Telegram file_id с клавиатурой и возвращает отправленное сообщение.
+     * 
+     * <p>Этот метод аналогичен {@link #sendFileWithKeyboard}, но возвращает объект Message,
+     * что позволяет получить messageId отправленного сообщения для последующего редактирования.</p>
+     * 
+     * <p><b>Поддерживаемые типы файлов:</b></p>
+     * <ul>
+     *   <li>document - отправляется через sendDocument</li>
+     *   <li>photo - отправляется через sendPhoto</li>
+     *   <li>video - отправляется через sendVideo</li>
+     *   <li>audio - отправляется через sendAudio</li>
+     * </ul>
+     * 
+     * <p>Метод автоматически повторяет попытки отправки при ошибках
+     * с экспоненциальной задержкой. Максимум 3 попытки.</p>
+     * 
+     * <p><b>Требования:</b> 1.2</p>
+     * 
+     * @param chatId идентификатор чата для отправки файла
+     * @param fileId Telegram file_id файла
+     * @param fileType тип файла (document, photo, video, audio)
+     * @param caption подпись к файлу (может быть null)
+     * @param keyboard inline клавиатура
+     * @return отправленное сообщение с messageId
+     * @throws TelegramApiException если все попытки отправки не удались
+     * @throws IllegalArgumentException если chatId, fileId или fileType null/пустые, или fileType неподдерживаемый
+     */
+    @Retryable(
+        retryFor = TelegramApiException.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 1000, multiplier = 2.0)
+    )
+    public Message sendFileWithKeyboardAndGet(Long chatId, String fileId, String fileType, String caption, 
+                                              InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        // Валидация параметров
+        if (chatId == null) {
+            log.error("Попытка отправить файл с null chatId");
+            throw new IllegalArgumentException("ChatId не может быть null");
+        }
+        
+        if (fileId == null || fileId.isBlank()) {
+            log.error("Попытка отправить файл с пустым fileId: chatId={}", chatId);
+            throw new IllegalArgumentException("FileId не может быть пустым");
+        }
+        
+        if (fileType == null || fileType.isBlank()) {
+            log.error("Попытка отправить файл с пустым fileType: chatId={}, fileId={}", 
+                    chatId, fileId);
+            throw new IllegalArgumentException("FileType не может быть пустым");
+        }
+        
+        log.debug("Отправка файла с клавиатурой (с возвратом Message): chatId={}, fileId={}, fileType={}, caption='{}', hasKeyboard={}", 
+                chatId, fileId, fileType, caption, keyboard != null);
+        
+        try {
+            // Выбираем метод отправки в зависимости от типа файла
+            Message sentMessage = switch (fileType.toLowerCase()) {
+                case "document" -> sendDocumentWithKeyboardAndGet(chatId, fileId, caption, keyboard);
+                case "photo" -> sendPhotoWithKeyboardAndGet(chatId, fileId, caption, keyboard);
+                case "video" -> sendVideoWithKeyboardAndGet(chatId, fileId, caption, keyboard);
+                case "audio" -> sendAudioWithKeyboardAndGet(chatId, fileId, caption, keyboard);
+                default -> {
+                    log.error("Неподдерживаемый тип файла: chatId={}, fileType={}", 
+                            chatId, fileType);
+                    throw new IllegalArgumentException(
+                            "Неподдерживаемый тип файла: " + fileType + 
+                            ". Поддерживаются: document, photo, video, audio");
+                }
+            };
+            
+            log.debug("Файл с клавиатурой успешно отправлен (с возвратом Message): chatId={}, fileId={}, fileType={}, messageId={}", 
+                    chatId, fileId, fileType, sentMessage.getMessageId());
+            
+            return sentMessage;
+            
+        } catch (TelegramApiRequestException e) {
+            recordMetricForTelegramError(e);
+            log.error("Ошибка при отправке файла с клавиатурой (с возвратом Message): chatId={}, fileId={}, fileType={}, " +
+                     "errorCode={}, error={}", 
+                     chatId, fileId, fileType, e.getErrorCode(), e.getMessage());
+            throw e;
+            
+        } catch (TelegramApiException e) {
+            recordMetric("network_error");
+            log.error("Сетевая ошибка при отправке файла с клавиатурой (с возвратом Message): chatId={}, fileId={}, fileType={}, error={}", 
+                    chatId, fileId, fileType, e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
      * Отправляет файл пользователю по Telegram file_id.
      * 
      * <p>Этот метод используется для отправки файлов, которые уже загружены в Telegram
@@ -1157,38 +1307,149 @@ public class TelegramMessageService extends DefaultAbsSender {
     }
 
     /**
+     * Отправляет документ пользователю с inline клавиатурой и возвращает отправленное сообщение.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id документа
+     * @param caption подпись к документу
+     * @param keyboard inline клавиатура
+     * @return отправленное сообщение
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private Message sendDocumentWithKeyboardAndGet(Long chatId, String fileId, String caption, 
+                                                   InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        var sendDocument = new org.telegram.telegrambots.meta.api.methods.send.SendDocument();
+        sendDocument.setChatId(chatId.toString());
+        sendDocument.setDocument(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendDocument.setCaption(caption);
+            sendDocument.setParseMode("MarkdownV2");
+        }
+        
+        if (keyboard != null) {
+            sendDocument.setReplyMarkup(keyboard);
+        }
+        
+        return execute(sendDocument);
+    }
+    
+    /**
+     * Отправляет фотографию пользователю с inline клавиатурой и возвращает отправленное сообщение.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id фотографии
+     * @param caption подпись к фотографии
+     * @param keyboard inline клавиатура
+     * @return отправленное сообщение
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private Message sendPhotoWithKeyboardAndGet(Long chatId, String fileId, String caption, 
+                                                InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        var sendPhoto = new org.telegram.telegrambots.meta.api.methods.send.SendPhoto();
+        sendPhoto.setChatId(chatId.toString());
+        sendPhoto.setPhoto(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendPhoto.setCaption(caption);
+            sendPhoto.setParseMode("MarkdownV2");
+        }
+        
+        if (keyboard != null) {
+            sendPhoto.setReplyMarkup(keyboard);
+        }
+        
+        return execute(sendPhoto);
+    }
+    
+    /**
+     * Отправляет видео пользователю с inline клавиатурой и возвращает отправленное сообщение.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id видео
+     * @param caption подпись к видео
+     * @param keyboard inline клавиатура
+     * @return отправленное сообщение
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private Message sendVideoWithKeyboardAndGet(Long chatId, String fileId, String caption, 
+                                                InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        var sendVideo = new org.telegram.telegrambots.meta.api.methods.send.SendVideo();
+        sendVideo.setChatId(chatId.toString());
+        sendVideo.setVideo(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendVideo.setCaption(caption);
+            sendVideo.setParseMode("MarkdownV2");
+        }
+        
+        if (keyboard != null) {
+            sendVideo.setReplyMarkup(keyboard);
+        }
+        
+        return execute(sendVideo);
+    }
+    
+    /**
+     * Отправляет аудио пользователю с inline клавиатурой и возвращает отправленное сообщение.
+     * 
+     * @param chatId идентификатор чата
+     * @param fileId Telegram file_id аудио
+     * @param caption подпись к аудио
+     * @param keyboard inline клавиатура
+     * @return отправленное сообщение
+     * @throws TelegramApiException если отправка не удалась
+     */
+    private Message sendAudioWithKeyboardAndGet(Long chatId, String fileId, String caption, 
+                                                InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        var sendAudio = new org.telegram.telegrambots.meta.api.methods.send.SendAudio();
+        sendAudio.setChatId(chatId.toString());
+        sendAudio.setAudio(new org.telegram.telegrambots.meta.api.objects.InputFile(fileId));
+        
+        if (caption != null && !caption.isBlank()) {
+            sendAudio.setCaption(caption);
+            sendAudio.setParseMode("MarkdownV2");
+        }
+        
+        if (keyboard != null) {
+            sendAudio.setReplyMarkup(keyboard);
+        }
+        
+        return execute(sendAudio);
+    }
+
+    /**
      * Удаляет сообщение из чата.
      * 
-     * <p>Этот метод используется для удаления промежуточных сообщений пользователя,
-     * например, текстовых сообщений с новыми значениями полей при редактировании события.
-     * Удаление помогает поддерживать чистоту чата.</p>
+     * <p>Этот метод пытается удалить сообщение и возвращает результат операции.
+     * Не выбрасывает исключение, если сообщение не найдено или уже удалено.</p>
      * 
      * <p><b>Обработка ошибок:</b></p>
      * <ul>
-     *   <li>Сообщение не найдено или удалено - логирует предупреждение, не выбрасывает исключение</li>
-     *   <li>Сообщение слишком старое (>48 часов) - логирует предупреждение, не выбрасывает исключение</li>
-     *   <li>Нет прав на удаление - логирует предупреждение, не выбрасывает исключение</li>
-     *   <li>Другие ошибки - логирует предупреждение, не выбрасывает исключение</li>
+     *   <li>Сообщение удалено пользователем - возвращает false</li>
+     *   <li>Сообщение не найдено - возвращает false</li>
+     *   <li>Успешное удаление - возвращает true</li>
+     *   <li>Другие ошибки - выбрасывает TelegramApiException</li>
      * </ul>
      * 
-     * <p>Метод никогда не выбрасывает исключения, чтобы ошибка удаления сообщения
-     * не прерывала основной процесс обработки (например, обновление события).</p>
+     * <p><b>Требования:</b> 4.1, 4.2, 4.3, 4.4, 4.5</p>
      * 
-     * <p><b>Требования:</b> 5.4, 8.1, 8.2, 8.3, 8.4</p>
-     * 
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения для удаления
-     * @see DeleteMessage
+     * @param chatId ID чата, где находится сообщение
+     * @param messageId ID сообщения для удаления
+     * @return true если удаление успешно, false если сообщение не найдено/удалено
+     * @throws TelegramApiException при других ошибках (сетевые и т.д.)
+     * @throws IllegalArgumentException если chatId или messageId null
      */
-    public void deleteMessage(Long chatId, Integer messageId) {
+    public boolean deleteMessage(Long chatId, Integer messageId) throws TelegramApiException {
+        // Валидация параметров
         if (chatId == null) {
             log.error("Попытка удалить сообщение с null chatId");
-            return;
+            throw new IllegalArgumentException("ChatId не может быть null");
         }
         
         if (messageId == null) {
             log.error("Попытка удалить сообщение с null messageId: chatId={}", chatId);
-            return;
+            throw new IllegalArgumentException("MessageId не может быть null");
         }
         
         log.debug("Удаление сообщения: chatId={}, messageId={}", chatId, messageId);
@@ -1199,32 +1460,149 @@ public class TelegramMessageService extends DefaultAbsSender {
         
         try {
             execute(deleteMessage);
-            log.debug("Сообщение успешно удалено: chatId={}, messageId={}", chatId, messageId);
+            log.info("Сообщение успешно удалено: chatId={}, messageId={}", chatId, messageId);
+            return true;
             
         } catch (TelegramApiRequestException e) {
             // Проверяем, не удалено ли сообщение уже
-            if (isMessageNotFoundError(e)) {
-                log.info("Сообщение не найдено или уже удалено: chatId={}, messageId={}", 
-                        chatId, messageId);
-                return;
+            if (isMessageDeleteNotFoundError(e)) {
+                log.warn("Сообщение не найдено или уже удалено: chatId={}, messageId={}, error={}", 
+                        chatId, messageId, e.getMessage());
+                return false;
             }
             
-            // Проверяем, не слишком ли старое сообщение
-            if (isMessageTooOldError(e)) {
-                log.info("Сообщение слишком старое для удаления: chatId={}, messageId={}", 
-                        chatId, messageId);
-                return;
-            }
-            
-            // Логируем другие ошибки как предупреждения, но не выбрасываем исключение
-            log.warn("Не удалось удалить сообщение: chatId={}, messageId={}, errorCode={}, error={}", 
+            // Другие ошибки пробрасываем дальше
+            log.error("Ошибка при удалении сообщения: chatId={}, messageId={}, errorCode={}, error={}", 
                     chatId, messageId, e.getErrorCode(), e.getMessage());
+            throw e;
             
         } catch (TelegramApiException e) {
-            // Логируем сетевые и другие ошибки как предупреждения
-            log.warn("Ошибка при удалении сообщения: chatId={}, messageId={}, error={}", 
+            // Логируем сетевые и другие ошибки
+            log.error("Сетевая ошибка при удалении сообщения: chatId={}, messageId={}, error={}", 
                     chatId, messageId, e.getMessage());
+            throw e;
         }
+    }
+
+    /**
+     * Удаляет сообщение из чата (silent версия).
+     * 
+     * <p>Этот метод используется для удаления промежуточных сообщений пользователя,
+     * например, текстовых сообщений с новыми значениями полей при редактировании события.
+     * Удаление помогает поддерживать чистоту чата.</p>
+     * 
+     * <p><b>Обработка ошибок:</b></p>
+     * <ul>
+     *   <li>403 Forbidden - отсутствие прав на удаление (WARN уровень логирования)</li>
+     *   <li>400 Bad Request "message to delete not found" - сообщение не найдено (DEBUG уровень)</li>
+     *   <li>400 Bad Request (другие) - сообщение слишком старое или другие причины (DEBUG уровень)</li>
+     *   <li>Сетевые ошибки - проблемы с подключением к Telegram API (ERROR уровень)</li>
+     *   <li>Другие ошибки API - неожиданные ошибки (WARN уровень)</li>
+     * </ul>
+     * 
+     * <p>Метод никогда не выбрасывает исключения, чтобы ошибка удаления сообщения
+     * не прерывала основной процесс обработки (например, обновление события или
+     * завершение создания события).</p>
+     * 
+     * <p><b>Метрики:</b></p>
+     * <ul>
+     *   <li>delete_message_forbidden - отсутствие прав на удаление</li>
+     *   <li>delete_message_not_found - сообщение не найдено</li>
+     *   <li>delete_message_bad_request - другие ошибки 400</li>
+     *   <li>delete_message_api_error - другие ошибки API</li>
+     *   <li>delete_message_network_error - сетевые ошибки</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.4, 2.4, 5.1, 5.2, 5.3, 5.4</p>
+     * 
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для удаления
+     * @see DeleteMessage
+     * @deprecated Используйте {@link #deleteMessage(Long, Integer)} для новой функциональности
+     */
+    @Deprecated
+    public void deleteMessageSilently(Long chatId, Integer messageId) {
+        if (chatId == null) {
+            log.error("Попытка удалить сообщение с null chatId");
+            return;
+        }
+        
+        if (messageId == null) {
+            log.error("Попытка удалить сообщение с null messageId: chatId={}", chatId);
+            return;
+        }
+        
+        log.debug("Удаление сообщения (silent): chatId={}, messageId={}", chatId, messageId);
+        
+        DeleteMessage deleteMessage = new DeleteMessage();
+        deleteMessage.setChatId(chatId.toString());
+        deleteMessage.setMessageId(messageId);
+        
+        try {
+            execute(deleteMessage);
+            log.debug("Сообщение успешно удалено (silent): chatId={}, messageId={}", chatId, messageId);
+            
+        } catch (TelegramApiRequestException e) {
+            Integer errorCode = e.getErrorCode();
+            
+            // Обработка ошибки "отсутствие прав" (код 403)
+            if (errorCode != null && errorCode == 403) {
+                log.warn("Нет прав для удаления сообщения пользователя: chatId={}, messageId={}, error={}", 
+                        chatId, messageId, e.getMessage());
+                recordMetric("delete_message_forbidden");
+                return;
+            }
+            
+            // Обработка ошибки "сообщение не найдено" (код 400)
+            if (errorCode != null && errorCode == 400 && isMessageNotFoundError(e)) {
+                log.debug("Сообщение пользователя уже удалено: chatId={}, messageId={}", 
+                        chatId, messageId);
+                recordMetric("delete_message_not_found");
+                return;
+            }
+            
+            // Обработка других ошибок 400 (например, слишком старое сообщение)
+            if (errorCode != null && errorCode == 400) {
+                log.debug("Сообщение не может быть удалено (возможно, слишком старое): chatId={}, messageId={}, error={}", 
+                        chatId, messageId, e.getMessage());
+                recordMetric("delete_message_bad_request");
+                return;
+            }
+            
+            // Логируем другие ошибки API как предупреждения
+            log.warn("Не удалось удалить сообщение (silent): chatId={}, messageId={}, errorCode={}, error={}", 
+                    chatId, messageId, errorCode, e.getMessage());
+            recordMetric("delete_message_api_error");
+            
+        } catch (TelegramApiException e) {
+            // Обработка сетевых ошибок
+            log.error("Ошибка при удалении сообщения пользователя: chatId={}, messageId={}, error={}", 
+                    chatId, messageId, e.getMessage());
+            recordMetric("delete_message_network_error");
+        }
+    }
+
+    /**
+     * Проверяет, является ли ошибка "сообщение не найдено для удаления".
+     * 
+     * <p>Эта ошибка возникает когда:</p>
+     * <ul>
+     *   <li>Пользователь удалил сообщение</li>
+     *   <li>Сообщение не существует</li>
+     *   <li>Бот не имеет доступа к сообщению</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 4.2</p>
+     * 
+     * @param e исключение от Telegram API
+     * @return true если это ошибка "сообщение не найдено", false иначе
+     */
+    private boolean isMessageDeleteNotFoundError(TelegramApiRequestException e) {
+        String message = e.getMessage();
+        String apiResponse = e.getApiResponse();
+        
+        return (message != null && message.contains("message to delete not found")) ||
+               (apiResponse != null && apiResponse.contains("message to delete not found"));
     }
 
     /**

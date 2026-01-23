@@ -180,19 +180,37 @@ public class Event {
 
     /**
      * Идентификатор сообщения Telegram, связанного с этим событием.
-     * Используется для обновления существующего сообщения при редактировании события
-     * вместо отправки нового сообщения, что предотвращает засорение чата.
      * 
-     * <p>Значение NULL возможно в следующих случаях:
+     * <p><b>Для активных событий (ACTIVE, COMPLETED, DELETED):</b></p>
+     * <p>Используется для обновления существующего сообщения при редактировании события
+     * вместо отправки нового сообщения, что предотвращает засорение чата.</p>
+     * 
+     * <p><b>Для черновиков (DRAFT):</b></p>
+     * <p>Хранит messageId сообщения создания события, которое обновляется на каждом шаге
+     * многошагового диалога создания события. Это позволяет весь процесс создания
+     * отображать в одном сообщении бота, обновляя его по мере ввода данных пользователем.</p>
+     * 
+     * <p><b>Примеры использования:</b></p>
+     * <ul>
+     *   <li>При создании события через /add_event - сохраняется messageId первого сообщения,
+     *       которое затем обновляется при выборе даты, времени, вводе названия и описания</li>
+     *   <li>При редактировании активного события - используется для обновления карточки события
+     *       вместо отправки нового сообщения</li>
+     *   <li>При отображении списка событий - позволяет обновлять конкретное сообщение
+     *       при изменении данных события</li>
+     * </ul>
+     * 
+     * <p><b>Значение NULL возможно в следующих случаях:</b></p>
      * <ul>
      *   <li>Событие создано до внедрения функции редактирования сообщений</li>
      *   <li>Сообщение о событии было удалено пользователем</li>
-     *   <li>Событие находится в статусе DRAFT и сообщение еще не отправлено</li>
+     *   <li>Черновик только что создан и сообщение еще не отправлено</li>
      * </ul>
-     * </p>
      * 
-     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#sendMessageAndGet
-     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#tryEditMessageText
+     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#sendMessageWithInlineKeyboardAndGet
+     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#editMessageText
+     * @see ru.golubyatnikov.family.calendar.bot.service.ConversationService#setCreationMessageId
+     * @see ru.golubyatnikov.family.calendar.bot.handler.AddEventCommandHandler#handle
      */
     @Column(name = "message_id")
     private Long messageId;

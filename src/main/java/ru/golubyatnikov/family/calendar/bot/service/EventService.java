@@ -527,7 +527,7 @@ public class EventService {
             Long chatId = event.getUser().getTelegramId();
             if (chatId != null) {
                 try {
-                    telegramMessageService.deleteMessage(chatId, event.getMessageId().intValue());
+                    telegramMessageService.deleteMessageSilently(chatId, event.getMessageId().intValue());
                     log.debug("Сообщение события удалено при удалении: eventId={}, messageId={}", 
                              eventId, event.getMessageId());
                 } catch (Exception e) {
@@ -618,7 +618,7 @@ public class EventService {
             Long chatId = event.getUser().getTelegramId();
             if (chatId != null) {
                 try {
-                    telegramMessageService.deleteMessage(chatId, event.getMessageId().intValue());
+                    telegramMessageService.deleteMessageSilently(chatId, event.getMessageId().intValue());
                     log.debug("Сообщение события удалено при завершении: eventId={}, messageId={}", 
                              eventId, event.getMessageId());
                 } catch (Exception e) {

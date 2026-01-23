@@ -83,6 +83,11 @@ public class AddEventCommandHandler implements CommandHandler {
      * При возникновении ошибки транзакция откатывается, и черновик удаляется
      * из базы данных через вызов {@link ConversationService#cancelEventCreation(Long)}.</p>
      * 
+     * <p><b>Новое поведение:</b> Метод сохраняет messageId отправленного сообщения
+     * в черновике события для последующего обновления этого же сообщения на всех
+     * шагах диалога. Это обеспечивает чистоту чата - весь процесс создания события
+     * происходит в одном сообщении бота.</p>
+     * 
      * @param message входящее сообщение от Telegram
      * @param user пользователь из базы данных (не может быть null, так как команда требует авторизации)
      * @return текст ответа пользователю (null, так как ответ отправляется через TelegramMessageService)
@@ -122,12 +127,17 @@ public class AddEventCommandHandler implements CommandHandler {
             // Показываем выбор типа события (персональное или семейное)
             InlineKeyboardMarkup typeKeyboard = keyboardService.createEventTypeSelectionKeyboard();
             
-            messageService.sendMessageWithInlineKeyboard(chatId, 
-                formatMessage("📅 %s\n\nВыберите тип события:", "Создание нового события"), 
-                typeKeyboard);
+            // Отправляем сообщение и получаем объект Message с messageId
+            org.telegram.telegrambots.meta.api.objects.Message sentMessage = 
+                messageService.sendMessageWithInlineKeyboardAndGet(chatId, 
+                    bold("📋 Создание нового события") + "\n\nВыберите тип события:", 
+                    typeKeyboard);
             
-            log.debug("Клавиатура выбора типа события отправлена пользователю: userId={}, telegramId={}", 
-                    user.getId(), telegramId);
+            // Сохраняем messageId в черновике для последующих обновлений
+            conversationService.setCreationMessageId(user.getId(), sentMessage.getMessageId().longValue());
+            
+            log.debug("Клавиатура выбора типа события отправлена и messageId сохранен: userId={}, telegramId={}, messageId={}", 
+                    user.getId(), telegramId, sentMessage.getMessageId());
             
             // Возвращаем null, так как ответ уже отправлен через TelegramMessageService
             return null;

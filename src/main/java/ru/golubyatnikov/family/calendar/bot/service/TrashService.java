@@ -155,7 +155,7 @@ public class TrashService {
         // Удаляем старое сообщение события перед восстановлением
         if (event.getMessageId() != null) {
             Long chatId = event.getUser().getTelegramId();
-            messageService.deleteMessage(chatId, event.getMessageId().intValue());
+            messageService.deleteMessageSilently(chatId, event.getMessageId().intValue());
             log.debug("Старое сообщение события удалено при восстановлении: eventId={}, messageId={}", 
                      eventId, event.getMessageId());
         }
@@ -256,7 +256,7 @@ public class TrashService {
         // Удаляем сообщение события перед окончательным удалением
         if (event.getMessageId() != null) {
             Long chatId = event.getUser().getTelegramId();
-            messageService.deleteMessage(chatId, event.getMessageId().intValue());
+            messageService.deleteMessageSilently(chatId, event.getMessageId().intValue());
             log.debug("Сообщение события удалено при окончательном удалении: eventId={}, messageId={}", 
                      eventId, event.getMessageId());
         }
@@ -481,7 +481,7 @@ public class TrashService {
                 if (event.getMessageId() != null) {
                     try {
                         Long chatId = event.getUser().getTelegramId();
-                        messageService.deleteMessage(chatId, event.getMessageId().intValue());
+                        messageService.deleteMessageSilently(chatId, event.getMessageId().intValue());
                         log.debug("Сообщение события удалено при автоматической очистке: eventId={}, messageId={}", 
                                  event.getId(), event.getMessageId());
                     } catch (Exception e) {

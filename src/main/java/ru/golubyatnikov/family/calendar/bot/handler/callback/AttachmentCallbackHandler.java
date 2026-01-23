@@ -118,7 +118,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                     }
                     Long eventId = Long.parseLong(parts[1]);
                     log.debug("Обработка действия 'list': eventId={}", eventId);
-                    handleBackToAttachments(eventId, user, chatId, messageId, callbackQueryId);
+                    handleBackToAttachments(eventId, user, chatId, messageId, callbackQueryId, callbackQuery);
                 }
                 case "add" -> {
                     // Формат: add_{eventId}
@@ -143,7 +143,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                     Long eventId = Long.parseLong(parts[1]);
                     Long attachmentId = Long.parseLong(parts[2]);
                     log.debug("Обработка действия 'view': eventId={}, attachmentId={}", eventId, attachmentId);
-                    handleViewFile(attachmentId, eventId, user, chatId, callbackQueryId);
+                    handleViewFile(attachmentId, eventId, user, chatId, messageId, callbackQueryId);
                 }
                 case "delete" -> {
                     // Формат: delete_{eventId}_{attachmentId}
@@ -363,6 +363,36 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             double sizeInMb = sizeInKb / 1024.0;
             return String.format("%.2f МБ", sizeInMb);
         }
+    }
+    
+    /**
+     * Проверяет, является ли сообщение медиа-сообщением.
+     * 
+     * <p>Медиа-сообщением считается сообщение, содержащее:</p>
+     * <ul>
+     *   <li>Фото (hasPhoto())</li>
+     *   <li>Документ (hasDocument())</li>
+     *   <li>Видео (hasVideo())</li>
+     *   <li>Аудио (hasAudio())</li>
+     * </ul>
+     * 
+     * <p>Метод безопасно обрабатывает null-значения, возвращая false
+     * для null сообщений.</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4</p>
+     * 
+     * @param message объект сообщения из Telegram API
+     * @return true если сообщение содержит медиа-контент, false в противном случае
+     */
+    private boolean isMediaMessage(org.telegram.telegrambots.meta.api.objects.Message message) {
+        if (message == null) {
+            return false;
+        }
+        
+        return message.hasPhoto() || 
+               message.hasDocument() || 
+               message.hasVideo() || 
+               message.hasAudio();
     }
     
     /**
@@ -611,19 +641,34 @@ public class AttachmentCallbackHandler implements CallbackHandler {
      * <p>Caption отправляется с parseMode="MarkdownV2", поэтому все специальные символы
      * (точки, подчеркивания, скобки и т.д.) должны быть экранированы.</p>
      * 
-     * <p><b>Требования:</b> 2.4, 3.1, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 9.1, 9.2</p>
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 3.1, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 9.1, 9.2</p>
      * 
      * @param attachmentId идентификатор вложения
      * @param eventId идентификатор события
      * @param user пользователь
      * @param chatId идентификатор чата
+     * @param messageId идентификатор текущего сообщения для удаления
      * @param callbackQueryId идентификатор callback query
      */
     private void handleViewFile(Long attachmentId, Long eventId, User user, 
-                               Long chatId, String callbackQueryId) throws Exception {
+                               Long chatId, Integer messageId, String callbackQueryId) throws Exception {
         log.debug("Просмотр файла ID={}, пользователь ID={}", attachmentId, user.getId());
         
         try {
+            // Удаляем текущее сообщение со списком вложений
+            log.debug("Попытка удаления сообщения перед отправкой файла: chatId={}, messageId={}, userId={}", 
+                    chatId, messageId, user.getId());
+            
+            boolean deleted = messageService.deleteMessage(chatId, messageId);
+            
+            if (deleted) {
+                log.info("Сообщение успешно удалено перед отправкой файла: chatId={}, messageId={}, userId={}", 
+                        chatId, messageId, user.getId());
+            } else {
+                log.warn("Не удалось удалить сообщение (возможно, уже удалено пользователем): " +
+                        "chatId={}, messageId={}, userId={}", chatId, messageId, user.getId());
+            }
+            
             // Получаем вложение
             Attachment attachment = attachmentService.getAttachment(attachmentId);
             
@@ -635,14 +680,30 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             // Создаем клавиатуру с кнопкой "Назад к вложениям"
             var keyboard = keyboardService.createFileViewKeyboard(eventId);
             
-            // Отправляем файл с клавиатурой через TelegramMessageService
-            messageService.sendFileWithKeyboard(chatId, attachment.getFileId(), 
-                    attachment.getFileType(), caption, keyboard);
+            // Отправляем файл с клавиатурой через TelegramMessageService и получаем Message объект
+            org.telegram.telegrambots.meta.api.objects.Message sentMessage = 
+                    messageService.sendFileWithKeyboardAndGet(chatId, attachment.getFileId(), 
+                            attachment.getFileType(), caption, keyboard);
+            
+            // Извлекаем messageId из отправленного сообщения
+            Integer newMessageId = sentMessage.getMessageId();
+            
+            log.info("Файл ID={} успешно отправлен с клавиатурой пользователю ID={}, новый messageId={}", 
+                    attachmentId, user.getId(), newMessageId);
+            
+            // Сохраняем новый messageId в ConversationState
+            try {
+                conversationStateService.saveAttachmentMessageId(user.getId(), eventId, chatId, newMessageId);
+                log.debug("Message_Id сохранен в ConversationState: userId={}, eventId={}, messageId={}", 
+                        user.getId(), eventId, newMessageId);
+            } catch (Exception e) {
+                log.error("Ошибка при сохранении messageId в ConversationState: " +
+                        "userId={}, eventId={}, messageId={}, error={}", 
+                        user.getId(), eventId, newMessageId, e.getMessage(), e);
+                // Не пробрасываем исключение - файл уже отправлен пользователю
+            }
             
             messageService.answerCallbackQuery(callbackQueryId, "");
-            
-            log.info("Файл ID={} успешно отправлен с клавиатурой пользователю ID={}", 
-                    attachmentId, user.getId());
             
         } catch (ru.golubyatnikov.family.calendar.bot.exception.AttachmentNotFoundException e) {
             log.error("Вложение ID={} не найдено", attachmentId);
@@ -868,10 +929,33 @@ public class AttachmentCallbackHandler implements CallbackHandler {
      * 
      * <p>Этот метод вызывается при нажатии кнопки "Назад к вложениям" при просмотре файла.
      * Получает событие и список вложений, формирует сообщение со списком вложений
-     * (аналогично {@link #handleAttachmentList}) и использует {@link #editOrSendMessage}
-     * для редактирования существующего сообщения или отправки нового при невозможности редактирования.</p>
+     * и выбирает стратегию обработки в зависимости от типа текущего сообщения.</p>
      * 
-     * <p>Формирует сообщение с информацией о каждом вложении:</p>
+     * <h3>Определение типа сообщения</h3>
+     * <p>Метод использует {@link #isMediaMessage(org.telegram.telegrambots.meta.api.objects.Message)}
+     * для определения типа текущего сообщения:</p>
+     * <ul>
+     *   <li><b>Медиа-сообщение</b> - содержит фото, документ, видео или аудио</li>
+     *   <li><b>Текстовое сообщение</b> - содержит только текст и inline-клавиатуру</li>
+     * </ul>
+     * 
+     * <h3>Обработка медиа-сообщений</h3>
+     * <p>Для медиа-сообщений выполняется следующая последовательность действий:</p>
+     * <ol>
+     *   <li>Удаление текущего медиа-сообщения через {@link TelegramMessageService#deleteMessage}</li>
+     *   <li>Отправка нового текстового сообщения через {@link TelegramMessageService#sendMessageAndGet}</li>
+     *   <li>Сохранение нового messageId через {@link ConversationStateService#saveAttachmentMessageId}</li>
+     * </ol>
+     * 
+     * <p><b>Причина:</b> Telegram API не поддерживает редактирование медиа-сообщений методом EditMessageText.
+     * Попытка редактирования приводит к ошибке "Bad Request: there is no text in the message to edit".</p>
+     * 
+     * <h3>Обработка текстовых сообщений</h3>
+     * <p>Для текстовых сообщений используется существующий механизм {@link #editOrSendMessage},
+     * который пытается отредактировать сообщение, а при неудаче отправляет новое.</p>
+     * 
+     * <h3>Формирование сообщения</h3>
+     * <p>Сообщение со списком вложений содержит информацию о каждом вложении:</p>
      * <ul>
      *   <li>Эмодзи для типа файла (📄, 🖼️, 🎥, 🎵)</li>
      *   <li>Имя файла</li>
@@ -884,20 +968,87 @@ public class AttachmentCallbackHandler implements CallbackHandler {
      * 
      * <p>Если список пуст, отображает сообщение "У этого события пока нет вложений".</p>
      * 
-     * <p><b>Требования:</b> 3.2, 3.3, 3.4</p>
+     * <h3>Обработка ошибок</h3>
+     * <p>Метод реализует устойчивую обработку ошибок на каждом этапе:</p>
+     * <ul>
+     *   <li><b>Ошибка удаления медиа-сообщения:</b> логирование WARN, продолжение выполнения
+     *       (сообщение могло быть удалено пользователем)</li>
+     *   <li><b>Ошибка отправки нового сообщения:</b> логирование ERROR, отправка callback ответа
+     *       с ошибкой, пробрасывание исключения</li>
+     *   <li><b>Ошибка сохранения контекста:</b> логирование ERROR, продолжение выполнения
+     *       (основная функциональность уже выполнена)</li>
+     * </ul>
+     * 
+     * <h3>Логирование</h3>
+     * <p>Метод выполняет подробное логирование на всех этапах:</p>
+     * <ul>
+     *   <li><b>DEBUG:</b> начало операции, определение типа сообщения, выбор стратегии обработки,
+     *       сохранение messageId, завершение операции</li>
+     *   <li><b>INFO:</b> успешное удаление медиа-сообщения, отправка нового сообщения</li>
+     *   <li><b>WARN:</b> неудачное удаление медиа-сообщения (возможно, уже удалено),
+     *       ошибка Telegram API при удалении</li>
+     *   <li><b>ERROR:</b> ошибка отправки нового сообщения, ошибка сохранения контекста,
+     *       общая ошибка обработки</li>
+     * </ul>
+     * 
+     * <h3>Примеры логирования</h3>
+     * <pre>
+     * // DEBUG - начало операции
+     * log.debug("Возврат к списку вложений для события ID={}, пользователь ID={}", eventId, user.getId());
+     * 
+     * // DEBUG - определение типа сообщения
+     * log.debug("Проверка типа сообщения: chatId={}, messageId={}, isMedia={}, eventId={}", 
+     *         chatId, messageId, isMedia, eventId);
+     * 
+     * // INFO - успешное удаление медиа-сообщения
+     * log.info("Медиа-сообщение успешно удалено: chatId={}, messageId={}", chatId, messageId);
+     * 
+     * // WARN - неудачное удаление
+     * log.warn("Не удалось удалить медиа-сообщение (возможно, уже удалено): " +
+     *         "chatId={}, messageId={}", chatId, messageId);
+     * 
+     * // INFO - отправка нового сообщения
+     * log.info("Новое текстовое сообщение отправлено после удаления медиа: " +
+     *         "chatId={}, newMessageId={}, eventId={}", chatId, resultMessageId, eventId);
+     * 
+     * // ERROR - ошибка отправки
+     * log.error("Ошибка Telegram API при отправке нового сообщения: " +
+     *         "chatId={}, eventId={}, error={}", chatId, eventId, e.getMessage(), e);
+     * </pre>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 3.1, 3.2, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3</p>
      * 
      * @param eventId идентификатор события
-     * @param user пользователь
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения
-     * @param callbackQueryId идентификатор callback query
+     * @param user пользователь, инициировавший возврат к списку вложений
+     * @param chatId идентификатор чата Telegram
+     * @param messageId идентификатор текущего сообщения (медиа или текстового)
+     * @param callbackQueryId идентификатор callback query для отправки ответа
+     * @param callbackQuery объект callback query для доступа к текущему сообщению и определения его типа
+     * @throws Exception при критических ошибках обработки (ошибка отправки нового сообщения,
+     *                   ошибка получения события или вложений)
      */
     private void handleBackToAttachments(Long eventId, User user, Long chatId, 
-                                        Integer messageId, String callbackQueryId) throws Exception {
+                                        Integer messageId, String callbackQueryId,
+                                        CallbackQuery callbackQuery) throws Exception {
         log.debug("Возврат к списку вложений для события ID={}, пользователь ID={}", 
                 eventId, user.getId());
         
         try {
+            // Получаем текущее сообщение из CallbackQuery
+            // getMessage() возвращает MaybeInaccessibleMessage, который может быть Message или InaccessibleMessage
+            var maybeMessage = callbackQuery.getMessage();
+            org.telegram.telegrambots.meta.api.objects.Message currentMessage = null;
+            
+            // Проверяем, что это доступное сообщение
+            if (maybeMessage instanceof org.telegram.telegrambots.meta.api.objects.Message) {
+                currentMessage = (org.telegram.telegrambots.meta.api.objects.Message) maybeMessage;
+            }
+            
+            // Определяем тип сообщения
+            boolean isMedia = isMediaMessage(currentMessage);
+            log.debug("Проверка типа сообщения: chatId={}, messageId={}, isMedia={}, eventId={}", 
+                    chatId, messageId, isMedia, eventId);
+            
             // Получаем событие для проверки прав доступа
             Event event = eventService.getEventById(eventId);
             
@@ -946,9 +1097,68 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             // Создаем клавиатуру
             var keyboard = keyboardService.createAttachmentsListKeyboard(eventId, attachments, isCreator);
             
-            // Используем editOrSendMessage для редактирования или отправки нового сообщения
-            Integer resultMessageId = editOrSendMessage(chatId, messageId, message.toString(), 
-                    keyboard, user.getId(), eventId);
+            Integer resultMessageId;
+            
+            // Проверяем тип сообщения и выбираем стратегию обработки
+            if (isMedia) {
+                log.debug("Текущее сообщение является медиа-сообщением, удаляем и отправляем новое: " +
+                        "chatId={}, messageId={}, eventId={}", chatId, messageId, eventId);
+                
+                // Удаляем медиа-сообщение с обработкой ошибок
+                try {
+                    boolean deleted = messageService.deleteMessage(chatId, messageId);
+                    
+                    if (deleted) {
+                        log.info("Медиа-сообщение успешно удалено: chatId={}, messageId={}", 
+                                chatId, messageId);
+                    } else {
+                        log.warn("Не удалось удалить медиа-сообщение (возможно, уже удалено): " +
+                                "chatId={}, messageId={}", chatId, messageId);
+                    }
+                } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                    log.warn("Ошибка Telegram API при удалении медиа-сообщения (продолжаем выполнение): " +
+                            "chatId={}, messageId={}, error={}", chatId, messageId, e.getMessage());
+                    // Продолжаем выполнение - попытаемся отправить новое сообщение
+                }
+                
+                // Отправляем новое текстовое сообщение с обработкой ошибок
+                try {
+                    org.telegram.telegrambots.meta.api.objects.Message sentMessage = 
+                            messageService.sendMessageAndGet(chatId, message.toString(), keyboard);
+                    
+                    resultMessageId = sentMessage.getMessageId();
+                    
+                    log.info("Новое текстовое сообщение отправлено после удаления медиа: " +
+                            "chatId={}, newMessageId={}, eventId={}", chatId, resultMessageId, eventId);
+                    
+                } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                    log.error("Ошибка Telegram API при отправке нового сообщения: " +
+                            "chatId={}, eventId={}, error={}", chatId, eventId, e.getMessage(), e);
+                    messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка отправки сообщения");
+                    throw e;
+                }
+                
+                // Сохраняем новый messageId в ConversationState с обработкой ошибок
+                try {
+                    conversationStateService.saveAttachmentMessageId(user.getId(), eventId, 
+                            chatId, resultMessageId);
+                    log.debug("Message_Id сохранен в ConversationState: userId={}, eventId={}, messageId={}", 
+                            user.getId(), eventId, resultMessageId);
+                } catch (Exception e) {
+                    log.error("Ошибка при сохранении messageId в ConversationState (продолжаем выполнение): " +
+                            "userId={}, eventId={}, messageId={}, error={}", 
+                            user.getId(), eventId, resultMessageId, e.getMessage(), e);
+                    // Не пробрасываем исключение - основная функциональность уже выполнена
+                }
+                
+            } else {
+                log.debug("Текущее сообщение является текстовым, используем редактирование: " +
+                        "chatId={}, messageId={}, eventId={}", chatId, messageId, eventId);
+                
+                // Используем существующий механизм редактирования
+                resultMessageId = editOrSendMessage(chatId, messageId, message.toString(), 
+                        keyboard, user.getId(), eventId);
+            }
             
             log.debug("Список вложений отображен при возврате: eventId={}, userId={}, messageId={}", 
                     eventId, user.getId(), resultMessageId);
