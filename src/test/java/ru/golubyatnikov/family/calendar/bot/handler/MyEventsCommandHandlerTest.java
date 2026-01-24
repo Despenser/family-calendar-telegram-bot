@@ -560,6 +560,46 @@ class MyEventsCommandHandlerTest {
         assertTrue(message.contains("Текущие данные"), 
             "Сообщение должно содержать секцию текущих данных");
     }
+
+    @Test
+    @DisplayName("Должен сохранить контекст шапки при отправке первого события")
+    void shouldSaveEventHeaderContextWhenSendingFirstEvent() throws Exception {
+        // Given
+        ru.golubyatnikov.family.calendar.bot.model.User user = createUser();
+        List<Event> events = createTestEvents(user);
+        
+        // Создаем клавиатуру с непустым списком кнопок
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        keyboard.setKeyboard(List.of(List.of()));
+        
+        when(message.getFrom()).thenReturn(telegramUser);
+        when(telegramUser.getId()).thenReturn(123456789L);
+        when(telegramUser.getUserName()).thenReturn("test_user");
+        when(message.getChatId()).thenReturn(123456789L);
+        when(eventService.getUserEvents(user.getId())).thenReturn(events);
+        when(keyboardService.createEventActionsKeyboard(any(Event.class), anyLong())).thenReturn(keyboard);
+        
+        // Мокаем botMessageBuilder
+        when(botMessageBuilder.buildMyEventsHeader(2)).thenReturn("📋 *Мои события*\n\nВсего событий: 2\n");
+        when(botMessageBuilder.buildEventMessage(any(Event.class))).thenAnswer(invocation -> {
+            Event event = invocation.getArgument(0);
+            return "📌 *" + event.getTitle() + "*\n📅 Дата: " + event.getFormattedDate() + "\n🕐 Время: " + event.getFormattedTime();
+        });
+        
+        // Мокаем sendMessageAndGet
+        org.telegram.telegrambots.meta.api.objects.Message sentMessage = mock(org.telegram.telegrambots.meta.api.objects.Message.class);
+        when(sentMessage.getMessageId()).thenReturn(1);
+        when(messageService.sendMessageAndGet(anyLong(), anyString(), any(InlineKeyboardMarkup.class))).thenReturn(sentMessage);
+
+        // When
+        handler.handle(message, user);
+
+        // Then
+        // Проверяем, что контекст шапки был сохранен после отправки первого события
+        verify(conversationStateService).saveEventHeaderContext(
+                eq(user.getId()), 
+                eq(true), 
+                eq(2)
+        );
+    }
 }
-
-

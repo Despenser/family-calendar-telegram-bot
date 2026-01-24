@@ -250,7 +250,7 @@ public class HelpCommandHandler implements CommandHandler {
             Map.entry("/today", "🗓️"),
             Map.entry("/week", "📆"),
             Map.entry("/search", "🔍"),
-            Map.entry("/filter", "🫧"),
+            Map.entry("/filter", "🔎"),
             Map.entry("/stats", "📊"),
             Map.entry("/trash", "🗑️")
     );

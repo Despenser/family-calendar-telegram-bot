@@ -125,10 +125,14 @@ class AddEventCommandHandlerTest {
         // Given
         Message message = createMessage("/add_event", testUser.getTelegramId(), 123L);
         InlineKeyboardMarkup calendar = mock(InlineKeyboardMarkup.class);
+        Message sentMessage = mock(Message.class);
+        when(sentMessage.getMessageId()).thenReturn(999);
         
         when(conversationService.startEventCreation(testUser.getId())).thenReturn(testDraft);
         when(keyboardService.createEventTypeSelectionKeyboard())
                 .thenReturn(calendar);
+        when(messageService.sendMessageWithInlineKeyboardAndGet(eq(123L), 
+                anyString(), eq(calendar))).thenReturn(sentMessage);
 
         // When
         String response = handler.handle(message, testUser);
@@ -137,8 +141,9 @@ class AddEventCommandHandlerTest {
         assertNull(response); // Ответ отправляется через TelegramMessageService
         verify(conversationService).startEventCreation(testUser.getId());
         verify(keyboardService).createEventTypeSelectionKeyboard();
-        verify(messageService).sendMessageWithInlineKeyboard(eq(123L), 
+        verify(messageService).sendMessageWithInlineKeyboardAndGet(eq(123L), 
                 contains("Создание нового события"), eq(calendar));
+        verify(conversationService).setCreationMessageId(testUser.getId(), 999L);
     }
 
     @Test
@@ -189,8 +194,8 @@ class AddEventCommandHandlerTest {
         when(conversationService.startEventCreation(testUser.getId())).thenReturn(testDraft);
         when(keyboardService.createEventTypeSelectionKeyboard())
                 .thenReturn(typeKeyboard);
-        doThrow(new TelegramApiException("Network error"))
-                .when(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any());
+        when(messageService.sendMessageWithInlineKeyboardAndGet(anyLong(), anyString(), any()))
+                .thenThrow(new TelegramApiException("Network error"));
 
         // When
         String response = handler.handle(message, testUser);
@@ -200,7 +205,7 @@ class AddEventCommandHandlerTest {
         assertTrue(response.contains("Произошла ошибка"));
         assertTrue(response.contains("Network error"));
         verify(conversationService).startEventCreation(testUser.getId());
-        verify(messageService).sendMessageWithInlineKeyboard(anyLong(), anyString(), any());
+        verify(messageService).sendMessageWithInlineKeyboardAndGet(anyLong(), anyString(), any());
     }
 
     @Test
@@ -209,9 +214,13 @@ class AddEventCommandHandlerTest {
         // Given
         Message message = createMessage("/add_event", testUser.getTelegramId(), 123L);
         InlineKeyboardMarkup typeKeyboard = mock(InlineKeyboardMarkup.class);
+        Message sentMessage = mock(Message.class);
+        when(sentMessage.getMessageId()).thenReturn(999);
         
         when(conversationService.startEventCreation(testUser.getId())).thenReturn(testDraft);
         when(keyboardService.createEventTypeSelectionKeyboard()).thenReturn(typeKeyboard);
+        when(messageService.sendMessageWithInlineKeyboardAndGet(anyLong(), anyString(), any()))
+                .thenReturn(sentMessage);
 
         // When
         handler.handle(message, testUser);
@@ -226,18 +235,22 @@ class AddEventCommandHandlerTest {
         // Given
         Message message = createMessage("/add_event", testUser.getTelegramId(), 123L);
         InlineKeyboardMarkup typeKeyboard = mock(InlineKeyboardMarkup.class);
+        Message sentMessage = mock(Message.class);
+        when(sentMessage.getMessageId()).thenReturn(999);
         
         when(conversationService.startEventCreation(testUser.getId())).thenReturn(testDraft);
         when(keyboardService.createEventTypeSelectionKeyboard())
                 .thenReturn(typeKeyboard);
+        when(messageService.sendMessageWithInlineKeyboardAndGet(anyLong(), anyString(), any()))
+                .thenReturn(sentMessage);
 
         // When
         handler.handle(message, testUser);
 
         // Then
-        verify(messageService).sendMessageWithInlineKeyboard(
+        verify(messageService).sendMessageWithInlineKeyboardAndGet(
                 eq(123L),
-                eq("📅 Создание нового события\n\nВыберите тип события:"),
+                eq("*📋 Создание нового события*\n\nВыберите тип события:"),
                 eq(typeKeyboard)
         );
     }

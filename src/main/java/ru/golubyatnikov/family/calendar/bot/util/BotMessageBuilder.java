@@ -43,6 +43,9 @@ public class BotMessageBuilder {
     
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
+    private static final String EVENT_CREATION_HEADER = "📋 Создание нового события";
+    private static final String FAMILY_EVENT_TYPE = "👨‍👩‍👧‍👦 Тип: Семейное";
+    private static final String PERSONAL_EVENT_TYPE = "👤 Тип: Персональное";
     
     // ===== Сообщения о создании события =====
     
@@ -84,7 +87,8 @@ public class BotMessageBuilder {
      * @return отформатированное сообщение
      */
     public String buildDateSelectedMessage(LocalDate date) {
-        return formatMessage("✅ Дата выбрана: %s\n\nТеперь выберите час:", formatDate(date));
+        return bold(EVENT_CREATION_HEADER) + "\n\n" +
+               formatMessage("✅ Дата выбрана: %s\n\nТеперь выберите час:", formatDate(date));
     }
     
     /**
@@ -94,7 +98,8 @@ public class BotMessageBuilder {
      * @return отформатированное сообщение
      */
     public String buildDateSelectedMessage(String formattedDate) {
-        return formatMessage("✅ Дата выбрана: %s\n\nТеперь выберите час:", formattedDate);
+        return bold(EVENT_CREATION_HEADER) + "\n\n" +
+               formatMessage("✅ Дата выбрана: %s\n\nТеперь выберите час:", formattedDate);
     }
     
     /**
@@ -124,7 +129,8 @@ public class BotMessageBuilder {
      * @return отформатированное сообщение
      */
     public String buildHourSelectedMessage(int hour) {
-        return formatMessage("✅ Час выбран: %02d:00\n\nТеперь выберите минуты:", hour);
+        return bold(EVENT_CREATION_HEADER) + "\n\n" +
+               formatMessage("✅ Час выбран: %02d:00\n\nТеперь выберите минуты:", hour);
     }
     
     /**
@@ -134,7 +140,8 @@ public class BotMessageBuilder {
      * @return отформатированное сообщение
      */
     public String buildTimeSelectedMessage(LocalTime time) {
-        return formatMessage("✅ Время выбрано: %s\n\nТеперь отправьте название события:", 
+        return bold(EVENT_CREATION_HEADER) + "\n\n" +
+                formatMessage("✅ Время выбрано: %s\n\nТеперь отправьте название события:", 
                 formatTime(time));
     }
     
@@ -145,7 +152,8 @@ public class BotMessageBuilder {
      * @return отформатированное сообщение
      */
     public String buildTimeSelectedMessage(String formattedTime) {
-        return formatMessage("✅ Время выбрано: %s\n\nТеперь отправьте название события:", 
+        return bold(EVENT_CREATION_HEADER) + "\n\n" +
+                formatMessage("✅ Время выбрано: %s\n\nТеперь отправьте название события:", 
                 formattedTime);
     }
     
@@ -177,11 +185,13 @@ public class BotMessageBuilder {
      */
     public String buildEventTypeSelectedMessage(boolean isPersonal) {
         if (isPersonal) {
-            return "✅ " + bold("Выбрано: Персональное событие") + "\n\n" +
+            return bold(EVENT_CREATION_HEADER) + "\n\n" +
+                   "✅ " + escape("Выбрано: Персональное событие") + "\n\n" +
                    italic("Только вы будете видеть это событие.") + "\n\n" +
                    "📅 " + escape("Теперь выберите дату события:");
         } else {
-            return "✅ " + bold("Выбрано: Семейное событие") + "\n\n" +
+            return bold(EVENT_CREATION_HEADER) + "\n\n" +
+                   "✅ " + escape("Выбрано: Семейное событие") + "\n\n" +
                    italic("Все члены семьи будут видеть это событие.") + "\n\n" +
                    "📅 " + escape("Теперь выберите дату события:");
         }
@@ -361,13 +371,14 @@ public class BotMessageBuilder {
      *   <li>Заголовок с эмодзи 📌 и названием события (выделено жирным)</li>
      *   <li>Дата события в формате "📅 Дата: DD.MM.YYYY"</li>
      *   <li>Время события в формате "🕐 Время: HH:MM"</li>
+     *   <li>Тип события: "👨‍👩‍👧‍👦 Тип: Семейное" или "👤 Тип: Персональное"</li>
      *   <li>Описание события (если указано) в формате "📝 Описание: текст"</li>
      * </ul>
      * 
      * <p>Использует единый формат для всех случаев отображения событий:
      * первоначальный список, обновление после редактирования, отдельное сообщение.</p>
      * 
-     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.5, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3</p>
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3</p>
      * 
      * @param event событие для форматирования
      * @return отформатированное сообщение с MarkdownV2 экранированием
@@ -384,6 +395,15 @@ public class BotMessageBuilder {
         formatted.append(escape("📌 ")).append(bold(event.getTitle())).append(escape("\n"));
         formatted.append(escape("📅 Дата: ")).append(escape(event.getFormattedDate())).append(escape("\n"));
         formatted.append(escape("🕐 Время: ")).append(escape(event.getFormattedTime()));
+        
+        // Добавляем тип события
+        formatted.append(escape("\n"));
+        Boolean isPersonalValue = event.getIsPersonal() != null ? event.getIsPersonal() : false;
+        if (isPersonalValue) {
+            formatted.append(escape(PERSONAL_EVENT_TYPE));
+        } else {
+            formatted.append(escape(FAMILY_EVENT_TYPE));
+        }
         
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
             formatted.append(escape("\n📝 Описание: ")).append(escape(event.getDescription()));

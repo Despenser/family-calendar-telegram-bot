@@ -96,6 +96,24 @@ public class AttachmentService {
     }
     
     /**
+     * Получает вложение по идентификатору.
+     * 
+     * @param attachmentId идентификатор вложения
+     * @return вложение
+     * @throws AttachmentNotFoundException если вложение не найдено
+     */
+    @Transactional(readOnly = true)
+    public Attachment getAttachment(Long attachmentId) {
+        log.debug("Получение вложения ID {}", attachmentId);
+        
+        return attachmentRepository.findById(attachmentId)
+            .orElseThrow(() -> {
+                log.warn("Вложение ID {} не найдено", attachmentId);
+                return new AttachmentNotFoundException(attachmentId);
+            });
+    }
+    
+    /**
      * Получает все вложения события, отсортированные по дате загрузки.
      * 
      * @param eventId идентификатор события
@@ -109,6 +127,26 @@ public class AttachmentService {
         
         log.debug("Найдено {} вложений для события ID {}", attachments.size(), eventId);
         return attachments;
+    }
+    
+    /**
+     * Подсчитывает количество вложений у события.
+     * 
+     * <p>Этот метод выполняет COUNT запрос к базе данных без загрузки самих вложений,
+     * что эффективно для случаев, когда нужно только количество (например, для отображения
+     * счетчика в UI).</p>
+     * 
+     * @param eventId идентификатор события
+     * @return количество вложений у события
+     */
+    @Transactional(readOnly = true)
+    public long countEventAttachments(Long eventId) {
+        log.debug("Подсчет вложений для события ID {}", eventId);
+        
+        long count = attachmentRepository.countByEventId(eventId);
+        
+        log.debug("Событие ID {} имеет {} вложений", eventId, count);
+        return count;
     }
     
     /**

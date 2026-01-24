@@ -173,6 +173,19 @@ public class UpdateProcessor {
                 return;
             }
             
+            // Если пользователь ожидает загрузки файла, отправляем подсказку
+            if (userOptional.isPresent() && conversationStateService.isAwaitingFile(userOptional.get().getId())) {
+                Long chatId = message.getChatId();
+                String hintMessage = formatMessage(
+                    "📎 Пожалуйста, отправьте файл \\(документ, фото, видео или аудио\\)\n\n" +
+                    "_Для отмены нажмите кнопку 'Отмена' в списке вложений_"
+                );
+                messageService.sendMessage(chatId, hintMessage);
+                log.debug("Отправлена подсказка пользователю в режиме ожидания файла: userId={}", 
+                        userOptional.get().getId());
+                return;
+            }
+            
             // Если пользователь ожидает ввода заметки к завершенному событию, обрабатываем текст как заметку
             if (userOptional.isPresent() && conversationStateService.isAwaitingCompletionNote(userOptional.get().getId())) {
                 handleCompletionNote(message, userOptional.get(), originalText);
@@ -215,10 +228,66 @@ public class UpdateProcessor {
     /**
      * Обрабатывает сообщение в контексте активного диалога создания события.
      * 
-     * <p>Определяет текущий шаг диалога и обрабатывает сообщение соответственно.</p>
+     * <p>Этот метод реализует улучшенный процесс создания события, где весь диалог
+     * происходит в одном сообщении бота, а сообщения пользователя удаляются из чата.
+     * Это делает чат чистым и удобным для пользователя.</p>
      * 
-     * @param message сообщение от пользователя
-     * @param user авторизованный пользователь
+     * <p><b>Основные операции:</b></p>
+     * <ul>
+     *   <li><b>Удаление сообщений пользователя:</b> После получения текстового сообщения
+     *       от пользователя (название или описание события), система удаляет это сообщение
+     *       из чата через {@link TelegramMessageService#deleteMessageSilently(Long, Integer)}.
+     *       Удаление происходит "тихо" - ошибки логируются, но не прерывают процесс.</li>
+     *   
+     *   <li><b>Сохранение данных:</b> Введенные пользователем данные сохраняются в черновике
+     *       события через {@link ConversationService#updateEventTitle(Long, String)} или
+     *       {@link ConversationService#completeEventCreation(Long, String)}.</li>
+     *   
+     *   <li><b>Обновление сообщения создания:</b> Единое сообщение бота (messageId которого
+     *       сохранен в черновике) обновляется через {@link TelegramMessageService#editMessageText}
+     *       с актуальной информацией о прогрессе создания события. При ошибке обновления
+     *       отправляется новое сообщение (fallback).</li>
+     * </ul>
+     * 
+     * <p><b>Шаги диалога:</b></p>
+     * <ul>
+     *   <li><b>WAITING_FOR_TITLE:</b> Пользователь отправляет название события.
+     *       Сообщение удаляется, название сохраняется, сообщение создания обновляется
+     *       с запросом описания.</li>
+     *   
+     *   <li><b>WAITING_FOR_DESCRIPTION:</b> Пользователь отправляет описание события
+     *       или пропускает этот шаг. Сообщение удаляется, событие завершается и переходит
+     *       в статус ACTIVE, сообщение создания обновляется с финальной карточкой события.</li>
+     * </ul>
+     * 
+     * <p><b>Обработка ошибок:</b></p>
+     * <ul>
+     *   <li>Ошибки удаления сообщений пользователя логируются, но не прерывают процесс</li>
+     *   <li>При ошибке обновления сообщения создания отправляется новое сообщение</li>
+     *   <li>Если creationMessageId отсутствует в черновике, отправляется новое сообщение</li>
+     * </ul>
+     * 
+     * <p><b>Реализуемые требования:</b></p>
+     * <ul>
+     *   <li><b>1.1:</b> Удаление сообщения пользователя с названием события</li>
+     *   <li><b>1.2:</b> Сохранение названия в черновике после удаления сообщения</li>
+     *   <li><b>1.3:</b> Обновление сообщения создания с подтверждением сохранения названия</li>
+     *   <li><b>2.1:</b> Удаление сообщения пользователя с описанием события</li>
+     *   <li><b>2.2:</b> Сохранение описания в черновике после удаления сообщения</li>
+     *   <li><b>2.3:</b> Завершение создания события после ввода описания</li>
+     *   <li><b>4.2:</b> Использование сохраненного messageId для обновления при вводе названия</li>
+     *   <li><b>4.3:</b> Использование сохраненного messageId для обновления при вводе описания</li>
+     * </ul>
+     * 
+     * @param message сообщение от пользователя с названием или описанием события
+     * @param user авторизованный пользователь, создающий событие
+     * 
+     * @see ConversationService#getActiveDraft(Long)
+     * @see ConversationService#getCurrentStep(ru.golubyatnikov.family.calendar.bot.model.Event)
+     * @see ConversationService#updateEventTitle(Long, String)
+     * @see ConversationService#completeEventCreation(Long, String)
+     * @see TelegramMessageService#deleteMessageSilently(Long, Integer)
+     * @see TelegramMessageService#editMessageText(Long, Integer, String, InlineKeyboardMarkup)
      */
     private void handleConversationMessage(Message message, User user) {
         try {
@@ -229,52 +298,138 @@ public class UpdateProcessor {
             String text = message.getText();
             Long chatId = message.getChatId();
             Long telegramId = user.getTelegramId();
+            Integer userMessageId = message.getMessageId();
+            Long creationMessageId = draft.getMessageId();
             
-            log.debug("Обработка сообщения в контексте диалога: userId={}, telegramId={}, step={}", 
-                user.getId(), telegramId, step);
+            log.debug("Обработка сообщения в контексте диалога: userId={}, telegramId={}, step={}, creationMessageId={}", 
+                user.getId(), telegramId, step, creationMessageId);
             
             switch (step) {
                 case WAITING_FOR_TITLE -> {
+                    // 1. Удаляем сообщение пользователя
+                    messageService.deleteMessageSilently(chatId, userMessageId);
+                    log.debug("Сообщение пользователя с названием удалено: chatId={}, messageId={}, userId={}", 
+                            chatId, userMessageId, user.getId());
+                    
+                    // 2. Сохраняем название в черновике
                     conversationService.updateEventTitle(user.getId(), text);
+                    log.debug("Название события сохранено: userId={}, title='{}'", user.getId(), text);
                     
-                    String response = "✅ Название сохранено: " + text + "\n\n" +
-                        "Теперь отправьте описание события или нажмите кнопку 'Пропустить':";
-                    
-                    InlineKeyboardMarkup skipKeyboard = keyboardService.createSkipDescriptionKeyboard();
-                    messageService.sendMessageWithInlineKeyboard(chatId, response, skipKeyboard);
-                    
-                    log.debug("Название события сохранено для пользователя: userId={}, telegramId={}", 
-                            user.getId(), telegramId);
+                    // 3. Обновляем сообщение создания
+                    if (creationMessageId != null) {
+                        try {
+                            String response = bold("📋 Создание нового события") + "\n\n" +
+                                "✅ Название: " + escape(text) + "\n\n" +
+                                "Теперь отправьте описание события или нажмите кнопку 'Пропустить':";
+                            
+                            InlineKeyboardMarkup skipKeyboard = keyboardService.createSkipDescriptionKeyboard();
+                            messageService.editMessageText(chatId, creationMessageId.intValue(), response, skipKeyboard);
+                            
+                            log.debug("Сообщение создания обновлено с названием: chatId={}, messageId={}, userId={}", 
+                                    chatId, creationMessageId, user.getId());
+                            
+                        } catch (TelegramApiException e) {
+                            log.warn("Не удалось обновить сообщение создания, отправка нового: chatId={}, messageId={}, error={}", 
+                                    chatId, creationMessageId, e.getMessage());
+                            
+                            // Fallback: отправляем новое сообщение
+                            String response = bold("📋 Создание нового события") + "\n\n" +
+                                "✅ Название: " + escape(text) + "\n\n" +
+                                "Теперь отправьте описание события или нажмите кнопку 'Пропустить':";
+                            
+                            InlineKeyboardMarkup skipKeyboard = keyboardService.createSkipDescriptionKeyboard();
+                            messageService.sendMessageWithInlineKeyboard(chatId, response, skipKeyboard);
+                        }
+                    } else {
+                        log.warn("creationMessageId отсутствует в черновике, отправка нового сообщения: userId={}", 
+                                user.getId());
+                        
+                        // Fallback: отправляем новое сообщение
+                        String response = bold("📋 Создание нового события") + "\n\n" +
+                            "✅ Название: " + escape(text) + "\n\n" +
+                            "Теперь отправьте описание события или нажмите кнопку 'Пропустить':";
+                        
+                        InlineKeyboardMarkup skipKeyboard = keyboardService.createSkipDescriptionKeyboard();
+                        messageService.sendMessageWithInlineKeyboard(chatId, response, skipKeyboard);
+                    }
                 }
                 
                 case WAITING_FOR_DESCRIPTION -> {
+                    // 1. Удаляем сообщение пользователя
+                    messageService.deleteMessageSilently(chatId, userMessageId);
+                    log.debug("Сообщение пользователя с описанием удалено: chatId={}, messageId={}, userId={}", 
+                            chatId, userMessageId, user.getId());
+                    
+                    // 2. Обрабатываем текст описания (включая "пропустить")
                     String description = text.equalsIgnoreCase("пропустить") ? null : text;
                     
+                    // 3. Завершаем создание события
                     ru.golubyatnikov.family.calendar.bot.model.Event completedEvent = 
                         conversationService.completeEventCreation(user.getId(), description);
+                    log.debug("Создание события завершено: eventId={}, userId={}", 
+                            completedEvent.getId(), user.getId());
                     
-                    // Отправляем сообщение о созданном событии и сохраняем messageId
-                    try {
-                        eventService.sendOrUpdateEventMessage(completedEvent, chatId);
-                        log.debug("Сообщение о созданном событии отправлено и messageId сохранён: eventId={}", 
-                                completedEvent.getId());
-                    } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
-                        log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
-                                completedEvent.getId(), e.getMessage());
-                        // Отправляем простое подтверждающее сообщение как fallback
-                        String response = formatMessage(
-                            "✅ *Событие успешно создано!*\n\n" +
-                            "📅 Дата: %s\n" +
-                            "🕐 Время: %s\n" +
-                            "📝 Название: %s\n" +
-                            "%s",
-                            completedEvent.getFormattedDate(),
-                            completedEvent.getFormattedTime(),
-                            completedEvent.getTitle(),
-                            description != null ? "📄 Описание: " + description : ""
-                        );
-                        ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
-                        messageService.sendMessage(chatId, response, keyboard);
+                    // 4. Обновляем сообщение создания с финальной карточкой события
+                    if (creationMessageId != null) {
+                        try {
+                            // Формируем финальную карточку события
+                            int eventCount = eventService.getActiveEventsCount(user.getId());
+                            String eventMessage = botMessageBuilder.buildEventMessageWithHeader(completedEvent, eventCount);
+                            
+                            // Создаем клавиатуру действий
+                            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(completedEvent, user.getId());
+                            
+                            // Обновляем сообщение
+                            messageService.editMessageText(chatId, creationMessageId.intValue(), eventMessage, keyboard);
+                            
+                            log.debug("Сообщение создания обновлено с финальной карточкой: chatId={}, messageId={}, eventId={}", 
+                                    chatId, creationMessageId, completedEvent.getId());
+                            
+                        } catch (TelegramApiException e) {
+                            log.warn("Не удалось обновить сообщение создания с финальной карточкой, отправка нового: chatId={}, messageId={}, error={}", 
+                                    chatId, creationMessageId, e.getMessage());
+                            
+                            // Fallback: отправляем сообщение о созданном событии через eventService
+                            try {
+                                eventService.sendOrUpdateEventMessage(completedEvent, chatId);
+                                log.debug("Сообщение о созданном событии отправлено (fallback): eventId={}", 
+                                        completedEvent.getId());
+                            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
+                                log.error("Ошибка при отправке сообщения о созданном событии (fallback): eventId={}, error={}", 
+                                        completedEvent.getId(), ex.getMessage());
+                                
+                                // Последний fallback: простое подтверждающее сообщение
+                                String response = bold("✅ Событие успешно создано!") + "\n\n" +
+                                    "📅 Дата: " + escape(completedEvent.getFormattedDate()) + "\n" +
+                                    "🕐 Время: " + escape(completedEvent.getFormattedTime()) + "\n" +
+                                    "📝 Название: " + escape(completedEvent.getTitle()) + "\n" +
+                                    (description != null ? "📄 Описание: " + escape(description) : "");
+                                ReplyKeyboardMarkup fallbackKeyboard = keyboardService.createAuthorizedUserKeyboard();
+                                messageService.sendMessage(chatId, response, fallbackKeyboard);
+                            }
+                        }
+                    } else {
+                        log.warn("creationMessageId отсутствует в черновике, отправка нового сообщения: userId={}", 
+                                user.getId());
+                        
+                        // Fallback: отправляем сообщение о созданном событии через eventService
+                        try {
+                            eventService.sendOrUpdateEventMessage(completedEvent, chatId);
+                            log.debug("Сообщение о созданном событии отправлено: eventId={}", 
+                                    completedEvent.getId());
+                        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                            log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
+                                    completedEvent.getId(), e.getMessage());
+                            
+                            // Последний fallback: простое подтверждающее сообщение
+                            String response = bold("✅ Событие успешно создано!") + "\n\n" +
+                                "📅 Дата: " + escape(completedEvent.getFormattedDate()) + "\n" +
+                                "🕐 Время: " + escape(completedEvent.getFormattedTime()) + "\n" +
+                                "📝 Название: " + escape(completedEvent.getTitle()) + "\n" +
+                                (description != null ? "📄 Описание: " + escape(description) : "");
+                            ReplyKeyboardMarkup fallbackKeyboard = keyboardService.createAuthorizedUserKeyboard();
+                            messageService.sendMessage(chatId, response, fallbackKeyboard);
+                        }
                     }
                     
                     log.debug("Событие успешно создано: eventId={}, userId={}, telegramId={}", 
@@ -328,6 +483,12 @@ public class UpdateProcessor {
             }
             
             User user = userOptional.get();
+            
+            // Проверяем, ожидает ли пользователь загрузки файла для вложения
+            if (conversationStateService.isAwaitingFile(user.getId())) {
+                handleAttachmentFileUpload(message, user);
+                return;
+            }
             
             if (!conversationService.hasActiveDraft(user.getId())) {
                 log.debug("Пользователь отправил файл без активного черновика: userId={}, telegramId={}", 
@@ -393,13 +554,10 @@ public class UpdateProcessor {
             try {
                 attachmentService.saveAttachment(draft.getId(), fileId, fileName, fileType, fileSize);
                 
-                String response = formatMessage(
-                    "✅ *Файл успешно прикреплен!*\n\n" +
-                    "📎 Название: %s\n" +
-                    "📊 Размер: %.2f МБ\n\n" +
-                    "Вы можете продолжить прикреплять файлы или завершить создание события.",
-                    fileName, fileSize / (1024.0 * 1024.0)
-                );
+                String response = bold("✅ Файл успешно прикреплен!") + "\n\n" +
+                    "📎 Название: " + escape(fileName) + "\n" +
+                    formatMessage("📊 Размер: %.2f МБ\n\n", fileSize / (1024.0 * 1024.0)) +
+                    "Вы можете продолжить прикреплять файлы или завершить создание события.";
                 
                 ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
                 messageService.sendMessage(chatId, response, keyboard);
@@ -431,6 +589,251 @@ public class UpdateProcessor {
             } catch (Exception ex) {
                 log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}, stackTrace={}", 
                         telegramId, ex.getMessage(), getStackTraceString(ex), ex);
+            }
+        }
+    }
+
+
+    /**
+     * Обрабатывает загрузку файла для вложения к событию.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Получает контекст ожидания файла</li>
+     *   <li>Извлекает информацию о файле из сообщения</li>
+     *   <li>Сохраняет вложение через AttachmentService</li>
+     *   <li>Удаляет сообщение пользователя с файлом для чистоты чата</li>
+     *   <li>Обновляет список вложений</li>
+     *   <li>Очищает состояние ожидания файла</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 9.1, 9.2, 9.3, 9.4, 9.5</p>
+     * 
+     * @param message сообщение с файлом
+     * @param user авторизованный пользователь
+     */
+    private void handleAttachmentFileUpload(Message message, User user) {
+        Long chatId = message.getChatId();
+        Long userId = user.getId();
+        Long telegramId = user.getTelegramId();
+        
+        log.debug("Обработка загрузки файла для вложения: userId={}, telegramId={}", userId, telegramId);
+        
+        try {
+            // Получаем контекст ожидания файла
+            ConversationStateService.AwaitingFileContext context = 
+                conversationStateService.getAwaitingFileContext(userId);
+            
+            if (context == null) {
+                log.warn("Контекст ожидания файла не найден для пользователя: userId={}", userId);
+                conversationStateService.clearAwaitingFile(userId);
+                messageService.sendMessage(chatId, 
+                    "❌ Произошла ошибка. Попробуйте добавить файл заново.");
+                return;
+            }
+            
+            Long eventId = context.getEventId();
+            Integer messageId = context.getMessageId();
+            
+            // Извлекаем информацию о файле из сообщения
+            String fileId;
+            String fileName;
+            String fileType;
+            Long fileSize;
+            
+            if (message.hasDocument()) {
+                org.telegram.telegrambots.meta.api.objects.Document document = message.getDocument();
+                fileId = document.getFileId();
+                fileName = document.getFileName();
+                fileType = "document";
+                fileSize = document.getFileSize();
+                
+                log.debug("Получен документ для вложения: fileId={}, fileName='{}', size={}, eventId={}", 
+                        fileId, fileName, fileSize, eventId);
+                
+            } else if (message.hasPhoto()) {
+                // Выбираем самое большое разрешение
+                List<org.telegram.telegrambots.meta.api.objects.PhotoSize> photos = message.getPhoto();
+                org.telegram.telegrambots.meta.api.objects.PhotoSize photo = photos.get(photos.size() - 1);
+                
+                fileId = photo.getFileId();
+                fileName = "photo_" + System.currentTimeMillis() + ".jpg";
+                fileType = "photo";
+                fileSize = photo.getFileSize().longValue();
+                
+                log.debug("Получено фото для вложения: fileId={}, size={}, eventId={}", 
+                        fileId, fileSize, eventId);
+                
+            } else if (message.hasVideo()) {
+                org.telegram.telegrambots.meta.api.objects.Video video = message.getVideo();
+                fileId = video.getFileId();
+                fileName = video.getFileName() != null ? video.getFileName() : "video_" + System.currentTimeMillis() + ".mp4";
+                fileType = "video";
+                fileSize = video.getFileSize().longValue();
+                
+                log.debug("Получено видео для вложения: fileId={}, fileName='{}', size={}, eventId={}", 
+                        fileId, fileName, fileSize, eventId);
+                
+            } else if (message.hasAudio()) {
+                org.telegram.telegrambots.meta.api.objects.Audio audio = message.getAudio();
+                fileId = audio.getFileId();
+                fileName = audio.getFileName() != null ? audio.getFileName() : "audio_" + System.currentTimeMillis() + ".mp3";
+                fileType = "audio";
+                fileSize = audio.getFileSize().longValue();
+                
+                log.debug("Получено аудио для вложения: fileId={}, fileName='{}', size={}, eventId={}", 
+                        fileId, fileName, fileSize, eventId);
+                
+            } else {
+                log.warn("Сообщение не содержит поддерживаемого типа файла: userId={}, eventId={}", 
+                        userId, eventId);
+                conversationStateService.clearAwaitingFile(userId);
+                messageService.sendMessage(chatId, 
+                    "❌ Неподдерживаемый тип файла. Отправьте документ, фото, видео или аудио.");
+                return;
+            }
+            
+            // Сохраняем вложение
+            ru.golubyatnikov.family.calendar.bot.model.Attachment attachment = 
+                attachmentService.saveAttachment(eventId, fileId, fileName, fileType, fileSize);
+            
+            log.info("Вложение успешно сохранено: attachmentId={}, eventId={}, userId={}", 
+                    attachment.getId(), eventId, userId);
+            
+            // Удаляем сообщение пользователя с файлом
+            messageService.deleteMessageSilently(chatId, message.getMessageId());
+            log.debug("Запрос на удаление сообщения пользователя с файлом отправлен: chatId={}, messageId={}, userId={}", 
+                    chatId, message.getMessageId(), userId);
+            
+            // Обновляем список вложений с использованием editOrSendMessage
+            try {
+                ru.golubyatnikov.family.calendar.bot.model.Event event = eventService.getEventById(eventId);
+                List<ru.golubyatnikov.family.calendar.bot.model.Attachment> attachments = 
+                    attachmentService.getEventAttachments(eventId);
+                
+                boolean isCreator = event.belongsToUser(userId);
+                
+                // Формируем сообщение со списком вложений
+                StringBuilder messageBuilder = new StringBuilder();
+                messageBuilder.append(bold("📎 Вложения события")).append("\n\n");
+                messageBuilder.append(bold(event.getTitle())).append("\n\n");
+                
+                if (attachments.isEmpty()) {
+                    messageBuilder.append(italic("У этого события пока нет вложений\\."));
+                } else {
+                    for (int i = 0; i < attachments.size(); i++) {
+                        ru.golubyatnikov.family.calendar.bot.model.Attachment att = attachments.get(i);
+                        
+                        // Эмодзи для типа файла
+                        String emoji = switch (att.getFileType()) {
+                            case "photo" -> "🖼️";
+                            case "video" -> "🎥";
+                            case "audio" -> "🎵";
+                            default -> "📄";
+                        };
+                        
+                        // Форматирование размера
+                        String sizeStr;
+                        if (att.getFileSize() >= 1024 * 1024) {
+                            sizeStr = String.format("%.2f МБ", att.getFileSize() / (1024.0 * 1024.0));
+                        } else {
+                            sizeStr = String.format("%.2f КБ", att.getFileSize() / 1024.0);
+                        }
+                        
+                        // Форматирование даты (без двоеточия для избежания проблем с экранированием)
+                        String dateStr = att.getUploadedAt()
+                            .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH-mm"));
+                        
+                        messageBuilder.append(emoji).append(" ")
+                                     .append(bold(att.getFileName())).append("\n")
+                                     .append("   Размер: ").append(escape(sizeStr)).append("\n")
+                                     .append("   Загружено: ").append(escape(dateStr)).append("\n");
+                        
+                        if (i < attachments.size() - 1) {
+                            messageBuilder.append("\n");
+                        }
+                    }
+                }
+                
+                InlineKeyboardMarkup keyboard = keyboardService.createAttachmentsListKeyboard(
+                    eventId, attachments, isCreator);
+                
+                String fullText = messageBuilder.toString();
+                
+                // Детальное логирование для диагностики
+                log.debug("Полный текст сообщения перед отправкой: chatId={}, messageId={}, textLength={}", 
+                        chatId, messageId, fullText.length());
+                log.debug("Текст сообщения (первые 500 символов): '{}'", 
+                        fullText.length() > 500 ? fullText.substring(0, 500) : fullText);
+                log.debug("Текст сообщения (последние 200 символов): '{}'", 
+                        fullText.length() > 200 ? fullText.substring(fullText.length() - 200) : fullText);
+                
+                // Используем editOrSendMessage для редактирования или отправки нового сообщения
+                Integer resultMessageId = editOrSendMessage(chatId, messageId, fullText, 
+                        keyboard, userId, eventId);
+                
+                log.debug("Список вложений обновлен: eventId={}, messageId={}", eventId, resultMessageId);
+                
+            } catch (TelegramApiException e) {
+                log.warn("Не удалось обновить список вложений: eventId={}, messageId={}, error={}", 
+                        eventId, messageId, e.getMessage());
+                // Продолжаем выполнение, даже если обновление не удалось
+            }
+            
+            // Очищаем состояние ожидания файла
+            conversationStateService.clearAwaitingFile(userId);
+            log.debug("Состояние ожидания файла очищено: userId={}", userId);
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.FileSizeExceededException e) {
+            log.warn("Размер файла превышает лимит: userId={}, error={}", userId, e.getMessage());
+            conversationStateService.clearAwaitingFile(userId);
+            
+            try {
+                messageService.sendMessage(chatId, 
+                    formatMessage("❌ Размер файла превышает максимально допустимый \\(20 МБ\\)\\."));
+            } catch (TelegramApiException ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
+                        telegramId, ex.getMessage(), ex);
+            }
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
+            log.error("Событие не найдено при добавлении вложения: userId={}, error={}", 
+                    userId, e.getMessage());
+            conversationStateService.clearAwaitingFile(userId);
+            
+            try {
+                messageService.sendMessage(chatId, 
+                    "❌ Событие не найдено. Возможно, оно было удалено.");
+            } catch (TelegramApiException ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
+                        telegramId, ex.getMessage(), ex);
+            }
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException e) {
+            log.error("Нет прав для добавления вложения: userId={}, error={}", 
+                    userId, e.getMessage());
+            conversationStateService.clearAwaitingFile(userId);
+            
+            try {
+                messageService.sendMessage(chatId, 
+                    "❌ У вас нет прав для добавления вложений к этому событию.");
+            } catch (TelegramApiException ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
+                        telegramId, ex.getMessage(), ex);
+            }
+            
+        } catch (Exception e) {
+            log.error("Ошибка при обработке загрузки файла для вложения: userId={}, telegramId={}, error={}, stackTrace={}", 
+                    userId, telegramId, e.getMessage(), getStackTraceString(e), e);
+            conversationStateService.clearAwaitingFile(userId);
+            
+            try {
+                messageService.sendMessage(chatId, 
+                    "❌ " + bold("Произошла ошибка при сохранении файла") + "\\. " + 
+                    italic("Попробуйте еще раз\\."));
+            } catch (Exception ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
+                        telegramId, ex.getMessage(), ex);
             }
         }
     }
@@ -492,16 +895,11 @@ public class UpdateProcessor {
             log.debug("Событие успешно распознано: title='{}', date={}, time={}, telegramId={}", 
                      parsedEvent.getTitle(), parsedEvent.getDate(), parsedEvent.getTime(), telegramId);
             
-            String preview = formatMessage(
-                "✅ *Распознано событие из текста:*\n\n" +
-                "📝 Название: %s\n" +
-                "📅 Дата: %s\n" +
-                "🕐 Время: %s\n\n" +
-                "Подтвердите создание события:",
-                parsedEvent.getTitle(),
-                parsedEvent.getDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")),
-                parsedEvent.getTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-            );
+            String preview = bold("✅ Распознано событие из текста:") + "\n\n" +
+                "📝 Название: " + escape(parsedEvent.getTitle()) + "\n" +
+                "📅 Дата: " + escape(parsedEvent.getDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))) + "\n" +
+                "🕐 Время: " + escape(parsedEvent.getTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))) + "\n\n" +
+                "Подтвердите создание события:";
             
             InlineKeyboardMarkup keyboard = createEventConfirmationKeyboard(parsedEvent);
             messageService.sendMessageWithInlineKeyboard(chatId, preview, keyboard);
@@ -514,9 +912,8 @@ public class UpdateProcessor {
                      user.getId(), user.getTelegramId(), e.getMessage(), getStackTraceString(e), e);
             
             try {
-                String response = formatMessage(
-                        "❌ *Произошла ошибка при распознавании события*.\n\n" +
-                        "_Используйте команду /add_event для пошагового создания._");
+                String response = bold("❌ Произошла ошибка при распознавании события") + ".\n\n" +
+                        italic("Используйте команду /add_event для пошагового создания.");
                 ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
                 messageService.sendMessage(message.getChatId(), response, keyboard);
             } catch (Exception ex) {
@@ -995,7 +1392,7 @@ public class UpdateProcessor {
                 }
                 
                 // Удаляем сообщение пользователя с введенным текстом
-                messageService.deleteMessage(chatId, userMessageId);
+                messageService.deleteMessageSilently(chatId, userMessageId);
                 log.debug("Сообщение пользователя удалено: messageId={}", userMessageId);
             }
             
@@ -1043,6 +1440,85 @@ public class UpdateProcessor {
             }
             
             conversationStateService.clearEventEditing(userId);
+        }
+    }
+    
+    /**
+     * Редактирует существующее сообщение или отправляет новое при невозможности редактирования.
+     * 
+     * <p>Метод реализует паттерн "edit-or-send" для обеспечения надежной доставки обновлений:</p>
+     * <ol>
+     *   <li>Пытается отредактировать существующее сообщение через {@link TelegramMessageService#tryEditMessageText}</li>
+     *   <li>При успехе сохраняет messageId в {@link ConversationStateService}</li>
+     *   <li>При неудаче (сообщение удалено/старое) отправляет новое сообщение</li>
+     *   <li>Сохраняет новый messageId для последующих операций</li>
+     * </ol>
+     * 
+     * <p>Этот подход обеспечивает:</p>
+     * <ul>
+     *   <li>Чистоту чата (редактирование вместо новых сообщений)</li>
+     *   <li>Надежность (fallback на новое сообщение при ошибках)</li>
+     *   <li>Сохранение контекста (messageId для следующих операций)</li>
+     * </ul>
+     * 
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для редактирования
+     * @param text новый текст сообщения (с MarkdownV2 форматированием)
+     * @param keyboard inline-клавиатура для сообщения
+     * @param userId идентификатор пользователя
+     * @param eventId идентификатор события
+     * @return messageId отредактированного или нового сообщения
+     * @throws TelegramApiException при критических ошибках отправки
+     */
+    private Integer editOrSendMessage(Long chatId, Integer messageId, String text, 
+                                     InlineKeyboardMarkup keyboard, 
+                                     Long userId, Long eventId) 
+            throws TelegramApiException {
+        
+        log.debug("Попытка редактирования сообщения: chatId={}, messageId={}, userId={}, eventId={}", 
+                chatId, messageId, userId, eventId);
+        
+        try {
+            // Попытка отредактировать существующее сообщение
+            boolean edited = messageService.tryEditMessageText(chatId, messageId, text, keyboard);
+            
+            if (edited) {
+                log.info("Сообщение успешно отредактировано: chatId={}, messageId={}, userId={}, eventId={}", 
+                        chatId, messageId, userId, eventId);
+                
+                // Сохраняем messageId в ConversationState
+                conversationStateService.saveAttachmentMessageId(userId, eventId, chatId, messageId);
+                
+                return messageId;
+            } else {
+                // Редактирование не удалось - переключаемся на fallback режим
+                log.info("Редактирование не удалось (сообщение удалено/старое), отправка нового сообщения: " +
+                        "chatId={}, oldMessageId={}, userId={}, eventId={}", 
+                        chatId, messageId, userId, eventId);
+                
+                // Отправляем новое сообщение
+                org.telegram.telegrambots.meta.api.objects.Message sentMessage = 
+                        messageService.sendMessageAndGet(chatId, text, keyboard);
+                
+                Integer newMessageId = sentMessage.getMessageId();
+                
+                log.info("Новое сообщение успешно отправлено (fallback): chatId={}, newMessageId={}, userId={}, eventId={}", 
+                        chatId, newMessageId, userId, eventId);
+                
+                // Сохраняем новый messageId в ConversationState
+                conversationStateService.saveAttachmentMessageId(userId, eventId, chatId, newMessageId);
+                
+                log.debug("Новый messageId сохранен в ConversationState: userId={}, eventId={}, messageId={}", 
+                        userId, eventId, newMessageId);
+                
+                return newMessageId;
+            }
+            
+        } catch (TelegramApiException e) {
+            log.error("Критическая ошибка при редактировании/отправке сообщения: " +
+                     "chatId={}, messageId={}, userId={}, eventId={}, error={}", 
+                     chatId, messageId, userId, eventId, e.getMessage(), e);
+            throw e;
         }
     }
 }

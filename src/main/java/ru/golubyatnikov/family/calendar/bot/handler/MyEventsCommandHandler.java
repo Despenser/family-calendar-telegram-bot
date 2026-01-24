@@ -229,6 +229,11 @@ public class MyEventsCommandHandler implements CommandHandler {
             firstEvent.setMessageId((long) sentMessage.getMessageId());
             eventService.saveEvent(firstEvent);
             
+            // ИЗМЕНЕНИЕ: Сохраняем контекст шапки для корректного восстановления при возврате к событию
+            conversationStateService.saveEventHeaderContext(user.getId(), true, userEvents.size());
+            log.debug("Контекст шапки сохранен для пользователя ID={}: hasMyEventsHeader=true, eventCount={}", 
+                    user.getId(), userEvents.size());
+            
             successCount++;
             log.debug("Объединенное сообщение с первым событием ID={} успешно отправлено, messageId={} сохранен", 
                     firstEvent.getId(), sentMessage.getMessageId());
@@ -246,6 +251,12 @@ public class MyEventsCommandHandler implements CommandHandler {
                     messageService.sendMessage(chatId, header);
                     // Отправляем первое событие без форматирования и сохраняем messageId
                     sendWithoutFormattingAndSaveMessageId(chatId, firstEvent, user.getId());
+                    
+                    // ИЗМЕНЕНИЕ: Сохраняем контекст шапки для корректного восстановления при возврате к событию
+                    conversationStateService.saveEventHeaderContext(user.getId(), true, userEvents.size());
+                    log.debug("Контекст шапки сохранен для пользователя ID={} (fallback): hasMyEventsHeader=true, eventCount={}", 
+                            user.getId(), userEvents.size());
+                    
                     successCount++;
                     log.debug("Заголовок и первое событие ID={} успешно отправлены через fallback механизм", 
                             firstEvent.getId());

@@ -24,4 +24,12 @@ public interface AttachmentRepository extends JpaRepository<Attachment, Long> {
      * @return список вложений события, отсортированный по дате загрузки
      */
     List<Attachment> findByEventIdOrderByUploadedAtAsc(Long eventId);
+    
+    /**
+     * Подсчитывает количество вложений у события.
+     * 
+     * @param eventId идентификатор события
+     * @return количество вложений
+     */
+    long countByEventId(Long eventId);
 }

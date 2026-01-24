@@ -181,7 +181,10 @@ public class DateTimeCallbackHandler implements CallbackHandler {
             String message = messageBuilder.buildDateSelectedMessage(formattedDate);
             
             try {
+                // Обновляем сообщение создания через editMessageText
                 messageService.editMessageText(chatId, messageId, message, keyboard);
+                log.debug("Сообщение создания обновлено после выбора даты: userId={}, messageId={}, date={}", 
+                         userId, messageId, date);
                 messageService.answerCallbackQuery(callbackQueryId, "Дата выбрана");
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
                 log.error("Ошибка при выборе даты: userId={}, date={}, error={}", 
@@ -213,7 +216,10 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         String message = messageBuilder.buildHourSelectedMessage(hour);
         
         try {
+            // Обновляем сообщение создания через editMessageText
             messageService.editMessageText(chatId, messageId, message, keyboard);
+            log.debug("Сообщение создания обновлено после выбора часа: messageId={}, hour={}", 
+                     messageId, hour);
             messageService.answerCallbackQuery(callbackQueryId, "Час выбран");
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при выборе часа: hour={}, error={}", hour, e.getMessage());
@@ -299,7 +305,10 @@ public class DateTimeCallbackHandler implements CallbackHandler {
             String message = messageBuilder.buildTimeSelectedMessage(formattedTime);
             
             try {
+                // Обновляем сообщение создания через editMessageText
                 messageService.editMessageText(chatId, messageId, message, null);
+                log.debug("Сообщение создания обновлено после выбора времени: userId={}, messageId={}, time={}", 
+                         userId, messageId, time);
                 messageService.answerCallbackQuery(callbackQueryId, "Время выбрано");
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
                 log.error("Ошибка при выборе времени: userId={}, time={}, error={}", 

@@ -8,6 +8,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMar
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
+import ru.golubyatnikov.family.calendar.bot.model.Attachment;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 
@@ -79,6 +80,7 @@ import java.util.stream.Collectors;
 public class KeyboardService {
 
     private final EventRepository eventRepository;
+    private final AttachmentService attachmentService;
 
     // Константы для текста кнопок
     private static final String BTN_START = "🚀 Начать";
@@ -285,7 +287,7 @@ public class KeyboardService {
         
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         
-        // Кнопки редактирования и удаления
+        // Первый ряд: кнопки редактирования и удаления
         List<InlineKeyboardButton> row1 = new ArrayList<>();
         
         InlineKeyboardButton editBtn = new InlineKeyboardButton("✏️ Редактировать");
@@ -299,12 +301,31 @@ public class KeyboardService {
         row1.add(deleteBtn);
         
         rows.add(row1);
+        
+        // Второй ряд: кнопка вложений
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        
+        // Получаем количество вложений через сервис (без загрузки коллекции)
+        long attachmentsCount = attachmentService.countEventAttachments(eventId);
+        
+        // Формируем текст кнопки в зависимости от количества вложений
+        String attachmentsButtonText = attachmentsCount > 0 
+            ? "📎 Вложения (" + attachmentsCount + ")" 
+            : "📎 Вложения";
+        
+        InlineKeyboardButton attachmentsBtn = new InlineKeyboardButton(attachmentsButtonText);
+        String attachmentsCallbackData = "attach_file_list_" + eventId;
+        attachmentsBtn.setCallbackData(attachmentsCallbackData);
+        row2.add(attachmentsBtn);
+        
+        rows.add(row2);
+        
         keyboard.setKeyboard(rows);
         
         // Детальное логирование созданной клавиатуры
         log.debug("Inline клавиатура для события ID={} создана: buttonCount={}, " +
-                "editCallback='{}', deleteCallback='{}'", 
-                eventId, row1.size(), editCallbackData, deleteCallbackData);
+                "editCallback='{}', deleteCallback='{}', attachmentsCallback='{}'", 
+                eventId, row1.size(), editCallbackData, deleteCallbackData, attachmentsCallbackData);
         
         return keyboard;
     }
@@ -381,29 +402,43 @@ public class KeyboardService {
         
         rows.add(row1);
         
-        // Второй ряд: кнопка "Завершить событие" (только для активных событий создателя)
+        // Второй ряд: кнопка вложений и условно кнопка завершения
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        
+        // Получаем количество вложений через сервис (без загрузки коллекции)
+        long attachmentsCount = attachmentService.countEventAttachments(event.getId());
+        
+        // Формируем текст кнопки в зависимости от количества вложений
+        String attachmentsButtonText = attachmentsCount > 0 
+            ? "📎 Вложения (" + attachmentsCount + ")" 
+            : "📎 Вложения";
+        
+        InlineKeyboardButton attachmentsBtn = new InlineKeyboardButton(attachmentsButtonText);
+        String attachmentsCallbackData = "attach_file_list_" + eventId;
+        attachmentsBtn.setCallbackData(attachmentsCallbackData);
+        row2.add(attachmentsBtn);
+        
+        // Кнопка "Завершить" (только для активных событий создателя)
         boolean isActive = event.getStatus() == Event.EventStatus.ACTIVE;
         boolean isOwner = event.belongsToUser(userId);
         
+        String completeCallbackData = null;
         if (isActive && isOwner) {
-            List<InlineKeyboardButton> row2 = new ArrayList<>();
-            
-            InlineKeyboardButton completeBtn = new InlineKeyboardButton("✅ Завершить событие");
-            String completeCallbackData = "complete_event_" + eventId;
+            InlineKeyboardButton completeBtn = new InlineKeyboardButton("✅ Завершить");
+            completeCallbackData = "complete_event_" + eventId;
             completeBtn.setCallbackData(completeCallbackData);
             row2.add(completeBtn);
             
-            // Вставляем кнопку "Завершить" перед кнопкой "Удалить" (в начало списка)
-            rows.add(0, row2);
-            
             log.debug("Inline клавиатура для события ID={} создана с кнопкой завершения: " +
-                    "buttonCount={}, editCallback='{}', completeCallback='{}', deleteCallback='{}'", 
-                    eventId, 3, editCallbackData, completeCallbackData, deleteCallbackData);
+                    "rowCount={}, buttonCount={}, editCallback='{}', deleteCallback='{}', attachmentsCallback='{}', completeCallback='{}'", 
+                    eventId, 2, 4, editCallbackData, deleteCallbackData, attachmentsCallbackData, completeCallbackData);
         } else {
             log.debug("Inline клавиатура для события ID={} создана без кнопки завершения " +
-                    "(isActive={}, isOwner={}): buttonCount={}, editCallback='{}', deleteCallback='{}'", 
-                    eventId, isActive, isOwner, 2, editCallbackData, deleteCallbackData);
+                    "(isActive={}, isOwner={}): rowCount={}, buttonCount={}, editCallback='{}', deleteCallback='{}', attachmentsCallback='{}'", 
+                    eventId, isActive, isOwner, 2, 3, editCallbackData, deleteCallbackData, attachmentsCallbackData);
         }
+        
+        rows.add(row2);
         
         keyboard.setKeyboard(rows);
         
@@ -1550,6 +1585,277 @@ public class KeyboardService {
         log.debug("Inline-клавиатура для события в корзине ID={} создана: buttonCount={}, " +
                 "restoreCallback='{}', deleteCallback='{}'", 
                 eventId, row1.size(), restoreCallbackData, deleteCallbackData);
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру для списка вложений события.
+     * 
+     * <p>Клавиатура содержит кнопки для каждого вложения, кнопку добавления файла
+     * (только для создателя события) и кнопку возврата к событию.</p>
+     * 
+     * <p>Для каждого вложения отображаются:</p>
+     * <ul>
+     *   <li>Кнопка просмотра с эмодзи типа файла и именем файла - всегда</li>
+     *   <li>Кнопка удаления (🗑️) - только для создателя события</li>
+     * </ul>
+     * 
+     * <p>Callback data формируется в формате:</p>
+     * <ul>
+     *   <li>"attach_file_view_{eventId}_{attachmentId}" - для просмотра вложения</li>
+     *   <li>"attach_file_delete_{eventId}_{attachmentId}" - для удаления вложения (только для создателя)</li>
+     *   <li>"attach_file_add_{eventId}" - для добавления файла (только для создателя)</li>
+     *   <li>"attach_file_back_{eventId}" - для возврата к событию</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 4.5, 8.1, 8.4, 10.4</p>
+     * 
+     * @param eventId идентификатор события
+     * @param attachments список вложений события
+     * @param isCreator является ли пользователь создателем события
+     * @return настроенная InlineKeyboardMarkup со списком вложений
+     * @throws IllegalArgumentException если eventId равен null или не является положительным числом
+     */
+    public InlineKeyboardMarkup createAttachmentsListKeyboard(Long eventId, List<Attachment> attachments, boolean isCreator) {
+        // Валидация eventId
+        if (eventId == null) {
+            log.error("Попытка создать клавиатуру вложений с null eventId");
+            throw new IllegalArgumentException("EventId не может быть null");
+        }
+        
+        if (eventId <= 0) {
+            log.error("Попытка создать клавиатуру вложений с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом, получено: " + eventId);
+        }
+        
+        log.debug("Создание inline-клавиатуры списка вложений для события ID={}, isCreator={}, attachmentsCount={}", 
+                eventId, isCreator, attachments != null ? attachments.size() : 0);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопки для каждого вложения
+        if (attachments != null && !attachments.isEmpty()) {
+            for (Attachment attachment : attachments) {
+                List<InlineKeyboardButton> row = new ArrayList<>();
+                
+                // Определяем эмодзи по типу файла
+                String emoji = switch (attachment.getFileType()) {
+                    case "photo" -> "🖼️";
+                    case "video" -> "🎥";
+                    case "audio" -> "🎵";
+                    default -> "📄";
+                };
+                
+                // Формируем текст кнопки с именем файла
+                String buttonText = emoji + " " + (attachment.getFileName() != null ? attachment.getFileName() : "Файл");
+                InlineKeyboardButton viewBtn = new InlineKeyboardButton(buttonText);
+                String viewCallbackData = "attach_file_view_" + eventId + "_" + attachment.getId();
+                viewBtn.setCallbackData(viewCallbackData);
+                row.add(viewBtn);
+                
+                // Кнопка "Удалить" только для создателя
+                if (isCreator) {
+                    InlineKeyboardButton deleteBtn = new InlineKeyboardButton("🗑️");
+                    String deleteCallbackData = "attach_file_delete_" + eventId + "_" + attachment.getId();
+                    deleteBtn.setCallbackData(deleteCallbackData);
+                    row.add(deleteBtn);
+                }
+                
+                rows.add(row);
+            }
+        }
+        
+        // Кнопка "Добавить файл" только для создателя
+        if (isCreator) {
+            List<InlineKeyboardButton> addRow = new ArrayList<>();
+            InlineKeyboardButton addBtn = new InlineKeyboardButton("➕ Добавить файл");
+            String addCallbackData = "attach_file_add_" + eventId;
+            addBtn.setCallbackData(addCallbackData);
+            addRow.add(addBtn);
+            rows.add(addRow);
+        }
+        
+        // Кнопка "Назад к событию"
+        List<InlineKeyboardButton> backRow = new ArrayList<>();
+        InlineKeyboardButton backBtn = new InlineKeyboardButton("🔙 Назад к событию");
+        String backCallbackData = "attach_file_back_" + eventId;
+        backBtn.setCallbackData(backCallbackData);
+        backRow.add(backBtn);
+        rows.add(backRow);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура списка вложений для события ID={} создана: {} рядов", 
+                eventId, rows.size());
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру для подтверждения удаления вложения.
+     * 
+     * <p>Клавиатура содержит кнопки подтверждения и отмены удаления.</p>
+     * 
+     * <p>Callback data формируется в формате:</p>
+     * <ul>
+     *   <li>"attach_file_confirm_delete_{eventId}_{attachmentId}" - для подтверждения удаления</li>
+     *   <li>"attach_file_cancel_delete_{eventId}" - для отмены удаления</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 6.1, 10.4</p>
+     * 
+     * @param eventId идентификатор события
+     * @param attachmentId идентификатор вложения
+     * @return настроенная InlineKeyboardMarkup с кнопками подтверждения
+     * @throws IllegalArgumentException если eventId или attachmentId равны null или не являются положительными числами
+     */
+    public InlineKeyboardMarkup createDeleteAttachmentConfirmationKeyboard(Long eventId, Long attachmentId) {
+        // Валидация eventId
+        if (eventId == null) {
+            log.error("Попытка создать клавиатуру подтверждения удаления вложения с null eventId");
+            throw new IllegalArgumentException("EventId не может быть null");
+        }
+        
+        if (eventId <= 0) {
+            log.error("Попытка создать клавиатуру подтверждения удаления вложения с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом, получено: " + eventId);
+        }
+        
+        // Валидация attachmentId
+        if (attachmentId == null) {
+            log.error("Попытка создать клавиатуру подтверждения удаления вложения с null attachmentId");
+            throw new IllegalArgumentException("AttachmentId не может быть null");
+        }
+        
+        if (attachmentId <= 0) {
+            log.error("Попытка создать клавиатуру подтверждения удаления вложения с некорректным attachmentId: {}", attachmentId);
+            throw new IllegalArgumentException("AttachmentId должен быть положительным числом, получено: " + attachmentId);
+        }
+        
+        log.debug("Создание inline-клавиатуры подтверждения удаления вложения ID={} для события ID={}", 
+                attachmentId, eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопки подтверждения и отмены
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        
+        InlineKeyboardButton confirmBtn = new InlineKeyboardButton("✅ Да, удалить");
+        String confirmCallbackData = "attach_file_confirm_delete_" + eventId + "_" + attachmentId;
+        confirmBtn.setCallbackData(confirmCallbackData);
+        row1.add(confirmBtn);
+        
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        String cancelCallbackData = "attach_file_cancel_delete_" + eventId;
+        cancelBtn.setCallbackData(cancelCallbackData);
+        row1.add(cancelBtn);
+        
+        rows.add(row1);
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура подтверждения удаления вложения ID={} создана: confirmCallback='{}', cancelCallback='{}'", 
+                attachmentId, confirmCallbackData, cancelCallbackData);
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline-клавиатуру для просмотра файла вложения.
+     * 
+     * <p>Клавиатура содержит кнопку "Назад к вложениям" для возврата к списку вложений события.</p>
+     * 
+     * <p>Callback data формируется в формате:</p>
+     * <ul>
+     *   <li>"attach_file_list_{eventId}" - для возврата к списку вложений</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 3.1</p>
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup с кнопкой возврата к вложениям
+     * @throws IllegalArgumentException если eventId равен null или не является положительным числом
+     */
+    public InlineKeyboardMarkup createFileViewKeyboard(Long eventId) {
+        // Валидация eventId
+        if (eventId == null) {
+            log.error("Попытка создать клавиатуру просмотра файла с null eventId");
+            throw new IllegalArgumentException("EventId не может быть null");
+        }
+        
+        if (eventId <= 0) {
+            log.error("Попытка создать клавиатуру просмотра файла с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом, получено: " + eventId);
+        }
+        
+        log.debug("Создание inline-клавиатуры для просмотра файла события ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Кнопка "Назад к вложениям"
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton backBtn = new InlineKeyboardButton("⬅️ Назад к вложениям");
+        String backCallbackData = "attach_file_list_" + eventId;
+        backBtn.setCallbackData(backCallbackData);
+        row1.add(backBtn);
+        
+        rows.add(row1);
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline-клавиатура для просмотра файла события ID={} создана: backCallback='{}'", 
+                eventId, backCallbackData);
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline клавиатуру для режима загрузки вложения.
+     * 
+     * <p>Клавиатура содержит единственную кнопку "Отмена", которая позволяет
+     * пользователю прервать процесс загрузки файла и вернуться к стандартному
+     * виду карточки события.</p>
+     * 
+     * <p>Callback data формируется в формате "attach_file_cancel_add_{eventId}".</p>
+     * 
+     * <p><b>Требования:</b> 2.1, 6.1</p>
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup с кнопкой "Отмена"
+     * @throws IllegalArgumentException если eventId равен null или не является положительным числом
+     */
+    public InlineKeyboardMarkup createAttachmentUploadKeyboard(Long eventId) {
+        // Валидация eventId
+        if (eventId == null) {
+            log.error("Попытка создать клавиатуру с null eventId");
+            throw new IllegalArgumentException("EventId не может быть null");
+        }
+        
+        if (eventId <= 0) {
+            log.error("Попытка создать клавиатуру с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом, получено: " + eventId);
+        }
+        
+        log.debug("Создание inline клавиатуры для загрузки вложения к событию ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Единственная кнопка "Отмена"
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        String cancelCallbackData = "attach_file_cancel_add_" + eventId;
+        cancelBtn.setCallbackData(cancelCallbackData);
+        row.add(cancelBtn);
+        
+        rows.add(row);
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline клавиатура для загрузки вложения создана: eventId={}, cancelCallback='{}'", 
+                eventId, cancelCallbackData);
         
         return keyboard;
     }
