@@ -12,8 +12,8 @@ import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.SearchService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
@@ -46,9 +46,7 @@ public class FilterCommandHandler implements CommandHandler {
     private final KeyboardService keyboardService;
     private final SearchService searchService;
     private final TelegramMessageService messageService;
-    
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
+    private final BotMessageBuilder botMessageBuilder;
     
     /**
      * Обрабатывает команду /filter.
@@ -127,11 +125,17 @@ public class FilterCommandHandler implements CommandHandler {
                 messageBuilder.append(escape("Событий не найдено.")).append("\n\n");
                 messageBuilder.append(italic("Попробуйте другой фильтр или создайте новое событие."));
             } else {
-                for (Event event : results) {
-                    messageBuilder.append(formatEvent(event, user));
-                    messageBuilder.append("\n");
+                // Используем BotMessageBuilder для форматирования каждого события
+                for (int i = 0; i < results.size(); i++) {
+                    Event event = results.get(i);
+                    messageBuilder.append(botMessageBuilder.buildEventMessage(event));
+                    
+                    // Добавляем разделитель между событиями (но не после последнего)
+                    if (i < results.size() - 1) {
+                        messageBuilder.append("\n").append(escape("─────────────────────")).append("\n");
+                    }
                 }
-                messageBuilder.append(String.format("\n%s", italic("Найдено событий: " + results.size())));
+                messageBuilder.append(String.format("\n\n%s", italic("Найдено событий: " + results.size())));
             }
             
             messageService.sendMessage(chatId, messageBuilder.toString());
@@ -177,49 +181,6 @@ public class FilterCommandHandler implements CommandHandler {
             case PERSONAL_ONLY -> "Персональные события";
             default -> "Неизвестный фильтр";
         };
-    }
-    
-    /**
-     * Форматирует событие для отображения в результатах фильтрации.
-     * 
-     * @param event событие для форматирования
-     * @param user текущий пользователь (для определения персональных событий)
-     * @return отформатированная строка с информацией о событии
-     */
-    private String formatEvent(Event event, User user) {
-        StringBuilder sb = new StringBuilder();
-        
-        // Иконка типа события
-        if (event.getIsPersonal()) {
-            sb.append("🔒 ");
-        } else {
-            sb.append("👨‍👩‍👧‍👦 ");
-        }
-        
-        // Дата события
-        sb.append(bold(event.getEventDate().format(DATE_FORMATTER)));
-        
-        // Время события
-        if (event.getEventTime() != null) {
-            sb.append(escape(" в ")).append(bold(event.getEventTime().format(TIME_FORMATTER)));
-            
-            // Временной интервал
-            if (event.getEndTime() != null) {
-                sb.append(escape(" - ")).append(bold(event.getEndTime().format(TIME_FORMATTER)));
-            }
-        }
-        
-        sb.append("\n   ");
-        
-        // Название события
-        sb.append(escape(event.getTitle()));
-        
-        // Создатель события
-        if (!event.belongsToUser(user.getId())) {
-            sb.append(escape(" (")).append(escape(event.getUser().getFirstName())).append(escape(")"));
-        }
-        
-        return sb.toString();
     }
     
     @Override

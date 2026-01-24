@@ -45,7 +45,7 @@ class CommandDescriptionsTest {
     @Test
     @DisplayName("Требование 4.4: /filter должна иметь описание 'Фильтрация событий по типу'")
     void filterCommandShouldHaveCorrectDescription() {
-        FilterCommandHandler handler = new FilterCommandHandler(null, null, null);
+        FilterCommandHandler handler = new FilterCommandHandler(null, null, null, null);
         assertEquals("Фильтрация событий по типу", handler.getDescription(),
                 "Описание команды /filter не соответствует требованию 4.4");
     }

@@ -13,11 +13,10 @@ import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.UserService;
+import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 import ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter;
 
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Обработчик callback queries для фильтрации событий.
@@ -53,11 +52,7 @@ public class FilterCallbackHandler implements CallbackHandler {
     private final EventService eventService;
     private final TelegramMessageService messageService;
     private final KeyboardService keyboardService;
-    
-    private static final DateTimeFormatter DATE_FORMATTER = 
-        DateTimeFormatter.ofPattern("dd.MM.yyyy (EEEE)", new Locale("ru"));
-    private static final DateTimeFormatter TIME_FORMATTER = 
-        DateTimeFormatter.ofPattern("HH:mm");
+    private final BotMessageBuilder botMessageBuilder;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -150,13 +145,8 @@ public class FilterCallbackHandler implements CallbackHandler {
      * [Список событий или сообщение об отсутствии событий]
      * </pre>
      * 
-     * <p>Каждое событие форматируется с применением экранирования MarkdownV2:</p>
-     * <ul>
-     *   <li>Дата и время события</li>
-     *   <li>Название события (жирным шрифтом)</li>
-     *   <li>Описание (если есть)</li>
-     *   <li>Тип события (семейное/личное)</li>
-     * </ul>
+     * <p>Каждое событие форматируется через BotMessageBuilder с применением экранирования MarkdownV2.</p>
+     * События разделяются горизонтальными линиями.
      * 
      * @param events список событий для форматирования
      * @param filter примененный фильтр
@@ -179,54 +169,19 @@ public class FilterCallbackHandler implements CallbackHandler {
               .append(events.size())
               .append("*\n\n");
             
-            for (Event event : events) {
-                sb.append(formatEvent(event)).append("\n\n");
+            // Используем BotMessageBuilder для форматирования каждого события
+            for (int i = 0; i < events.size(); i++) {
+                Event event = events.get(i);
+                sb.append(botMessageBuilder.buildEventMessage(event));
+                
+                // Добавляем разделитель между событиями (но не после последнего)
+                if (i < events.size() - 1) {
+                    sb.append("\n")
+                      .append(MarkdownFormatter.escapeMarkdownV2("─────────────────────"))
+                      .append("\n");
+                }
             }
         }
-        
-        return sb.toString();
-    }
-    
-    /**
-     * Форматирует одно событие для отображения.
-     * 
-     * <p>Формат события:</p>
-     * <pre>
-     * 📅 [Дата] в [Время]
-     * [Название события] (жирным)
-     * [Описание]
-     * [Тип: Семейное/Личное]
-     * </pre>
-     * 
-     * @param event событие для форматирования
-     * @return отформатированная строка с экранированием MarkdownV2
-     */
-    private String formatEvent(Event event) {
-        StringBuilder sb = new StringBuilder();
-        
-        // Дата и время
-        String dateStr = event.getEventDate().format(DATE_FORMATTER);
-        String timeStr = event.getEventTime() != null 
-            ? event.getEventTime().format(TIME_FORMATTER) 
-            : "весь день";
-        
-        sb.append(MarkdownFormatter.escapeMarkdownV2("📅 " + dateStr + " в " + timeStr))
-          .append("\n");
-        
-        // Название события (жирным)
-        sb.append("*")
-          .append(MarkdownFormatter.escapeMarkdownV2(event.getTitle()))
-          .append("*\n");
-        
-        // Описание (если есть)
-        if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            sb.append(MarkdownFormatter.escapeMarkdownV2(event.getDescription()))
-              .append("\n");
-        }
-        
-        // Тип события
-        String eventType = event.getIsPersonal() ? "👤 Личное" : "👨‍👩‍👧‍👦 Семейное";
-        sb.append(MarkdownFormatter.escapeMarkdownV2(eventType));
         
         return sb.toString();
     }
