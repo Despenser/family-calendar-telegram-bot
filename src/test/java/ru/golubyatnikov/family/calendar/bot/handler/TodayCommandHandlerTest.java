@@ -80,8 +80,8 @@ class TodayCommandHandlerTest {
     }
     
     @Test
-    @DisplayName("Должен отображать заголовок дня для текущей даты")
-    void shouldDisplayDayHeaderForToday() {
+    @DisplayName("Не должен отображать дублирующийся заголовок дня, так как дата уже в основном заголовке")
+    void shouldNotDisplayDuplicateDayHeader() {
         // Given
         Event event = createTestEvent("Тестовое событие", today, false);
         when(eventService.getUpcomingEvents(anyLong(), anyInt()))
@@ -91,12 +91,17 @@ class TodayCommandHandlerTest {
         String result = handler.handle(testMessage, testUser);
         
         // Then
-        // Проверяем наличие иконки заголовка дня
-        assertTrue(result.contains("📍"), 
-                  "Результат должен содержать иконку заголовка дня '📍'");
-        // Проверяем наличие слова "сегодня"
-        assertTrue(result.contains("сегодня"), 
-                  "Результат должен содержать слово 'сегодня' в заголовке дня");
+        // Проверяем, что основной заголовок команды присутствует
+        assertTrue(result.contains("📅"), 
+                  "Результат должен содержать иконку основного заголовка '📅'");
+        assertTrue(result.contains("События на сегодня"), 
+                  "Результат должен содержать текст 'События на сегодня'");
+        
+        // Проверяем, что дублирующийся заголовок дня НЕ добавляется
+        // Заголовок дня содержит текст "(сегодня -" который не должен присутствовать
+        assertFalse(result.contains("(сегодня -"), 
+                    "Результат не должен содержать дублирующийся заголовок дня с текстом '(сегодня -', " +
+                    "так как дата уже указана в основном заголовке команды");
     }
     
     @Test

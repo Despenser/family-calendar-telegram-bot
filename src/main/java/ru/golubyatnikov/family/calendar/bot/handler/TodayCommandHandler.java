@@ -118,8 +118,7 @@ public class TodayCommandHandler implements CommandHandler {
             ));
             messageBuilder.append(escape("\n\n"));
             
-            // Добавляем заголовок дня для текущей даты
-            messageBuilder.append(EventFormatter.formatDayHeader(today, today));
+            // Для команды /today не добавляем заголовок дня, так как дата уже указана в основном заголовке
             
             for (Event event : filteredEvents) {
                 messageBuilder.append(EventFormatter.formatEvent(event, user));
