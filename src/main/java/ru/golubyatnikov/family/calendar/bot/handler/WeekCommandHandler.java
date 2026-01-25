@@ -8,6 +8,7 @@ import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.EventFormatter;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -21,18 +22,22 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * Обработчик команды /week для отображения событий на текущую неделю.
  * 
  * <p>Этот обработчик показывает все события семьи на ближайшие 7 дней,
- * сгруппированные по дням недели. Включает семейные события и персональные
- * события пользователя.</p>
+ * сгруппированные по дням недели с разделителями между днями. Включает семейные 
+ * события и персональные события пользователя.</p>
  * 
- * <p>События отображаются с использованием Markdown форматирования и
- * группируются по датам для удобства восприятия.</p>
+ * <p>События отображаются в едином компактном формате без отступов с использованием
+ * {@link EventFormatter}, что обеспечивает согласованный пользовательский опыт
+ * во всех командах списка событий. Между группами событий разных дней добавляются
+ * визуальные разделители для улучшения читаемости.</p>
  * 
- * <p><b>Требования:</b> 28.2</p>
+ * <p><b>Требования:</b> 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 4.2, 5.1, 5.2,
+ * 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6</p>
  * 
  * @see CommandHandler
  * @see EventService
+ * @see EventFormatter
  * @author Family Calendar Bot Team
- * @version 1.0.0
+ * @version 2.0.0
  * @since 2026-01-08
  */
 @Component
@@ -44,15 +49,18 @@ public class WeekCommandHandler implements CommandHandler {
     private final TelegramMessageService messageService;
     
     private static final int WEEK_DAYS = 7;
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy (EEEE)");
-    private static final DateTimeFormatter SHORT_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM (EEEE)");
+    private static final DateTimeFormatter DATE_RANGE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     
     /**
      * Обрабатывает команду /week.
      * 
      * <p>Получает все события семьи на ближайшие 7 дней, группирует их
-     * по датам и отправляет отформатированный список пользователю.</p>
+     * по датам и отправляет отформатированный список пользователю. События
+     * отображаются в едином компактном формате без отступов, с разделителями
+     * между группами разных дней.</p>
+     * 
+     * <p>Использует {@link EventFormatter} для единообразного форматирования
+     * заголовков, событий, разделителей и счетчиков.</p>
      * 
      * @param message сообщение от пользователя с командой
      * @param user пользователь, отправивший команду
@@ -93,9 +101,10 @@ public class WeekCommandHandler implements CommandHandler {
                     filteredEvents.size(), user.getId());
             
             if (filteredEvents.isEmpty()) {
-                String responseMessage = escape("📅 ") + bold("События на неделю (7 дней)") + escape("\n\n") +
-                                       escape("На ближайшую неделю событий не запланировано. ") +
-                                       escape("Время для новых планов! 📝");
+                String responseMessage = EventFormatter.formatNoEventsMessage(
+                    "События на неделю",
+                    "На ближайшую неделю событий не запланировано."
+                );
                 log.debug("Пользователю ID={} будет отправлено сообщение об отсутствии событий на неделю", user.getId());
                 return responseMessage;
             }
@@ -106,31 +115,39 @@ public class WeekCommandHandler implements CommandHandler {
             
             // Формирование сообщения с событиями
             StringBuilder messageBuilder = new StringBuilder();
-            messageBuilder.append(escape("📅 ")).append(bold("События на неделю (7 дней)")).append(escape("\n"));
-            messageBuilder.append(italic(LocalDate.now().format(DATE_FORMATTER) +
-                         " - " +
-                         LocalDate.now().plusDays(6).format(DATE_FORMATTER)))
-                         .append(escape("\n\n"));
+            
+            // Заголовок команды
+            LocalDate startDate = LocalDate.now();
+            LocalDate endDate = startDate.plusDays(6);
+            String dateRange = startDate.format(DATE_RANGE_FORMATTER) + " - " + endDate.format(DATE_RANGE_FORMATTER);
+            messageBuilder.append(EventFormatter.formatCommandHeader("События на неделю", dateRange));
+            messageBuilder.append(escape("\n\n"));
             
             // Сортировка дат и вывод событий по дням
             LocalDate today = LocalDate.now();
+            boolean firstDay = true;
             for (int i = 0; i < 7; i++) {
                 LocalDate date = today.plusDays(i);
                 List<Event> dayEvents = eventsByDate.get(date);
                 
                 if (dayEvents != null && !dayEvents.isEmpty()) {
-                    messageBuilder.append(formatDayHeader(date, today));
-                    
-                    for (Event event : dayEvents) {
-                        messageBuilder.append(formatEvent(event, user));
+                    // Добавляем разделитель перед каждым днем, кроме первого
+                    if (!firstDay) {
+                        messageBuilder.append(EventFormatter.formatDaySeparator());
                         messageBuilder.append(escape("\n"));
                     }
+                    firstDay = false;
                     
-                    messageBuilder.append(escape("\n"));
+                    messageBuilder.append(EventFormatter.formatDayHeader(date, today));
+                    
+                    for (Event event : dayEvents) {
+                        messageBuilder.append(EventFormatter.formatEvent(event, user));
+                    }
                 }
             }
             
-            messageBuilder.append(italic("Всего событий: " + filteredEvents.size()));
+            // Добавляем счетчик без разделителя перед ним
+            messageBuilder.append(EventFormatter.formatEventCounter(filteredEvents.size()));
             
             String responseMessage = messageBuilder.toString();
             log.debug("Пользователю ID={} будет отправлен список из {} событий на неделю", 
@@ -142,80 +159,6 @@ public class WeekCommandHandler implements CommandHandler {
             String errorMessage = escape("❌ Произошла ошибка при получении событий на неделю. Попробуйте позже.");
             return errorMessage;
         }
-    }
-    
-    /**
-     * Форматирует заголовок дня с датой.
-     * 
-     * @param date дата для форматирования
-     * @param today текущая дата (для определения "сегодня" и "завтра")
-     * @return отформатированный заголовок дня
-     */
-    private String formatDayHeader(LocalDate date, LocalDate today) {
-        StringBuilder sb = new StringBuilder();
-        
-        if (date.equals(today)) {
-            sb.append(escape("📍 ")).append(bold("Сегодня")).append(escape(" ("));
-        } else if (date.equals(today.plusDays(1))) {
-            sb.append(escape("🔜 ")).append(bold("Завтра")).append(escape(" ("));
-        } else {
-            sb.append(escape("📆 "));
-        }
-        
-        sb.append(bold(date.format(SHORT_DATE_FORMATTER)));
-        
-        if (date.equals(today) || date.equals(today.plusDays(1))) {
-            sb.append(escape(")"));
-        }
-        
-        sb.append(escape("\n"));
-        return sb.toString();
-    }
-    
-    /**
-     * Форматирует событие для отображения в списке.
-     * 
-     * @param event событие для форматирования
-     * @param user текущий пользователь (для определения персональных событий)
-     * @return отформатированная строка с информацией о событии
-     */
-    private String formatEvent(Event event, User user) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(escape("   "));
-        
-        // Иконка типа события
-        if (event.getIsPersonal()) {
-            sb.append(escape("🔒 "));
-        } else {
-            sb.append(escape("👨‍👩‍👧‍👦 "));
-        }
-        
-        // Время события
-        if (event.getEventTime() != null) {
-            sb.append(bold(event.getEventTime().format(TIME_FORMATTER)));
-            
-            // Временной интервал
-            if (event.getEndTime() != null) {
-                sb.append(escape(" - ")).append(bold(event.getEndTime().format(TIME_FORMATTER)));
-            }
-            
-            sb.append(escape(" | "));
-        }
-        
-        // Название события
-        sb.append(bold(event.getTitle()));
-        
-        // Описание события
-        if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            sb.append(escape("\n      ")).append(italic(event.getDescription()));
-        }
-        
-        // Создатель события
-        if (!event.belongsToUser(user.getId())) {
-            sb.append(escape(" (")).append(escape(event.getUser().getFirstName())).append(escape(")"));
-        }
-        
-        return sb.toString();
     }
     
     @Override

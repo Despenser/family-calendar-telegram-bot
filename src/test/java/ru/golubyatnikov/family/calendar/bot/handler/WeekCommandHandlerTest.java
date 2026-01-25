@@ -114,8 +114,8 @@ class WeekCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("События на неделю \\(7 дней\\)"), 
-                "Ответ должен содержать заголовок с указанием 7 дней");
+        assertTrue(response.contains("События на неделю"), 
+                "Ответ должен содержать заголовок с указанием недели");
         assertTrue(response.contains("День рождения"), "Ответ должен содержать название события");
         assertTrue(response.contains("Поход в кино"), "Ответ должен содержать название второго события");
         assertTrue(response.contains("Всего событий: 2"), "Ответ должен содержать счетчик событий");
@@ -148,8 +148,17 @@ class WeekCommandHandlerTest {
         assertNotNull(response);
         assertTrue(response.contains("Сегодня") || response.contains("📍"), 
                 "Ответ должен содержать маркер 'Сегодня'");
-        assertTrue(response.contains("Завтра") || response.contains("🔜"), 
-                "Ответ должен содержать маркер 'Завтра'");
+        assertTrue(response.contains("завтра") || response.contains("🔜"), 
+                "Ответ должен содержать маркер 'завтра' в новом формате");
+        // Проверяем, что дни недели на русском языке со строчной буквы (проверяем хотя бы одно название)
+        boolean hasRussianDayName = response.contains("понедельник") || 
+                                    response.contains("вторник") || 
+                                    response.contains("среда") || 
+                                    response.contains("четверг") || 
+                                    response.contains("пятница") || 
+                                    response.contains("суббота") || 
+                                    response.contains("воскресенье");
+        assertTrue(hasRussianDayName, "Ответ должен содержать русское название дня недели со строчной буквы");
         
         verify(eventService).getUpcomingEvents(familyId, 7);
     }
@@ -199,12 +208,10 @@ class WeekCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("События на неделю") && response.contains("7 дней"), 
+        assertTrue(response.contains("События на неделю"), 
                 "Ответ должен содержать заголовок");
         assertTrue(response.contains("На ближайшую неделю событий не запланировано"), 
                 "Ответ должен содержать сообщение об отсутствии событий");
-        assertTrue(response.contains("Время для новых планов"), 
-                "Ответ должен содержать мотивирующее сообщение");
         
         verify(eventService).getUpcomingEvents(familyId, 7);
     }
@@ -250,10 +257,10 @@ class WeekCommandHandlerTest {
 
         // Then
         assertNotNull(response);
-        assertTrue(response.contains("👨‍👩‍👧‍👦") || response.contains("👨"), 
+        assertTrue(response.contains("👨‍👩‍👧‍👦"), 
                 "Ответ должен содержать иконку семейного события");
-        assertTrue(response.contains("🔒"), 
-                "Ответ должен содержать иконку персонального события");
+        assertTrue(response.contains("👤"), 
+                "Ответ должен содержать иконку персонального события (изменено с 🔒 на 👤)");
         
         verify(eventService).getUpcomingEvents(familyId, 7);
     }

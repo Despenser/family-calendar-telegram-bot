@@ -177,7 +177,7 @@ public class UpdateProcessor {
             if (userOptional.isPresent() && conversationStateService.isAwaitingFile(userOptional.get().getId())) {
                 Long chatId = message.getChatId();
                 String hintMessage = formatMessage(
-                    "📎 Пожалуйста, отправьте файл \\(документ, фото, видео или аудио\\)\n\n" +
+                    "📎 Пожалуйста, отправьте файл " + escape("(документ, фото, видео или аудио)") + "\n\n" +
                     "_Для отмены нажмите кнопку 'Отмена' в списке вложений_"
                 );
                 messageService.sendMessage(chatId, hintMessage);

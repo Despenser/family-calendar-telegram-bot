@@ -165,7 +165,7 @@ public class WeeklySummaryScheduler {
         StringBuilder summary = new StringBuilder();
         
         summary.append("📅 ").append(bold("Еженедельная сводка")).append("\n");
-        summary.append(italic(startDate.format(DATE_FORMATTER) + " - " + endDate.format(DATE_FORMATTER))).append("\n\n");
+        summary.append(italic(startDate.format(DATE_FORMATTER) + " \\- " + endDate.format(DATE_FORMATTER))).append("\n\n");
         
         if (events.isEmpty()) {
             summary.append("На следующей неделе нет запланированных событий.\n\n");

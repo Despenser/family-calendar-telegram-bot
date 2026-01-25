@@ -8,13 +8,15 @@ import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.EventFormatter;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
-import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
 
 /**
  * Обработчик команды /today для отображения событий на текущий день.
@@ -22,16 +24,17 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * <p>Этот обработчик показывает все события семьи, запланированные на сегодня,
  * включая семейные события и персональные события пользователя.</p>
  * 
- * <p>События отображаются с использованием Markdown форматирования для
- * улучшения читаемости. Если событий на сегодня нет, отправляется
- * соответствующее сообщение.</p>
+ * <p>События отображаются с использованием единообразного форматирования через
+ * {@link EventFormatter} для обеспечения консистентного пользовательского опыта
+ * во всех командах списка событий.</p>
  * 
- * <p><b>Требования:</b> 28.1</p>
+ * <p><b>Требования:</b> 1.1, 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 4.1, 5.1, 5.2, 6.1, 6.2, 6.3, 6.4</p>
  * 
  * @see CommandHandler
  * @see EventService
+ * @see EventFormatter
  * @author Family Calendar Bot Team
- * @version 1.0.0
+ * @version 2.0.0
  * @since 2026-01-08
  */
 @Component
@@ -42,14 +45,17 @@ public class TodayCommandHandler implements CommandHandler {
     private final EventService eventService;
     private final TelegramMessageService messageService;
     
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy (EEEE)");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy - EEEE", Locale.forLanguageTag("ru"));
     
     /**
      * Обрабатывает команду /today.
      * 
      * <p>Получает все события семьи на текущий день и отправляет
-     * отформатированный список пользователю.</p>
+     * отформатированный список пользователю с использованием единообразного
+     * форматирования через {@link EventFormatter}.</p>
+     * 
+     * <p>Применяется фильтрация персональных событий: семейные события видны всем,
+     * персональные события видны только создателю.</p>
      * 
      * @param message сообщение от пользователя с командой
      * @param user пользователь, отправивший команду
@@ -96,25 +102,30 @@ public class TodayCommandHandler implements CommandHandler {
                     filteredEvents.size(), user.getId());
             
             if (filteredEvents.isEmpty()) {
-                String responseMessage = escape("📅 ") + bold("События на сегодня") + escape("\n\n") +
-                               escape("На сегодня событий не запланировано. Отличный день для отдыха! 😊");
+                String responseMessage = EventFormatter.formatNoEventsMessage(
+                    "События на сегодня",
+                    "На сегодня событий не запланировано."
+                );
                 log.debug("Пользователю ID={} будет отправлено сообщение об отсутствии событий на сегодня", user.getId());
                 return responseMessage;
             }
             
             // Формирование сообщения с событиями
             StringBuilder messageBuilder = new StringBuilder();
-            messageBuilder.append(escape("📅 ")).append(bold("События на сегодня"))
-                         .append(escape(" ("))
-                         .append(escape(today.format(DATE_FORMATTER)))
-                         .append(escape(")\n\n"));
+            messageBuilder.append(EventFormatter.formatCommandHeader(
+                "События на сегодня",
+                today.format(DATE_FORMATTER)
+            ));
+            messageBuilder.append(escape("\n\n"));
+            
+            // Добавляем заголовок дня для текущей даты
+            messageBuilder.append(EventFormatter.formatDayHeader(today, today));
             
             for (Event event : filteredEvents) {
-                messageBuilder.append(formatEvent(event, user));
-                messageBuilder.append(escape("\n"));
+                messageBuilder.append(EventFormatter.formatEvent(event, user));
             }
             
-            messageBuilder.append(escape("\n")).append(italic("Всего событий: " + filteredEvents.size()));
+            messageBuilder.append(EventFormatter.formatEventCounter(filteredEvents.size()));
             
             String responseMessage = messageBuilder.toString();
             log.debug("Пользователю ID={} будет отправлен список из {} событий на сегодня", 
@@ -126,51 +137,6 @@ public class TodayCommandHandler implements CommandHandler {
             String errorMessage = escape("❌ Произошла ошибка при получении событий на сегодня. Попробуйте позже.");
             return errorMessage;
         }
-    }
-    
-    /**
-     * Форматирует событие для отображения в списке.
-     * 
-     * @param event событие для форматирования
-     * @param user текущий пользователь (для определения персональных событий)
-     * @return отформатированная строка с информацией о событии
-     */
-    private String formatEvent(Event event, User user) {
-        StringBuilder sb = new StringBuilder();
-        
-        // Иконка типа события
-        if (event.getIsPersonal()) {
-            sb.append(escape("🔒 "));
-        } else {
-            sb.append(escape("👨‍👩‍👧‍👦 "));
-        }
-        
-        // Время события
-        if (event.getEventTime() != null) {
-            sb.append(bold(event.getEventTime().format(TIME_FORMATTER)));
-            
-            // Временной интервал
-            if (event.getEndTime() != null) {
-                sb.append(escape(" - ")).append(bold(event.getEndTime().format(TIME_FORMATTER)));
-            }
-            
-            sb.append(escape(" | "));
-        }
-        
-        // Название события
-        sb.append(bold(event.getTitle()));
-        
-        // Создатель события
-        if (!event.belongsToUser(user.getId())) {
-            sb.append(escape(" (")).append(escape(event.getUser().getFirstName())).append(escape(")"));
-        }
-        
-        // Описание события
-        if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            sb.append(escape("\n   ")).append(italic(event.getDescription()));
-        }
-        
-        return sb.toString();
     }
     
     @Override

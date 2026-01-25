@@ -6,8 +6,11 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.EventService;
+import ru.golubyatnikov.family.calendar.bot.util.EventFormatter;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
@@ -16,11 +19,11 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * Обработчик команды /upcoming_events для Telegram бота семейного календаря.
  * 
  * <p>Команда /upcoming_events позволяет пользователям просматривать все предстоящие
- * события их семьи на ближайшие 30 дней. Она выполняет следующие функции:</p>
+ * события их семьи на ближайшие 30 дней в едином компактном формате. Она выполняет следующие функции:</p>
  * <ul>
  *   <li>Получает список предстоящих событий семьи пользователя</li>
- *   <li>Форматирует события с использованием Markdown для улучшения читаемости</li>
- *   <li>Отображает дату, время, название, описание и автора каждого события</li>
+ *   <li>Форматирует события с использованием {@link EventFormatter} для единообразия с другими командами</li>
+ *   <li>Отображает название, время, описание и автора каждого события в компактном формате без отступов</li>
  *   <li>Сортирует события по дате и времени</li>
  *   <li>Отправляет соответствующее сообщение, если событий нет</li>
  * </ul>
@@ -28,41 +31,40 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * <p>Команда требует авторизации - пользователь должен быть зарегистрирован
  * в системе и принадлежать семье.</p>
  * 
- * <p><b>Требования:</b> 5.1, 5.2, 5.3, 5.4, 5.5</p>
+ * <p><b>Требования:</b> 1.3, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 4.3, 5.1, 5.2, 6.1, 6.2, 6.3, 6.4, 6.5, 8.1, 8.2, 8.3, 8.4, 8.5</p>
  * 
  * <p><b>Пример использования:</b></p>
  * <pre>
  * Пользователь отправляет: /upcoming_events
  * 
  * Если есть события:
- * Бот отвечает: "📅 *Планы на 30 дней*
+ * Бот отвечает: "📅 **Предстоящие события** (30 дней)
  *                
- *                📌 *День рождения мамы*
- *                📅 Дата: 31.12.2025
+ *                👨‍👩‍👧‍👦 День рождения мамы
  *                🕐 Время: 18:00
  *                📝 Описание: Празднование дня рождения
  *                👤 Создал: Иван Иванов
  *                
- *                📌 *Поход в кино*
- *                📅 Дата: 02.01.2026
+ *                👨‍👩‍👧‍👦 Поход в кино
  *                🕐 Время: 20:00
  *                📝 Описание: Смотрим новый фильм
- *                👤 Создал: Мария Петрова"
+ *                👤 Создал: Мария Петрова
+ *                
+ *                _Всего событий: 2_"
  * 
  * Если событий нет:
- * Бот отвечает: "📅 *Планы на 30 дней*
+ * Бот отвечает: "📅 **Предстоящие события**
  *                
- *                На ближайшие 7 дней событий не запланировано.
- *                
- *                Используйте /add_event для добавления нового события."
+ *                На ближайшие 30 дней событий не запланировано."
  * </pre>
  * 
  * @see CommandHandler
  * @see EventService
+ * @see EventFormatter
  * @see Event
  * @see User
  * @author Family Calendar Bot Team
- * @version 1.0.0
+ * @version 2.0.0
  * @since 2025-12-30
  */
 @Component
@@ -86,8 +88,8 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      * Обрабатывает команду /upcoming_events от пользователя.
      * 
      * <p>Метод получает список предстоящих событий семьи пользователя
-     * на ближайшие 30 дней и форматирует их в читаемый вид с использованием
-     * Markdown разметки.</p>
+     * на ближайшие 30 дней и форматирует их в едином компактном формате с использованием
+     * {@link EventFormatter} для обеспечения единообразия с другими командами списка событий.</p>
      * 
      * <p>Если у пользователя нет семьи, возвращается сообщение об ошибке.
      * Если событий нет, возвращается соответствующее информационное сообщение.</p>
@@ -95,7 +97,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      * @param message входящее сообщение от Telegram, содержащее команду /upcoming_events
      * @param user пользователь из базы данных, запросивший список событий.
      *             Не может быть null, так как команда требует авторизации.
-     * @return текст со списком предстоящих событий или сообщение об их отсутствии
+     * @return текст со списком предстоящих событий в компактном формате или сообщение об их отсутствии
      * @throws IllegalArgumentException если message равен null
      * @throws IllegalStateException если пользователь не принадлежит ни одной семье
      */
@@ -157,7 +159,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
             return buildNoEventsMessage();
         }
 
-        return buildEventsListMessage(filteredEvents);
+        return buildEventsListMessage(filteredEvents, user);
     }
 
     /**
@@ -179,97 +181,80 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
     /**
      * Формирует сообщение об отсутствии предстоящих событий.
      * 
-     * <p>Сообщение включает:</p>
-     * <ul>
-     *   <li>Заголовок с эмодзи</li>
-     *   <li>Информацию об отсутствии событий</li>
-     *   <li>Подсказку о добавлении нового события</li>
-     * </ul>
+     * <p>Использует {@link EventFormatter#formatNoEventsMessage(String, String)}
+     * для обеспечения единообразия с другими командами списка событий.</p>
+     * 
+     * <p><b>Требования:</b> 4.3</p>
      * 
      * @return отформатированное сообщение об отсутствии событий
      */
     private String buildNoEventsMessage() {
-        return escape("📅 ") + bold("Планы на 30 дней") + escape("\n\n") +
-                escape("На ближайшие " + DEFAULT_DAYS + " дней событий не запланировано.\n\n") +
-                escape("Используйте /add_event для добавления нового события.");
+        return EventFormatter.formatNoEventsMessage(
+                "Предстоящие события",
+                "На ближайшие " + DEFAULT_DAYS + " дней событий не запланировано."
+        );
     }
 
     /**
-     * Формирует список предстоящих событий с форматированием.
+     * Формирует список предстоящих событий с форматированием и группировкой по дням.
      * 
-     * <p>Каждое событие отображается в следующем формате:</p>
-     * <pre>
-     * 📌 *Название события*
-     * 📅 Дата: dd.MM.yyyy
-     * 🕐 Время: HH:mm
-     * 📝 Описание: текст описания (если есть)
-     * 👤 Создал: Имя Фамилия
-     * </pre>
+     * <p>Использует {@link EventFormatter#formatCommandHeader(String, String)},
+     * {@link EventFormatter#formatDayHeader(LocalDate, LocalDate)},
+     * {@link EventFormatter#formatDaySeparator()},
+     * {@link EventFormatter#formatEvent(Event, User)} и
+     * {@link EventFormatter#formatEventCounter(int)} для обеспечения единообразия
+     * с другими командами списка событий.</p>
      * 
-     * <p>События разделяются пустой строкой для улучшения читаемости.</p>
+     * <p>События группируются по датам, для каждой даты добавляется заголовок дня,
+     * между группами разных дней добавляются визуальные разделители.</p>
+     * 
+     * <p><b>Требования:</b> 1.3, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 5.1, 5.2, 6.1, 6.2, 6.3, 6.4, 6.5, 8.1, 8.2, 8.3, 8.4, 8.5</p>
      * 
      * @param filteredEvents список отфильтрованных событий для форматирования
-     * @return отформатированное сообщение со списком событий
+     * @param user текущий пользователь для определения создателя событий
+     * @return отформатированное сообщение со списком событий, сгруппированных по дням
      */
-    private String buildEventsListMessage(List<Event> filteredEvents) {
-        String eventsList = filteredEvents.stream()
-                .map(this::formatEvent)
-                .collect(Collectors.joining("\n\n"));
-
-        return escape("📅 ") + bold("Планы на 30 дней") + escape("\n\n") +
-                eventsList + escape("\n\n") +
-                escape("Всего событий: ") + escape(String.valueOf(filteredEvents.size()));
-    }
-
-    /**
-     * Форматирует одно событие в читаемый вид с детальной информацией.
-     * 
-     * <p>Использует эмодзи для визуального выделения различных полей события.
-     * Название события выделяется жирным шрифтом с помощью Markdown.</p>
-     * 
-     * <p>Формат вывода включает:</p>
-     * <ul>
-     *   <li>Иконку типа события (🔒 для персональных, 👨‍👩‍👧‍👦 для семейных)</li>
-     *   <li>Название события (жирным шрифтом)</li>
-     *   <li>Дату события в формате dd.MM.yyyy</li>
-     *   <li>Время события (с интервалом, если указано время окончания)</li>
-     *   <li>Описание события (если заполнено)</li>
-     *   <li>Имя создателя события</li>
-     * </ul>
-     * 
-     * <p>Если у события нет описания, поле "Описание" не отображается.</p>
-     * 
-     * <p><b>Требования:</b> 2.2, 2.4, 4.3, 4.4</p>
-     * 
-     * @param event событие для форматирования
-     * @return отформатированная строка с информацией о событии
-     */
-    private String formatEvent(Event event) {
-        StringBuilder formatted = new StringBuilder();
+    private String buildEventsListMessage(List<Event> filteredEvents, User user) {
+        String header = EventFormatter.formatCommandHeader("Предстоящие события", DEFAULT_DAYS + " дней");
         
-        // Иконка типа события (персональное или семейное)
-        String eventTypeIcon = event.getIsPersonal() ? "🔒" : "👨‍👩‍👧‍👦";
-        formatted.append(escape(eventTypeIcon)).append(bold(event.getTitle())).append(escape("\n"));
+        // Группировка событий по датам
+        Map<LocalDate, List<Event>> eventsByDate = filteredEvents.stream()
+                .collect(Collectors.groupingBy(Event::getEventDate));
         
-        // Дата события
-        formatted.append(escape("📅 Дата: ")).append(escape(event.getFormattedDate())).append(escape("\n"));
+        StringBuilder messageBuilder = new StringBuilder();
+        messageBuilder.append(header);
+        messageBuilder.append(escape("\n\n"));
         
-        // Время события (с интервалом, если указано)
-        if (event.hasTimeInterval()) {
-            formatted.append(escape("🕐 Время: ")).append(escape(event.getFormattedTimeInterval())).append(escape("\n"));
-        } else {
-            formatted.append(escape("🕐 Время: ")).append(escape(event.getFormattedTime())).append(escape("\n"));
+        // Сортировка дат и вывод событий по дням
+        LocalDate today = LocalDate.now();
+        LocalDate endDate = today.plusDays(DEFAULT_DAYS - 1);
+        boolean firstDay = true;
+        
+        for (LocalDate date = today; !date.isAfter(endDate); date = date.plusDays(1)) {
+            List<Event> dayEvents = eventsByDate.get(date);
+            
+            if (dayEvents != null && !dayEvents.isEmpty()) {
+                // Добавляем разделитель перед каждым днем, кроме первого
+                if (!firstDay) {
+                    messageBuilder.append(EventFormatter.formatDaySeparator());
+                    messageBuilder.append(escape("\n"));
+                }
+                firstDay = false;
+                
+                // Добавляем заголовок дня
+                messageBuilder.append(EventFormatter.formatDayHeader(date, today));
+                
+                // Добавляем события дня
+                for (Event event : dayEvents) {
+                    messageBuilder.append(EventFormatter.formatEvent(event, user));
+                }
+            }
         }
         
-        // Описание события (опционально)
-        if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            formatted.append(escape("📝 Описание: ")).append(escape(event.getDescription())).append(escape("\n"));
-        }
+        // Добавляем счетчик событий
+        messageBuilder.append(EventFormatter.formatEventCounter(filteredEvents.size()));
         
-        // Создатель события
-        formatted.append(escape("👤 Создал: ")).append(escape(event.getUser().getFullName()));
-        
-        return formatted.toString();
+        return messageBuilder.toString();
     }
 
     /**
