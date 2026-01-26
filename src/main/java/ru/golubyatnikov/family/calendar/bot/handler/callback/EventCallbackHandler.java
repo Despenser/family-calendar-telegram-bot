@@ -62,7 +62,9 @@ public class EventCallbackHandler implements CallbackHandler {
                CallbackPrefix.DELETE_EVENT.matches(callbackData) ||
                CallbackPrefix.EDIT_FIELD.matches(callbackData) ||
                CallbackPrefix.COMPLETE_EVENT.matches(callbackData) ||
-               CallbackPrefix.EDIT_CANCEL.matches(callbackData);
+               CallbackPrefix.EDIT_CANCEL.matches(callbackData) ||
+               CallbackPrefix.ADD_COMPLETION_NOTE.matches(callbackData) ||
+               CallbackPrefix.SKIP_COMPLETION_NOTE.matches(callbackData);
     }
     
     @Override
@@ -88,6 +90,10 @@ public class EventCallbackHandler implements CallbackHandler {
             handleCompleteEvent(callbackData, user.getId(), chatId, messageId, callbackQueryId);
         } else if (CallbackPrefix.EDIT_CANCEL.matches(callbackData)) {
             handleEditCancel(callbackData, user.getId(), chatId, callbackQueryId);
+        } else if (CallbackPrefix.ADD_COMPLETION_NOTE.matches(callbackData)) {
+            handleAddCompletionNote(callbackData, user.getId(), chatId, callbackQueryId);
+        } else if (CallbackPrefix.SKIP_COMPLETION_NOTE.matches(callbackData)) {
+            handleSkipCompletionNote(user.getId(), chatId, callbackQueryId);
         }
     }
     
