@@ -184,12 +184,9 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
                 );
                 
                 if (edited) {
-                    // Обновляем контекст с тем же message_id для кнопки "Найти заново"
-                    conversationStateService.setAwaitingSearchQuery(
-                        user.getId(), 
-                        chatId, 
-                        context.getMessageId()
-                    );
+                    // Очищаем контекст - пользователь больше не в режиме поиска
+                    // Контекст будет восстановлен только при нажатии "Найти заново"
+                    conversationStateService.clearAwaitingSearchQuery(user.getId());
                     
                     log.info("Пользователю ID={} отредактировано сообщение с {} результатами поиска", 
                             user.getId(), results.size());
@@ -202,12 +199,8 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
                         keyboard
                     );
                     
-                    // Обновляем контекст с новым message_id
-                    conversationStateService.setAwaitingSearchQuery(
-                        user.getId(), 
-                        chatId, 
-                        newMessage.getMessageId()
-                    );
+                    // Очищаем контекст - пользователь больше не в режиме поиска
+                    conversationStateService.clearAwaitingSearchQuery(user.getId());
                     
                     log.info("Пользователю ID={} отправлено новое сообщение с {} результатами поиска", 
                             user.getId(), results.size());
@@ -221,12 +214,8 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
                     keyboard
                 );
                 
-                // Сохраняем новый контекст
-                conversationStateService.setAwaitingSearchQuery(
-                    user.getId(), 
-                    chatId, 
-                    newMessage.getMessageId()
-                );
+                // Очищаем контекст на всякий случай
+                conversationStateService.clearAwaitingSearchQuery(user.getId());
                 
                 log.info("Пользователю ID={} отправлено {} результатов поиска", user.getId(), results.size());
             }
