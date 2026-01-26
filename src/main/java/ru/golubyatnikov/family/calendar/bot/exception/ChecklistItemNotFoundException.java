@@ -1,7 +1,7 @@
 package ru.golubyatnikov.family.calendar.bot.exception;
 
 /**
- * Исключение, выбрасываемое когда пункт чек-листа не найден в базе данных.
+ * Исключение, выбрасываемое, когда пункт чек-листа не найден в базе данных.
  *
  * @author Golubyatnikov Aleksey
  * @version 1.0.0

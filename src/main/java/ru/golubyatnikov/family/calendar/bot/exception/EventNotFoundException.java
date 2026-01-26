@@ -1,7 +1,7 @@
 package ru.golubyatnikov.family.calendar.bot.exception;
 
 /**
- * Исключение, выбрасываемое когда событие не найдено в системе.
+ * Исключение, выбрасываемое, когда событие не найдено в системе.
  *
  * @author Golubyatnikov Aleksey
  * @version 1.0.0

@@ -240,18 +240,24 @@ public final class EventFormatter {
      *   <li>Другие дни: 📆 dd.MM (День недели)</li>
      * </ul>
      * 
+     * <p>Заголовок завершается двойным переносом строки для создания визуального отступа
+     * между заголовком дня и первым событием в списке.</p>
+     * 
      * <p>Примеры:</p>
      * <pre>
      * 📍 **Сегодня** (25.01 (Воскресенье))
+     * 
      * 🔜 26.01 (Завтра - Понедельник)
+     * 
      * 📆 27.01 (Вторник)
+     * 
      * </pre>
      * 
-     * <p><b>Требования:</b> 2.1, 2.2, 3.1, 3.2, 3.3, 7.1, 7.2, 7.3, 7.4, 7.5</p>
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 3.1, 3.2, 3.3, 7.1, 7.2, 7.3, 7.4, 7.5</p>
      * 
      * @param date дата для форматирования, не может быть null
      * @param today текущая дата (для определения "сегодня" и "завтра"), не может быть null
-     * @return отформатированный заголовок дня
+     * @return отформатированный заголовок дня с двойным переносом строки в конце
      * @throws IllegalArgumentException если date или today равны null
      */
     public static String formatDayHeader(LocalDate date, LocalDate today) {
@@ -295,7 +301,7 @@ public final class EventFormatter {
             sb.append(escape(date.format(SHORT_DATE_FORMATTER)));
         }
         
-        sb.append(escape("\n"));
+        sb.append(escape("\n\n"));
         return sb.toString();
     }
     
@@ -316,6 +322,102 @@ public final class EventFormatter {
      */
     public static String formatDaySeparator() {
         return escape("─────────────────────");
+    }
+    
+    /**
+     * Форматирует событие для результатов поиска с полной информацией.
+     * 
+     * <p>Формат вывода:</p>
+     * <pre>
+     * 📌 [название]
+     * 📅 Дата: DD.MM.YYYY
+     * 🕐 Время: [время]
+     * [иконка типа] Тип: [Семейное/Личное]
+     * 📝 Описание: [описание]
+     * 👤 Создал: [имя]
+     * </pre>
+     * 
+     * <p>Примеры:</p>
+     * <pre>
+     * 📌 Встреча с врачом
+     * 📅 Дата: 26.01.2026
+     * 🕐 Время: 14:30 - 15:00
+     * 👨‍👩‍👧‍👦 Тип: Семейное
+     * 📝 Описание: Не забыть взять карту
+     * 👤 Создал: Мария
+     * 
+     * 📌 Утренняя пробежка
+     * 📅 Дата: 27.01.2026
+     * 🕐 Время: 09:00
+     * 👤 Тип: Личное
+     * 
+     * 📌 День рождения мамы
+     * 📅 Дата: 28.01.2026
+     * 👨‍👩‍👧‍👦 Тип: Семейное
+     * 📝 Описание: Празднование
+     * 👤 Создал: Алексей
+     * </pre>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 4.1, 4.3</p>
+     * 
+     * @param event событие для форматирования, не может быть null
+     * @param currentUser текущий пользователь (для определения, показывать ли создателя), не может быть null
+     * @return отформатированная строка с информацией о событии для результатов поиска
+     * @throws IllegalArgumentException если event или currentUser равны null
+     */
+    public static String formatSearchResult(Event event, User currentUser) {
+        if (event == null) {
+            throw new IllegalArgumentException("Событие не может быть null");
+        }
+        if (currentUser == null) {
+            throw new IllegalArgumentException("Текущий пользователь не может быть null");
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        
+        // Эмодзи 📌 и название события
+        sb.append(escape("📌 "));
+        sb.append(bold(event.getTitle()));
+        sb.append(escape("\n"));
+        
+        // Дата события
+        sb.append(escape("📅 Дата: "));
+        sb.append(escape(event.getEventDate().format(DATE_FORMATTER)));
+        sb.append(escape("\n"));
+        
+        // Время события (если есть)
+        if (event.getEventTime() != null) {
+            sb.append(escape("🕐 Время: "));
+            if (event.getEndTime() != null) {
+                sb.append(escape(event.getEventTime().format(TIME_FORMATTER) + " - " + event.getEndTime().format(TIME_FORMATTER)));
+            } else {
+                sb.append(escape(event.getEventTime().format(TIME_FORMATTER)));
+            }
+            sb.append(escape("\n"));
+        }
+        
+        // Тип события
+        if (event.getIsPersonal()) {
+            sb.append(escape("👤 Тип: Личное"));
+        } else {
+            sb.append(escape("👨‍👩‍👧‍👦 Тип: Семейное"));
+        }
+        sb.append(escape("\n"));
+        
+        // Описание события (если есть)
+        if (event.getDescription() != null && !event.getDescription().isBlank()) {
+            sb.append(escape("📝 Описание: "));
+            sb.append(escape(event.getDescription()));
+            sb.append(escape("\n"));
+        }
+        
+        // Создатель события (если не текущий пользователь)
+        if (!event.belongsToUser(currentUser.getId())) {
+            sb.append(escape("👤 Создал: " + event.getUser().getFirstName()));
+            sb.append(escape("\n"));
+        }
+        
+        return sb.toString();
     }
     
     /**

@@ -13,10 +13,10 @@ import java.util.Optional;
  * 
  * <p>Предоставляет методы для сохранения и извлечения состояния диалога пользователя,
  * включая контекст сообщений с вложениями.</p>
- * 
- * @author Family Calendar Bot Team
+ *
+ * @author Golubyatnikov Aleksey
  * @version 1.0.0
- * @since 2026-01-21
+ * @since 2026-01-16
  */
 @Repository
 public interface ConversationStateRepository extends JpaRepository<ConversationState, Long> {

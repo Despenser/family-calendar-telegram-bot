@@ -176,9 +176,9 @@ public class FilterCallbackHandler implements CallbackHandler {
                 
                 // Добавляем разделитель между событиями (но не после последнего)
                 if (i < events.size() - 1) {
-                    sb.append("\n")
+                    sb.append("\n\n")  // Пустая строка ПЕРЕД разделителем
                       .append(MarkdownFormatter.escapeMarkdownV2("─────────────────────"))
-                      .append("\n");
+                      .append("\n\n");  // Пустая строка ПОСЛЕ разделителя
                 }
             }
         }

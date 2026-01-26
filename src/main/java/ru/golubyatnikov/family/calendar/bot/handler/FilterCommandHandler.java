@@ -132,7 +132,9 @@ public class FilterCommandHandler implements CommandHandler {
                     
                     // Добавляем разделитель между событиями (но не после последнего)
                     if (i < results.size() - 1) {
-                        messageBuilder.append("\n").append(escape("─────────────────────")).append("\n");
+                        messageBuilder.append("\n\n")  // Пустая строка ПЕРЕД разделителем
+                                      .append(escape("─────────────────────"))
+                                      .append("\n\n");  // Пустая строка ПОСЛЕ разделителя
                     }
                 }
                 messageBuilder.append(String.format("\n\n%s", italic("Найдено событий: " + results.size())));

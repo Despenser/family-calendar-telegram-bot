@@ -237,7 +237,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
                 // Добавляем разделитель перед каждым днем, кроме первого
                 if (!firstDay) {
                     messageBuilder.append(EventFormatter.formatDaySeparator());
-                    messageBuilder.append(escape("\n"));
+                    messageBuilder.append(escape("\n\n")); // Пустая строка ПОСЛЕ разделителя
                 }
                 firstDay = false;
                 

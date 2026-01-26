@@ -36,7 +36,7 @@ public class TelegramWebhookController {
      * @return ResponseEntity с HTTP 200 OK при успешной обработке, или HTTP 401 Unauthorized при неверном токене
      */
     @PostMapping("/{botToken}")
-    public ResponseEntity<Void> onUpdateReceived(@PathVariable String botToken,
+    public ResponseEntity<Void> onUpdateReceived(@NonNull @PathVariable String botToken,
                                                  @RequestBody Update update) {
         
         log.debug("Получен webhook запрос с токеном: {}...", 
@@ -55,7 +55,7 @@ public class TelegramWebhookController {
      * Валидирует токен бота из URL.
      * 
      * @param token токен из URL пути
-     * @return true если токен совпадает с настроенным, false в противном случае
+     * @return true, если токен совпадает с настроенным, false в противном случае
      */
     private boolean isValidToken(String token) {
         return botConfig.getToken().equals(token);

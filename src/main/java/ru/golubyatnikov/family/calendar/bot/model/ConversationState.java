@@ -5,7 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.time.Instant;
 import java.time.LocalDateTime;
 
@@ -15,12 +14,10 @@ import java.time.LocalDateTime;
  * <p>Используется для сохранения контекста между операциями, в частности
  * для хранения информации о сообщениях с вложениями, которые нужно редактировать
  * вместо создания новых сообщений.</p>
- * 
- * <p>Каждый пользователь имеет только одно состояние диалога (UNIQUE constraint на user_id).</p>
- * 
- * @author Family Calendar Bot Team
+ *
+ * @author Golubyatnikov Aleksey
  * @version 1.0.0
- * @since 2026-01-21
+ * @since 2026-01-16
  * @see User
  * @see Event
  */
@@ -84,8 +81,7 @@ public class ConversationState {
     private Instant attachmentContextCreatedAt;
     
     /**
-     * Флаг, указывающий что событие было первым в списке "Мои события".
-     * Используется для восстановления шапки "📋 Мои события" при возврате к событию.
+     * Флаг, указывающий, что событие было первым в списке "Мои события".
      */
     @Column(name = "event_has_my_events_header")
     private Boolean eventHasMyEventsHeader;

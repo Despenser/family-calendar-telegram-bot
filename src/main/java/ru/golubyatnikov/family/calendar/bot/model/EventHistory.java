@@ -10,9 +10,10 @@ import java.time.LocalDateTime;
 /**
  * Entity класс для истории изменений событий.
  * Отслеживает все действия пользователей с событиями для аудита и отображения истории.
- * 
- * @author Family Calendar Bot
- * @version 1.0
+ *
+ * @author Golubyatnikov Aleksey
+ * @version 1.0.0
+ * @since 2026-01-16
  * @see Event
  * @see User
  */

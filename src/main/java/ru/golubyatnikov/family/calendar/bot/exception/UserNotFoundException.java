@@ -1,7 +1,7 @@
 package ru.golubyatnikov.family.calendar.bot.exception;
 
 /**
- * Исключение, выбрасываемое когда пользователь не найден в системе.
+ * Исключение, выбрасываемое, когда пользователь не найден в системе.
  *
  * @author Golubyatnikov Aleksey
  * @version 1.0.0

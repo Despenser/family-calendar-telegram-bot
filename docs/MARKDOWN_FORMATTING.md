@@ -671,7 +671,6 @@ details.append(formatMessage("🕐 Время: %s\n", escape(event.getFormattedT
 - [Telegram Bot API - MarkdownV2 style](https://core.telegram.org/bots/api#markdownv2-style)
 - [Javadoc MarkdownFormatter](../src/main/java/ru/golubyatnikov/family/calendar/bot/util/MarkdownFormatter.java)
 - [Тесты MarkdownFormatter](../src/test/java/ru/golubyatnikov/family/calendar/bot/util/MarkdownFormatterTest.java)
-- [SETUP.md - Работа с MarkdownV2](../SETUP.md#работа-с-markdownv2-форматированием)
 
 ---
 

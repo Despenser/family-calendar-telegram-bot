@@ -224,7 +224,7 @@ public enum CallbackPrefix {
     /**
      * Проверяет, является ли данный префикс префиксом без параметров (требует точного совпадения).
      * 
-     * @return true если префикс требует точного совпадения
+     * @return true, если префикс требует точного совпадения
      */
     private boolean isExactMatchPrefix() {
         return this == TIME_BACK || 

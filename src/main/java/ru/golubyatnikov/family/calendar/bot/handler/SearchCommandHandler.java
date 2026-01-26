@@ -9,8 +9,8 @@ import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.SearchService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.EventFormatter;
 
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
@@ -47,9 +47,6 @@ public class SearchCommandHandler implements CommandHandler {
     private final SearchService searchService;
     private final TelegramMessageService messageService;
     private final ConversationStateService conversationStateService;
-    
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     
     /**
      * Обрабатывает команду /search.
@@ -122,15 +119,29 @@ public class SearchCommandHandler implements CommandHandler {
             
             // Формирование сообщения с результатами
             StringBuilder messageBuilder = new StringBuilder();
-            messageBuilder.append("🔍 ").append(bold("Результаты поиска")).append("\n");
+            
+            // Заголовок результатов поиска
+            messageBuilder.append("🔍 ").append(bold("Результаты поиска")).append("\n\n");
             messageBuilder.append(italic("Запрос: " + escape("\"") + query + escape("\""))).append("\n\n");
             
-            for (Event event : results) {
-                messageBuilder.append(formatEvent(event, user));
-                messageBuilder.append("\n");
+            // Форматирование событий с использованием EventFormatter.formatSearchResult()
+            for (int i = 0; i < results.size(); i++) {
+                Event event = results.get(i);
+                messageBuilder.append(EventFormatter.formatSearchResult(event, user));
+                
+                // Добавляем разделитель между событиями (но не после последнего)
+                if (i < results.size() - 1) {
+                    messageBuilder.append(escape("\n"));  // Пустая строка ПЕРЕД разделителем
+                    messageBuilder.append(EventFormatter.formatDaySeparator());
+                    messageBuilder.append(escape("\n\n")); // Пустая строка ПОСЛЕ разделителя
+                }
             }
             
-            messageBuilder.append("\n").append(italic("Найдено событий: " + results.size()));
+            // Пустая строка перед счетчиком
+            messageBuilder.append(escape("\n"));
+            
+            // Счетчик результатов
+            messageBuilder.append(italic("Найдено событий: " + results.size()));
             
             messageService.sendMessage(chatId, messageBuilder.toString());
             log.info("Пользователю ID={} отправлено {} результатов поиска", user.getId(), results.size());
@@ -144,54 +155,6 @@ public class SearchCommandHandler implements CommandHandler {
                 log.error("Ошибка при отправке сообщения об ошибке: {}", ex.getMessage(), ex);
             }
         }
-    }
-    
-    /**
-     * Форматирует событие для отображения в результатах поиска.
-     * 
-     * @param event событие для форматирования
-     * @param user текущий пользователь (для определения персональных событий)
-     * @return отформатированная строка с информацией о событии
-     */
-    private String formatEvent(Event event, User user) {
-        StringBuilder sb = new StringBuilder();
-        
-        // Иконка типа события
-        if (event.getIsPersonal()) {
-            sb.append("🔒 ");
-        } else {
-            sb.append("👨‍👩‍👧‍👦 ");
-        }
-        
-        // Дата события
-        sb.append(bold(event.getEventDate().format(DATE_FORMATTER)));
-        
-        // Время события
-        if (event.getEventTime() != null) {
-            sb.append(escape(" в ")).append(bold(event.getEventTime().format(TIME_FORMATTER)));
-            
-            // Временной интервал
-            if (event.getEndTime() != null) {
-                sb.append(escape(" - ")).append(bold(event.getEndTime().format(TIME_FORMATTER)));
-            }
-        }
-        
-        sb.append("\n   ");
-        
-        // Название события
-        sb.append(bold(event.getTitle()));
-        
-        // Создатель события
-        if (!event.belongsToUser(user.getId())) {
-            sb.append(escape(" (")).append(escape(event.getUser().getFirstName())).append(escape(")"));
-        }
-        
-        // Описание события
-        if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            sb.append("\n   ").append(italic(event.getDescription()));
-        }
-        
-        return sb.toString();
     }
     
     @Override
