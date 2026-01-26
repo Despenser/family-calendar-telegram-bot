@@ -280,6 +280,9 @@ class CallbackQueryDispatcherPropertyTest {
             "comment_add",
             "add_completion_note_123",
             
+            // Поиск
+            "search_again:",
+            
             // Создание события из текста
             "confirm_text_event:dGVzdA==",
             "cancel_text_event"
@@ -382,6 +385,11 @@ class CallbackQueryDispatcherPropertyTest {
         handlers.add(createMockHandler(CallbackPrefix.CONFIRM_TEXT_EVENT, callbackData ->
             CallbackPrefix.CONFIRM_TEXT_EVENT.matches(callbackData) ||
             CallbackPrefix.CANCEL_TEXT_EVENT.matches(callbackData)
+        ));
+        
+        // SearchCommandHandler (для callback "search_again:")
+        handlers.add(createMockHandler(CallbackPrefix.SEARCH_AGAIN, callbackData ->
+            CallbackPrefix.SEARCH_AGAIN.matches(callbackData)
         ));
         
         return handlers;

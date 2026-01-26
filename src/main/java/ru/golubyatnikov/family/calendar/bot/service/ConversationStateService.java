@@ -65,12 +65,56 @@ public class ConversationStateService {
     /**
      * Устанавливает состояние ожидания поискового запроса для пользователя.
      * 
+     * <p>Метод сохраняет контекст поиска в базе данных, чтобы система могла
+     * редактировать сообщение при последующих операциях поиска.
+     * Если состояние диалога для пользователя не существует, оно будет создано.</p>
+     * 
+     * <p>Метод выполняется в транзакции для обеспечения атомарности операции.</p>
+     * 
      * @param userId идентификатор пользователя
      * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для редактирования
+     * @throws IllegalArgumentException если userId, chatId или messageId равны null
      */
-    public void setAwaitingSearchQuery(Long userId, Long chatId) {
+    @Transactional
+    public void setAwaitingSearchQuery(Long userId, Long chatId, Integer messageId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        if (chatId == null) {
+            throw new IllegalArgumentException("chatId не может быть null");
+        }
+        if (messageId == null) {
+            throw new IllegalArgumentException("messageId не может быть null");
+        }
+        
+        log.debug("Установка состояния ожидания поискового запроса для пользователя ID={}, чата ID={}, сообщения ID={}", 
+                userId, chatId, messageId);
+        
+        // Сохраняем в in-memory map для быстрого доступа
         usersAwaitingSearchQuery.put(userId, chatId);
-        log.info("Пользователь ID={} переведен в режим ожидания поискового запроса", userId);
+        
+        // Получаем или создаем состояние диалога
+        ConversationState state = conversationStateRepository.findByUserId(userId)
+                .orElseGet(() -> {
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new IllegalArgumentException("Пользователь с ID=" + userId + " не найден"));
+                    
+                    ConversationState newState = ConversationState.builder()
+                            .user(user)
+                            .build();
+                    
+                    log.debug("Создано новое состояние диалога для пользователя ID={}", userId);
+                    return newState;
+                });
+        
+        // Сохраняем контекст поиска
+        state.setSearchChatId(chatId);
+        state.setSearchMessageId(messageId);
+        
+        conversationStateRepository.save(state);
+        
+        log.info("Пользователь ID={} переведен в режим ожидания поискового запроса, messageId={}", userId, messageId);
     }
     
     /**
@@ -94,12 +138,75 @@ public class ConversationStateService {
     }
     
     /**
-     * Очищает состояние ожидания поискового запроса для пользователя.
+     * Получает сохраненный контекст поискового запроса для пользователя.
+     * 
+     * <p>Метод извлекает сохраненный контекст из базы данных.
+     * Если контекст не найден или не полный, метод вернет null.</p>
      * 
      * @param userId идентификатор пользователя
+     * @return SearchQueryContext с chatId и messageId, или null если контекст не найден
+     * @throws IllegalArgumentException если userId равен null
      */
+    @Transactional(readOnly = true)
+    public SearchQueryContext getSearchQueryContext(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        
+        log.debug("Получение контекста поискового запроса для пользователя ID={}", userId);
+        
+        return conversationStateRepository.findByUserId(userId)
+                .filter(ConversationState::hasSearchContext)
+                .map(state -> {
+                    SearchQueryContext context = new SearchQueryContext(
+                            state.getSearchChatId(),
+                            state.getSearchMessageId()
+                    );
+                    
+                    log.debug("Найден контекст поискового запроса для пользователя ID={}: chatId={}, messageId={}", 
+                            userId, context.getChatId(), context.getMessageId());
+                    return context;
+                })
+                .orElseGet(() -> {
+                    log.debug("Контекст поискового запроса не найден для пользователя ID={}", userId);
+                    return null;
+                });
+    }
+    
+    /**
+     * Очищает состояние ожидания поискового запроса для пользователя.
+     * 
+     * <p>Метод удаляет контекст поиска как из in-memory map, так и из базы данных.
+     * Используется при завершении поиска или при переходе к другой операции.</p>
+     * 
+     * <p>Метод выполняется в транзакции для обеспечения атомарности операции.</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @throws IllegalArgumentException если userId равен null
+     */
+    @Transactional
     public void clearAwaitingSearchQuery(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        
+        log.debug("Очистка состояния ожидания поискового запроса для пользователя ID={}", userId);
+        
+        // Очищаем из in-memory map
         usersAwaitingSearchQuery.remove(userId);
+        
+        // Очищаем из базы данных
+        conversationStateRepository.findByUserId(userId)
+                .ifPresent(state -> {
+                    if (state.hasSearchContext()) {
+                        state.clearSearchContext();
+                        conversationStateRepository.save(state);
+                        log.info("Контекст поиска очищен для пользователя ID={}", userId);
+                    } else {
+                        log.debug("Контекст поиска не найден в БД для пользователя ID={}, очистка не требуется", userId);
+                    }
+                });
+        
         log.debug("Состояние ожидания поискового запроса очищено для пользователя ID={}", userId);
     }
     
@@ -652,5 +759,23 @@ public class ConversationStateService {
          * Количество событий для формирования шапки
          */
         private int eventCount;
+    }
+    
+    /**
+     * Контекст поискового запроса.
+     * Содержит информацию о чате и сообщении для редактирования при поиске.
+     */
+    @Data
+    @AllArgsConstructor
+    public static class SearchQueryContext {
+        /**
+         * Идентификатор чата
+         */
+        private Long chatId;
+        
+        /**
+         * Идентификатор сообщения для редактирования
+         */
+        private Integer messageId;
     }
 }

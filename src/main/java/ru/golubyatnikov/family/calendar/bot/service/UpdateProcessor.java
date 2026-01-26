@@ -966,14 +966,15 @@ public class UpdateProcessor {
         try {
             String query = message.getText();
             Long chatId = message.getChatId();
+            Integer messageId = message.getMessageId();
             Long userId = user.getId();
             Long telegramId = user.getTelegramId();
             
             log.debug("Обработка поискового запроса от пользователя: userId={}, telegramId={}", 
                     userId, telegramId);
             
-            conversationStateService.clearAwaitingSearchQuery(userId);
-            searchCommandHandler.performSearch(chatId, user, query);
+            // Не очищаем контекст здесь - это будет сделано в performSearch после редактирования
+            searchCommandHandler.performSearch(chatId, user, query, messageId);
             
         } catch (Exception e) {
             log.error("Ошибка при обработке поискового запроса: userId={}, telegramId={}, error={}, stackTrace={}", 

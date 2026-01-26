@@ -118,6 +118,11 @@ public enum CallbackPrefix {
     /** Пропуск добавления заметки к завершенному событию */
     SKIP_COMPLETION_NOTE("skip_completion_note"),
     
+    // ===== Поиск =====
+    
+    /** Повторный поиск событий (формат: search_again:) */
+    SEARCH_AGAIN("search_again:"),
+    
     // ===== Создание события из текста =====
     
     /** Подтверждение создания события из текста (формат: confirm_text_event:{data}) */

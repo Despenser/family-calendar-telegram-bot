@@ -499,6 +499,82 @@ public class TelegramMessageService extends DefaultAbsSender {
     }
 
     /**
+     * Отправляет текстовое сообщение без клавиатуры и возвращает отправленное сообщение.
+     * 
+     * <p>Этот метод отправляет простое текстовое сообщение и возвращает объект Message,
+     * содержащий messageId и другую информацию об отправленном сообщении. Основное назначение -
+     * сохранение messageId для последующих обновлений сообщения через 
+     * {@link #editMessageText(Long, Integer, String, InlineKeyboardMarkup)}.</p>
+     * 
+     * <p>Сообщение отправляется с поддержкой MarkdownV2 форматирования.
+     * Все специальные символы MarkdownV2 должны быть экранированы с помощью
+     * {@link ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter}.</p>
+     * 
+     * <p><b>Обработка ошибок парсинга:</b></p>
+     * <ul>
+     *   <li>При ошибке парсинга MarkdownV2 (400 Bad Request) автоматически переключается на plain text</li>
+     *   <li>Детальное логирование для диагностики проблем с экранированием</li>
+     *   <li>Метрика "markdown_parse_error_fallback" для мониторинга</li>
+     * </ul>
+     * 
+     * @param chatId Telegram ID пользователя-получателя
+     * @param text текст сообщения (поддерживает MarkdownV2, требует экранирования)
+     * @return отправленное сообщение с messageId и другой информацией
+     * @throws TelegramApiException если все попытки отправки не удались
+     * @throws IllegalArgumentException если chatId null или text пустой
+     * 
+     * @see #sendMessage(Long, String)
+     * @see #editMessageText(Long, Integer, String, InlineKeyboardMarkup)
+     * @see ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter
+     */
+    @Retryable(
+        retryFor = TelegramApiException.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 1000, multiplier = 2.0)
+    )
+    public Message sendMessageAndGet(Long chatId, String text) throws TelegramApiException {
+        validateSendMessageParams(chatId, text);
+        
+        log.debug("Отправка сообщения (с возвратом Message): chatId={}, textLength={}", 
+                chatId, text.length());
+        
+        SendMessage message = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(text)
+                .parseMode("MarkdownV2")
+                .build();
+        
+        try {
+            Message sentMessage = execute(message);
+            log.debug("Сообщение успешно отправлено: chatId={}, messageId={}", 
+                    chatId, sentMessage.getMessageId());
+            return sentMessage;
+            
+        } catch (TelegramApiRequestException e) {
+            // Обработка ошибок парсинга с fallback
+            if (isParseError(e)) {
+                log.warn("Ошибка парсинга MarkdownV2, переключаемся на plain text: chatId={}", 
+                        chatId);
+                recordMetric("markdown_parse_error_fallback");
+                
+                SendMessage plainMessage = SendMessage.builder()
+                        .chatId(chatId.toString())
+                        .text(text)
+                        .build();
+                
+                Message sentMessage = execute(plainMessage);
+                log.info("Сообщение успешно отправлено без форматирования (fallback): chatId={}, messageId={}", 
+                        chatId, sentMessage.getMessageId());
+                return sentMessage;
+            }
+            
+            recordMetricForTelegramError(e);
+            handleTelegramApiError(e, chatId, text);
+            throw e;
+        }
+    }
+
+    /**
      * Отправляет текстовое сообщение с inline кнопками без форматирования.
      * 
      * <p>Этот метод используется как fallback механизм, когда отправка

@@ -94,6 +94,20 @@ public class ConversationState {
     private Integer eventCountForHeader;
     
     /**
+     * Идентификатор чата для контекста поиска событий.
+     * Необходим для редактирования сообщения поиска в правильном чате.
+     */
+    @Column(name = "search_chat_id")
+    private Long searchChatId;
+    
+    /**
+     * Идентификатор сообщения для редактирования при поиске событий.
+     * Позволяет системе редактировать одно и то же сообщение вместо создания новых.
+     */
+    @Column(name = "search_message_id")
+    private Integer searchMessageId;
+    
+    /**
      * Дата и время создания записи состояния диалога.
      * Устанавливается автоматически при создании записи.
      */
@@ -164,5 +178,23 @@ public class ConversationState {
     public void clearEventHeaderContext() {
         this.eventHasMyEventsHeader = null;
         this.eventCountForHeader = null;
+    }
+    
+    /**
+     * Проверяет, есть ли сохраненный контекст поиска.
+     * 
+     * @return true, если все поля контекста поиска заполнены, false в противном случае
+     */
+    public boolean hasSearchContext() {
+        return searchChatId != null && searchMessageId != null;
+    }
+    
+    /**
+     * Очищает контекст поиска.
+     * Устанавливает поля контекста поиска в null.
+     */
+    public void clearSearchContext() {
+        this.searchChatId = null;
+        this.searchMessageId = null;
     }
 }
