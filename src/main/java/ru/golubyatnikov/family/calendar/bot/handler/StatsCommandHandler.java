@@ -16,27 +16,28 @@ import java.util.Locale;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
- * Обработчик команды /stats для отображения статистики активных событий.
+ * Обработчик команды /stats для отображения статистики событий.
  * 
- * <p>Этот обработчик показывает статистику только активных событий семьи за текущий месяц.
- * Завершенные, удаленные и черновики исключаются из подсчета "Всего событий".</p>
+ * <p>Этот обработчик показывает статистику событий семьи за текущий месяц.
+ * "Всего событий" включает сумму активных и завершенных событий.
+ * Удаленные события и черновики исключаются из подсчета.</p>
  * 
  * <p>Отображаемая статистика:</p>
  * <ul>
- *   <li>Общее количество активных событий (статус ACTIVE)</li>
+ *   <li>Общее количество событий (активные + завершенные)</li>
  *   <li>Количество завершенных событий (статус COMPLETED)</li>
  *   <li>Количество активных событий (статус ACTIVE)</li>
- *   <li>Количество семейных активных событий</li>
- *   <li>Количество персональных активных событий пользователя</li>
+ *   <li>Количество семейных событий</li>
+ *   <li>Количество персональных событий пользователя</li>
  *   <li>Процент завершения (завершенные / (активные + завершенные))</li>
  * </ul>
  * 
- * <p><b>Требования:</b> 1.1 - статистика показывает только активные события</p>
+ * <p><b>Требования:</b> 1.1, 1.3 - статистика показывает сумму активных и завершенных событий</p>
  * 
  * @see CommandHandler
  * @see StatisticsService
  * @author Family Calendar Bot Team
- * @version 2.0.0
+ * @version 2.1.0
  * @since 2026-01-08
  */
 @Component
@@ -53,9 +54,10 @@ public class StatsCommandHandler implements CommandHandler {
     /**
      * Обрабатывает команду /stats.
      * 
-     * <p>Получает статистику только активных событий за текущий месяц и отправляет
-     * отформатированный отчет пользователю. События со статусами COMPLETED, DELETED
-     * и DRAFT исключаются из подсчета "Всего событий".</p>
+     * <p>Получает статистику событий за текущий месяц и отправляет
+     * отформатированный отчет пользователю. "Всего событий" включает сумму
+     * активных и завершенных событий. События со статусами DELETED
+     * и DRAFT исключаются из подсчета.</p>
      * 
      * @param message сообщение от пользователя с командой
      * @param user пользователь, отправивший команду
@@ -80,7 +82,7 @@ public class StatsCommandHandler implements CommandHandler {
             // Формирование сообщения со статистикой
             StringBuilder messageBuilder = new StringBuilder();
             messageBuilder.append(escape("📊 "))
-                          .append(bold("Статистика активных событий"))
+                          .append(bold("Статистика событий"))
                           .append(escape("\n"))
                           .append(italic(currentMonth.atDay(1).format(MONTH_FORMATTER)))
                           .append(escape("\n\n"));
@@ -91,7 +93,6 @@ public class StatsCommandHandler implements CommandHandler {
                           .append(escape("\n"));
             messageBuilder.append(escape("• Всего событий: "))
                           .append(bold(String.valueOf(stats.getTotalEvents())))
-                          .append(escape(" (только активные)"))
                           .append(escape("\n"));
             messageBuilder.append(escape("• Завершено: "))
                           .append(bold(String.valueOf(stats.getCompletedEvents())))
@@ -123,7 +124,7 @@ public class StatsCommandHandler implements CommandHandler {
             
             // Дополнительная информация
             if (stats.getTotalEvents() == 0) {
-                messageBuilder.append(italic("В этом месяце нет активных событий. Создайте первое событие с помощью /add_event"));
+                messageBuilder.append(italic("В этом месяце нет событий. Создайте первое событие с помощью /add_event"));
             } else if (stats.getActiveEvents() > 0) {
                 messageBuilder.append(italic(String.format("У вас %d активных событий в этом месяце", stats.getActiveEvents())));
             } else {

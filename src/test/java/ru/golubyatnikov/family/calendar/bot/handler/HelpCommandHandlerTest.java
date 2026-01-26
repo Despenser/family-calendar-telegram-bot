@@ -354,12 +354,12 @@ class HelpCommandHandlerTest {
         assertFalse(response.contains("🚀"), "Ответ НЕ должен содержать эмодзи 🚀, так как /start исключен");
         assertTrue(response.contains("📚"), "Ответ должен содержать эмодзи 📚 для /help");
         assertTrue(response.contains("➕"), "Ответ должен содержать эмодзи ➕ для /add_event");
-        assertTrue(response.contains("📋"), "Ответ должен содержать эмодзи 📋 для /my_events");
-        assertTrue(response.contains("📅"), "Ответ должен содержать эмодзи 📅 для /upcoming_events");
-        assertTrue(response.contains("📆"), "Ответ должен содержать эмодзи 📆 для /today");
-        assertTrue(response.contains("🗓️"), "Ответ должен содержать эмодзи 🗓️ для /week");
+        assertTrue(response.contains("📝"), "Ответ должен содержать эмодзи 📝 для /my_events");
+        assertTrue(response.contains("📋"), "Ответ должен содержать эмодзи 📋 для /upcoming_events");
+        assertTrue(response.contains("📅"), "Ответ должен содержать эмодзи 📅 для /today");
+        assertTrue(response.contains("📆"), "Ответ должен содержать эмодзи 📆 для /week");
         assertTrue(response.contains("🔍"), "Ответ должен содержать эмодзи 🔍 для /search");
-        assertTrue(response.contains("🔎"), "Ответ должен содержать эмодзи 🔎 для /filter");
+        assertTrue(response.contains("🫧"), "Ответ должен содержать эмодзи 🫧 для /filter");
         assertTrue(response.contains("📊"), "Ответ должен содержать эмодзи 📊 для /stats");
         assertTrue(response.contains("🗑️"), "Ответ должен содержать эмодзи 🗑️ для /trash");
         
@@ -528,18 +528,18 @@ class HelpCommandHandlerTest {
                 "/help должен иметь эмодзи 📚");
         assertTrue(response.contains("➕") && (response.contains("/add_event") || response.contains("/add\\_event")), 
                 "/add_event должен иметь эмодзи ➕");
-        assertTrue(response.contains("📋") && (response.contains("/my_events") || response.contains("/my\\_events")), 
-                "/my_events должен иметь эмодзи 📋");
-        assertTrue(response.contains("📅") && (response.contains("/upcoming_events") || response.contains("/upcoming\\_events")), 
-                "/upcoming_events должен иметь эмодзи 📅");
-        assertTrue(response.contains("📆") && response.contains("/today"), 
-                "/today должен иметь эмодзи 📆");
-        assertTrue(response.contains("🗓️") && response.contains("/week"), 
-                "/week должен иметь эмодзи 🗓️");
+        assertTrue(response.contains("📝") && (response.contains("/my_events") || response.contains("/my\\_events")), 
+                "/my_events должен иметь эмодзи 📝");
+        assertTrue(response.contains("📋") && (response.contains("/upcoming_events") || response.contains("/upcoming\\_events")), 
+                "/upcoming_events должен иметь эмодзи 📋");
+        assertTrue(response.contains("📅") && response.contains("/today"), 
+                "/today должен иметь эмодзи 📅");
+        assertTrue(response.contains("📆") && response.contains("/week"), 
+                "/week должен иметь эмодзи 📆");
         assertTrue(response.contains("🔍") && response.contains("/search"), 
                 "/search должен иметь эмодзи 🔍");
-        assertTrue(response.contains("🔎") && response.contains("/filter"), 
-                "/filter должен иметь эмодзи 🔎");
+        assertTrue(response.contains("🫧") && response.contains("/filter"), 
+                "/filter должен иметь эмодзи 🫧");
         assertTrue(response.contains("📊") && response.contains("/stats"), 
                 "/stats должен иметь эмодзи 📊");
         assertTrue(response.contains("🗑️") && response.contains("/trash"), 
@@ -698,8 +698,8 @@ class HelpCommandHandlerTest {
                 "Команда /start не должна отображаться в списке");
         assertTrue(response.contains("➕") && (response.contains("/add_event") || response.contains("/add\\_event")), 
                 "Команда /add_event должна иметь тематический эмодзи ➕");
-        assertTrue(response.contains("📋") && (response.contains("/my_events") || response.contains("/my\\_events")), 
-                "Команда /my_events должна иметь тематический эмодзи 📋");
+        assertTrue(response.contains("📝") && (response.contains("/my_events") || response.contains("/my\\_events")), 
+                "Команда /my_events должна иметь тематический эмодзи 📝");
         assertTrue(response.contains("🔍") && response.contains("/search"), 
                 "Команда /search должна иметь тематический эмодзи 🔍");
         

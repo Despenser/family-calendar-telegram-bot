@@ -22,10 +22,10 @@ import static org.mockito.Mockito.*;
  * Тесты для {@link StatsCommandHandler}.
  * 
  * <p>Проверяет корректность обработки команды /stats и форматирования
- * сообщений со статистикой только активных событий.</p>
+ * сообщений со статистикой событий (активных и завершенных).</p>
  * 
  * @author Family Calendar Bot Team
- * @version 2.0.0
+ * @version 2.1.0
  * @since 2026-01-16
  */
 @ExtendWith(MockitoExtension.class)
@@ -89,9 +89,9 @@ class StatsCommandHandlerTest {
         // Then
         assertNotNull(result);
         assertTrue(result.contains("📊"), "Должен содержать эмодзи статистики");
-        assertTrue(result.contains("Статистика активных событий"), "Должен содержать заголовок с указанием на активные события");
+        assertTrue(result.contains("Статистика событий"), "Должен содержать заголовок статистики");
         assertTrue(result.contains("Всего событий"), "Должен содержать общую статистику");
-        assertTrue(result.contains("только активные"), "Должен содержать пояснение о подсчете только активных событий");
+        assertFalse(result.contains("только активные"), "НЕ должен содержать пояснение о подсчете только активных событий");
         assertTrue(result.contains("Завершено"), "Должен содержать количество завершенных");
         assertTrue(result.contains("Активных"), "Должен содержать количество активных");
         assertTrue(result.contains("Семейные"), "Должен содержать семейные события");
@@ -131,7 +131,7 @@ class StatsCommandHandlerTest {
         
         // Then
         assertNotNull(result);
-        assertTrue(result.contains("В этом месяце нет активных событий"), 
+        assertTrue(result.contains("В этом месяце нет событий"), 
                   "Должен содержать подсказку о создании события");
         // Проверяем, что команда НЕ обернута в code-форматирование (кликабельна)
         // italic() экранирует underscore, поэтому проверяем обе версии

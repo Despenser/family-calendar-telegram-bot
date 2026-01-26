@@ -43,11 +43,11 @@ public class StatisticsService {
     /**
      * Получает статистику по событиям семьи за указанный месяц.
      * 
-     * <p>Подсчитывает различные метрики только для активных событий:
-     * общее количество активных событий, завершенные события,
-     * семейные и персональные активные события.
+     * <p>Подсчитывает различные метрики по событиям:
+     * общее количество событий (активные + завершенные), активные события,
+     * завершенные события, семейные и персональные активные события.
      * Включает семейные события и персональные события пользователя.
-     * Исключает из подсчета события со статусами COMPLETED, DELETED и DRAFT.</p>
+     * Исключает из подсчета события со статусами DELETED и DRAFT.</p>
      * 
      * @param familyId идентификатор семьи
      * @param userId идентификатор пользователя
@@ -69,18 +69,18 @@ public class StatisticsService {
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
         
-        // Подсчет только активных событий за месяц (исключая COMPLETED, DELETED, DRAFT)
-        long totalEvents = eventRepository.countByFamilyIdAndEventDateBetweenAndStatus(
+        // Подсчет активных событий за месяц (исключая COMPLETED, DELETED, DRAFT)
+        long activeEvents = eventRepository.countByFamilyIdAndEventDateBetweenAndStatus(
             familyId, startDate, endDate, Event.EventStatus.ACTIVE
         );
-        
-        // Подсчет активных событий (для обратной совместимости, равен totalEvents)
-        long activeEvents = totalEvents;
         
         // Подсчет завершенных событий
         long completedEvents = eventRepository.countByFamilyIdAndEventDateBetweenAndStatus(
             familyId, startDate, endDate, Event.EventStatus.COMPLETED
         );
+        
+        // Общее количество событий = активные + завершенные
+        long totalEvents = activeEvents + completedEvents;
         
         // Подсчет семейных активных событий
         long familyEvents = eventRepository.countByUserIdAndEventDateBetweenAndIsPersonalAndStatus(
@@ -107,8 +107,8 @@ public class StatisticsService {
             .recurringEvents(recurringEvents)
             .build();
         
-        log.info("Статистика для семьи ID {} и пользователя ID {} за {}/{}: всего активных={}, завершенных={}", 
-                 familyId, userId, month, year, totalEvents, completedEvents);
+        log.info("Статистика для семьи ID {} и пользователя ID {} за {}/{}: всего={}, активных={}, завершенных={}", 
+                 familyId, userId, month, year, totalEvents, activeEvents, completedEvents);
         
         return statistics;
     }
@@ -136,7 +136,7 @@ public class StatisticsService {
         private int month;
         
         /**
-         * Общее количество событий за период
+         * Общее количество событий за период (активные + завершенные)
          */
         private long totalEvents;
         

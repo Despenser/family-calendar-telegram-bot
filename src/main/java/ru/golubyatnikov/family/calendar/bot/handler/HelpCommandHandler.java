@@ -76,24 +76,24 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * 
  * *Доступные команды:*
  * 
- * *📅 Просмотр событий*
- * 📆 /today - Показать события на сегодня
- * 🗓️ /week - Показать события на неделю (7 дней)
- * 📅 /upcoming_events - Показать планы на 30 дней
+ * *Просмотр событий*
+ * 📅 /today - Показать события на сегодня
+ * 📆 /week - Показать события на неделю (7 дней)
+ * 📋 /upcoming_events - Показать планы на 30 дней
  * 
- * *➕ Управление событиями*
+ * *Управление событиями*
  * ➕ /add_event - Добавить новое событие в календарь
- * 📋 /my_events - Управление моими событиями
+ * 📝 /my_events - Управление моими событиями
  * 
- * *🔍 Поиск и фильтрация*
- * 🔎 /filter - Фильтрация событий по типу
+ * *Поиск и фильтрация*
+ * 🫧 /filter - Фильтрация событий по типу
  * 🔍 /search - Поиск событий по тексту
  * 
- * *📊 Статистика и корзина*
+ * *Статистика и корзина*
  * 📊 /stats - Статистика событий за месяц
  * 🗑️ /trash - Корзина удаленных событий
  * 
- * *ℹ️ Справка*
+ * *Справка*
  * 📚 /help - Показать список всех команд
  * 
  * Для использования команды просто отправьте её в чат.
@@ -227,12 +227,12 @@ public class HelpCommandHandler implements CommandHandler {
      *   <li>🚀 /start - начало работы, запуск</li>
      *   <li>📚 /help - справка, документация</li>
      *   <li>➕ /add_event - добавление нового элемента</li>
-     *   <li>📋 /my_events - список, управление</li>
-     *   <li>📅 /upcoming_events - календарь, предстоящие события</li>
-     *   <li>📆 /today - сегодняшний день</li>
-     *   <li>🗓️ /week - неделя</li>
+     *   <li>📝 /my_events - список, управление</li>
+     *   <li>📋 /upcoming_events - календарь, предстоящие события</li>
+     *   <li>📅 /today - сегодняшний день</li>
+     *   <li>📆 /week - неделя</li>
      *   <li>🔍 /search - поиск</li>
-     *   <li>🔎 /filter - фильтрация</li>
+     *   <li>🫧 /filter - фильтрация</li>
      *   <li>📊 /stats - статистика, аналитика</li>
      *   <li>🗑️ /trash - корзина, удаленные элементы</li>
      * </ul>
@@ -245,12 +245,12 @@ public class HelpCommandHandler implements CommandHandler {
             Map.entry("/start", "🚀"),
             Map.entry("/help", "📚"),
             Map.entry("/add_event", "➕"),
-            Map.entry("/my_events", "📋"),
-            Map.entry("/upcoming_events", "📅"),
-            Map.entry("/today", "🗓️"),
+            Map.entry("/my_events", "📝"),
+            Map.entry("/upcoming_events", "📋"),
+            Map.entry("/today", "📅"),
             Map.entry("/week", "📆"),
             Map.entry("/search", "🔍"),
-            Map.entry("/filter", "🔎"),
+            Map.entry("/filter", "🫧"),
             Map.entry("/stats", "📊"),
             Map.entry("/trash", "🗑️")
     );
@@ -423,51 +423,106 @@ public class HelpCommandHandler implements CommandHandler {
             }
             result.append(bold(getCategoryName(category))).append("\n");
 
-            // Добавляем команды категории, отсортированные по алфавиту
-            String categoryCommands = handlers.stream()
-                    .sorted(Comparator.comparing(CommandHandler::getCommand))
-                    .map(handler -> {
-                        try {
-                            String emoji;
+            // Добавляем команды категории
+            // Для категории VIEW_EVENTS используем кастомный порядок, для остальных - алфавитный
+            String categoryCommands;
+            if (category == CommandCategory.VIEW_EVENTS) {
+                // Кастомный порядок для просмотра событий: today, week, upcoming_events
+                List<String> viewEventsOrder = List.of("/today", "/week", "/upcoming_events");
+                categoryCommands = handlers.stream()
+                        .sorted(Comparator.comparingInt(handler -> {
+                            int index = viewEventsOrder.indexOf(handler.getCommand());
+                            return index == -1 ? Integer.MAX_VALUE : index;
+                        }))
+                        .map(handler -> {
+                            try {
+                                String emoji;
 
-                            if (!isAuthorized && handler.requiresAuth()) {
-                                // Для неавторизованных пользователей: эмодзи замка для команд с авторизацией
-                                emoji = "🔒 ";
-                            } else if (isAuthorized) {
-                                // Для авторизованных пользователей: тематические эмодзи
-                                String thematicEmoji = getCommandEmoji(handler.getCommand());
-                                emoji = thematicEmoji.isEmpty() ? "" : thematicEmoji + " ";
-                            } else {
-                                // Для команд, не требующих авторизации у неавторизованных пользователей
-                                emoji = "";
-                            }
+                                if (!isAuthorized && handler.requiresAuth()) {
+                                    // Для неавторизованных пользователей: эмодзи замка для команд с авторизацией
+                                    emoji = "🔒 ";
+                                } else if (isAuthorized) {
+                                    // Для авторизованных пользователей: тематические эмодзи
+                                    String thematicEmoji = getCommandEmoji(handler.getCommand());
+                                    emoji = thematicEmoji.isEmpty() ? "" : thematicEmoji + " ";
+                                } else {
+                                    // Для команд, не требующих авторизации у неавторизованных пользователей
+                                    emoji = "";
+                                }
 
-                            // Команды экранируем полностью, чтобы избежать проблем с MarkdownV2
-                            // Символы подчеркивания в командах типа /add_event могут интерпретироваться как курсив
-                            String command = handler.getCommand();
-                            String description = handler.getDescription();
-                            
-                            // Проверка на null значения
-                            if (command == null) {
-                                log.warn("Обработчик {} имеет null команду. Пропускаем.", 
-                                        handler.getClass().getSimpleName());
+                                // Команды экранируем полностью, чтобы избежать проблем с MarkdownV2
+                                // Символы подчеркивания в командах типа /add_event могут интерпретироваться как курсив
+                                String command = handler.getCommand();
+                                String description = handler.getDescription();
+                                
+                                // Проверка на null значения
+                                if (command == null) {
+                                    log.warn("Обработчик {} имеет null команду. Пропускаем.", 
+                                            handler.getClass().getSimpleName());
+                                    return null;
+                                }
+                                
+                                if (description == null) {
+                                    log.warn("Команда {} имеет null описание. Используется fallback описание.", command);
+                                    description = "Описание недоступно";
+                                }
+                                
+                                return emoji + escape(command) + " " + escape("-") + " " + escape(description);
+                            } catch (Exception e) {
+                                log.error("Ошибка при форматировании команды {}: {}", 
+                                        handler.getCommand(), e.getMessage(), e);
                                 return null;
                             }
-                            
-                            if (description == null) {
-                                log.warn("Команда {} имеет null описание. Используется fallback описание.", command);
-                                description = "Описание недоступно";
+                        })
+                        .filter(cmd -> cmd != null) // Фильтруем null значения после обработки ошибок
+                        .collect(Collectors.joining("\n"));
+            } else {
+                // Алфавитный порядок для остальных категорий
+                categoryCommands = handlers.stream()
+                        .sorted(Comparator.comparing(CommandHandler::getCommand))
+                        .map(handler -> {
+                            try {
+                                String emoji;
+
+                                if (!isAuthorized && handler.requiresAuth()) {
+                                    // Для неавторизованных пользователей: эмодзи замка для команд с авторизацией
+                                    emoji = "🔒 ";
+                                } else if (isAuthorized) {
+                                    // Для авторизованных пользователей: тематические эмодзи
+                                    String thematicEmoji = getCommandEmoji(handler.getCommand());
+                                    emoji = thematicEmoji.isEmpty() ? "" : thematicEmoji + " ";
+                                } else {
+                                    // Для команд, не требующих авторизации у неавторизованных пользователей
+                                    emoji = "";
+                                }
+
+                                // Команды экранируем полностью, чтобы избежать проблем с MarkdownV2
+                                // Символы подчеркивания в командах типа /add_event могут интерпретироваться как курсив
+                                String command = handler.getCommand();
+                                String description = handler.getDescription();
+                                
+                                // Проверка на null значения
+                                if (command == null) {
+                                    log.warn("Обработчик {} имеет null команду. Пропускаем.", 
+                                            handler.getClass().getSimpleName());
+                                    return null;
+                                }
+                                
+                                if (description == null) {
+                                    log.warn("Команда {} имеет null описание. Используется fallback описание.", command);
+                                    description = "Описание недоступно";
+                                }
+                                
+                                return emoji + escape(command) + " " + escape("-") + " " + escape(description);
+                            } catch (Exception e) {
+                                log.error("Ошибка при форматировании команды {}: {}", 
+                                        handler.getCommand(), e.getMessage(), e);
+                                return null;
                             }
-                            
-                            return emoji + escape(command) + " " + escape("-") + " " + escape(description);
-                        } catch (Exception e) {
-                            log.error("Ошибка при форматировании команды {}: {}", 
-                                    handler.getCommand(), e.getMessage(), e);
-                            return null;
-                        }
-                    })
-                    .filter(cmd -> cmd != null) // Фильтруем null значения после обработки ошибок
-                    .collect(Collectors.joining("\n"));
+                        })
+                        .filter(cmd -> cmd != null) // Фильтруем null значения после обработки ошибок
+                        .collect(Collectors.joining("\n"));
+            }
 
             result.append(categoryCommands).append("\n");
         }
@@ -636,12 +691,12 @@ public class HelpCommandHandler implements CommandHandler {
      *   <li>/start - 🚀 (начало работы, запуск)</li>
      *   <li>/help - 📚 (справка, документация)</li>
      *   <li>/add_event - ➕ (добавление нового элемента)</li>
-     *   <li>/my_events - 📋 (список, управление)</li>
-     *   <li>/upcoming_events - 📅 (календарь, предстоящие события)</li>
-     *   <li>/today - 📆 (сегодняшний день)</li>
-     *   <li>/week - 🗓️ (неделя)</li>
+     *   <li>/my_events - 📝 (список, управление)</li>
+     *   <li>/upcoming_events - 📋 (календарь, предстоящие события)</li>
+     *   <li>/today - 📅 (сегодняшний день)</li>
+     *   <li>/week - 📆 (неделя)</li>
      *   <li>/search - 🔍 (поиск)</li>
-     *   <li>/filter - 🔎 (фильтрация)</li>
+     *   <li>/filter - 🫧 (фильтрация)</li>
      *   <li>/stats - 📊 (статистика, аналитика)</li>
      *   <li>/trash - 🗑️ (корзина, удаленные элементы)</li>
      * </ul>
