@@ -281,7 +281,7 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
             // Сообщение об отсутствии результатов
             messageBuilder.append(escape("По запросу \"")).append(escape(query)).append(escape("\" ничего не найдено.")).append("\n\n");
             messageBuilder.append(italic("Попробуйте изменить запрос или использовать другие ключевые слова.")).append("\n\n");
-            messageBuilder.append(escape("Вы можете использовать ")).append(escape("/today")).append(escape(" или ")).append(escape("/week"))
+            messageBuilder.append(escape("Вы можете использовать ")).append("📅 ").append(escape("/today")).append(escape(" или ")).append("📆 ").append(escape("/week"))
                          .append(escape(" для просмотра событий."));
         } else {
             // Форматирование событий с использованием EventFormatter.formatSearchResult()
@@ -386,7 +386,7 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
             try {
                 messageService.answerCallbackQuery(
                     callbackQuery.getId(), 
-                    "❌ Произошла ошибка. Попробуйте использовать команду /search заново."
+                    "❌ Произошла ошибка. Попробуйте использовать команду 🔍 " + escape("/search") + " заново."
                 );
             } catch (Exception ex) {
                 log.error("Ошибка при отправке ответа на callback query: {}", ex.getMessage(), ex);

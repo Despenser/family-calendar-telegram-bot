@@ -139,7 +139,7 @@ public class CommandDispatcher {
         if (!message.hasText()) {
             log.warn("Получено сообщение без текста от пользователя: telegramId={}, chatId={}", 
                     message.getFrom().getId(), message.getChatId());
-            return MarkdownFormatter.formatMessage("Пожалуйста, отправьте текстовую команду. Используйте /help для списка доступных команд.");
+            return MarkdownFormatter.formatMessage("Пожалуйста, отправьте текстовую команду. Используйте 📚 /help для списка доступных команд.");
         }
         
         String messageText = message.getText().trim();
@@ -153,7 +153,7 @@ public class CommandDispatcher {
         
         if (command == null) {
             log.warn("Не удалось извлечь команду из текста, telegramId={}", telegramId);
-            return MarkdownFormatter.formatMessage("Команда должна начинаться с символа '/'. Используйте /help для списка доступных команд.");
+            return MarkdownFormatter.formatMessage("Команда должна начинаться с символа '/'. Используйте 📚 /help для списка доступных команд.");
         }
         
         log.debug("Извлечена команда: '{}', telegramId={}", command, telegramId);
@@ -163,7 +163,7 @@ public class CommandDispatcher {
         
         if (handler == null) {
             log.warn("Обработчик не найден для команды: '{}', telegramId={}", command, telegramId);
-            return MarkdownFormatter.formatMessage("Неизвестная команда: %s\n\nИспользуйте /help для списка доступных команд.", command);
+            return MarkdownFormatter.formatMessage("Неизвестная команда: %s\n\nИспользуйте 📚 /help для списка доступных команд.", command);
         }
         
         log.debug("Найден обработчик для команды '{}': {}, requiresAuth={}", 
@@ -183,7 +183,7 @@ public class CommandDispatcher {
                 log.warn("Неавторизованная попытка выполнить команду '{}': telegramId={}", 
                         command, telegramId);
                 throw new UnauthorizedAccessException(
-                        MarkdownFormatter.formatMessage("Команда %s требует авторизации. Пожалуйста, используйте /start для регистрации.", command));
+                        MarkdownFormatter.formatMessage("Команда %s требует авторизации. Пожалуйста, используйте 🚀 /start для регистрации.", command));
             }
             
             log.debug("Пользователь авторизован: telegramId={}, userId={}, familyId={}", 

@@ -299,11 +299,13 @@ public class ConversationStateService {
      * @param userId идентификатор пользователя
      * @param eventId идентификатор завершенного события
      * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для редактирования
      */
-    public void setAwaitingCompletionNote(Long userId, Long eventId, Long chatId) {
-        CompletionNoteContext context = new CompletionNoteContext(eventId, chatId);
+    public void setAwaitingCompletionNote(Long userId, Long eventId, Long chatId, Integer messageId) {
+        CompletionNoteContext context = new CompletionNoteContext(eventId, chatId, messageId);
         usersAwaitingCompletionNote.put(userId, context);
-        log.info("Пользователь ID={} переведен в режим ожидания заметки для события ID={}", userId, eventId);
+        log.info("Пользователь ID={} переведен в режим ожидания заметки для события ID={}, messageId={}", 
+                userId, eventId, messageId);
     }
     
     /**
@@ -704,7 +706,7 @@ public class ConversationStateService {
     
     /**
      * Контекст добавления заметки к завершенному событию.
-     * Содержит информацию о событии и чате.
+     * Содержит информацию о событии, чате и сообщении для редактирования.
      */
     @Data
     @AllArgsConstructor
@@ -718,6 +720,12 @@ public class ConversationStateService {
          * Идентификатор чата
          */
         private Long chatId;
+        
+        /**
+         * Идентификатор сообщения для редактирования.
+         * Используется для обновления того же сообщения на всех этапах добавления заметки.
+         */
+        private Integer messageId;
     }
     
     /**

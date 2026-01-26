@@ -476,7 +476,7 @@ class HelpCommandHandlerTest {
                 "Команда /start не должна отображаться в списке");
         assertTrue(response.contains("➕ /add\\_event") || response.contains("➕ /add_event") || response.contains("➕ \\/add"), 
                 "Команда /add_event должна иметь тематический эмодзи ➕");
-        assertTrue(response.contains("📋 /my\\_events") || response.contains("📋 /my_events") || response.contains("📋 \\/my"), 
+        assertTrue(response.contains("📝 /my\\_events") || response.contains("📋 /my_events") || response.contains("📋 \\/my"), 
                 "Команда /my_events должна иметь тематический эмодзи 📋");
         assertTrue(response.contains("🔍 /search") || response.contains("🔍 \\/search"), 
                 "Команда /search должна иметь тематический эмодзи 🔍");

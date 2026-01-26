@@ -371,9 +371,9 @@ public class MyEventsCommandHandler implements CommandHandler {
      */
     private String buildNoEventsMessage() {
         StringBuilder message = new StringBuilder();
-        message.append("📋 ").append(bold("Мои события")).append("\n\n");
+        message.append("📝 ").append(bold("Мои события")).append("\n\n");
         message.append(escape("У вас пока нет созданных событий.\n\n"));
-        message.append(escape("Используйте ")).append(escape("/add_event")).append(escape(" для добавления нового события."));
+        message.append(escape("Используйте ")).append(escape("➕ /add_event")).append(escape(" для добавления нового события."));
         return message.toString();
     }
 

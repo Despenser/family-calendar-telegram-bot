@@ -442,7 +442,7 @@ public class UpdateProcessor {
                     conversationService.cancelEventCreation(user.getId());
                     
                     String response = "❌ " + bold("Произошла ошибка") + "\\. " + 
-                                    italic("Попробуйте начать заново с команды /add_event");
+                                    italic("Попробуйте начать заново с команды ➕ " + escape("/add_event"));
                     ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
                     messageService.sendMessage(chatId, response, keyboard);
                 }
@@ -454,7 +454,7 @@ public class UpdateProcessor {
             
             try {
                 String response = "❌ " + bold("Произошла ошибка") + "\\. " + 
-                                italic("Попробуйте начать заново с команды /add_event");
+                                italic("Попробуйте начать заново с команды ➕ " + escape("/add_event"));
                 ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
                 messageService.sendMessage(message.getChatId(), response, keyboard);
             } catch (Exception ex) {
@@ -478,7 +478,7 @@ public class UpdateProcessor {
             if (userOptional.isEmpty()) {
                 log.warn("Неавторизованный пользователь пытается отправить файл: telegramId={}", telegramId);
                 messageService.sendMessage(chatId, 
-                    "❌ Для отправки файлов необходимо авторизоваться. Используйте " + escape("/start"));
+                    "❌ Для отправки файлов необходимо авторизоваться. Используйте 🚀 " + escape("/start"));
                 return;
             }
             
@@ -494,7 +494,7 @@ public class UpdateProcessor {
                 log.debug("Пользователь отправил файл без активного черновика: userId={}, telegramId={}", 
                         user.getId(), telegramId);
                 messageService.sendMessage(chatId, 
-                    "❌ Для прикрепления файлов сначала создайте событие с помощью /add_event");
+                    "❌ Для прикрепления файлов сначала создайте событие с помощью ➕ " + escape("/add_event"));
                 return;
             }
             
@@ -884,7 +884,7 @@ public class UpdateProcessor {
                               .append("• `Событие: Встреча Дата: 15.01.2026 Время: 14:30`\n")
                               .append("• `Встреча 15.01.2026 14:30`\n")
                               .append("• `Встреча завтра в 14:30`\n\n")
-                              .append("Или используйте команду /add_event для пошагового создания.");
+                              .append("Или используйте команду ➕ /add_event для пошагового создания.");
                 
                 String response = formatMessage(responseBuilder.toString());
                 ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
@@ -913,7 +913,7 @@ public class UpdateProcessor {
             
             try {
                 String response = bold("❌ Произошла ошибка при распознавании события") + ".\n\n" +
-                        italic("Используйте команду /add_event для пошагового создания.");
+                        italic("Используйте команду ➕ " + escape("/add_event") + " для пошагового создания.");
                 ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
                 messageService.sendMessage(message.getChatId(), response, keyboard);
             } catch (Exception ex) {
@@ -997,14 +997,42 @@ public class UpdateProcessor {
     /**
      * Обрабатывает ввод заметки к завершенному событию.
      * 
-     * <p>Метод выполняет следующие действия:</p>
+     * <p>Этот метод вызывается, когда пользователь находится в режиме ожидания ввода заметки
+     * к завершенному событию. Заметка добавляется к событию и сохраняется в базе данных.</p>
+     * 
+     * <p><b>Изменения в версии 2.0:</b></p>
+     * <ul>
+     *   <li>Редактирование существующего сообщения вместо отправки нового</li>
+     *   <li>Использование messageId из контекста для редактирования</li>
+     *   <li>Удаление сообщения пользователя с текстом заметки</li>
+     *   <li>Улучшенная обработка ошибок с fallback на новое сообщение</li>
+     * </ul>
+     * 
+     * <p><b>Процесс обработки:</b></p>
      * <ol>
-     *   <li>Получает контекст добавления заметки из ConversationStateService</li>
-     *   <li>Извлекает текст заметки из параметра noteText</li>
-     *   <li>Вызывает EventService.addCompletionNote() для сохранения заметки</li>
-     *   <li>Отправляет подтверждающее сообщение</li>
+     *   <li>Получает контекст добавления заметки (включая messageId)</li>
+     *   <li>Удаляет сообщение пользователя с текстом заметки</li>
+     *   <li>Добавляет заметку к событию</li>
+     *   <li>Редактирует сообщение с финальной карточкой события</li>
      *   <li>Очищает состояние ожидания заметки</li>
+     *   <li>Обновляет шапку /my_events после завершения процесса</li>
      * </ol>
+     * 
+     * <p><b>Важно:</b> Обновление шапки /my_events происходит ПОСЛЕ полного завершения процесса
+     * добавления заметки. Это гарантирует правильную последовательность сообщений:</p>
+     * <ol>
+     *   <li>Карточка завершенного события с заметкой</li>
+     *   <li>Сообщение "У вас пока нет созданных событий" (если список активных событий пуст)</li>
+     * </ol>
+     * 
+     * <p><b>Реализуемые требования:</b></p>
+     * <ul>
+     *   <li><b>1.3:</b> Редактирование сообщения с финальной карточкой события</li>
+     *   <li><b>2.2:</b> Сохранение заметки и обновление отображения события</li>
+     *   <li><b>2.3:</b> Обновление шапки /my_events после добавления заметки</li>
+     *   <li><b>3.3:</b> Очистка контекста после добавления заметки</li>
+     *   <li><b>3.4:</b> Обработка ошибок (отсутствие контекста, события не найдено)</li>
+     * </ul>
      * 
      * @param message сообщение с текстом заметки
      * @param user пользователь, добавляющий заметку
@@ -1015,6 +1043,7 @@ public class UpdateProcessor {
             Long chatId = message.getChatId();
             Long userId = user.getId();
             Long telegramId = user.getTelegramId();
+            Integer userMessageId = message.getMessageId();
             
             log.debug("Обработка заметки к завершенному событию от пользователя: userId={}, telegramId={}", 
                     userId, telegramId);
@@ -1028,7 +1057,7 @@ public class UpdateProcessor {
                 conversationStateService.clearAwaitingCompletionNote(userId);
                 
                 String response = formatMessage(
-                    "❌ Произошла ошибка. Попробуйте завершить событие заново."
+                    "❌ Время ожидания истекло. Попробуйте завершить событие заново."
                 );
                 ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
                 messageService.sendMessage(chatId, response, keyboard);
@@ -1036,37 +1065,57 @@ public class UpdateProcessor {
             }
             
             Long eventId = context.getEventId();
+            Integer messageId = context.getMessageId();
+            
+            // Удаляем сообщение пользователя с текстом заметки
+            messageService.deleteMessageSilently(chatId, userMessageId);
+            log.debug("Сообщение пользователя с заметкой удалено: chatId={}, messageId={}, userId={}", 
+                    chatId, userMessageId, userId);
             
             // Добавляем заметку к событию
             ru.golubyatnikov.family.calendar.bot.model.Event event = 
                 eventService.addCompletionNote(eventId, userId, noteText);
             
-            log.info("Заметка успешно добавлена к событию ID={} пользователем ID={}", 
-                    eventId, userId);
+            log.info("Заметка успешно добавлена к завершенному событию ID={} пользователем ID={}: noteLength={}", 
+                    eventId, userId, noteText != null ? noteText.length() : 0);
             
-            // Обновляем сообщение о событии с заметкой
-            try {
-                eventService.sendOrUpdateEventMessage(event, chatId);
-                log.debug("Сообщение о событии с заметкой обновлено: eventId={}", eventId);
-            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
-                log.warn("Не удалось обновить сообщение о событии с заметкой: eventId={}, error={}", 
-                        eventId, e.getMessage());
-                // Продолжаем выполнение, даже если обновление сообщения не удалось
+            // Редактируем сообщение с финальной карточкой события
+            if (messageId != null) {
+                try {
+                    String eventMessage = botMessageBuilder.buildCompletedEventMessage(event);
+                    messageService.editMessageText(chatId, messageId, eventMessage, null);
+                    
+                    log.debug("Сообщение отредактировано с финальной карточкой события: chatId={}, messageId={}, eventId={}", 
+                            chatId, messageId, eventId);
+                    
+                } catch (TelegramApiException e) {
+                    log.warn("Не удалось отредактировать сообщение, отправка нового (fallback): chatId={}, messageId={}, error={}", 
+                            chatId, messageId, e.getMessage());
+                    
+                    // Fallback: отправляем новое сообщение
+                    String eventMessage = botMessageBuilder.buildCompletedEventMessage(event);
+                    messageService.sendMessage(chatId, eventMessage);
+                }
+            } else {
+                log.warn("messageId отсутствует в контексте, отправка нового сообщения: userId={}", userId);
+                
+                // Fallback: отправляем новое сообщение
+                String eventMessage = botMessageBuilder.buildCompletedEventMessage(event);
+                messageService.sendMessage(chatId, eventMessage);
             }
             
             // Очищаем состояние ожидания заметки
             conversationStateService.clearAwaitingCompletionNote(userId);
+            log.debug("Контекст добавления заметки очищен: userId={}", userId);
             
-            // Отправляем подтверждающее сообщение
-            String response = formatMessage(
-                "✅ Заметка успешно добавлена к событию \"%s\"!\n\n" +
-                "📝 Заметка: %s",
-                event.getTitle(),
-                noteText
-            );
-            
-            ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
-            messageService.sendMessage(chatId, response, keyboard);
+            // Обновляем шапку /my_events ПОСЛЕ завершения процесса добавления заметки
+            // Это гарантирует правильную последовательность сообщений:
+            // 1. Карточка завершенного события с заметкой
+            // 2. Сообщение "У вас пока нет созданных событий" (если список активных событий пуст)
+            // Требования: 2.2, 2.3
+            eventService.updateMyEventsHeaderAfterRemoval(userId);
+            log.info("Шапка /my_events обновлена после добавления заметки к событию ID={}: userId={}", 
+                    eventId, userId);
             
         } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
             log.error("Событие не найдено при добавлении заметки: userId={}, error={}", 
@@ -1166,7 +1215,7 @@ public class UpdateProcessor {
                         : keyboardService.createUnauthorizedUserKeyboard();
                 
                 String response = formatMessage(
-                        "Команда должна начинаться с символа '/'. Используйте /help для списка доступных команд.");
+                        "Команда должна начинаться с символа '/'. Используйте 📚 " + escape("/help") + " для списка доступных команд.");
                 messageService.sendMessage(chatId, response, keyboard);
             } catch (Exception e) {
                 log.error("Ошибка при отправке сообщения об ошибке: {}", e.getMessage(), e);
@@ -1185,8 +1234,8 @@ public class UpdateProcessor {
                         ? keyboardService.createAuthorizedUserKeyboard()
                         : keyboardService.createUnauthorizedUserKeyboard();
                 
-                String response = formatMessage("Неизвестная команда: %s\n\nИспользуйте %s для списка доступных команд.", 
-                                              commandText, "/help");
+                String response = formatMessage("Неизвестная команда: %s\n\nИспользуйте 📚 %s для списка доступных команд.", 
+                                              commandText, escape("/help"));
                 messageService.sendMessage(chatId, response, keyboard);
             } catch (Exception e) {
                 log.error("Ошибка при отправке сообщения об ошибке: {}", e.getMessage(), e);

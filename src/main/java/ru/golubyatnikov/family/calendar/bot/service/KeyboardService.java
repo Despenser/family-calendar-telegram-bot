@@ -9,6 +9,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import ru.golubyatnikov.family.calendar.bot.model.Attachment;
+import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 
@@ -1856,6 +1857,65 @@ public class KeyboardService {
         
         log.debug("Inline клавиатура для загрузки вложения создана: eventId={}, cancelCallback='{}'", 
                 eventId, cancelCallbackData);
+        
+        return keyboard;
+    }
+    
+    /**
+     * Создает inline клавиатуру для добавления заметки к завершённому событию.
+     * 
+     * <p>Клавиатура содержит две кнопки:</p>
+     * <ul>
+     *   <li>📝 Добавить заметку - переводит пользователя в режим ввода заметки</li>
+     *   <li>⏭️ Пропустить - пропускает добавление заметки</li>
+     * </ul>
+     * 
+     * <p>Callback data формируется в формате:</p>
+     * <ul>
+     *   <li>"add_completion_note_{eventId}" - для кнопки добавления заметки</li>
+     *   <li>"skip_completion_note_" - для кнопки пропуска</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 4.2</p>
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup с кнопками для работы с заметкой
+     * @throws IllegalArgumentException если eventId равен null или не является положительным числом
+     */
+    public InlineKeyboardMarkup createCompletionNoteKeyboard(Long eventId) {
+        // Валидация eventId
+        if (eventId == null) {
+            log.error("Попытка создать клавиатуру заметки о завершении с null eventId");
+            throw new IllegalArgumentException("EventId не может быть null");
+        }
+        
+        if (eventId <= 0) {
+            log.error("Попытка создать клавиатуру заметки о завершении с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом, получено: " + eventId);
+        }
+        
+        log.debug("Создание inline клавиатуры для добавления заметки к завершённому событию ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Первая строка: кнопка "Добавить заметку"
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton addNoteButton = new InlineKeyboardButton("📝 Добавить заметку");
+        addNoteButton.setCallbackData(CallbackPrefix.ADD_COMPLETION_NOTE.withPayload(eventId.toString()));
+        row1.add(addNoteButton);
+        rows.add(row1);
+        
+        // Вторая строка: кнопка "Пропустить"
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton skipButton = new InlineKeyboardButton("⏭️ Пропустить");
+        skipButton.setCallbackData(CallbackPrefix.SKIP_COMPLETION_NOTE.withPayload(""));
+        row2.add(skipButton);
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline клавиатура для добавления заметки создана: eventId={}", eventId);
         
         return keyboard;
     }

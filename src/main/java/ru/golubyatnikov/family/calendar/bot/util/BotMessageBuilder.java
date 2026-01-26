@@ -442,6 +442,81 @@ public class BotMessageBuilder {
         return messageText;
     }
     
+    // ===== Сообщения о завершении события =====
+    
+    /**
+     * Формирует сообщение о завершенном событии с предложением добавить заметку.
+     * 
+     * <p>Сообщение включает:</p>
+     * <ul>
+     *   <li>Заголовок "✅ Событие завершено!" (выделено жирным)</li>
+     *   <li>Карточку события с использованием {@link #buildEventMessage(Event)}</li>
+     *   <li>Предложение добавить заметку о том, как прошло событие</li>
+     * </ul>
+     * 
+     * <p>Используется при ручном завершении события пользователем через кнопку "✅ Завершить".
+     * После отображения этого сообщения пользователю предлагаются кнопки "📝 Добавить заметку"
+     * и "⏭️ Пропустить".</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 2.1</p>
+     * 
+     * @param event завершенное событие
+     * @return отформатированное сообщение с использованием MarkdownV2
+     * @throws IllegalArgumentException если event равен null
+     */
+    public String buildCompletionMessage(Event event) {
+        if (event == null) {
+            throw new IllegalArgumentException("Event не может быть null");
+        }
+        
+        StringBuilder message = new StringBuilder();
+        message.append("✅ ").append(bold("Событие завершено!")).append("\n\n");
+        message.append(buildEventMessage(event));
+        message.append("\n\n").append(escape("Хотите добавить заметку о том, как прошло событие?"));
+        
+        return message.toString();
+    }
+    
+    /**
+     * Формирует сообщение о завершенном событии с заметкой.
+     * 
+     * <p>Сообщение включает:</p>
+     * <ul>
+     *   <li>Заголовок "✅ Событие завершено" (выделено жирным)</li>
+     *   <li>Карточку события с использованием {@link #buildEventMessage(Event)}</li>
+     *   <li>Секцию заметки с эмодзи "📝" (если заметка присутствует)</li>
+     * </ul>
+     * 
+     * <p>Текст заметки корректно экранируется для Telegram MarkdownV2 с помощью
+     * метода {@link MarkdownFormatter#escape(String)}.</p>
+     * 
+     * <p>Используется для финального отображения завершенного события после того,
+     * как пользователь добавил заметку или пропустил её добавление.</p>
+     * 
+     * <p><b>Требования:</b> 4.1, 4.2, 4.3, 4.4</p>
+     * 
+     * @param event завершенное событие (может содержать заметку или нет)
+     * @return отформатированное сообщение с использованием MarkdownV2
+     * @throws IllegalArgumentException если event равен null
+     */
+    public String buildCompletedEventMessage(Event event) {
+        if (event == null) {
+            throw new IllegalArgumentException("Event не может быть null");
+        }
+        
+        StringBuilder message = new StringBuilder();
+        message.append("✅ ").append(bold("Событие завершено")).append("\n\n");
+        message.append(buildEventMessage(event));
+        
+        // Добавляем секцию заметки, если она присутствует
+        if (event.getCompletionNote() != null && !event.getCompletionNote().isBlank()) {
+            message.append("\n\n📝 ").append(bold("Заметка:")).append("\n");
+            message.append(escape(event.getCompletionNote()));
+        }
+        
+        return message.toString();
+    }
+    
     // ===== Вспомогательные методы =====
     
     /**

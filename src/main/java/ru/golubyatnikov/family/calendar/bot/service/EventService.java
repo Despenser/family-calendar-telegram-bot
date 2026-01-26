@@ -659,6 +659,293 @@ public class EventService {
     }
     
     /**
+     * Завершает событие вручную без удаления сообщения.
+     * 
+     * <p>Этот метод используется при ручном завершении события с последующим
+     * предложением добавить заметку. В отличие от {@link #completeEvent(Long, Long)},
+     * данный метод НЕ удаляет сообщение события и НЕ сбрасывает messageId,
+     * что позволяет редактировать сообщение на последующих этапах.</p>
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Проверяет существование события</li>
+     *   <li>Проверяет права доступа (только создатель может завершить)</li>
+     *   <li>Проверяет статус события (должно быть ACTIVE)</li>
+     *   <li>Изменяет статус на COMPLETED</li>
+     *   <li>Сбрасывает isMyEventsHeader (событие больше не в списке активных)</li>
+     *   <li>Устанавливает completedAt в текущее время</li>
+     *   <li>Записывает действие в историю изменений</li>
+     *   <li>Отмечает все неотправленные напоминания как отправленные</li>
+     *   <li>Обновляет шапку /my_events</li>
+     * </ol>
+     * 
+     * <p><b>Важно:</b> messageId события НЕ сбрасывается, сообщение НЕ удаляется.
+     * Это позволяет редактировать сообщение для отображения статуса завершения
+     * и предложения добавить заметку.</p>
+     * 
+     * <p><b>Требования:</b> 2.1, 5.2</p>
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя, завершающего событие
+     * @return завершенное событие с сохраненным messageId
+     * @throws EventNotFoundException если событие не найдено
+     * @throws UnauthorizedAccessException если пользователь не является создателем
+     * @throws IllegalStateException если событие не в статусе ACTIVE
+     */
+    public Event completeEventWithoutDeletion(
+            @NotNull(message = "eventId не может быть null") Long eventId,
+            @NotNull(message = "userId не может быть null") Long userId) {
+        log.debug("Завершение события ID={} без удаления сообщения пользователем ID={}", eventId, userId);
+        
+        // Поиск события
+        Event event = eventRepository.findById(eventId)
+            .orElseThrow(() -> {
+                log.error("Событие с ID={} не найдено при попытке завершения", eventId);
+                return new EventNotFoundException(eventId);
+            });
+        
+        // Проверка прав доступа - только создатель может завершить
+        if (!event.belongsToUser(userId)) {
+            log.warn("Пользователь ID={} попытался завершить чужое событие ID={} (владелец: ID={})", 
+                     userId, eventId, event.getUser().getId());
+            throw new UnauthorizedAccessException(
+                "Только создатель события может его завершить");
+        }
+        
+        // Проверка статуса события - должно быть ACTIVE
+        if (event.getStatus() != Event.EventStatus.ACTIVE) {
+            log.warn("Попытка завершить неактивное событие ID={} (статус: {})", 
+                     eventId, event.getStatus());
+            throw new IllegalStateException(
+                String.format("Можно завершить только активное событие (текущий статус: %s)", 
+                             event.getStatus()));
+        }
+        
+        // НЕ удаляем сообщение события - оно будет отредактировано в EventCallbackHandler
+        // НЕ сбрасываем messageId - он нужен для редактирования сообщения
+        
+        // Установка статуса COMPLETED и completedAt
+        event.setStatus(Event.EventStatus.COMPLETED);
+        event.setCompletedAt(LocalDateTime.now());
+        event.setIsMyEventsHeader(false);
+        
+        Event completedEvent = eventRepository.save(event);
+        log.info("Событие ID={} успешно завершено без удаления сообщения пользователем ID={}, messageId сохранён: {}", 
+                 eventId, userId, event.getMessageId());
+        
+        // Запись в историю изменений
+        eventHistoryService.recordChange(
+            eventId,
+            userId,
+            EventHistory.ActionType.UPDATED,
+            "status",
+            "ACTIVE",
+            "COMPLETED"
+        );
+        
+        // Обработка напоминаний
+        handleEventCompletion(eventId);
+        
+        // Обновляем шапку /my_events после удаления события из активных
+        updateMyEventsHeaderAfterRemoval(userId);
+        
+        return completedEvent;
+    }
+    
+    /**
+     * Завершает событие вручную без удаления сообщения и без обновления шапки /my_events.
+     * 
+     * <p>Этот метод используется при ручном завершении события с последующим
+     * предложением добавить заметку. В отличие от {@link #completeEventWithoutDeletion(Long, Long)},
+     * данный метод НЕ вызывает {@link #updateMyEventsHeaderAfterRemoval(Long)},
+     * что позволяет отложить проверку пустоты списка событий до момента завершения
+     * ввода заметки пользователем.</p>
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Проверяет существование события</li>
+     *   <li>Проверяет права доступа (только создатель может завершить)</li>
+     *   <li>Проверяет статус события (должно быть ACTIVE)</li>
+     *   <li>Изменяет статус на COMPLETED</li>
+     *   <li>Сбрасывает isMyEventsHeader (событие больше не в списке активных)</li>
+     *   <li>Устанавливает completedAt в текущее время</li>
+     *   <li>Записывает действие в историю изменений</li>
+     *   <li>Отмечает все неотправленные напоминания как отправленные</li>
+     * </ol>
+     * 
+     * <p><b>Важно:</b> messageId события НЕ сбрасывается, сообщение НЕ удаляется,
+     * и метод {@link #updateMyEventsHeaderAfterRemoval(Long)} НЕ вызывается.
+     * Это позволяет редактировать сообщение для отображения статуса завершения
+     * и предложения добавить заметку, а также отложить отправку сообщения о пустом
+     * списке событий до момента завершения ввода заметки.</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 2.1, 2.2</p>
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя, завершающего событие
+     * @return завершенное событие с сохраненным messageId
+     * @throws EventNotFoundException если событие не найдено
+     * @throws UnauthorizedAccessException если пользователь не является создателем
+     * @throws IllegalStateException если событие не в статусе ACTIVE
+     */
+    public Event completeEventWithoutHeaderUpdate(
+            @NotNull(message = "eventId не может быть null") Long eventId,
+            @NotNull(message = "userId не может быть null") Long userId) {
+        log.debug("Завершение события ID={} без удаления сообщения и без обновления шапки пользователем ID={}", eventId, userId);
+        
+        // Поиск события
+        Event event = eventRepository.findById(eventId)
+            .orElseThrow(() -> {
+                log.error("Событие с ID={} не найдено при попытке завершения", eventId);
+                return new EventNotFoundException(eventId);
+            });
+        
+        // Проверка прав доступа - только создатель может завершить
+        if (!event.belongsToUser(userId)) {
+            log.warn("Пользователь ID={} попытался завершить чужое событие ID={} (владелец: ID={})", 
+                     userId, eventId, event.getUser().getId());
+            throw new UnauthorizedAccessException(
+                "Только создатель события может его завершить");
+        }
+        
+        // Проверка статуса события - должно быть ACTIVE
+        if (event.getStatus() != Event.EventStatus.ACTIVE) {
+            log.warn("Попытка завершить неактивное событие ID={} (статус: {})", 
+                     eventId, event.getStatus());
+            throw new IllegalStateException(
+                String.format("Можно завершить только активное событие (текущий статус: %s)", 
+                             event.getStatus()));
+        }
+        
+        // НЕ удаляем сообщение события - оно будет отредактировано в EventCallbackHandler
+        // НЕ сбрасываем messageId - он нужен для редактирования сообщения
+        
+        // Установка статуса COMPLETED и completedAt
+        event.setStatus(Event.EventStatus.COMPLETED);
+        event.setCompletedAt(LocalDateTime.now());
+        event.setIsMyEventsHeader(false);
+        
+        Event completedEvent = eventRepository.save(event);
+        log.info("Событие ID={} успешно завершено без удаления сообщения и без обновления шапки пользователем ID={}, messageId сохранён: {}", 
+                 eventId, userId, event.getMessageId());
+        
+        // Запись в историю изменений
+        eventHistoryService.recordChange(
+            eventId,
+            userId,
+            EventHistory.ActionType.UPDATED,
+            "status",
+            "ACTIVE",
+            "COMPLETED"
+        );
+        
+        // Обработка напоминаний
+        handleEventCompletion(eventId);
+        
+        // НЕ вызываем updateMyEventsHeaderAfterRemoval - это ключевое отличие от completeEventWithoutDeletion
+        // Обновление шапки будет выполнено позже, после завершения ввода заметки
+        
+        return completedEvent;
+    }
+    
+    /**
+     * Завершает событие и переупорядочивает список "Мои события" если необходимо.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Получает событие и проверяет права доступа</li>
+     *   <li>Получает список активных событий ДО завершения</li>
+     *   <li>Определяет позицию события в списке через {@link #findEventPosition(List, Long)}</li>
+     *   <li>Проверяет, является ли событие последним</li>
+     *   <li>Завершает событие через {@link #completeEventWithoutHeaderUpdate(Long, Long)}</li>
+     *   <li>Если событие не последнее и есть другие события - вызывает {@link #reorderMyEventsList(Long, Event, List)}</li>
+     * </ol>
+     * 
+     * <p>Переупорядочивание выполняется только если:</p>
+     * <ul>
+     *   <li>Завершаемое событие НЕ является последним в списке</li>
+     *   <li>В списке есть более одного события (включая завершаемое)</li>
+     * </ul>
+     * 
+     * <p>После переупорядочивания:</p>
+     * <ul>
+     *   <li>Все активные события отображаются выше завершённого</li>
+     *   <li>Относительный порядок активных событий сохраняется</li>
+     *   <li>Завершённое событие отображается внизу с предложением добавить заметку</li>
+     *   <li>Все messageId обновляются</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4</p>
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя, завершающего событие
+     * @return завершённое событие
+     * @throws EventNotFoundException если событие не найдено
+     * @throws UnauthorizedAccessException если пользователь не является создателем
+     * @throws IllegalStateException если событие не в статусе ACTIVE
+     */
+    @Transactional
+    public Event completeEventWithReordering(
+            @NotNull(message = "eventId не может быть null") Long eventId,
+            @NotNull(message = "userId не может быть null") Long userId) {
+        log.info("Начало завершения события ID={} с переупорядочиванием для пользователя ID={}", 
+                eventId, userId);
+        
+        // 1. Получаем событие и проверяем права доступа
+        Event event = getEventById(eventId);
+        log.debug("Событие ID={} получено: title='{}', status={}", 
+                 eventId, event.getTitle(), event.getStatus());
+        
+        // Проверка прав доступа выполняется внутри completeEventWithoutHeaderUpdate
+        
+        // 2. Получаем список активных событий ДО завершения
+        List<Event> activeEventsBefore = getUserEvents(userId);
+        log.debug("Получен список активных событий ДО завершения: {} событий", 
+                 activeEventsBefore.size());
+        
+        // 3. Определяем позицию события в списке
+        int eventPosition = findEventPosition(activeEventsBefore, eventId);
+        
+        if (eventPosition == -1) {
+            log.warn("Событие ID={} не найдено в списке активных событий пользователя ID={}", 
+                    eventId, userId);
+            // Продолжаем завершение без переупорядочивания
+        }
+        
+        // 4. Проверяем, является ли событие последним
+        boolean isLastEvent = (eventPosition == activeEventsBefore.size() - 1);
+        log.debug("Событие ID={} находится на позиции {} из {}, является последним: {}", 
+                 eventId, eventPosition, activeEventsBefore.size(), isLastEvent);
+        
+        // 5. Завершаем событие БЕЗ обновления шапки
+        Event completedEvent = completeEventWithoutHeaderUpdate(eventId, userId);
+        log.info("Событие ID={} успешно завершено, статус изменён на COMPLETED", eventId);
+        
+        // 6. Если событие не последнее и есть другие события - переупорядочиваем список
+        if (!isLastEvent && activeEventsBefore.size() > 1) {
+            log.info("Событие ID={} не является последним (позиция {} из {}), начинаем переупорядочивание", 
+                    eventId, eventPosition, activeEventsBefore.size());
+            reorderMyEventsList(userId, completedEvent, activeEventsBefore);
+            log.info("Переупорядочивание списка завершено для пользователя ID={}", userId);
+        } else {
+            if (isLastEvent) {
+                log.info("Событие ID={} является последним в списке, переупорядочивание не требуется", 
+                        eventId);
+            } else if (activeEventsBefore.size() <= 1) {
+                log.info("В списке только одно событие, переупорядочивание не требуется");
+            }
+            
+            // Если переупорядочивание не требуется, обновляем шапку стандартным способом
+            updateMyEventsHeaderAfterRemoval(userId);
+        }
+        
+        log.info("Завершение события ID={} с переупорядочиванием успешно выполнено для пользователя ID={}", 
+                eventId, userId);
+        
+        return completedEvent;
+    }
+    
+    /**
      * Добавляет заметку к завершенному событию.
      * 
      * <p>Метод позволяет пользователю добавить заметку после завершения события,
@@ -1130,9 +1417,9 @@ public class EventService {
      */
     private String buildEmptyStateMessage() {
         StringBuilder message = new StringBuilder();
-        message.append("📋 ").append(bold("Мои события")).append("\n\n");
+        message.append("📝 ").append(bold("Мои события")).append("\n\n");
         message.append(escape("У вас пока нет созданных событий.\n\n"));
-        message.append(escape("Используйте ")).append(escape("/add_event")).append(escape(" для добавления нового события."));
+        message.append(escape("Используйте ")).append(escape("➕ /add_event")).append(escape(" для добавления нового события."));
         return message.toString();
     }
     
@@ -1347,5 +1634,397 @@ public class EventService {
                 event.getId(), oldMessageId, sentMessage.getMessageId());
         
         return savedEvent;
+    }
+    
+    // ===== Вспомогательные методы для переупорядочивания списка "Мои события" =====
+    
+    /**
+     * Определяет позицию события в списке активных событий пользователя.
+     * 
+     * <p>Метод ищет событие в списке и возвращает его индекс (начиная с 0).
+     * Если событие не найдено, возвращает -1.</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 4.2</p>
+     * 
+     * @param events список активных событий
+     * @param eventId идентификатор искомого события
+     * @return индекс события в списке (0-based) или -1 если не найдено
+     */
+    private int findEventPosition(List<Event> events, Long eventId) {
+        log.debug("Поиск позиции события ID={} в списке из {} событий", eventId, events.size());
+        
+        for (int i = 0; i < events.size(); i++) {
+            if (events.get(i).getId().equals(eventId)) {
+                log.debug("Событие ID={} найдено на позиции {}", eventId, i);
+                return i;
+            }
+        }
+        
+        log.warn("Событие ID={} не найдено в списке активных событий", eventId);
+        return -1;
+    }
+    
+    /**
+     * Удаляет сообщения активных событий из чата.
+     * 
+     * <p>Метод выполняет следующие действия для каждого события:</p>
+     * <ol>
+     *   <li>Проверяет наличие messageId</li>
+     *   <li>Удаляет сообщение из Telegram</li>
+     *   <li>Сбрасывает messageId в null</li>
+     *   <li>Сохраняет изменения в базе данных</li>
+     * </ol>
+     * 
+     * <p>При ошибках удаления логируется предупреждение, но процесс продолжается
+     * для остальных событий.</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 4.2</p>
+     * 
+     * @param events список событий для удаления сообщений
+     * @param userId идентификатор пользователя
+     */
+    private void deleteActiveEventMessages(List<Event> events, Long userId) {
+        log.debug("Удаление сообщений {} активных событий для пользователя ID={}", 
+                 events.size(), userId);
+        
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> {
+                log.error("Пользователь с ID={} не найден при удалении сообщений событий", userId);
+                return new UserNotFoundException(userId);
+            });
+        
+        Long chatId = user.getTelegramId();
+        
+        if (chatId == null) {
+            log.warn("Не удалось получить chatId для пользователя ID={}", userId);
+            return;
+        }
+        
+        int deletedCount = 0;
+        for (Event event : events) {
+            if (event.getMessageId() != null) {
+                try {
+                    telegramMessageService.deleteMessageSilently(
+                        chatId, 
+                        event.getMessageId().intValue()
+                    );
+                    event.setMessageId(null);
+                    eventRepository.save(event);
+                    deletedCount++;
+                    log.debug("Сообщение события ID={} успешно удалено", event.getId());
+                } catch (Exception e) {
+                    log.warn("Не удалось удалить сообщение события ID={}: {}", 
+                            event.getId(), e.getMessage());
+                }
+            }
+        }
+        
+        log.info("Удалено {} из {} сообщений событий для пользователя ID={}", 
+                deletedCount, events.size(), userId);
+    }
+    
+    /**
+     * Отправляет событие с шапкой "Мои события".
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Формирует текст события через BotMessageBuilder</li>
+     *   <li>Объединяет шапку с текстом события</li>
+     *   <li>Создает клавиатуру действий для события</li>
+     *   <li>Отправляет сообщение в Telegram</li>
+     *   <li>Сохраняет messageId в событие</li>
+     *   <li>Устанавливает флаг isMyEventsHeader</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 4.2</p>
+     * 
+     * @param chatId идентификатор чата для отправки
+     * @param header текст шапки списка
+     * @param event событие для отправки
+     * @param userId идентификатор пользователя
+     */
+    private void sendEventWithHeader(Long chatId, String header, Event event, Long userId) {
+        log.debug("Отправка события ID={} с шапкой для пользователя ID={}", 
+                 event.getId(), userId);
+        
+        try {
+            // Формируем текст события
+            String eventText = botMessageBuilder.buildEventMessage(event);
+            String combinedMessage = header + "\n" + eventText;
+            
+            // Создаем клавиатуру
+            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
+            
+            // Отправляем сообщение
+            Message sentMessage = telegramMessageService.sendMessageAndGet(
+                chatId, 
+                combinedMessage, 
+                keyboard
+            );
+            
+            // Сохраняем messageId и устанавливаем флаг шапки
+            event.setMessageId((long) sentMessage.getMessageId());
+            event.setIsMyEventsHeader(true);
+            eventRepository.save(event);
+            
+            log.info("Событие ID={} с шапкой успешно отправлено, messageId={}", 
+                    event.getId(), sentMessage.getMessageId());
+        } catch (Exception e) {
+            log.error("Ошибка при отправке события ID={} с шапкой: {}", 
+                     event.getId(), e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Отправляет событие без шапки.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Формирует текст события через BotMessageBuilder</li>
+     *   <li>Создает клавиатуру действий для события</li>
+     *   <li>Отправляет сообщение в Telegram</li>
+     *   <li>Сохраняет messageId в событие</li>
+     *   <li>Сбрасывает флаг isMyEventsHeader</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 4.2</p>
+     * 
+     * @param chatId идентификатор чата для отправки
+     * @param event событие для отправки
+     * @param userId идентификатор пользователя
+     */
+    private void sendEvent(Long chatId, Event event, Long userId) {
+        log.debug("Отправка события ID={} без шапки для пользователя ID={}", 
+                 event.getId(), userId);
+        
+        try {
+            // Формируем текст события
+            String eventText = botMessageBuilder.buildEventMessage(event);
+            
+            // Создаем клавиатуру
+            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
+            
+            // Отправляем сообщение
+            Message sentMessage = telegramMessageService.sendMessageAndGet(
+                chatId, 
+                eventText, 
+                keyboard
+            );
+            
+            // Сохраняем messageId и сбрасываем флаг шапки
+            event.setMessageId((long) sentMessage.getMessageId());
+            event.setIsMyEventsHeader(false);
+            eventRepository.save(event);
+            
+            log.info("Событие ID={} без шапки успешно отправлено, messageId={}", 
+                    event.getId(), sentMessage.getMessageId());
+        } catch (Exception e) {
+            log.error("Ошибка при отправке события ID={} без шапки: {}", 
+                     event.getId(), e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Отправляет завершённое событие с предложением добавить заметку.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Формирует сообщение о завершённом событии с предложением добавить заметку</li>
+     *   <li>Создает клавиатуру с кнопками "Добавить заметку" и "Пропустить"</li>
+     *   <li>Отправляет сообщение в Telegram</li>
+     *   <li>Сохраняет messageId в событие</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 4.2</p>
+     * 
+     * @param chatId идентификатор чата для отправки
+     * @param event завершённое событие
+     * @param userId идентификатор пользователя
+     */
+    private void sendCompletedEventWithNote(Long chatId, Event event, Long userId) {
+        log.debug("Отправка завершённого события ID={} с предложением добавить заметку для пользователя ID={}", 
+                 event.getId(), userId);
+        
+        try {
+            // Формируем сообщение о завершённом событии
+            String completedMessage = botMessageBuilder.buildCompletedEventMessage(event);
+            
+            // Создаем клавиатуру с кнопками для добавления заметки
+            InlineKeyboardMarkup keyboard = keyboardService.createCompletionNoteKeyboard(event.getId());
+            
+            // Отправляем сообщение
+            Message sentMessage = telegramMessageService.sendMessageAndGet(
+                chatId, 
+                completedMessage, 
+                keyboard
+            );
+            
+            // Сохраняем messageId
+            event.setMessageId((long) sentMessage.getMessageId());
+            eventRepository.save(event);
+            
+            log.info("Завершённое событие ID={} с предложением добавить заметку успешно отправлено, messageId={}", 
+                    event.getId(), sentMessage.getMessageId());
+        } catch (Exception e) {
+            log.error("Ошибка при отправке завершённого события ID={} с предложением добавить заметку: {}", 
+                     event.getId(), e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Переупорядочивает список "Мои события" после завершения события.
+     * 
+     * <p>Алгоритм:</p>
+     * <ol>
+     *   <li>Получает актуальный список активных событий (без завершённого)</li>
+     *   <li>Удаляет все сообщения активных событий из чата</li>
+     *   <li>Формирует новый порядок отображения</li>
+     *   <li>Отправляет события заново с обновлённой шапкой</li>
+     *   <li>Сохраняет новые messageId</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.4, 4.2</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @param completedEvent завершённое событие
+     * @param previousActiveEvents список активных событий до завершения
+     */
+    private void reorderMyEventsList(Long userId, Event completedEvent, 
+                                     List<Event> previousActiveEvents) {
+        log.info("Начало переупорядочивания списка 'Мои события' для пользователя ID={}, завершённое событие ID={}", 
+                userId, completedEvent.getId());
+        
+        // 1. Получаем актуальный список активных событий (без завершённого)
+        List<Event> currentActiveEvents = getUserEvents(userId);
+        log.debug("Получен актуальный список активных событий: {} событий (до завершения было {})", 
+                 currentActiveEvents.size(), previousActiveEvents.size());
+        
+        // 2. Удаляем сообщение завершённого события
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> {
+                log.error("Пользователь с ID={} не найден при удалении сообщения завершённого события", userId);
+                return new UserNotFoundException(userId);
+            });
+        
+        Long chatId = user.getTelegramId();
+        
+        if (chatId != null && completedEvent.getMessageId() != null) {
+            try {
+                telegramMessageService.deleteMessageSilently(
+                    chatId, 
+                    completedEvent.getMessageId().intValue()
+                );
+                completedEvent.setMessageId(null);
+                eventRepository.save(completedEvent);
+                log.debug("Сообщение завершённого события ID={} успешно удалено", completedEvent.getId());
+            } catch (Exception e) {
+                log.warn("Не удалось удалить сообщение завершённого события ID={}: {}", 
+                        completedEvent.getId(), e.getMessage());
+            }
+        }
+        
+        // 3. Удаляем все сообщения активных событий
+        log.debug("Удаление сообщений {} активных событий", currentActiveEvents.size());
+        deleteActiveEventMessages(currentActiveEvents, userId);
+        log.debug("Сообщения активных событий удалены");
+        
+        // 4. Отправляем события заново в правильном порядке
+        log.debug("Отправка событий в новом порядке: {} активных + 1 завершённое", 
+                 currentActiveEvents.size());
+        resendMyEventsWithHeader(userId, currentActiveEvents, completedEvent);
+        
+        log.info("Переупорядочивание списка 'Мои события' завершено для пользователя ID={}", userId);
+    }
+    
+    /**
+     * Отправляет список событий заново с обновлённой шапкой.
+     * 
+     * <p>Порядок отправки:</p>
+     * <ol>
+     *   <li>Шапка + первое активное событие (если есть активные)</li>
+     *   <li>Остальные активные события</li>
+     *   <li>Завершённое событие с предложением добавить заметку</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.5, 4.2</p>
+     * 
+     * @param userId идентификатор пользователя
+     * @param activeEvents список активных событий
+     * @param completedEvent завершённое событие
+     */
+    private void resendMyEventsWithHeader(Long userId, List<Event> activeEvents, 
+                                          Event completedEvent) {
+        log.debug("Отправка списка событий заново для пользователя ID={}: {} активных + 1 завершённое", 
+                 userId, activeEvents.size());
+        
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> {
+                log.error("Пользователь с ID={} не найден при отправке списка событий", userId);
+                return new UserNotFoundException(userId);
+            });
+        
+        Long chatId = user.getTelegramId();
+        
+        if (chatId == null) {
+            log.warn("Не удалось получить chatId для пользователя ID={}", userId);
+            return;
+        }
+        
+        // Формируем шапку с учётом всех событий (активные + завершённое)
+        int totalCount = activeEvents.size() + 1; // активные + завершённое
+        String header = botMessageBuilder.buildMyEventsHeader(totalCount);
+        log.debug("Сформирована шапка для {} событий", totalCount);
+        
+        if (!activeEvents.isEmpty()) {
+            // Отправляем шапку + первое активное событие
+            Event firstEvent = activeEvents.get(0);
+            log.debug("Отправка первого активного события ID={} с шапкой", firstEvent.getId());
+            sendEventWithHeader(chatId, header, firstEvent, userId);
+            
+            // Отправляем остальные активные события
+            for (int i = 1; i < activeEvents.size(); i++) {
+                Event event = activeEvents.get(i);
+                log.debug("Отправка активного события ID={} без шапки (позиция {})", event.getId(), i);
+                sendEvent(chatId, event, userId);
+            }
+            
+            // Отправляем завершённое событие с предложением добавить заметку
+            log.debug("Отправка завершённого события ID={} с предложением добавить заметку", 
+                     completedEvent.getId());
+            sendCompletedEventWithNote(chatId, completedEvent, userId);
+        } else {
+            // Если активных событий нет, отправляем только завершённое событие с шапкой
+            log.debug("Активных событий нет, отправка только завершённого события ID={} с шапкой", 
+                     completedEvent.getId());
+            
+            // Формируем сообщение о завершённом событии
+            String completedMessage = botMessageBuilder.buildCompletedEventMessage(completedEvent);
+            String combinedMessage = header + "\n" + completedMessage;
+            
+            // Создаем клавиатуру с кнопками для добавления заметки
+            InlineKeyboardMarkup keyboard = keyboardService.createCompletionNoteKeyboard(completedEvent.getId());
+            
+            try {
+                // Отправляем сообщение
+                Message sentMessage = telegramMessageService.sendMessageAndGet(
+                    chatId, 
+                    combinedMessage, 
+                    keyboard
+                );
+                
+                // Сохраняем messageId и устанавливаем флаг шапки
+                completedEvent.setMessageId((long) sentMessage.getMessageId());
+                completedEvent.setIsMyEventsHeader(true);
+                eventRepository.save(completedEvent);
+                
+                log.info("Завершённое событие ID={} с шапкой успешно отправлено, messageId={}", 
+                        completedEvent.getId(), sentMessage.getMessageId());
+            } catch (Exception e) {
+                log.error("Ошибка при отправке завершённого события ID={} с шапкой: {}", 
+                         completedEvent.getId(), e.getMessage(), e);
+            }
+        }
+        
+        log.info("Список событий успешно отправлен заново для пользователя ID={}", userId);
     }
 }

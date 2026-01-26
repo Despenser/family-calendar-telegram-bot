@@ -11,6 +11,8 @@ import ru.golubyatnikov.family.calendar.bot.model.User;
 import java.util.List;
 import java.util.Optional;
 
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
+
 /**
  * Диспетчер для маршрутизации callback queries к соответствующим обработчикам.
  * 
@@ -179,7 +181,7 @@ public class CallbackQueryDispatcher {
      * @param callbackQuery callback query от неавторизованного пользователя
      */
     private void handleUnauthorizedUser(CallbackQuery callbackQuery) {
-        String message = "❌ Пользователь не найден. Используйте /start для регистрации.";
+        String message = "❌ Пользователь не найден. Используйте 🚀 " + escape("/start") + " для регистрации.";
         answerCallbackQuerySafely(callbackQuery.getId(), message);
     }
     
