@@ -188,8 +188,8 @@ class StatsCommandHandlerTest {
         
         // Then
         assertNotNull(result);
-        assertTrue(result.contains("активных событий"), 
-                  "Должен содержать информацию об активных событиях");
+        assertTrue(result.contains("Активных событий в этом месяце"), 
+                  "Должен содержать информацию об активных событиях в новом формате");
     }
     
     @Test

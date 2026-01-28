@@ -50,6 +50,9 @@ class EventCallbackHandlerTest {
     private ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder botMessageBuilder;
 
     @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
+
+    @Mock
     private CallbackQuery callbackQuery;
 
     @Mock
@@ -60,7 +63,7 @@ class EventCallbackHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new EventCallbackHandler(myEventsCommandHandler, messageService, conversationStateService, keyboardService, eventService, botMessageBuilder);
+        handler = new EventCallbackHandler(myEventsCommandHandler, messageService, conversationStateService, keyboardService, eventService, botMessageBuilder, reminderService);
         
         user = new User();
         user.setId(1L);
@@ -127,16 +130,25 @@ class EventCallbackHandlerTest {
         
         setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
         
-        when(myEventsCommandHandler.handleViewEventDetails(123L, user.getId()))
-                .thenReturn("Детали события");
+        // Создаем событие без активных напоминаний
+        ru.golubyatnikov.family.calendar.bot.model.Event event = new ru.golubyatnikov.family.calendar.bot.model.Event();
+        event.setId(123L);
+        event.setTitle("Тестовое событие");
+        
+        when(eventService.getEventById(123L)).thenReturn(event);
+        when(botMessageBuilder.buildEventMessage(event)).thenReturn("Детали события");
+        when(keyboardService.createEventActionsKeyboard(event, user.getId()))
+                .thenReturn(new org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup());
 
         // When
         handler.handle(callbackQuery, user);
 
         // Then
-        verify(myEventsCommandHandler).handleViewEventDetails(123L, user.getId());
-        verify(messageService).sendMessage(eq(chatId), eq("Детали события"));
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Обработано"));
+        verify(eventService).getEventById(123L);
+        verify(botMessageBuilder).buildEventMessage(event);
+        verify(keyboardService).createEventActionsKeyboard(event, user.getId());
+        verify(messageService).editMessageText(eq(chatId), eq(messageId), eq("Детали события"), any());
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq(""));
     }
 
     @Test

@@ -36,6 +36,9 @@ public class NavigationCallbackHandler implements CallbackHandler {
     private final TelegramMessageService messageService;
     private final KeyboardService keyboardService;
     private final BotMessageBuilder messageBuilder;
+    private final ru.golubyatnikov.family.calendar.bot.service.ConversationStateService conversationStateService;
+    private final ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
+    private final ru.golubyatnikov.family.calendar.bot.service.ConversationService conversationService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -84,11 +87,74 @@ public class NavigationCallbackHandler implements CallbackHandler {
         try {
             // Проверяем отмену
             if (callbackData.equals("calendar_cancel")) {
-                String message = messageBuilder.buildEventCancelledMessage();
-                messageService.editMessageText(chatId, messageId, message, null);
-                messageService.answerCallbackQuery(callbackQueryId, "Отменено");
-                
-                log.info("Создание события отменено пользователем {}", user.getId());
+                // Проверяем, редактируется ли существующее событие
+                if (conversationStateService.isEditingEvent(user.getId())) {
+                    // Редактирование существующего события - просто выходим из режима редактирования
+                    var context = conversationStateService.getEditingContext(user.getId());
+                    
+                    if (context != null && context.getEventId() != null) {
+                        try {
+                            // Получаем событие
+                            ru.golubyatnikov.family.calendar.bot.model.Event event = 
+                                eventService.getEventById(context.getEventId());
+                            
+                            // Получаем messageId из контекста
+                            Integer editingMessageId = context.getMessageId();
+                            
+                            if (editingMessageId != null) {
+                                // Возвращаем карточку события
+                                int eventCount = eventService.getActiveEventsCount(event.getUser().getId());
+                                String eventMessage = messageBuilder.buildEventMessageWithHeader(event, eventCount);
+                                InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, user.getId());
+                                
+                                try {
+                                    messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
+                                    log.info("Редактирование даты отменено, возврат к карточке события: eventId={}, messageId={}", 
+                                            context.getEventId(), editingMessageId);
+                                } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                                    log.warn("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
+                                            context.getEventId(), editingMessageId, e.getMessage());
+                                    
+                                    // Fallback: отправляем новое сообщение
+                                    eventService.sendOrUpdateEventMessage(event, chatId);
+                                }
+                            } else {
+                                // Fallback: отправляем новое сообщение
+                                log.warn("MessageId не найден в контексте, используем sendOrUpdateEventMessage");
+                                eventService.sendOrUpdateEventMessage(event, chatId);
+                            }
+                            
+                            // Очищаем состояние редактирования
+                            conversationStateService.clearEventEditing(user.getId());
+                            
+                            messageService.answerCallbackQuery(callbackQueryId, "Редактирование отменено");
+                            log.info("Редактирование даты отменено пользователем {}, eventId={}", 
+                                    user.getId(), context.getEventId());
+                            
+                        } catch (Exception e) {
+                            log.error("Ошибка при отмене редактирования даты: userId={}, error={}", 
+                                     user.getId(), e.getMessage());
+                            
+                            // Очищаем состояние редактирования в любом случае
+                            conversationStateService.clearEventEditing(user.getId());
+                            
+                            throw new RuntimeException("Ошибка при отмене редактирования даты", e);
+                        }
+                    } else {
+                        // Контекст некорректный - просто очищаем состояние
+                        conversationStateService.clearEventEditing(user.getId());
+                        log.warn("Некорректный контекст редактирования при отмене: userId={}", user.getId());
+                    }
+                } else {
+                    // Создание нового события - отменяем создание
+                    conversationService.cancelEventCreation(user.getId());
+                    
+                    String message = messageBuilder.buildEventCancelledMessage();
+                    messageService.editMessageText(chatId, messageId, message, null);
+                    messageService.answerCallbackQuery(callbackQueryId, "Создание отменено");
+                    
+                    log.info("Создание события отменено пользователем {}", user.getId());
+                }
                 return;
             }
             
@@ -100,9 +166,9 @@ public class NavigationCallbackHandler implements CallbackHandler {
             
             log.debug("Навигация по календарю: год={}, месяц={}, userId={}", year, month, user.getId());
             
-            // Показываем календарь для выбранного месяца с событиями семьи
+            // Показываем календарь для выбранного месяца с учетом timezone пользователя
             InlineKeyboardMarkup keyboard = keyboardService.createCalendarKeyboard(
-                    year, month, user.getFamily().getId());
+                    year, month, user);
             
             String message = messageBuilder.buildSelectDateMessage();
             messageService.editMessageText(chatId, messageId, message, keyboard);

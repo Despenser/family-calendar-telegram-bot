@@ -57,7 +57,7 @@ public final class EventFormatter {
      * 
      * <p>Формат вывода:</p>
      * <pre>
-     * [иконка типа] [название]
+     * [иконка типа] [название] [🔔 если есть напоминания]
      * 🕐 Время: [время]
      * 📝 Описание: [описание]
      * 👤 Создал: [имя]
@@ -72,7 +72,7 @@ public final class EventFormatter {
      * 
      * <p>Примеры:</p>
      * <pre>
-     * 👨‍👩‍👧‍👦 Встреча с врачом
+     * 👨‍👩‍👧‍👦 Встреча с врачом 🔔
      * 🕐 Время: 14:30 - 15:00
      * 📝 Описание: Не забыть взять карту
      * 👤 Создал: Мария
@@ -80,20 +80,21 @@ public final class EventFormatter {
      * 🔒 Утренняя пробежка
      * 🕐 Время: 09:00
      * 
-     * 👨‍👩‍👧‍👦 День рождения мамы
+     * 👨‍👩‍👧‍👦 День рождения мамы 🔔
      * 📝 Описание: Празднование
      * 👤 Создал: Алексей
      * 
      * </pre>
      * 
-     * <p><b>Требования:</b> 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 6.1, 6.2, 6.3, 6.4, 6.5, 8.1, 8.2, 8.3, 8.4</p>
+     * <p><b>Требования:</b> 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 6.1, 6.2, 6.3, 6.4, 6.5, 8.1, 8.2, 8.3, 8.4, 9.1</p>
      * 
      * @param event событие для форматирования, не может быть null
      * @param currentUser текущий пользователь (для определения, показывать ли создателя), не может быть null
+     * @param hasReminders флаг наличия активных напоминаний для события
      * @return отформатированная строка с информацией о событии, завершающаяся пустой строкой
      * @throws IllegalArgumentException если event или currentUser равны null
      */
-    public static String formatEvent(Event event, User currentUser) {
+    public static String formatEvent(Event event, User currentUser, boolean hasReminders) {
         if (event == null) {
             throw new IllegalArgumentException("Событие не может быть null");
         }
@@ -106,6 +107,9 @@ public final class EventFormatter {
         // Иконка типа события и название на первой строке
         sb.append(escape(getEventTypeIcon(event)));
         sb.append(bold(event.getTitle()));
+        
+        // Колокольчик больше не отображается в списках событий (Требования 1.1, 1.2, 1.3, 1.4, 1.5)
+        // Параметр hasReminders сохранён для обратной совместимости API (Требования 3.1, 3.2)
         
         // Время события (на новой строке без отступа)
         String timeStr = formatEventTime(event);
@@ -129,6 +133,23 @@ public final class EventFormatter {
         sb.append(escape("\n\n"));
         
         return sb.toString();
+    }
+    
+    /**
+     * Форматирует событие в едином компактном формате для всех команд (без проверки напоминаний).
+     * 
+     * <p>Этот метод предоставляется для обратной совместимости. Рекомендуется использовать
+     * {@link #formatEvent(Event, User, boolean)} с явным указанием наличия напоминаний.</p>
+     * 
+     * @param event событие для форматирования, не может быть null
+     * @param currentUser текущий пользователь (для определения, показывать ли создателя), не может быть null
+     * @return отформатированная строка с информацией о событии, завершающаяся пустой строкой
+     * @throws IllegalArgumentException если event или currentUser равны null
+     * @deprecated Используйте {@link #formatEvent(Event, User, boolean)} для отображения индикатора напоминаний
+     */
+    @Deprecated
+    public static String formatEvent(Event event, User currentUser) {
+        return formatEvent(event, currentUser, false);
     }
     
     /**

@@ -18,6 +18,7 @@ import ru.golubyatnikov.family.calendar.bot.handler.MyEventsCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventFilter;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
+import ru.golubyatnikov.family.calendar.bot.model.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
@@ -279,14 +280,29 @@ public class EventService {
      */
     @Transactional(readOnly = true)
     public List<Event> getUserEvents(Long userId) {
-        log.debug("Получение активных событий пользователя ID={}", userId);
+        log.info("Получение активных событий пользователя ID={}", userId);
         
         List<Event> events = eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(
             userId, 
             Event.EventStatus.ACTIVE
         );
         
-        log.debug("Найдено {} активных событий для пользователя ID={}", events.size(), userId);
+        log.info("Найдено {} активных событий для пользователя ID={}", events.size(), userId);
+        
+        // Дополнительное логирование для диагностики
+        if (log.isDebugEnabled() && !events.isEmpty()) {
+            log.debug("Список активных событий пользователя ID={}:", userId);
+            events.forEach(event -> 
+                log.debug("  - Событие ID={}, title='{}', status={}, date={}, time={}", 
+                    event.getId(), event.getTitle(), event.getStatus(), 
+                    event.getEventDate(), event.getEventTime())
+            );
+        }
+        
+        if (events.isEmpty()) {
+            log.info("У пользователя ID={} нет активных событий", userId);
+        }
+        
         return events;
     }
     
@@ -929,14 +945,39 @@ public class EventService {
             log.info("Переупорядочивание списка завершено для пользователя ID={}", userId);
         } else {
             if (isLastEvent) {
-                log.info("Событие ID={} является последним в списке, переупорядочивание не требуется", 
+                log.info("Событие ID={} является последним в списке, редактируем сообщение", 
                         eventId);
             } else if (activeEventsBefore.size() <= 1) {
-                log.info("В списке только одно событие, переупорядочивание не требуется");
+                log.info("В списке только одно событие, редактируем сообщение");
             }
             
-            // Если переупорядочивание не требуется, обновляем шапку стандартным способом
-            updateMyEventsHeaderAfterRemoval(userId);
+            // Получаем пользователя
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.error("Пользователь с ID={} не найден при редактировании сообщения последнего события", userId);
+                    return new UserNotFoundException(userId);
+                });
+            
+            Long chatId = user.getTelegramId();
+            
+            if (chatId != null) {
+                log.debug("Редактирование сообщения с предложением добавить заметку для последнего события ID={}", eventId);
+                // ✅ ИЗМЕНЕНИЕ: Используем editCompletedEventWithNote вместо sendCompletedEventWithNote
+                editCompletedEventWithNote(chatId, completedEvent, userId);
+                log.info("Сообщение последнего события ID={} обработано (отредактировано или отправлено новое)", eventId);
+            } else {
+                log.warn("Не удалось получить chatId для пользователя ID={}, сообщение не отправлено", userId);
+            }
+            
+            // НЕ вызываем updateMyEventsHeaderAfterRemoval здесь для последнего события!
+            // Причина: На этот момент событие уже завершено (статус COMPLETED), поэтому getUserEvents
+            // вернёт пустой список активных событий, и система преждевременно отправит сообщение
+            // "У вас пока нет созданных событий" ДО того, как пользователь выберет "Добавить заметку"
+            // или "Пропустить". Обновление шапки будет выполнено ПОСЛЕ выбора пользователя в:
+            // - UpdateProcessor.handleCompletionNoteInput() - после добавления заметки
+            // - EventCallbackHandler.handleSkipCompletionNote() - после пропуска заметки
+            // (комментарий остаётся без изменений)
+            log.debug("Обновление шапки /my_events отложено до выбора пользователя (добавить заметку или пропустить)");
         }
         
         log.info("Завершение события ID={} с переупорядочиванием успешно выполнено для пользователя ID={}", 
@@ -1011,6 +1052,46 @@ public class EventService {
         );
         
         return updatedEvent;
+    }
+    
+    /**
+     * Обрабатывает создание события и автоматически создает напоминания по умолчанию.
+     * 
+     * <p>Метод выполняет следующие действия:</p>
+     * <ol>
+     *   <li>Вызывает {@link ReminderService#createDefaultReminders(Event, User)} для создания напоминаний</li>
+     *   <li>Анализирует результат создания напоминаний</li>
+     *   <li>Формирует соответствующее сообщение для пользователя</li>
+     *   <li>Отправляет сообщение в чат</li>
+     * </ol>
+     * 
+     * <p>Возможные сценарии:</p>
+     * <ul>
+     *   <li>Напоминания созданы успешно - показывает "✅ Автоматически настроены напоминания: накануне, за 1 час, за 15 минут"</li>
+     *   <li>Событие без времени - показывает "ℹ️ Добавьте время события для автоматических напоминаний"</li>
+     *   <li>Все напоминания пропущены (событие слишком скоро) - показывает "ℹ️ Событие слишком скоро, автоматические напоминания не созданы"</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.5, 3.1, 5.1, 5.2, 6.5</p>
+     * 
+     * @param event созданное событие
+     * @param user пользователь, создавший событие
+     */
+    public void handleEventCreated(Event event, User user) {
+        log.debug("Обработка создания события ID={} пользователем ID={}", event.getId(), user.getId());
+        
+        // Создаем автоматические напоминания
+        List<Reminder> createdReminders = reminderService.createDefaultReminders(event, user);
+        
+        // Логируем результат создания напоминаний
+        if (event.getEventTime() == null) {
+            log.debug("Событие ID={} без времени, напоминания не созданы", event.getId());
+        } else if (createdReminders.isEmpty()) {
+            log.debug("Все напоминания пропущены для события ID={} (событие слишком скоро)", event.getId());
+        } else {
+            log.info("Автоматически созданы {} напоминаний для события ID={}", 
+                    createdReminders.size(), event.getId());
+        }
     }
     
     /**
@@ -1245,6 +1326,52 @@ public class EventService {
         );
         
         return updated;
+    }
+    
+    /**
+     * Определяет, является ли дата события "сегодня" относительно timezone пользователя.
+     * 
+     * <p>Метод сравнивает дату события с текущей датой в timezone пользователя.
+     * Это необходимо для корректного отображения относительных меток дат
+     * ("Сегодня", "Завтра") в интерфейсе.</p>
+     * 
+     * <p><b>Требования:</b> 4.2</p>
+     * 
+     * @param eventDate дата события
+     * @param user пользователь для определения timezone
+     * @return true если событие сегодня в timezone пользователя
+     */
+    public boolean isToday(LocalDate eventDate, User user) {
+        LocalDate userToday = user.getCurrentDate();
+        boolean result = eventDate.equals(userToday);
+        
+        log.debug("Проверка isToday: eventDate={}, userToday={}, timezone={}, result={}", 
+                 eventDate, userToday, user.getTimezone(), result);
+        
+        return result;
+    }
+    
+    /**
+     * Определяет, является ли дата события "завтра" относительно timezone пользователя.
+     * 
+     * <p>Метод сравнивает дату события с завтрашней датой в timezone пользователя.
+     * Это необходимо для корректного отображения относительных меток дат
+     * ("Сегодня", "Завтра") в интерфейсе.</p>
+     * 
+     * <p><b>Требования:</b> 4.2</p>
+     * 
+     * @param eventDate дата события
+     * @param user пользователь для определения timezone
+     * @return true если событие завтра в timezone пользователя
+     */
+    public boolean isTomorrow(LocalDate eventDate, User user) {
+        LocalDate userTomorrow = user.getCurrentDate().plusDays(1);
+        boolean result = eventDate.equals(userTomorrow);
+        
+        log.debug("Проверка isTomorrow: eventDate={}, userTomorrow={}, timezone={}, result={}", 
+                 eventDate, userTomorrow, user.getTimezone(), result);
+        
+        return result;
     }
     
     /**
@@ -1868,6 +1995,72 @@ public class EventService {
         } catch (Exception e) {
             log.error("Ошибка при отправке завершённого события ID={} с предложением добавить заметку: {}", 
                      event.getId(), e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Редактирует сообщение последнего события, показывая статус завершения и кнопки для добавления заметки.
+     * 
+     * <p>Метод пытается отредактировать существующее сообщение события. Если редактирование не удаётся
+     * (сообщение удалено, messageId отсутствует), отправляет новое сообщение как fallback.</p>
+     * 
+     * <p><b>Алгоритм:</b></p>
+     * <ol>
+     *   <li>Проверяет наличие messageId у события</li>
+     *   <li>Формирует текст завершённого события</li>
+     *   <li>Создаёт клавиатуру с кнопками для добавления заметки</li>
+     *   <li>Пытается отредактировать сообщение через tryEditMessageText</li>
+     *   <li>При успехе - сохраняет messageId (он уже есть)</li>
+     *   <li>При неудаче - отправляет новое сообщение через sendCompletedEventWithNote</li>
+     * </ol>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4</p>
+     * 
+     * @param chatId идентификатор чата пользователя
+     * @param event завершённое событие
+     * @param userId идентификатор пользователя
+     */
+    private void editCompletedEventWithNote(Long chatId, Event event, Long userId) {
+        log.debug("Редактирование сообщения последнего завершённого события ID={} для пользователя ID={}", 
+                 event.getId(), userId);
+        
+        // Проверяем наличие messageId
+        if (event.getMessageId() == null) {
+            log.info("У события ID={} отсутствует messageId, отправляем новое сообщение", event.getId());
+            sendCompletedEventWithNote(chatId, event, userId);
+            return;
+        }
+        
+        try {
+            // Формируем сообщение о завершённом событии
+            String completedMessage = botMessageBuilder.buildCompletedEventMessage(event);
+            
+            // Создаем клавиатуру с кнопками для добавления заметки
+            InlineKeyboardMarkup keyboard = keyboardService.createCompletionNoteKeyboard(event.getId());
+            
+            // Пытаемся отредактировать существующее сообщение
+            boolean edited = telegramMessageService.tryEditMessageText(
+                chatId, 
+                event.getMessageId().intValue(), 
+                completedMessage, 
+                keyboard
+            );
+            
+            if (edited) {
+                log.info("Сообщение последнего завершённого события ID={} успешно отредактировано, messageId={}", 
+                        event.getId(), event.getMessageId());
+            } else {
+                // Сообщение не найдено или удалено - отправляем новое
+                log.info("Не удалось отредактировать сообщение события ID={} (удалено или не найдено), отправляем новое", 
+                        event.getId());
+                sendCompletedEventWithNote(chatId, event, userId);
+            }
+            
+        } catch (Exception e) {
+            // При любой ошибке отправляем новое сообщение
+            log.error("Ошибка при редактировании сообщения последнего завершённого события ID={}: {}, отправляем новое сообщение", 
+                     event.getId(), e.getMessage(), e);
+            sendCompletedEventWithNote(chatId, event, userId);
         }
     }
     

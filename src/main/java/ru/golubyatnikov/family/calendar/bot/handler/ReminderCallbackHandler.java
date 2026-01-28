@@ -5,7 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
+import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Reminder;
+import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.service.ReminderService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 
@@ -45,6 +49,10 @@ public class ReminderCallbackHandler {
     
     private final ReminderService reminderService;
     private final TelegramMessageService messageService;
+    private final EventRepository eventRepository;
+    private final ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
+    private final ru.golubyatnikov.family.calendar.bot.service.KeyboardService keyboardService;
+    private final ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder botMessageBuilder;
     
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
     
@@ -71,7 +79,7 @@ public class ReminderCallbackHandler {
             message.append("• Утром в день события (9:00)\n");
             message.append("• Вечером накануне (20:00)\n");
             message.append("• За 1 час до события\n");
-            message.append("• За 10 минут до события\n");
+            message.append("• За 15 минут до события\n");
             message.append("• Свое время\n\n");
             message.append(italic("Нажмите на тип, чтобы выбрать или отменить выбор"));
             
@@ -293,6 +301,169 @@ public class ReminderCallbackHandler {
     }
     
     /**
+     * Обрабатывает отключение всех автоматических напоминаний для события.
+     * 
+     * <p>Этот метод вызывается при нажатии кнопки "🔕 Отключить напоминания".
+     * Он удаляет все напоминания для события и обновляет сообщение с подтверждением.</p>
+     * 
+     * <p>После отключения напоминаний клавиатура события обновляется
+     * с кнопкой "🔔 Включить напоминания" вместо "🔕 Отключить напоминания".</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 3.1, 3.2, 3.3, 3.4, 4.1, 4.3, 4.4, 4.5</p>
+     * 
+     * @param eventId идентификатор события
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для редактирования (может быть null)
+     * @param callbackQueryId идентификатор callback query для ответа
+     */
+    public void handleDisableReminders(Long eventId, Long chatId, Integer messageId, String callbackQueryId) {
+        log.debug("Отключение автоматических напоминаний для события ID={}", eventId);
+        
+        try {
+            // Отключаем все напоминания для события
+            reminderService.disableRemindersForEvent(eventId);
+            
+            // Отвечаем на callback query
+            messageService.answerCallbackQuery(callbackQueryId, "✅ Напоминания отключены");
+            
+            // Обновляем сообщение события с новой клавиатурой
+            if (messageId != null) {
+                try {
+                    // Получаем событие
+                    Event event = eventRepository.findById(eventId)
+                        .orElseThrow(() -> new EventNotFoundException(eventId));
+                    User user = event.getUser();
+                    
+                    // Формируем текст сообщения
+                    String messageText = botMessageBuilder.buildEventMessage(event);
+                    
+                    // Создаем клавиатуру с обновленной кнопкой напоминаний
+                    InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, user.getId());
+                    
+                    // Обновляем сообщение
+                    messageService.editMessageText(chatId, messageId, messageText, keyboard);
+                    
+                    log.debug("Сообщение события обновлено после отключения напоминаний: eventId={}, messageId={}", 
+                             eventId, messageId);
+                } catch (Exception e) {
+                    log.warn("Не удалось обновить сообщение события после отключения напоминаний: eventId={}, messageId={}, error={}", 
+                            eventId, messageId, e.getMessage());
+                    // Не прерываем выполнение, так как напоминания уже отключены
+                }
+            }
+            
+            log.info("Автоматические напоминания отключены для события ID={}", eventId);
+            
+        } catch (Exception e) {
+            log.error("Ошибка при отключении напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
+                    eventId, chatId, e.getMessage(), getStackTraceString(e), e);
+            try {
+                messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка при отключении напоминаний");
+            } catch (Exception ex) {
+                log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
+                        callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
+            }
+        }
+    }
+    
+    /**
+     * Обрабатывает включение автоматических напоминаний для события.
+     * 
+     * <p>Этот метод вызывается при нажатии кнопки "🔔 Включить напоминания".
+     * Он создает стандартный набор автоматических напоминаний для события
+     * и обновляет сообщение с подтверждением.</p>
+     * 
+     * <p>После включения напоминаний клавиатура события обновляется
+     * с кнопкой "🔕 Отключить напоминания" вместо "🔔 Включить напоминания".</p>
+     * 
+     * <p><b>Требования:</b> 13.5</p>
+     * 
+     * @param eventId идентификатор события
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для редактирования (может быть null)
+     * @param callbackQueryId идентификатор callback query для ответа
+     */
+    public void handleEnableReminders(Long eventId, Long chatId, Integer messageId, String callbackQueryId) {
+        log.debug("Включение автоматических напоминаний для события ID={}", eventId);
+        
+        try {
+            // Получаем событие с eager загрузкой пользователя для предотвращения LazyInitializationException
+            Event event = eventRepository.findByIdWithUser(eventId)
+                .orElseThrow(() -> new EventNotFoundException(eventId));
+            User user = event.getUser();
+            
+            // Проверяем, что User инициализирован
+            if (user == null) {
+                log.error("User is null для события ID {}", eventId);
+                messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: пользователь не найден");
+                return;
+            }
+            
+            // Создаем автоматические напоминания
+            List<Reminder> createdReminders = reminderService.createDefaultReminders(event, user);
+            
+            // Формируем сообщение в зависимости от результата
+            String responseMessage;
+            if (createdReminders.isEmpty()) {
+                if (event.getEventTime() == null) {
+                    responseMessage = "ℹ️ Добавьте время события для автоматических напоминаний";
+                } else {
+                    responseMessage = "ℹ️ Событие уже скоро, напоминания не созданы";
+                }
+            } else {
+                responseMessage = "✅ Напоминания включены";
+            }
+            
+            // Отвечаем на callback query
+            messageService.answerCallbackQuery(callbackQueryId, responseMessage);
+            
+            // Обновляем сообщение события с новой клавиатурой
+            if (messageId != null) {
+                try {
+                    // Формируем текст сообщения
+                    String messageText = botMessageBuilder.buildEventMessage(event);
+                    
+                    // Создаем клавиатуру с обновленной кнопкой напоминаний
+                    InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, user.getId());
+                    
+                    // Обновляем сообщение
+                    messageService.editMessageText(chatId, messageId, messageText, keyboard);
+                    
+                    log.debug("Сообщение события обновлено после включения напоминаний: eventId={}, messageId={}", 
+                             eventId, messageId);
+                } catch (Exception e) {
+                    log.warn("Не удалось обновить сообщение события после включения напоминаний: eventId={}, messageId={}, error={}", 
+                            eventId, messageId, e.getMessage());
+                    // Не прерываем выполнение, так как операция включения напоминаний уже выполнена
+                }
+            }
+            
+            log.info("Автоматические напоминания включены для события ID={}, создано напоминаний: {}", 
+                    eventId, createdReminders.size());
+            
+        } catch (org.hibernate.LazyInitializationException e) {
+            log.error("LazyInitializationException при включении напоминаний: eventId={}, chatId={}, error={}", 
+                    eventId, chatId, e.getMessage(), e);
+            try {
+                messageService.answerCallbackQuery(callbackQueryId, 
+                    "❌ Ошибка загрузки данных. Попробуйте еще раз.");
+            } catch (Exception ex) {
+                log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
+                        callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
+            }
+        } catch (Exception e) {
+            log.error("Ошибка при включении напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
+                    eventId, chatId, e.getMessage(), getStackTraceString(e), e);
+            try {
+                messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка при включении напоминаний");
+            } catch (Exception ex) {
+                log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
+                        callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
+            }
+        }
+    }
+    
+    /**
      * Завершает настройку напоминаний и создает выбранные напоминания.
      * 
      * @param eventId идентификатор события
@@ -370,7 +541,7 @@ public class ReminderCallbackHandler {
         addReminderTypeButton(keyboard, eventId, Reminder.ReminderType.MORNING_OF_DAY, "☀️ Утром в день события");
         addReminderTypeButton(keyboard, eventId, Reminder.ReminderType.EVENING_BEFORE, "🌙 Вечером накануне");
         addReminderTypeButton(keyboard, eventId, Reminder.ReminderType.ONE_HOUR_BEFORE, "⏰ За 1 час");
-        addReminderTypeButton(keyboard, eventId, Reminder.ReminderType.TEN_MINUTES_BEFORE, "⏱️ За 10 минут");
+        addReminderTypeButton(keyboard, eventId, Reminder.ReminderType.FIFTEEN_MINUTES_BEFORE, "⏱️ За 15 минут");
         addReminderTypeButton(keyboard, eventId, Reminder.ReminderType.CUSTOM, "🕐 Свое время");
         
         // Кнопка подтверждения
@@ -465,6 +636,8 @@ public class ReminderCallbackHandler {
                 return "За 1 час";
             case TEN_MINUTES_BEFORE:
                 return "За 10 минут";
+            case FIFTEEN_MINUTES_BEFORE:
+                return "За 15 минут";
             case CUSTOM:
                 return "Свое время";
             default:

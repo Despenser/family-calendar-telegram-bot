@@ -123,7 +123,7 @@ class UserServiceTest {
         when(userRepository.save(any(User.class))).thenReturn(newUser);
 
         // When
-        User result = userService.createUser(newTelegramId, username, firstName, testFamily);
+        User result = userService.createUser(newTelegramId, username, firstName, testFamily, null);
 
         // Then
         assertNotNull(result, "Созданный пользователь не должен быть null");
@@ -153,7 +153,7 @@ class UserServiceTest {
         when(userRepository.save(any(User.class))).thenReturn(newUser);
 
         // When
-        User result = userService.createUser(newTelegramId, username, firstName, null);
+        User result = userService.createUser(newTelegramId, username, firstName, null, null);
 
         // Then
         assertNotNull(result);
@@ -180,7 +180,7 @@ class UserServiceTest {
         when(userRepository.save(any(User.class))).thenReturn(newUser);
 
         // When
-        User result = userService.createUser(newTelegramId, null, firstName, testFamily);
+        User result = userService.createUser(newTelegramId, null, firstName, testFamily, null);
 
         // Then
         assertNotNull(result);
@@ -200,7 +200,7 @@ class UserServiceTest {
         // When & Then
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> userService.createUser(null, username, firstName, testFamily),
+                () -> userService.createUser(null, username, firstName, testFamily, null),
                 "Должно быть выброшено IllegalArgumentException"
         );
 
@@ -218,7 +218,7 @@ class UserServiceTest {
         // When & Then
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> userService.createUser(newTelegramId, username, null, testFamily),
+                () -> userService.createUser(newTelegramId, username, null, testFamily, null),
                 "Должно быть выброшено IllegalArgumentException"
         );
 
@@ -237,7 +237,7 @@ class UserServiceTest {
         // When & Then
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> userService.createUser(newTelegramId, username, blankFirstName, testFamily),
+                () -> userService.createUser(newTelegramId, username, blankFirstName, testFamily, null),
                 "Должно быть выброшено IllegalArgumentException"
         );
 

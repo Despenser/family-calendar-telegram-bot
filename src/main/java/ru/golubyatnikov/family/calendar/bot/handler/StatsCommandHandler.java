@@ -126,7 +126,7 @@ public class StatsCommandHandler implements CommandHandler {
             if (stats.getTotalEvents() == 0) {
                 messageBuilder.append(italic("В этом месяце нет событий. Создайте первое событие с помощью /add_event"));
             } else if (stats.getActiveEvents() > 0) {
-                messageBuilder.append(italic(String.format("У вас %d активных событий в этом месяце", stats.getActiveEvents())));
+                messageBuilder.append(italic(String.format("Активных событий в этом месяце - %d", stats.getActiveEvents())));
             } else {
                 messageBuilder.append(italic("Все события этого месяца завершены! 🎉"));
             }

@@ -8,6 +8,8 @@ import ru.golubyatnikov.family.calendar.bot.model.EventFilter;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
+import java.time.DateTimeException;
+import java.time.ZoneId;
 import java.util.Optional;
 
 /**
@@ -85,21 +87,22 @@ public class UserService {
     }
 
     /**
-     * Создает нового пользователя в системе.
+     * Создает нового пользователя в системе с указанной таймзоной.
      *
      * @param telegramId уникальный идентификатор пользователя в Telegram
      * @param username username пользователя в Telegram (может быть null)
      * @param firstName имя пользователя (обязательное поле)
      * @param family семья, к которой принадлежит пользователь (может быть null)
+     * @param timezone часовой пояс пользователя в формате IANA (может быть null, тогда используется default)
      *
      * @return созданный и сохраненный пользователь
      * @throws IllegalArgumentException если telegramId или firstName равны null
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @Transactional
-    public User createUser(Long telegramId, String username, String firstName, Family family) {
-        log.info("Создание нового пользователя: telegramId={}, username={}, firstName={}, familyId={}", 
-                telegramId, username, firstName, family != null ? family.getId() : null);
+    public User createUser(Long telegramId, String username, String firstName, Family family, String timezone) {
+        log.info("Создание нового пользователя: telegramId={}, username={}, firstName={}, familyId={}, timezone={}", 
+                telegramId, username, firstName, family != null ? family.getId() : null, timezone);
         
         if (telegramId == null) {
             log.error("Попытка создать пользователя с null telegramId");
@@ -111,17 +114,21 @@ public class UserService {
             throw new IllegalArgumentException("Имя пользователя не может быть пустым");
         }
         
+        // Валидация timezone
+        String validatedTimezone = validateAndNormalizeTimezone(timezone);
+        
         User user = User.builder()
                 .telegramId(telegramId)
                 .username(username)
                 .firstName(firstName)
                 .family(family)
+                .timezone(validatedTimezone)
                 .build();
         
         User savedUser = userRepository.save(user);
         
-        log.info("Пользователь успешно создан: userId={}, telegramId={}, username={}", 
-                savedUser.getId(), savedUser.getTelegramId(), savedUser.getUsername());
+        log.info("Пользователь успешно создан: userId={}, telegramId={}, timezone={}", 
+                savedUser.getId(), savedUser.getTelegramId(), savedUser.getTimezone());
         
         return savedUser;
     }
@@ -221,5 +228,53 @@ public class UserService {
         log.info("Фильтр событий получен: userId={}, filter={}", userId, filter);
         
         return filter;
+    }
+
+    /**
+     * Обновляет timezone пользователя.
+     * 
+     * <p><b>Требования:</b> 1.4</p>
+     * 
+     * @param userId ID пользователя
+     * @param timezone новая timezone
+     * @throws UserNotFoundException если пользователь не найден
+     */
+    @Transactional
+    public void updateTimezone(Long userId, String timezone) {
+        log.info("Обновление timezone: userId={}, timezone={}", userId, timezone);
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("Пользователь не найден: " + userId));
+        
+        String validatedTimezone = validateAndNormalizeTimezone(timezone);
+        user.setTimezone(validatedTimezone);
+        userRepository.save(user);
+        
+        log.info("Timezone успешно обновлена: userId={}, timezone={}", userId, validatedTimezone);
+    }
+
+    /**
+     * Валидирует и нормализует timezone.
+     * Если timezone невалидна или null, возвращает default timezone.
+     * 
+     * <p><b>Требования:</b> 1.3</p>
+     * 
+     * @param timezone timezone для валидации
+     * @return валидная timezone
+     */
+    private String validateAndNormalizeTimezone(String timezone) {
+        if (timezone == null || timezone.isBlank()) {
+            log.debug("Timezone не указана, используется default: Europe/Moscow");
+            return "Europe/Moscow";
+        }
+        
+        try {
+            ZoneId.of(timezone);
+            log.debug("Timezone валидна: {}", timezone);
+            return timezone;
+        } catch (DateTimeException e) {
+            log.warn("Невалидная timezone: {}, используется default: Europe/Moscow", timezone);
+            return "Europe/Moscow";
+        }
     }
 }

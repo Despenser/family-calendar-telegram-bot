@@ -649,4 +649,186 @@ class EventServiceTest {
         verify(eventRepository).findById(eventId);
         verify(eventRepository, never()).save(any(Event.class));
     }
+    
+    // ========== Тесты для isToday и isTomorrow ==========
+    
+    /**
+     * Создает mock User с указанной timezone для тестов.
+     * 
+     * @param userId ID пользователя
+     * @param timezone timezone пользователя
+     * @return mock User
+     */
+    private User createMockUser(Long userId, String timezone) {
+        Family family = Family.builder().id(1L).name("Test Family").build();
+        return User.builder()
+                .id(userId)
+                .telegramId(123456789L)
+                .firstName("Тест")
+                .family(family)
+                .timezone(timezone)
+                .build();
+    }
+    
+    @Test
+    @DisplayName("Должен корректно определить сегодняшнюю дату в timezone пользователя")
+    void shouldCorrectlyIdentifyTodayInUserTimezone() {
+        // Given
+        User mockUser = createMockUser(1L, "Europe/Moscow");
+        LocalDate today = mockUser.getCurrentDate();
+        
+        // When
+        boolean result = eventService.isToday(today, mockUser);
+        
+        // Then
+        assertTrue(result, "Сегодняшняя дата должна быть определена как 'сегодня'");
+    }
+    
+    @Test
+    @DisplayName("Должен корректно определить что дата не сегодня")
+    void shouldCorrectlyIdentifyNotToday() {
+        // Given
+        User mockUser = createMockUser(1L, "Europe/Moscow");
+        LocalDate today = mockUser.getCurrentDate();
+        LocalDate tomorrow = today.plusDays(1);
+        LocalDate yesterday = today.minusDays(1);
+        
+        // When
+        boolean resultTomorrow = eventService.isToday(tomorrow, mockUser);
+        boolean resultYesterday = eventService.isToday(yesterday, mockUser);
+        
+        // Then
+        assertFalse(resultTomorrow, "Завтрашняя дата не должна быть определена как 'сегодня'");
+        assertFalse(resultYesterday, "Вчерашняя дата не должна быть определена как 'сегодня'");
+    }
+    
+    @Test
+    @DisplayName("Должен корректно определить завтрашнюю дату в timezone пользователя")
+    void shouldCorrectlyIdentifyTomorrowInUserTimezone() {
+        // Given
+        User mockUser = createMockUser(1L, "Europe/Moscow");
+        LocalDate today = mockUser.getCurrentDate();
+        LocalDate tomorrow = today.plusDays(1);
+        
+        // When
+        boolean result = eventService.isTomorrow(tomorrow, mockUser);
+        
+        // Then
+        assertTrue(result, "Завтрашняя дата должна быть определена как 'завтра'");
+    }
+    
+    @Test
+    @DisplayName("Должен корректно определить что дата не завтра")
+    void shouldCorrectlyIdentifyNotTomorrow() {
+        // Given
+        User mockUser = createMockUser(1L, "Europe/Moscow");
+        LocalDate today = mockUser.getCurrentDate();
+        LocalDate dayAfterTomorrow = today.plusDays(2);
+        
+        // When
+        boolean resultToday = eventService.isTomorrow(today, mockUser);
+        boolean resultDayAfterTomorrow = eventService.isTomorrow(dayAfterTomorrow, mockUser);
+        
+        // Then
+        assertFalse(resultToday, "Сегодняшняя дата не должна быть определена как 'завтра'");
+        assertFalse(resultDayAfterTomorrow, "Послезавтрашняя дата не должна быть определена как 'завтра'");
+    }
+    
+    @Test
+    @DisplayName("Должен корректно работать с разными timezone для isToday")
+    void shouldCorrectlyWorkWithDifferentTimezonesForIsToday() {
+        // Given - пользователь в timezone UTC+10 (Владивосток)
+        User userVladivostok = createMockUser(1L, "Asia/Vladivostok");
+        LocalDate todayVladivostok = userVladivostok.getCurrentDate();
+        
+        // Given - пользователь в timezone UTC-8 (Лос-Анджелес)
+        User userLA = createMockUser(2L, "America/Los_Angeles");
+        LocalDate todayLA = userLA.getCurrentDate();
+        
+        // When
+        boolean resultVladivostok = eventService.isToday(todayVladivostok, userVladivostok);
+        boolean resultLA = eventService.isToday(todayLA, userLA);
+        
+        // Then
+        assertTrue(resultVladivostok, "Сегодняшняя дата во Владивостоке должна быть определена как 'сегодня'");
+        assertTrue(resultLA, "Сегодняшняя дата в Лос-Анджелесе должна быть определена как 'сегодня'");
+        
+        // Проверяем, что даты могут отличаться из-за разницы во времени
+        // (это нормально, так как в разных timezone может быть разная дата)
+        if (!todayVladivostok.equals(todayLA)) {
+            // Если даты разные, проверяем что каждый метод использует свою timezone
+            assertFalse(eventService.isToday(todayVladivostok, userLA), 
+                    "Дата Владивостока не должна быть 'сегодня' для пользователя из Лос-Анджелеса");
+            assertFalse(eventService.isToday(todayLA, userVladivostok), 
+                    "Дата Лос-Анджелеса не должна быть 'сегодня' для пользователя из Владивостока");
+        }
+    }
+    
+    @Test
+    @DisplayName("Должен корректно работать с разными timezone для isTomorrow")
+    void shouldCorrectlyWorkWithDifferentTimezonesForIsTomorrow() {
+        // Given - пользователь в timezone UTC+3 (Москва)
+        User userMoscow = createMockUser(1L, "Europe/Moscow");
+        LocalDate tomorrowMoscow = userMoscow.getCurrentDate().plusDays(1);
+        
+        // Given - пользователь в timezone UTC+9 (Токио)
+        User userTokyo = createMockUser(2L, "Asia/Tokyo");
+        LocalDate tomorrowTokyo = userTokyo.getCurrentDate().plusDays(1);
+        
+        // When
+        boolean resultMoscow = eventService.isTomorrow(tomorrowMoscow, userMoscow);
+        boolean resultTokyo = eventService.isTomorrow(tomorrowTokyo, userTokyo);
+        
+        // Then
+        assertTrue(resultMoscow, "Завтрашняя дата в Москве должна быть определена как 'завтра'");
+        assertTrue(resultTokyo, "Завтрашняя дата в Токио должна быть определена как 'завтра'");
+    }
+    
+    @Test
+    @DisplayName("Должен выбросить NullPointerException при null eventDate в isToday")
+    void shouldThrowNullPointerExceptionWhenEventDateIsNullInIsToday() {
+        // Given
+        User mockUser = createMockUser(1L, "Europe/Moscow");
+        
+        // When & Then
+        assertThrows(NullPointerException.class, 
+                () -> eventService.isToday(null, mockUser),
+                "Должно быть выброшено NullPointerException при null eventDate");
+    }
+    
+    @Test
+    @DisplayName("Должен выбросить NullPointerException при null user в isToday")
+    void shouldThrowNullPointerExceptionWhenUserIsNullInIsToday() {
+        // Given
+        LocalDate today = LocalDate.now();
+        
+        // When & Then
+        assertThrows(NullPointerException.class, 
+                () -> eventService.isToday(today, null),
+                "Должно быть выброшено NullPointerException при null user");
+    }
+    
+    @Test
+    @DisplayName("Должен выбросить NullPointerException при null eventDate в isTomorrow")
+    void shouldThrowNullPointerExceptionWhenEventDateIsNullInIsTomorrow() {
+        // Given
+        User mockUser = createMockUser(1L, "Europe/Moscow");
+        
+        // When & Then
+        assertThrows(NullPointerException.class, 
+                () -> eventService.isTomorrow(null, mockUser),
+                "Должно быть выброшено NullPointerException при null eventDate");
+    }
+    
+    @Test
+    @DisplayName("Должен выбросить NullPointerException при null user в isTomorrow")
+    void shouldThrowNullPointerExceptionWhenUserIsNullInIsTomorrow() {
+        // Given
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        
+        // When & Then
+        assertThrows(NullPointerException.class, 
+                () -> eventService.isTomorrow(tomorrow, null),
+                "Должно быть выброшено NullPointerException при null user");
+    }
 }

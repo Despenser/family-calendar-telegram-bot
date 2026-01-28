@@ -55,6 +55,9 @@ class ConversationServiceTest {
 
     @Mock
     private UserRepository userRepository;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
 
     @InjectMocks
     private ConversationService conversationService;
@@ -288,6 +291,7 @@ class ConversationServiceTest {
         when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
                 .thenReturn(Optional.of(testDraft));
         when(eventRepository.save(testDraft)).thenReturn(testDraft);
+        doNothing().when(eventService).handleEventCreated(any(Event.class), any(User.class));
 
         // When
         Event result = conversationService.completeEventCreation(userId, description);
@@ -309,6 +313,7 @@ class ConversationServiceTest {
         when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
                 .thenReturn(Optional.of(testDraft));
         when(eventRepository.save(testDraft)).thenReturn(testDraft);
+        doNothing().when(eventService).handleEventCreated(any(Event.class), any(User.class));
 
         // When
         Event result = conversationService.completeEventCreation(userId, null);
@@ -553,6 +558,7 @@ class ConversationServiceTest {
         when(eventRepository.save(any(Event.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
                 .thenReturn(Optional.of(testDraft));
+        doNothing().when(eventService).handleEventCreated(any(Event.class), any(User.class));
 
         // When - создаем черновик
         Event draft = conversationService.startEventCreation(userId);

@@ -73,12 +73,15 @@ class MyEventsCommandHandlerTest {
 
     @Mock
     private User telegramUser;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
 
     private MyEventsCommandHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new MyEventsCommandHandler(eventService, keyboardService, messageService, conversationStateService, botMessageBuilder);
+        handler = new MyEventsCommandHandler(eventService, keyboardService, messageService, conversationStateService, botMessageBuilder, reminderService);
     }
 
     @Test

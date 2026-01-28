@@ -11,10 +11,13 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import ru.golubyatnikov.family.calendar.bot.model.Attachment;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Function;
@@ -82,6 +85,7 @@ public class KeyboardService {
 
     private final EventRepository eventRepository;
     private final AttachmentService attachmentService;
+    private final ReminderService reminderService;
 
     // Константы для текста кнопок
     private static final String BTN_START = "🚀 Начать";
@@ -403,7 +407,11 @@ public class KeyboardService {
         
         rows.add(row1);
         
-        // Второй ряд: кнопка вложений и условно кнопка завершения
+        // Проверяем статус и права доступа для условных кнопок
+        boolean isActive = event.getStatus() == Event.EventStatus.ACTIVE;
+        boolean isOwner = event.belongsToUser(userId);
+        
+        // Второй ряд: кнопка вложений и кнопка управления напоминаниями (условно)
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         
         // Получаем количество вложений через сервис (без загрузки коллекции)
@@ -419,27 +427,55 @@ public class KeyboardService {
         attachmentsBtn.setCallbackData(attachmentsCallbackData);
         row2.add(attachmentsBtn);
         
-        // Кнопка "Завершить" (только для активных событий создателя)
-        boolean isActive = event.getStatus() == Event.EventStatus.ACTIVE;
-        boolean isOwner = event.belongsToUser(userId);
-        
-        String completeCallbackData = null;
+        // Кнопка управления напоминаниями (только для активных событий создателя)
+        String remindersCallbackData = null;
         if (isActive && isOwner) {
-            InlineKeyboardButton completeBtn = new InlineKeyboardButton("✅ Завершить");
-            completeCallbackData = "complete_event_" + eventId;
-            completeBtn.setCallbackData(completeCallbackData);
-            row2.add(completeBtn);
+            // Проверяем наличие активных напоминаний
+            boolean hasReminders = reminderService.hasActiveReminders(eventId);
             
-            log.debug("Inline клавиатура для события ID={} создана с кнопкой завершения: " +
-                    "rowCount={}, buttonCount={}, editCallback='{}', deleteCallback='{}', attachmentsCallback='{}', completeCallback='{}'", 
-                    eventId, 2, 4, editCallbackData, deleteCallbackData, attachmentsCallbackData, completeCallbackData);
-        } else {
-            log.debug("Inline клавиатура для события ID={} создана без кнопки завершения " +
-                    "(isActive={}, isOwner={}): rowCount={}, buttonCount={}, editCallback='{}', deleteCallback='{}', attachmentsCallback='{}'", 
-                    eventId, isActive, isOwner, 2, 3, editCallbackData, deleteCallbackData, attachmentsCallbackData);
+            InlineKeyboardButton remindersBtn;
+            
+            if (hasReminders) {
+                // Если есть напоминания, показываем кнопку отключения
+                remindersBtn = new InlineKeyboardButton("🔕 Откл. напоминания");
+                remindersCallbackData = "disable_reminders_" + eventId;
+                log.debug("Событие ID={} имеет активные напоминания, показываем кнопку отключения", eventId);
+            } else {
+                // Если нет напоминаний, показываем кнопку включения
+                remindersBtn = new InlineKeyboardButton("🔔 Вкл. напоминания");
+                remindersCallbackData = "enable_reminders_" + eventId;
+                log.debug("Событие ID={} не имеет активных напоминаний, показываем кнопку включения", eventId);
+            }
+            
+            remindersBtn.setCallbackData(remindersCallbackData);
+            row2.add(remindersBtn);
+            
+            log.debug("Добавлена кнопка управления напоминаниями во второй ряд для события ID={}: hasReminders={}", 
+                     eventId, hasReminders);
         }
         
         rows.add(row2);
+        
+        // Третий ряд: кнопка завершения (только для активных событий создателя)
+        String completeCallbackData = null;
+        if (isActive && isOwner) {
+            List<InlineKeyboardButton> row3 = new ArrayList<>();
+            
+            InlineKeyboardButton completeBtn = new InlineKeyboardButton("✅ Завершить");
+            completeCallbackData = "complete_event_" + eventId;
+            completeBtn.setCallbackData(completeCallbackData);
+            row3.add(completeBtn);
+            
+            rows.add(row3);
+            
+            log.debug("Inline клавиатура для события ID={} создана с 3 рядами: " +
+                    "rowCount={}, editCallback='{}', deleteCallback='{}', attachmentsCallback='{}', remindersCallback='{}', completeCallback='{}'", 
+                    eventId, rows.size(), editCallbackData, deleteCallbackData, attachmentsCallbackData, remindersCallbackData, completeCallbackData);
+        } else {
+            log.debug("Inline клавиатура для события ID={} создана с 2 рядами " +
+                    "(isActive={}, isOwner={}): rowCount={}, editCallback='{}', deleteCallback='{}', attachmentsCallback='{}'", 
+                    eventId, isActive, isOwner, rows.size(), editCallbackData, deleteCallbackData, attachmentsCallbackData);
+        }
         
         keyboard.setKeyboard(rows);
         
@@ -550,10 +586,10 @@ public class KeyboardService {
     }
 
     /**
-     * Создает inline-календарь для выбора даты события.
+     * Создает inline-календарь для выбора даты события с учетом таймзоны пользователя.
      * 
      * <p>Календарь отображает указанный месяц с кнопками для каждого дня.
-     * Даты в прошлом отображаются как пустые ячейки без текста.
+     * Даты в прошлом относительно таймзоны пользователя отображаются как пустые ячейки без текста.
      * Дни с существующими событиями выделяются визуальным индикатором с инициалом создателя.</p>
      * 
      * <p>Структура календаря:</p>
@@ -575,22 +611,29 @@ public class KeyboardService {
      * <p><b>Визуальные индикаторы:</b></p>
      * <ul>
      *   <li>Прошлые даты: пустая ячейка " "</li>
+     *   <li>Текущая дата: "📍день" (например, "📍15")</li>
      *   <li>Дни с событиями: "день📌инициал" (например, "5📌А")</li>
      *   <li>Навигация в прошлое: заблокирована пустой кнопкой "   "</li>
      * </ul>
      * 
+     * <p><b>Требования:</b> 2.1</p>
+     * 
      * @param year год для отображения
      * @param month месяц для отображения (1-12)
-     * @param familyId ID семьи для проверки существующих событий
+     * @param user пользователь для определения timezone и семьи
      * @return настроенная InlineKeyboardMarkup с календарем
      * @throws IllegalArgumentException если month не в диапазоне 1-12
      */
-    public InlineKeyboardMarkup createCalendarKeyboard(int year, int month, Long familyId) {
+    public InlineKeyboardMarkup createCalendarKeyboard(int year, int month, User user) {
         if (month < 1 || month > 12) {
             throw new IllegalArgumentException("Month must be between 1 and 12");
         }
         
-        log.debug("Создание inline-календаря для {}-{:02d}, familyId={}", year, month, familyId);
+        Long familyId = user.getFamily() != null ? user.getFamily().getId() : null;
+        ZoneId userZone = user.getZoneId();
+        
+        log.debug("Создание inline-календаря для {}-{:02d}, userId={}, timezone={}, familyId={}", 
+                year, month, user.getId(), user.getTimezone(), familyId);
         
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -649,8 +692,10 @@ public class KeyboardService {
             currentRow.add(emptyBtn);
         }
         
-        // Дни месяца
-        LocalDate today = LocalDate.now();
+        // Дни месяца - используем текущую дату в timezone пользователя
+        LocalDate today = user.getCurrentDate();
+        
+        log.debug("Текущая дата в timezone пользователя {}: {}", user.getTimezone(), today);
         
         // Подсчитываем количество событий для каждой даты
         Map<LocalDate, Long> eventCountByDate = monthEvents.stream()
@@ -878,6 +923,182 @@ public class KeyboardService {
     }
 
     /**
+     * Создает inline-клавиатуру для выбора часа события с фильтрацией прошедших часов.
+     * 
+     * <p>Для сегодняшнего дня отображает только часы, которые еще не прошли.
+     * Для будущих дат отображает все 24 часа.</p>
+     * 
+     * <p>Если нет доступных часов (например, время >= 23:46 для сегодняшнего дня),
+     * возвращает клавиатуру только с заголовком и кнопкой отмены.</p>
+     * 
+     * <p>Callback data формируется в формате:</p>
+     * <ul>
+     *   <li>"hour_HH" - для выбора часа (например, "hour_09")</li>
+     *   <li>"time_cancel" - для отмены выбора</li>
+     *   <li>"time_ignore" - для неактивных элементов</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4, 3.1, 3.2, 3.3, 3.4</p>
+     * 
+     * @param selectedDate выбранная дата события
+     * @param user пользователь (для определения timezone)
+     * @return настроенная InlineKeyboardMarkup с кнопками выбора часа
+     * @throws IllegalArgumentException если selectedDate или user равны null
+     */
+    public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate, User user) {
+        if (selectedDate == null) {
+            log.error("Попытка создать фильтрованную клавиатуру часов с null selectedDate");
+            throw new IllegalArgumentException("Selected date cannot be null");
+        }
+        if (user == null) {
+            log.error("Попытка создать фильтрованную клавиатуру часов с null user");
+            throw new IllegalArgumentException("User cannot be null");
+        }
+        
+        log.debug("Создание фильтрованной inline-клавиатуры для выбора часа: date={}, userId={}, timezone={}", 
+                selectedDate, user.getId(), user.getTimezone());
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Заголовок
+        List<InlineKeyboardButton> headerRow = new ArrayList<>();
+        InlineKeyboardButton headerBtn = new InlineKeyboardButton("Выберите час:");
+        headerBtn.setCallbackData("time_ignore");
+        headerRow.add(headerBtn);
+        rows.add(headerRow);
+        
+        // Получаем доступные часы
+        List<Integer> availableHours = getAvailableHours(selectedDate, user);
+        
+        log.debug("Доступно {} часов для даты {}", availableHours.size(), selectedDate);
+        
+        // Если есть доступные часы, создаем кнопки (по 4 в ряд)
+        if (!availableHours.isEmpty()) {
+            List<InlineKeyboardButton> currentRow = new ArrayList<>();
+            for (int i = 0; i < availableHours.size(); i++) {
+                int hour = availableHours.get(i);
+                InlineKeyboardButton hourBtn = new InlineKeyboardButton(
+                    String.format("%02d:00", hour));
+                hourBtn.setCallbackData(String.format("hour_%02d", hour));
+                currentRow.add(hourBtn);
+                
+                // Переход на новую строку после каждых 4 кнопок
+                if ((i + 1) % 4 == 0 || i == availableHours.size() - 1) {
+                    rows.add(new ArrayList<>(currentRow));
+                    currentRow.clear();
+                }
+            }
+        }
+        
+        // Кнопка отмены
+        List<InlineKeyboardButton> cancelRow = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("time_cancel");
+        cancelRow.add(cancelBtn);
+        rows.add(cancelRow);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Фильтрованная inline-клавиатура для выбора часа создана с {} рядами, {} доступных часов", 
+                rows.size(), availableHours.size());
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline-клавиатуру для выбора минут события с фильтрацией прошедших минут.
+     * 
+     * <p>Для текущего часа сегодняшнего дня отображает только минутные интервалы,
+     * которые еще не прошли. Для будущих часов или будущих дат отображает все интервалы.</p>
+     * 
+     * <p>Если нет доступных минут (например, текущие минуты >= 46 для текущего часа),
+     * возвращает клавиатуру только с заголовком и кнопками навигации.</p>
+     * 
+     * <p>Callback data формируется в формате:</p>
+     * <ul>
+     *   <li>"time_HH:MM" - для выбора времени (например, "time_09:30")</li>
+     *   <li>"time_back" - для возврата к выбору часа</li>
+     *   <li>"time_cancel" - для отмены выбора</li>
+     *   <li>"time_ignore" - для неактивных элементов</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4</p>
+     * 
+     * @param selectedHour выбранный час (0-23)
+     * @param selectedDate выбранная дата события
+     * @param user пользователь (для определения timezone)
+     * @return настроенная InlineKeyboardMarkup с кнопками выбора минут
+     * @throws IllegalArgumentException если selectedHour не в диапазоне 0-23, или selectedDate/user равны null
+     */
+    public InlineKeyboardMarkup createFilteredMinuteSelectionKeyboard(int selectedHour, LocalDate selectedDate, User user) {
+        if (selectedHour < 0 || selectedHour > 23) {
+            log.error("Попытка создать фильтрованную клавиатуру минут с некорректным selectedHour: {}", selectedHour);
+            throw new IllegalArgumentException("Selected hour must be between 0 and 23");
+        }
+        if (selectedDate == null) {
+            log.error("Попытка создать фильтрованную клавиатуру минут с null selectedDate");
+            throw new IllegalArgumentException("Selected date cannot be null");
+        }
+        if (user == null) {
+            log.error("Попытка создать фильтрованную клавиатуру минут с null user");
+            throw new IllegalArgumentException("User cannot be null");
+        }
+        
+        log.debug("Создание фильтрованной inline-клавиатуры для выбора минут: hour={}, date={}, userId={}, timezone={}", 
+                selectedHour, selectedDate, user.getId(), user.getTimezone());
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Заголовок
+        List<InlineKeyboardButton> headerRow = new ArrayList<>();
+        InlineKeyboardButton headerBtn = new InlineKeyboardButton(
+            String.format("Выберите минуты (час: %02d):", selectedHour));
+        headerBtn.setCallbackData("time_ignore");
+        headerRow.add(headerBtn);
+        rows.add(headerRow);
+        
+        // Получаем доступные минуты
+        List<Integer> availableMinutes = getAvailableMinutes(selectedHour, selectedDate, user);
+        
+        log.debug("Доступно {} интервалов минут для часа {} даты {}", 
+                availableMinutes.size(), selectedHour, selectedDate);
+        
+        // Если есть доступные минуты, создаем кнопки
+        if (!availableMinutes.isEmpty()) {
+            List<InlineKeyboardButton> minutesRow = new ArrayList<>();
+            for (int minute : availableMinutes) {
+                InlineKeyboardButton minuteBtn = new InlineKeyboardButton(
+                    String.format("%02d:%02d", selectedHour, minute));
+                minuteBtn.setCallbackData(String.format("time_%02d:%02d", selectedHour, minute));
+                minutesRow.add(minuteBtn);
+            }
+            rows.add(minutesRow);
+        }
+        
+        // Кнопки навигации
+        List<InlineKeyboardButton> navigationRow = new ArrayList<>();
+        
+        InlineKeyboardButton backBtn = new InlineKeyboardButton("◀️ Назад");
+        backBtn.setCallbackData("time_back");
+        navigationRow.add(backBtn);
+        
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("time_cancel");
+        navigationRow.add(cancelBtn);
+        
+        rows.add(navigationRow);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Фильтрованная inline-клавиатура для выбора минут создана с {} рядами, {} доступных интервалов", 
+                rows.size(), availableMinutes.size());
+        
+        return keyboard;
+    }
+
+    /**
      * Создает inline клавиатуру с кнопкой "Пропустить" для описания события.
      * 
      * <p>Эта клавиатура отображается при запросе описания события
@@ -906,6 +1127,156 @@ public class KeyboardService {
         return keyboard;
     }
 
+    /**
+     * Определяет доступные часы для выбора на основе текущего времени пользователя.
+     * 
+     * <p>Для сегодняшнего дня возвращает только часы, которые еще не прошли.
+     * Для будущих дат возвращает все 24 часа.</p>
+     * 
+     * <p>Граничный случай: если текущее время >= 23:46, то для сегодняшнего дня
+     * не остается доступных часов (так как минимальное время события - 15 минут,
+     * а последний интервал минут - 45).</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.4, 1.5, 4.1</p>
+     * 
+     * @param selectedDate выбранная дата
+     * @param user пользователь (для определения timezone)
+     * @return список доступных часов (0-23)
+     */
+    private List<Integer> getAvailableHours(LocalDate selectedDate, User user) {
+        if (selectedDate == null) {
+            throw new IllegalArgumentException("Selected date cannot be null");
+        }
+        if (user == null) {
+            throw new IllegalArgumentException("User cannot be null");
+        }
+        
+        LocalDate today = user.getCurrentDate();
+        
+        // Для будущих дат все часы доступны
+        if (selectedDate.isAfter(today)) {
+            log.debug("Выбрана будущая дата {}, все 24 часа доступны", selectedDate);
+            return java.util.stream.IntStream.range(0, 24)
+                    .boxed()
+                    .collect(Collectors.toList());
+        }
+        
+        // Для сегодняшнего дня фильтруем прошедшие часы
+        if (selectedDate.equals(today)) {
+            LocalDateTime currentDateTime = user.getCurrentDateTime();
+            int currentHour = currentDateTime.getHour();
+            int currentMinute = currentDateTime.getMinute();
+            
+            // Граничный случай: если время >= 23:46, то нет доступных часов
+            // (последний возможный интервал минут - 45, и он уже прошел)
+            if (currentHour == 23 && currentMinute >= 46) {
+                log.debug("Текущее время {}:{} >= 23:46, нет доступных часов для сегодня", 
+                        currentHour, currentMinute);
+                return Collections.emptyList();
+            }
+            
+            // Если текущий час < 23, то доступны часы от текущего до 23
+            // Если текущий час = 23 и минуты < 46, то доступен только час 23
+            List<Integer> availableHours = java.util.stream.IntStream.rangeClosed(currentHour, 23)
+                    .boxed()
+                    .collect(Collectors.toList());
+            
+            log.debug("Выбрана сегодняшняя дата {}, текущее время {}:{}, доступно {} часов", 
+                    selectedDate, currentHour, currentMinute, availableHours.size());
+            
+            return availableHours;
+        }
+        
+        // Для прошлых дат (не должно происходить, так как календарь их не показывает)
+        log.warn("Попытка получить доступные часы для прошлой даты {}", selectedDate);
+        return Collections.emptyList();
+    }
+    
+    /**
+     * Определяет доступные минутные интервалы для выбора.
+     * 
+     * <p>Минутные интервалы: 0, 15, 30, 45.</p>
+     * 
+     * <p>Для текущего часа сегодняшнего дня возвращает только те интервалы,
+     * которые еще не прошли. Для будущих часов или будущих дат возвращает
+     * все 4 интервала.</p>
+     * 
+     * <p>Граничный случай: если текущие минуты >= 46, то для текущего часа
+     * не остается доступных интервалов (последний интервал 45 уже прошел).</p>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.2, 2.4, 2.5, 4.2</p>
+     * 
+     * @param selectedHour выбранный час (0-23)
+     * @param selectedDate выбранная дата
+     * @param user пользователь (для определения timezone)
+     * @return список доступных минут (0, 15, 30, 45)
+     */
+    private List<Integer> getAvailableMinutes(int selectedHour, LocalDate selectedDate, User user) {
+        if (selectedHour < 0 || selectedHour > 23) {
+            throw new IllegalArgumentException("Selected hour must be between 0 and 23");
+        }
+        if (selectedDate == null) {
+            throw new IllegalArgumentException("Selected date cannot be null");
+        }
+        if (user == null) {
+            throw new IllegalArgumentException("User cannot be null");
+        }
+        
+        // Все доступные интервалы минут
+        List<Integer> allMinutes = List.of(0, 15, 30, 45);
+        
+        LocalDate today = user.getCurrentDate();
+        
+        // Для будущих дат все интервалы доступны
+        if (selectedDate.isAfter(today)) {
+            log.debug("Выбрана будущая дата {}, все 4 интервала минут доступны", selectedDate);
+            return allMinutes;
+        }
+        
+        // Для сегодняшнего дня проверяем, является ли выбранный час текущим
+        if (selectedDate.equals(today)) {
+            LocalDateTime currentDateTime = user.getCurrentDateTime();
+            int currentHour = currentDateTime.getHour();
+            int currentMinute = currentDateTime.getMinute();
+            
+            // Если выбран будущий час, все интервалы доступны
+            if (selectedHour > currentHour) {
+                log.debug("Выбран будущий час {} (текущий {}), все 4 интервала минут доступны", 
+                        selectedHour, currentHour);
+                return allMinutes;
+            }
+            
+            // Если выбран текущий час, фильтруем прошедшие интервалы
+            if (selectedHour == currentHour) {
+                // Граничный случай: если минуты >= 46, нет доступных интервалов
+                if (currentMinute >= 46) {
+                    log.debug("Текущее время {}:{} >= XX:46, нет доступных интервалов минут", 
+                            currentHour, currentMinute);
+                    return Collections.emptyList();
+                }
+                
+                // Фильтруем интервалы: оставляем только те, которые строго больше текущей минуты
+                List<Integer> availableMinutes = allMinutes.stream()
+                        .filter(minute -> minute > currentMinute)
+                        .collect(Collectors.toList());
+                
+                log.debug("Выбран текущий час {}, текущие минуты {}, доступно {} интервалов", 
+                        selectedHour, currentMinute, availableMinutes.size());
+                
+                return availableMinutes;
+            }
+            
+            // Если выбран прошлый час (не должно происходить)
+            log.warn("Попытка получить доступные минуты для прошлого часа {} (текущий {})", 
+                    selectedHour, currentHour);
+            return Collections.emptyList();
+        }
+        
+        // Для прошлых дат (не должно происходить)
+        log.warn("Попытка получить доступные минуты для прошлой даты {}", selectedDate);
+        return Collections.emptyList();
+    }
+    
     /**
      * Преобразует строку в надстрочный формат используя Unicode символы.
      * 
@@ -1085,7 +1456,7 @@ public class KeyboardService {
         
         // Ряд 3: Отмена
         List<InlineKeyboardButton> row3 = new ArrayList<>();
-        row3.add(createButton("❌ Отменить", "edit_cancel_" + eventId));
+        row3.add(createButton("❌ Отмена", "edit_cancel_" + eventId));
         rows.add(row3);
         
         keyboard.setKeyboard(rows);

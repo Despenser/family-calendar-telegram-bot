@@ -63,3 +63,16 @@ management:
 draft:
   cleanup:
     enabled: false
+
+# Конфигурация напоминаний для тестов
+reminder:
+  defaults:
+    enabled: true
+    types:
+      - EVENING_BEFORE
+      - ONE_HOUR_BEFORE
+      - FIFTEEN_MINUTES_BEFORE
+  scheduler:
+    enabled: false  # Отключаем планировщик в тестах
+  max-per-event: 10
+  max-custom-minutes: 43200

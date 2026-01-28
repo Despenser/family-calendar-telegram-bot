@@ -99,10 +99,10 @@ public class EventTypeCallbackHandler implements CallbackHandler {
         conversationService.updateEventType(user.getId(), isPersonal);
         log.info("Пользователь {} выбрал тип события: {}", user.getId(), eventType);
         
-        // Показываем календарь для выбора даты
-        LocalDate now = LocalDate.now();
+        // Показываем календарь для выбора даты с учетом timezone пользователя
+        LocalDate now = user.getCurrentDate();
         InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(
-            now.getYear(), now.getMonthValue(), user.getFamily().getId());
+            now.getYear(), now.getMonthValue(), user);
         
         String message = messageBuilder.buildEventTypeSelectedMessage(isPersonal);
         

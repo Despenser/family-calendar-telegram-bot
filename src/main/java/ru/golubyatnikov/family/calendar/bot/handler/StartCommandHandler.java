@@ -164,8 +164,11 @@ public class StartCommandHandler implements CommandHandler {
         Long telegramId = message.getFrom().getId();
         String username = message.getFrom().getUserName();
         String firstName = message.getFrom().getFirstName();
+        
+        // Извлекаем timezone из сообщения (для будущей автоматической регистрации)
+        String timezone = extractTimezoneFromMessage(message);
 
-        log.debug("Обработка команды /start: telegramId={}", telegramId);
+        log.debug("Обработка команды /start: telegramId={}, timezone={}", telegramId, timezone);
 
         // Проверяем наличие пользователя в БД
         boolean isRegistered = userService.isUserAuthorized(telegramId);
@@ -175,8 +178,53 @@ public class StartCommandHandler implements CommandHandler {
             return buildWelcomeMessageForRegisteredUser(firstName);
         } else {
             log.debug("Пользователь не зарегистрирован: telegramId={}", telegramId);
+            
+            // TODO: В будущем здесь можно добавить автоматическую регистрацию:
+            // Family family = familyService.createFamily(firstName);
+            // user = userService.createUser(telegramId, username, firstName, family, timezone);
+            // log.info("Новый пользователь зарегистрирован: userId={}, timezone={}", user.getId(), user.getTimezone());
+            
             return buildWelcomeMessageForUnregisteredUser(firstName);
         }
+    }
+
+    /**
+     * Пытается извлечь timezone из Telegram Message.
+     * 
+     * <p>Telegram Bot API не предоставляет прямой доступ к часовому поясу пользователя.
+     * Доступные данные ограничены:</p>
+     * <ul>
+     *   <li>language_code - код языка (например, "ru", "en")</li>
+     *   <li>Геолокация - только если пользователь явно отправляет</li>
+     * </ul>
+     * 
+     * <p>Маппинг language_code на timezone ненадежен, так как пользователь
+     * с кодом "ru" может находиться в любом часовом поясе.</p>
+     * 
+     * <p><b>Возможные улучшения в будущем:</b></p>
+     * <ul>
+     *   <li>Добавить команду для ручной настройки timezone (/settings)</li>
+     *   <li>Использовать геолокацию для определения timezone</li>
+     *   <li>Запрашивать timezone при первой регистрации</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 1.2</p>
+     * 
+     * @param message Telegram сообщение от пользователя
+     * @return timezone или null если недоступна (будет использован default timezone)
+     */
+    private String extractTimezoneFromMessage(Message message) {
+        // Telegram API не предоставляет прямой доступ к timezone
+        // Можно использовать language_code как подсказку, но это ненадежно
+        String languageCode = message.getFrom().getLanguageCode();
+        log.debug("Language code from Telegram: {}", languageCode);
+        
+        // Можно добавить маппинг language_code -> timezone, но это неточно
+        // Например: "ru" -> "Europe/Moscow", "en" -> "Europe/London"
+        // Но пользователь с "ru" может быть в любой timezone
+        
+        // Возвращаем null, чтобы использовался default timezone (Europe/Moscow)
+        return null;
     }
 
     /**

@@ -89,6 +89,7 @@ public class MyEventsCommandHandler implements CommandHandler {
     private final TelegramMessageService messageService;
     private final ConversationStateService conversationStateService;
     private final BotMessageBuilder botMessageBuilder;
+    private final ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
 
     /**
      * Обрабатывает команду /my_events от пользователя.
@@ -151,25 +152,27 @@ public class MyEventsCommandHandler implements CommandHandler {
         String username = message.getFrom().getUserName();
         Long chatId = message.getChatId();
 
-        log.debug("Обработка команды /my_events: telegramId={}, userId={}", 
-                telegramId, user.getId());
+        log.info("Обработка команды /my_events: telegramId={}, userId={}, username={}", 
+                telegramId, user.getId(), username);
 
-        // Получаем события пользователя
-        List<Event> userEvents = eventService.getUserEvents(user.getId());
+        try {
+            // Получаем события пользователя
+            List<Event> userEvents = eventService.getUserEvents(user.getId());
 
-        log.debug("Найдено {} событий для пользователя ID={}", userEvents.size(), user.getId());
+            log.info("Получено {} событий для отображения пользователю ID={}", 
+                    userEvents.size(), user.getId());
 
-        if (userEvents.isEmpty()) {
-            String noEventsMessage = buildNoEventsMessage();
-            try {
-                messageService.sendMessage(chatId, noEventsMessage);
-                log.debug("Сообщение об отсутствии событий отправлено пользователю chatId={}", chatId);
-            } catch (Exception e) {
-                log.error("Ошибка при отправке сообщения об отсутствии событий: chatId={}, error={}", 
-                        chatId, e.getMessage(), e);
+            if (userEvents.isEmpty()) {
+                String noEventsMessage = buildNoEventsMessage();
+                try {
+                    messageService.sendMessage(chatId, noEventsMessage);
+                    log.info("Сообщение об отсутствии событий отправлено пользователю chatId={}", chatId);
+                } catch (Exception e) {
+                    log.error("Ошибка при отправке сообщения об отсутствии событий: chatId={}, error={}", 
+                            chatId, e.getMessage(), e);
+                }
+                return null;
             }
-            return null;
-        }
 
         // Управление флагами isMyEventsHeader для событий
         // Устанавливаем флаг для первого события
@@ -351,10 +354,28 @@ public class MyEventsCommandHandler implements CommandHandler {
             }
         }
         
-        log.debug("Завершена отправка событий: успешно={}, ошибок={}", successCount, failureCount);
+        log.info("Завершена отправка событий пользователю ID={}: успешно={}, ошибок={}", 
+                user.getId(), successCount, failureCount);
         
         // Возвращаем null, так как все сообщения уже отправлены внутри метода
         return null;
+        
+        } catch (Exception e) {
+            log.error("Неожиданная ошибка при обработке команды /my_events для пользователя ID={}: {}", 
+                    user.getId(), e.getMessage(), e);
+            
+            // Пытаемся отправить сообщение об ошибке пользователю
+            try {
+                String errorMessage = "❌ " + bold("Ошибка") + "\n\n" + 
+                                    escape("Произошла ошибка при получении списка событий. Попробуйте позже.");
+                messageService.sendMessage(chatId, errorMessage);
+            } catch (Exception sendError) {
+                log.error("Не удалось отправить сообщение об ошибке пользователю chatId={}: {}", 
+                        chatId, sendError.getMessage());
+            }
+            
+            return null;
+        }
     }
 
     /**
@@ -543,7 +564,14 @@ public class MyEventsCommandHandler implements CommandHandler {
             details.append("📋 ").append(bold("Детали события")).append("\n\n");
             
             // Название
-            details.append("📌 ").append(bold(event.getTitle())).append("\n\n");
+            details.append("📌 ").append(bold(event.getTitle()));
+            
+            // Добавляем эмодзи 🔔 если есть напоминания (Требование 9.1)
+            boolean hasReminders = reminderService.hasActiveReminders(eventId);
+            if (hasReminders) {
+                details.append(escape(" 🔔"));
+            }
+            details.append("\n\n");
             
             // Дата
             details.append(formatMessage("📅 Дата: %s\n", event.getFormattedDate()));
@@ -578,6 +606,41 @@ public class MyEventsCommandHandler implements CommandHandler {
                 details.append(escape("✅ Статус: Завершено\n"));
             } else if (event.getStatus() == Event.EventStatus.DELETED) {
                 details.append(escape("🗑️ Статус: Удалено\n"));
+            }
+            
+            // Секция "Напоминания" (Требования 9.2, 9.3, 9.4, 9.5)
+            details.append("\n");
+            details.append("🔔 ").append(bold("Напоминания")).append("\n");
+            
+            if (hasReminders) {
+                // Получаем список напоминаний
+                List<ru.golubyatnikov.family.calendar.bot.model.Reminder> reminders = 
+                    reminderService.getEventReminders(eventId);
+                
+                // Фильтруем только неотправленные напоминания
+                List<ru.golubyatnikov.family.calendar.bot.model.Reminder> activeReminders = 
+                    reminders.stream()
+                        .filter(r -> !r.getSent())
+                        .sorted((r1, r2) -> r1.getReminderTime().compareTo(r2.getReminderTime()))
+                        .toList();
+                
+                if (!activeReminders.isEmpty()) {
+                    for (ru.golubyatnikov.family.calendar.bot.model.Reminder reminder : activeReminders) {
+                        String reminderText = getReminderDisplayText(reminder);
+                        // Помечаем автоматические напоминания (Требование 9.3)
+                        if (isAutomaticReminderType(reminder.getReminderType())) {
+                            details.append(formatMessage("  • %s (автоматически)\n", reminderText));
+                        } else {
+                            details.append(formatMessage("  • %s (настроено вручную)\n", reminderText));
+                        }
+                    }
+                } else {
+                    // Все напоминания уже отправлены
+                    details.append(escape("  Все напоминания уже отправлены\n"));
+                }
+            } else {
+                // Напоминаний нет (Требование 9.4)
+                details.append(escape("  Напоминания не настроены\n"));
             }
             
             log.debug("Детали события ID={} успешно отображены пользователю ID={}", eventId, userId);
@@ -934,5 +997,36 @@ public class MyEventsCommandHandler implements CommandHandler {
     @Override
     public String getDescription() {
         return "Управление моими событиями";
+    }
+    
+    /**
+     * Возвращает текстовое описание напоминания для отображения.
+     * 
+     * @param reminder напоминание
+     * @return текстовое описание
+     */
+    private String getReminderDisplayText(ru.golubyatnikov.family.calendar.bot.model.Reminder reminder) {
+        return switch (reminder.getReminderType()) {
+            case MORNING_OF_DAY -> "Утром в день события";
+            case EVENING_BEFORE -> "Вечером накануне";
+            case ONE_HOUR_BEFORE -> "За 1 час до события";
+            case TEN_MINUTES_BEFORE -> "За 10 минут до события";
+            case FIFTEEN_MINUTES_BEFORE -> "За 15 минут до события";
+            case CUSTOM -> "За " + reminder.getCustomMinutes() + " минут до события";
+        };
+    }
+    
+    /**
+     * Проверяет, является ли тип напоминания автоматическим.
+     * 
+     * <p>Автоматические типы: EVENING_BEFORE, ONE_HOUR_BEFORE, FIFTEEN_MINUTES_BEFORE</p>
+     * 
+     * @param type тип напоминания
+     * @return true если тип автоматический, иначе false
+     */
+    private boolean isAutomaticReminderType(ru.golubyatnikov.family.calendar.bot.model.Reminder.ReminderType type) {
+        return type == ru.golubyatnikov.family.calendar.bot.model.Reminder.ReminderType.EVENING_BEFORE ||
+               type == ru.golubyatnikov.family.calendar.bot.model.Reminder.ReminderType.ONE_HOUR_BEFORE ||
+               type == ru.golubyatnikov.family.calendar.bot.model.Reminder.ReminderType.FIFTEEN_MINUTES_BEFORE;
     }
 }

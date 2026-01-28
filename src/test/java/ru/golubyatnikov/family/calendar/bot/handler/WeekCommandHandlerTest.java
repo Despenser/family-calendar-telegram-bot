@@ -53,6 +53,9 @@ class WeekCommandHandlerTest {
 
     @Mock
     private TelegramMessageService messageService;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
 
     @Mock
     private Message message;
@@ -64,7 +67,7 @@ class WeekCommandHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new WeekCommandHandler(eventService, messageService);
+        handler = new WeekCommandHandler(eventService, messageService, reminderService);
     }
 
     @Test

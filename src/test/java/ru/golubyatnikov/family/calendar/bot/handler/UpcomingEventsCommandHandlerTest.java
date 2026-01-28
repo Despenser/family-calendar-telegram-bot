@@ -49,6 +49,9 @@ class UpcomingEventsCommandHandlerTest {
 
     @Mock
     private EventService eventService;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
 
     @Mock
     private Message message;
@@ -60,7 +63,7 @@ class UpcomingEventsCommandHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new UpcomingEventsCommandHandler(eventService);
+        handler = new UpcomingEventsCommandHandler(eventService, reminderService);
     }
 
     @Test

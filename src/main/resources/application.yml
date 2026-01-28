@@ -82,6 +82,16 @@ bot:
 
 # Конфигурация системы напоминаний
 reminder:
+  # Настройки автоматических напоминаний по умолчанию
+  defaults:
+    # Включить/выключить автоматическое создание напоминаний при создании события
+    enabled: true
+    # Список типов напоминаний, создаваемых автоматически
+    # Доступные типы: MORNING_OF_DAY, EVENING_BEFORE, ONE_HOUR_BEFORE, FIFTEEN_MINUTES_BEFORE, CUSTOM
+    types:
+      - EVENING_BEFORE
+      - ONE_HOUR_BEFORE
+      - FIFTEEN_MINUTES_BEFORE
   scheduler:
     # Включить/выключить планировщик напоминаний
     enabled: true

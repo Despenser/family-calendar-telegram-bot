@@ -72,6 +72,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     /**
      * Находит все события пользователя с определенным статусом, отсортированные по дате и времени в порядке возрастания.
      * 
+     * <p>Кэширование отключено для обеспечения получения актуальных данных из базы данных.</p>
+     * 
      * @param userId идентификатор пользователя
      * @param status статус события (ACTIVE, DELETED, COMPLETED, DRAFT)
      *
@@ -79,6 +81,12 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
+    @org.springframework.data.jpa.repository.QueryHints(
+        @jakarta.persistence.QueryHint(
+            name = org.hibernate.annotations.QueryHints.CACHEABLE, 
+            value = "false"
+        )
+    )
     List<Event> findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(Long userId, Event.EventStatus status);
     
     /**
@@ -431,4 +439,24 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     int countByUserIdAndStatus(Long userId, Event.EventStatus status);
+    
+    /**
+     * Находит событие по ID с eager загрузкой пользователя.
+     * 
+     * <p>Используется в случаях, когда необходим доступ к полям User вне транзакции,
+     * например, при обработке callback-запросов для включения напоминаний.
+     * Eager загрузка User предотвращает LazyInitializationException при попытке
+     * доступа к свойствам пользователя после закрытия сессии Hibernate.</p>
+     * 
+     * <p>Аннотация {@code @EntityGraph} указывает Hibernate загрузить связанную
+     * сущность User в том же запросе, используя JOIN вместо отдельного запроса.</p>
+     * 
+     * @param id идентификатор события
+     *
+     * @return Optional с событием и инициализированным User, или empty если событие не найдено
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    @Query("SELECT e FROM Event e WHERE e.id = :id")
+    @EntityGraph(attributePaths = {"user"})
+    Optional<Event> findByIdWithUser(@Param("id") Long id);
 }

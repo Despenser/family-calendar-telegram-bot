@@ -44,6 +44,7 @@ public class TodayCommandHandler implements CommandHandler {
     
     private final EventService eventService;
     private final TelegramMessageService messageService;
+    private final ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
     
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy - EEEE", Locale.forLanguageTag("ru"));
     
@@ -75,7 +76,7 @@ public class TodayCommandHandler implements CommandHandler {
                     todayEvents.size(), user.getFamily().getId());
             
             // Фильтрация событий: только на сегодня
-            LocalDate today = LocalDate.now();
+            LocalDate today = user.getCurrentDate();
             List<Event> todayOnlyEvents = todayEvents.stream()
                 .filter(event -> event.getEventDate().equals(today))
                 .collect(Collectors.toList());
@@ -121,7 +122,8 @@ public class TodayCommandHandler implements CommandHandler {
             // Для команды /today не добавляем заголовок дня, так как дата уже указана в основном заголовке
             
             for (Event event : filteredEvents) {
-                messageBuilder.append(EventFormatter.formatEvent(event, user));
+                boolean hasReminders = reminderService.hasActiveReminders(event.getId());
+                messageBuilder.append(EventFormatter.formatEvent(event, user, hasReminders));
             }
             
             messageBuilder.append(EventFormatter.formatEventCounter(filteredEvents.size()));

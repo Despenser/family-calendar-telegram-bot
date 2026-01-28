@@ -44,12 +44,43 @@ class KeyboardServiceTest {
     
     @Mock
     private AttachmentService attachmentService;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
 
     private KeyboardService keyboardService;
 
     @BeforeEach
     void setUp() {
-        keyboardService = new KeyboardService(eventRepository, attachmentService);
+        keyboardService = new KeyboardService(eventRepository, attachmentService, reminderService);
+    }
+
+    /**
+     * Создает mock User с указанной семьей и timezone для тестов.
+     * 
+     * @param familyId ID семьи
+     * @param timezone timezone пользователя
+     * @return mock User
+     */
+    private User createMockUser(Long familyId, String timezone) {
+        Family family = Family.builder().id(familyId).name("Test Family").build();
+        return User.builder()
+                .id(1L)
+                .telegramId(12345L)
+                .firstName("Test")
+                .family(family)
+                .timezone(timezone)
+                .build();
+    }
+
+    /**
+     * Создает mock User с указанной семьей и default timezone (Europe/Moscow).
+     * 
+     * @param familyId ID семьи
+     * @return mock User
+     */
+    private User createMockUser(Long familyId) {
+        return createMockUser(familyId, "Europe/Moscow");
     }
 
     @Test
@@ -501,13 +532,14 @@ class KeyboardServiceTest {
         int year = now.getYear();
         int month = now.getMonthValue();
         Long familyId = 1L;
+        User user = createMockUser(familyId);
         
         when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
             eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(Event.EventStatus.ACTIVE)))
             .thenReturn(new ArrayList<>());
 
         // When
-        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, familyId);
+        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, user);
 
         // Then
         assertNotNull(calendar);
@@ -534,13 +566,14 @@ class KeyboardServiceTest {
         int year = now.getYear();
         int month = now.getMonthValue();
         Long familyId = 1L;
+        User user = createMockUser(familyId);
         
         when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
             eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(Event.EventStatus.ACTIVE)))
             .thenReturn(new ArrayList<>());
 
         // When
-        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, familyId);
+        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, user);
 
         // Then
         assertNotNull(calendar);
@@ -564,13 +597,14 @@ class KeyboardServiceTest {
         int year = eventDate.getYear();
         int month = eventDate.getMonthValue();
         Long familyId = 1L;
+        User user = createMockUser(familyId);
         
         // Создаем тестовое событие
         Family family = Family.builder().id(familyId).name("Test Family").build();
-        User user = User.builder().id(1L).firstName("Алексей").family(family).build();
+        User eventUser = User.builder().id(1L).firstName("Алексей").family(family).build();
         Event event = Event.builder()
             .id(1L)
-            .user(user)
+            .user(eventUser)
             .family(family)
             .eventDate(eventDate)
             .eventTime(LocalTime.of(10, 0))
@@ -582,7 +616,7 @@ class KeyboardServiceTest {
             .thenReturn(List.of(event));
 
         // When
-        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, familyId);
+        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, user);
 
         // Then
         assertNotNull(calendar);
@@ -615,13 +649,14 @@ class KeyboardServiceTest {
         int year = eventDate.getYear();
         int month = eventDate.getMonthValue();
         Long familyId = 1L;
+        User mockUser = createMockUser(familyId);
         
         // Создаем событие с пользователем, имя которого начинается с маленькой буквы
         Family family = Family.builder().id(familyId).name("Test Family").build();
-        User user = User.builder().id(1L).firstName("иван").family(family).build();
+        User eventUser = User.builder().id(1L).firstName("иван").family(family).build();
         Event event = Event.builder()
             .id(1L)
-            .user(user)
+            .user(eventUser)
             .family(family)
             .eventDate(eventDate)
             .eventTime(LocalTime.of(14, 30))
@@ -633,7 +668,7 @@ class KeyboardServiceTest {
             .thenReturn(List.of(event));
 
         // When
-        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, familyId);
+        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, mockUser);
 
         // Then
         List<List<InlineKeyboardButton>> rows = calendar.getKeyboard();
@@ -662,6 +697,7 @@ class KeyboardServiceTest {
         int year = eventDate.getYear();
         int month = eventDate.getMonthValue();
         Long familyId = 1L;
+        User mockUser = createMockUser(familyId);
         
         // Создаем несколько событий на один день
         Family family = Family.builder().id(familyId).name("Test Family").build();
@@ -691,7 +727,7 @@ class KeyboardServiceTest {
             .thenReturn(List.of(event1, event2));
 
         // When
-        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, familyId);
+        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, mockUser);
 
         // Then
         List<List<InlineKeyboardButton>> rows = calendar.getKeyboard();
@@ -726,6 +762,7 @@ class KeyboardServiceTest {
         int year = now.getYear();
         int month = now.getMonthValue();
         Long familyId = 1L;
+        User user = createMockUser(familyId);
         
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDate monthStart = yearMonth.atDay(1);
@@ -736,7 +773,7 @@ class KeyboardServiceTest {
             .thenReturn(new ArrayList<>());
 
         // When
-        keyboardService.createCalendarKeyboard(year, month, familyId);
+        keyboardService.createCalendarKeyboard(year, month, user);
 
         // Then
         // Проверяем, что метод репозитория был вызван с правильными параметрами
@@ -752,13 +789,14 @@ class KeyboardServiceTest {
         int year = now.getYear();
         int month = now.getMonthValue();
         Long familyId = 1L;
+        User user = createMockUser(familyId);
         
         when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
             eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(Event.EventStatus.ACTIVE)))
             .thenReturn(new ArrayList<>());
 
         // When
-        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, familyId);
+        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, user);
 
         // Then
         assertNotNull(calendar);
@@ -791,6 +829,7 @@ class KeyboardServiceTest {
         int year = now.getYear();
         int month = now.getMonthValue();
         Long familyId = 1L;
+        User mockUser = createMockUser(familyId);
         
         // Создаем события от разных пользователей
         Family family = Family.builder().id(familyId).name("Test Family").build();
@@ -820,7 +859,7 @@ class KeyboardServiceTest {
             .thenReturn(List.of(event1, event2));
 
         // When
-        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, familyId);
+        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, mockUser);
 
         // Then
         assertNotNull(calendar);
@@ -849,11 +888,12 @@ class KeyboardServiceTest {
         int year = 2025;
         int invalidMonth = 13;
         Long familyId = 1L;
+        User user = createMockUser(familyId);
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> keyboardService.createCalendarKeyboard(year, invalidMonth, familyId)
+            () -> keyboardService.createCalendarKeyboard(year, invalidMonth, user)
         );
         
         assertEquals("Month must be between 1 and 12", exception.getMessage());
@@ -1017,8 +1057,8 @@ class KeyboardServiceTest {
     // ========== Тесты для createEventActionsKeyboard(Event, Long) ==========
 
     @Test
-    @DisplayName("Должен создать клавиатуру с двумя рядами для активного события владельца")
-    void shouldCreateTwoRowKeyboardForActiveOwnerEvent() {
+    @DisplayName("Должен создать клавиатуру с тремя рядами для активного события владельца")
+    void shouldCreateThreeRowKeyboardForActiveOwnerEvent() {
         // Given
         Long eventId = 100L;
         Long userId = 1L;
@@ -1035,6 +1075,7 @@ class KeyboardServiceTest {
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
+        when(reminderService.hasActiveReminders(eventId)).thenReturn(false);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
@@ -1044,7 +1085,7 @@ class KeyboardServiceTest {
         
         List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
         assertNotNull(rows, "Список рядов не должен быть null");
-        assertEquals(2, rows.size(), "Должно быть ровно 2 ряда кнопок");
+        assertEquals(3, rows.size(), "Должно быть ровно 3 ряда кнопок для активного события владельца");
         
         // Проверяем первый ряд: Редактировать | Удалить
         List<InlineKeyboardButton> row1 = rows.get(0);
@@ -1054,18 +1095,24 @@ class KeyboardServiceTest {
         assertEquals("🗑️ Удалить", row1.get(1).getText(), "Вторая кнопка должна быть 'Удалить'");
         assertEquals("delete_event_100", row1.get(1).getCallbackData(), "Callback data удаления должен быть 'delete_event_100'");
         
-        // Проверяем второй ряд: Вложения | Завершить
+        // Проверяем второй ряд: Вложения | Напоминания
         List<InlineKeyboardButton> row2 = rows.get(1);
-        assertEquals(2, row2.size(), "Второй ряд должен содержать 2 кнопки для активного события владельца");
+        assertEquals(2, row2.size(), "Второй ряд должен содержать 2 кнопки (Вложения и Напоминания)");
         assertEquals("📎 Вложения", row2.get(0).getText(), "Первая кнопка второго ряда должна быть 'Вложения'");
         assertEquals("attach_file_list_100", row2.get(0).getCallbackData(), "Callback data вложений должен быть 'attach_file_list_100'");
-        assertEquals("✅ Завершить", row2.get(1).getText(), "Текст кнопки должен быть '✅ Завершить' без слова 'событие'");
-        assertEquals("complete_event_100", row2.get(1).getCallbackData(), "Callback data завершения должен быть 'complete_event_100'");
+        assertEquals("🔔 Вкл. напоминания", row2.get(1).getText(), "Вторая кнопка второго ряда должна быть 'Вкл. напоминания'");
+        assertEquals("enable_reminders_100", row2.get(1).getCallbackData(), "Callback data включения напоминаний должен быть 'enable_reminders_100'");
+        
+        // Проверяем третий ряд: Завершить
+        List<InlineKeyboardButton> row3 = rows.get(2);
+        assertEquals(1, row3.size(), "Третий ряд должен содержать 1 кнопку (Завершить)");
+        assertEquals("✅ Завершить", row3.get(0).getText(), "Текст кнопки должен быть '✅ Завершить' без слова 'событие'");
+        assertEquals("complete_event_100", row3.get(0).getCallbackData(), "Callback data завершения должен быть 'complete_event_100'");
     }
 
     @Test
-    @DisplayName("Должен создать клавиатуру с двумя рядами без кнопки завершения для неактивного события")
-    void shouldCreateTwoRowKeyboardWithoutCompleteButtonForInactiveEvent() {
+    @DisplayName("Должен создать клавиатуру с двумя рядами без кнопок напоминаний и завершения для неактивного события")
+    void shouldCreateTwoRowKeyboardWithoutRemindersAndCompleteButtonForInactiveEvent() {
         // Given
         Long eventId = 101L;
         Long userId = 1L;
@@ -1090,7 +1137,7 @@ class KeyboardServiceTest {
         assertNotNull(keyboard, "Клавиатура не должна быть null");
         
         List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
-        assertEquals(2, rows.size(), "Должно быть ровно 2 ряда кнопок");
+        assertEquals(2, rows.size(), "Должно быть ровно 2 ряда кнопок для неактивного события");
         
         // Проверяем первый ряд: Редактировать | Удалить (без изменений)
         List<InlineKeyboardButton> row1 = rows.get(0);
@@ -1100,7 +1147,7 @@ class KeyboardServiceTest {
         assertEquals("🗑️ Удалить", row1.get(1).getText(), "Вторая кнопка должна быть 'Удалить'");
         assertEquals("delete_event_101", row1.get(1).getCallbackData(), "Callback data удаления должен быть 'delete_event_101'");
         
-        // Проверяем второй ряд: только Вложения
+        // Проверяем второй ряд: только Вложения (без кнопки напоминаний)
         List<InlineKeyboardButton> row2 = rows.get(1);
         assertEquals(1, row2.size(), "Второй ряд должен содержать только 1 кнопку для неактивного события");
         assertEquals("📎 Вложения", row2.get(0).getText(), "Кнопка должна быть 'Вложения'");
@@ -1108,8 +1155,8 @@ class KeyboardServiceTest {
     }
 
     @Test
-    @DisplayName("Должен создать клавиатуру с двумя рядами без кнопки завершения для события другого пользователя")
-    void shouldCreateTwoRowKeyboardWithoutCompleteButtonForOtherUserEvent() {
+    @DisplayName("Должен создать клавиатуру с двумя рядами без кнопок напоминаний и завершения для события другого пользователя")
+    void shouldCreateTwoRowKeyboardWithoutRemindersAndCompleteButtonForOtherUserEvent() {
         // Given
         Long eventId = 102L;
         Long ownerId = 1L;
@@ -1135,7 +1182,7 @@ class KeyboardServiceTest {
         assertNotNull(keyboard, "Клавиатура не должна быть null");
         
         List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
-        assertEquals(2, rows.size(), "Должно быть ровно 2 ряда кнопок");
+        assertEquals(2, rows.size(), "Должно быть ровно 2 ряда кнопок для события другого пользователя");
         
         // Проверяем первый ряд: Редактировать | Удалить (без изменений)
         List<InlineKeyboardButton> row1 = rows.get(0);
@@ -1145,7 +1192,7 @@ class KeyboardServiceTest {
         assertEquals("🗑️ Удалить", row1.get(1).getText(), "Вторая кнопка должна быть 'Удалить'");
         assertEquals("delete_event_102", row1.get(1).getCallbackData(), "Callback data удаления должен быть 'delete_event_102'");
         
-        // Проверяем второй ряд: только Вложения
+        // Проверяем второй ряд: только Вложения (без кнопки напоминаний)
         List<InlineKeyboardButton> row2 = rows.get(1);
         assertEquals(1, row2.size(), "Второй ряд должен содержать только 1 кнопку для события другого пользователя");
         assertEquals("📎 Вложения", row2.get(0).getText(), "Кнопка должна быть 'Вложения'");
@@ -1171,16 +1218,18 @@ class KeyboardServiceTest {
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(3L);
+        when(reminderService.hasActiveReminders(eventId)).thenReturn(false);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
 
         // Then
         List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
-        assertEquals(2, rows.size(), "Должно быть ровно 2 ряда кнопок");
+        assertEquals(3, rows.size(), "Должно быть ровно 3 ряда кнопок для активного события владельца");
         
+        // Проверяем второй ряд: Вложения с счетчиком | Напоминания
         List<InlineKeyboardButton> row2 = rows.get(1);
-        assertEquals(2, row2.size(), "Второй ряд должен содержать 2 кнопки (Вложения и Завершить)");
+        assertEquals(2, row2.size(), "Второй ряд должен содержать 2 кнопки (Вложения и Напоминания)");
         
         assertEquals("📎 Вложения (3)", row2.get(0).getText(), 
                 "Текст кнопки должен содержать счетчик вложений");
@@ -1207,13 +1256,14 @@ class KeyboardServiceTest {
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
+        when(reminderService.hasActiveReminders(eventId)).thenReturn(false);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
 
         // Then
         List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
-        assertEquals(2, rows.size(), "Должно быть ровно 2 ряда кнопок");
+        assertEquals(3, rows.size(), "Должно быть ровно 3 ряда кнопок для активного события владельца");
         
         // Проверяем callback data первого ряда
         List<InlineKeyboardButton> row1 = rows.get(0);
@@ -1223,12 +1273,18 @@ class KeyboardServiceTest {
         assertEquals("delete_event_104", row1.get(1).getCallbackData(), 
                 "Callback data кнопки удаления должен быть 'delete_event_{eventId}'");
         
-        // Проверяем callback data второго ряда
+        // Проверяем callback data второго ряда (Вложения и Напоминания)
         List<InlineKeyboardButton> row2 = rows.get(1);
-        assertEquals(2, row2.size(), "Второй ряд должен содержать 2 кнопки");
+        assertEquals(2, row2.size(), "Второй ряд должен содержать 2 кнопки (Вложения и Напоминания)");
         assertEquals("attach_file_list_104", row2.get(0).getCallbackData(), 
                 "Callback data кнопки вложений должен быть 'attach_file_list_{eventId}'");
-        assertEquals("complete_event_104", row2.get(1).getCallbackData(), 
+        assertEquals("enable_reminders_104", row2.get(1).getCallbackData(), 
+                "Callback data кнопки включения напоминаний должен быть 'enable_reminders_{eventId}'");
+        
+        // Проверяем callback data третьего ряда (Завершить)
+        List<InlineKeyboardButton> row3 = rows.get(2);
+        assertEquals(1, row3.size(), "Третий ряд должен содержать 1 кнопку (Завершить)");
+        assertEquals("complete_event_104", row3.get(0).getCallbackData(), 
                 "Callback data кнопки завершения должен быть 'complete_event_{eventId}'");
     }
 
@@ -1351,15 +1407,89 @@ class KeyboardServiceTest {
 
         // Then
         List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
-        assertEquals(2, rows.size(), "Должно быть ровно 2 ряда кнопок");
+        assertEquals(2, rows.size(), "Должно быть ровно 2 ряда кнопок для неактивного события");
         
-        // Проверяем второй ряд: только Вложения с счетчиком
+        // Проверяем второй ряд: только Вложения с счетчиком (без кнопки напоминаний)
         List<InlineKeyboardButton> row2 = rows.get(1);
         assertEquals(1, row2.size(), "Второй ряд должен содержать только 1 кнопку для неактивного события");
         assertEquals("📎 Вложения (5)", row2.get(0).getText(), 
                 "Текст кнопки должен содержать счетчик вложений");
         assertEquals("attach_file_list_107", row2.get(0).getCallbackData(), 
                 "Callback data вложений должен быть 'attach_file_list_107'");
+    }
+
+    @Test
+    @DisplayName("Должен отображать 'Включить напоминания' когда нет активных напоминаний")
+    void shouldDisplayEnableRemindersWhenNoActiveReminders() {
+        // Given
+        Long eventId = 108L;
+        Long userId = 1L;
+        
+        Family family = Family.builder().id(1L).name("Test Family").build();
+        User user = User.builder().id(userId).firstName("Сергей").family(family).build();
+        Event event = Event.builder()
+            .id(eventId)
+            .user(user)
+            .family(family)
+            .eventDate(LocalDate.now().plusDays(1))
+            .eventTime(LocalTime.of(10, 0))
+            .status(Event.EventStatus.ACTIVE)
+            .build();
+        
+        when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
+        when(reminderService.hasActiveReminders(eventId)).thenReturn(false);
+
+        // When
+        InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
+
+        // Then
+        List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
+        assertEquals(3, rows.size(), "Должно быть ровно 3 ряда кнопок");
+        
+        // Проверяем второй ряд: Вложения | Включить напоминания
+        List<InlineKeyboardButton> row2 = rows.get(1);
+        assertEquals(2, row2.size(), "Второй ряд должен содержать 2 кнопки");
+        assertEquals("🔔 Вкл. напоминания", row2.get(1).getText(), 
+                "Текст кнопки должен быть 'Включить напоминания' когда нет активных напоминаний");
+        assertEquals("enable_reminders_108", row2.get(1).getCallbackData(), 
+                "Callback data должен быть 'enable_reminders_{eventId}'");
+    }
+
+    @Test
+    @DisplayName("Должен отображать 'Отключить напоминания' когда есть активные напоминания")
+    void shouldDisplayDisableRemindersWhenActiveRemindersExist() {
+        // Given
+        Long eventId = 109L;
+        Long userId = 1L;
+        
+        Family family = Family.builder().id(1L).name("Test Family").build();
+        User user = User.builder().id(userId).firstName("Елена").family(family).build();
+        Event event = Event.builder()
+            .id(eventId)
+            .user(user)
+            .family(family)
+            .eventDate(LocalDate.now().plusDays(1))
+            .eventTime(LocalTime.of(14, 0))
+            .status(Event.EventStatus.ACTIVE)
+            .build();
+        
+        when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
+        when(reminderService.hasActiveReminders(eventId)).thenReturn(true);
+
+        // When
+        InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
+
+        // Then
+        List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
+        assertEquals(3, rows.size(), "Должно быть ровно 3 ряда кнопок");
+        
+        // Проверяем второй ряд: Вложения | Отключить напоминания
+        List<InlineKeyboardButton> row2 = rows.get(1);
+        assertEquals(2, row2.size(), "Второй ряд должен содержать 2 кнопки");
+        assertEquals("🔕 Откл. напоминания", row2.get(1).getText(), 
+                "Текст кнопки должен быть 'Отключить напоминания' когда есть активные напоминания");
+        assertEquals("disable_reminders_109", row2.get(1).getCallbackData(), 
+                "Callback data должен быть 'disable_reminders_{eventId}'");
     }
 }
 

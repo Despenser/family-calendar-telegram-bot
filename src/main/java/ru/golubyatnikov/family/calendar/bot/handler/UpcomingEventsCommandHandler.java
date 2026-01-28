@@ -74,14 +74,18 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
     private static final int DEFAULT_DAYS = 30;
     
     private final EventService eventService;
+    private final ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
 
     /**
      * Конструктор для внедрения зависимостей.
      * 
      * @param eventService сервис для работы с событиями
+     * @param reminderService сервис для работы с напоминаниями
      */
-    public UpcomingEventsCommandHandler(EventService eventService) {
+    public UpcomingEventsCommandHandler(EventService eventService, 
+                                       ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService) {
         this.eventService = eventService;
+        this.reminderService = reminderService;
     }
 
     /**
@@ -226,7 +230,7 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
         messageBuilder.append(escape("\n\n"));
         
         // Сортировка дат и вывод событий по дням
-        LocalDate today = LocalDate.now();
+        LocalDate today = user.getCurrentDate();
         LocalDate endDate = today.plusDays(DEFAULT_DAYS - 1);
         boolean firstDay = true;
         
@@ -246,7 +250,8 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
                 
                 // Добавляем события дня
                 for (Event event : dayEvents) {
-                    messageBuilder.append(EventFormatter.formatEvent(event, user));
+                    boolean hasReminders = reminderService.hasActiveReminders(event.getId());
+                    messageBuilder.append(EventFormatter.formatEvent(event, user, hasReminders));
                 }
             }
         }

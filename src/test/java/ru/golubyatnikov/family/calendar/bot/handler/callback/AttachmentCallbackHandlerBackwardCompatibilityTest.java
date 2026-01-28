@@ -300,7 +300,7 @@ class AttachmentCallbackHandlerBackwardCompatibilityTest {
         attachments.add(createAttachment(2L, eventId));
         
         // Создаем реальный экземпляр KeyboardService для этого теста
-        KeyboardService realKeyboardService = new KeyboardService(null, null);
+        KeyboardService realKeyboardService = new KeyboardService(null, null, null);
         
         // Act
         InlineKeyboardMarkup keyboard = realKeyboardService.createAttachmentsListKeyboard(eventId, attachments, true);
@@ -347,7 +347,7 @@ class AttachmentCallbackHandlerBackwardCompatibilityTest {
         Long attachmentId = 789L;
         
         // Создаем реальный экземпляр KeyboardService для этого теста
-        KeyboardService realKeyboardService = new KeyboardService(null, null);
+        KeyboardService realKeyboardService = new KeyboardService(null, null, null);
         
         // Act
         InlineKeyboardMarkup keyboard = realKeyboardService.createDeleteAttachmentConfirmationKeyboard(eventId, attachmentId);
@@ -383,7 +383,7 @@ class AttachmentCallbackHandlerBackwardCompatibilityTest {
         Long eventId = 999L;
         
         // Создаем реальный экземпляр KeyboardService для этого теста
-        KeyboardService realKeyboardService = new KeyboardService(null, null);
+        KeyboardService realKeyboardService = new KeyboardService(null, null, null);
         
         // Act
         InlineKeyboardMarkup keyboard = realKeyboardService.createFileViewKeyboard(eventId);
@@ -414,7 +414,7 @@ class AttachmentCallbackHandlerBackwardCompatibilityTest {
         Long attachmentId = 200L;
         
         // Создаем реальный экземпляр KeyboardService для этого теста
-        KeyboardService realKeyboardService = new KeyboardService(null, null);
+        KeyboardService realKeyboardService = new KeyboardService(null, null, null);
         
         // Act & Assert - проверяем все форматы
         

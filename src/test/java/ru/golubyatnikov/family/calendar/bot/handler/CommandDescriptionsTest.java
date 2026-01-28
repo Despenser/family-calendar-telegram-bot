@@ -21,7 +21,7 @@ class CommandDescriptionsTest {
     @Test
     @DisplayName("Требование 4.1: /today должна иметь описание 'Показать события на сегодня'")
     void todayCommandShouldHaveCorrectDescription() {
-        TodayCommandHandler handler = new TodayCommandHandler(null, null);
+        TodayCommandHandler handler = new TodayCommandHandler(null, null, null);
         assertEquals("Показать события на сегодня", handler.getDescription(),
                 "Описание команды /today не соответствует требованию 4.1");
     }
@@ -29,7 +29,7 @@ class CommandDescriptionsTest {
     @Test
     @DisplayName("Требование 4.2: /week должна иметь описание 'Показать события на неделю (7 дней)'")
     void weekCommandShouldHaveCorrectDescription() {
-        WeekCommandHandler handler = new WeekCommandHandler(null, null);
+        WeekCommandHandler handler = new WeekCommandHandler(null, null, null);
         assertEquals("Показать события на неделю (7 дней)", handler.getDescription(),
                 "Описание команды /week не соответствует требованию 4.2");
     }
@@ -69,7 +69,7 @@ class CommandDescriptionsTest {
     @Test
     @DisplayName("Требование 4.7: /upcoming_events должна иметь описание 'Показать планы на 30 дней'")
     void upcomingEventsCommandShouldHaveCorrectDescription() {
-        UpcomingEventsCommandHandler handler = new UpcomingEventsCommandHandler(null);
+        UpcomingEventsCommandHandler handler = new UpcomingEventsCommandHandler(null, null);
         assertEquals("Показать планы на 30 дней", handler.getDescription(),
                 "Описание команды /upcoming_events не соответствует требованию 4.7");
     }

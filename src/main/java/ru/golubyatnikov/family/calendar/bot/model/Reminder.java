@@ -42,7 +42,7 @@ public class Reminder {
      * Тип напоминания: MORNING_OF_DAY, EVENING_BEFORE, ONE_HOUR_BEFORE, TEN_MINUTES_BEFORE, CUSTOM
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "reminder_type", nullable = false)
+    @Column(name = "reminder_type", nullable = false, length = 50)
     private ReminderType reminderType;
     
     /**
@@ -52,7 +52,21 @@ public class Reminder {
     private Integer customMinutes;
     
     /**
-     * Рассчитанное время отправки напоминания
+     * Рассчитанное время отправки напоминания в UTC.
+     * 
+     * <p><b>ВАЖНО:</b> Это поле хранит время в UTC, независимо от таймзоны пользователя.</p>
+     * <ul>
+     *   <li>При расчете времени напоминания оно конвертируется из таймзоны пользователя в UTC</li>
+     *   <li>При чтении из БД интерпретируется как UTC</li>
+     *   <li>При отображении пользователю конвертируется из UTC в таймзону пользователя</li>
+     * </ul>
+     * 
+     * <p>Хранение в UTC обеспечивает:</p>
+     * <ul>
+     *   <li>Консистентное сравнение времени при отправке напоминаний</li>
+     *   <li>Корректную работу для пользователей в разных таймзонах</li>
+     *   <li>Отсутствие проблем с переходом на летнее/зимнее время</li>
+     * </ul>
      */
     @Column(name = "reminder_time", nullable = false)
     private LocalDateTime reminderTime;
@@ -65,7 +79,7 @@ public class Reminder {
     private Boolean sent = false;
     
     /**
-     * Дата и время фактической отправки напоминания
+     * Дата и время фактической отправки напоминания в UTC
      */
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
@@ -91,8 +105,15 @@ public class Reminder {
         
         /**
          * За 10 минут до события
+         * @deprecated Используйте {@link #FIFTEEN_MINUTES_BEFORE} вместо этого
          */
+        @Deprecated
         TEN_MINUTES_BEFORE,
+        
+        /**
+         * За 15 минут до события
+         */
+        FIFTEEN_MINUTES_BEFORE,
         
         /**
          * Свое время (указывается в customMinutes)

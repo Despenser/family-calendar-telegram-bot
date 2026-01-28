@@ -87,8 +87,17 @@ public enum CallbackPrefix {
     /** Удаление напоминания (формат: delete_reminder_{reminderId}) */
     DELETE_REMINDER("delete_reminder_"),
     
+    /** Отключение автоматических напоминаний (формат: disable_reminders_{eventId}) */
+    DISABLE_REMINDERS("disable_reminders_"),
+    
+    /** Включение автоматических напоминаний (формат: enable_reminders_{eventId}) */
+    ENABLE_REMINDERS("enable_reminders_"),
+    
     /** Старая обработка напоминаний (deprecated) */
     REMINDER("reminder_"),
+    
+    /** Возврат к минималистичному виду напоминания (формат: back_to_reminder_{eventId}_{reminderId}) */
+    BACK_TO_REMINDER("back_to_reminder_"),
     
     // ===== Повторения =====
     

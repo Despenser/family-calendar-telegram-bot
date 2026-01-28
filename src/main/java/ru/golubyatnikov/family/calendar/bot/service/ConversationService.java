@@ -44,6 +44,7 @@ public class ConversationService {
     
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
+    private final EventService eventService;
     
     /**
      * Начинает новый диалог создания события.
@@ -203,6 +204,7 @@ public class ConversationService {
     /**
      * Завершает создание события, обновляя описание и меняя статус на ACTIVE.
      * После этого событие становится полноценным и доступным для отображения.
+     * Также автоматически создаются напоминания по умолчанию.
      * 
      * @param userId идентификатор пользователя
      * @param description описание события (может быть null или пустым)
@@ -216,6 +218,9 @@ public class ConversationService {
         
         Event completed = eventRepository.save(draft);
         log.info("Completed event creation: {}", completed.getId());
+        
+        // Автоматически создаем напоминания по умолчанию
+        eventService.handleEventCreated(completed, draft.getUser());
         
         return completed;
     }

@@ -5,7 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * Entity класс для представления пользователя Telegram бота.
@@ -83,6 +85,15 @@ public class User {
     private EventFilter eventFilter = EventFilter.ALL;
 
     /**
+     * Часовой пояс пользователя в формате IANA (например, "Europe/Moscow").
+     * Используется для корректной валидации и отображения дат и времени.
+     * По умолчанию установлен в "Europe/Moscow" (UTC+3).
+     */
+    @Column(name = "timezone", length = 50)
+    @Builder.Default
+    private String timezone = "Europe/Moscow";
+
+    /**
      * Дата и время регистрации пользователя в системе.
      * Устанавливается автоматически при создании записи.
      */
@@ -117,5 +128,32 @@ public class User {
      */
     public boolean hasFamily() {
         return family != null;
+    }
+
+    /**
+     * Получает ZoneId пользователя для работы с датами и временем.
+     * 
+     * @return ZoneId пользователя
+     */
+    public ZoneId getZoneId() {
+        return ZoneId.of(timezone);
+    }
+
+    /**
+     * Получает текущую дату в таймзоне пользователя.
+     * 
+     * @return текущая дата в таймзоне пользователя
+     */
+    public LocalDate getCurrentDate() {
+        return LocalDate.now(getZoneId());
+    }
+
+    /**
+     * Получает текущее время в таймзоне пользователя.
+     * 
+     * @return текущее время в таймзоне пользователя
+     */
+    public LocalDateTime getCurrentDateTime() {
+        return LocalDateTime.now(getZoneId());
     }
 }

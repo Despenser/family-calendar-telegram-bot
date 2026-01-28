@@ -47,6 +47,7 @@ public class WeekCommandHandler implements CommandHandler {
     
     private final EventService eventService;
     private final TelegramMessageService messageService;
+    private final ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
     
     private static final int WEEK_DAYS = 7;
     private static final DateTimeFormatter DATE_RANGE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
@@ -117,14 +118,14 @@ public class WeekCommandHandler implements CommandHandler {
             StringBuilder messageBuilder = new StringBuilder();
             
             // Заголовок команды
-            LocalDate startDate = LocalDate.now();
+            LocalDate startDate = user.getCurrentDate();
             LocalDate endDate = startDate.plusDays(6);
             String dateRange = startDate.format(DATE_RANGE_FORMATTER) + " - " + endDate.format(DATE_RANGE_FORMATTER);
             messageBuilder.append(EventFormatter.formatCommandHeader("События на неделю", dateRange));
             messageBuilder.append(escape("\n\n"));
             
             // Сортировка дат и вывод событий по дням
-            LocalDate today = LocalDate.now();
+            LocalDate today = user.getCurrentDate();
             boolean firstDay = true;
             for (int i = 0; i < 7; i++) {
                 LocalDate date = today.plusDays(i);
@@ -141,7 +142,8 @@ public class WeekCommandHandler implements CommandHandler {
                     messageBuilder.append(EventFormatter.formatDayHeader(date, today));
                     
                     for (Event event : dayEvents) {
-                        messageBuilder.append(EventFormatter.formatEvent(event, user));
+                        boolean hasReminders = reminderService.hasActiveReminders(event.getId());
+                        messageBuilder.append(EventFormatter.formatEvent(event, user, hasReminders));
                     }
                 }
             }

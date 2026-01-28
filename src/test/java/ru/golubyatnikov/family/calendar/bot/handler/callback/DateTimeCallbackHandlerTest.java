@@ -6,20 +6,27 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.ConversationService;
 import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.UserService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -36,6 +43,7 @@ import static org.mockito.Mockito.*;
  * @since 2026-01-16
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("DateTimeCallbackHandler Unit Tests")
 class DateTimeCallbackHandlerTest {
 
@@ -56,6 +64,9 @@ class DateTimeCallbackHandlerTest {
     
     @Mock
     private EventService eventService;
+    
+    @Mock
+    private UserService userService;
 
     @Mock
     private CallbackQuery callbackQuery;
@@ -72,12 +83,13 @@ class DateTimeCallbackHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new DateTimeCallbackHandler(conversationService, messageService, 
-                keyboardService, messageBuilder, conversationStateService, eventService);
+                keyboardService, messageBuilder, conversationStateService, eventService, userService);
         
         user = new User();
         user.setId(1L);
         user.setTelegramId(123456789L);
         user.setFirstName("Тест");
+        user.setTimezone("Europe/Moscow");
     }
 
     @Test
@@ -141,9 +153,16 @@ class DateTimeCallbackHandlerTest {
         
         // Мокируем режим создания нового события (не редактирование)
         when(conversationStateService.isEditingEvent(user.getId())).thenReturn(false);
+        when(userService.findById(user.getId())).thenReturn(Optional.of(user));
         
+        // Создаем клавиатуру с минимум 3 строками (заголовок + отмена + хотя бы один час)
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        when(keyboardService.createHourSelectionKeyboard()).thenReturn(keyboard);
+        keyboard.setKeyboard(java.util.List.of(
+            java.util.List.of(new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton("Заголовок")),
+            java.util.List.of(new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton("10:00")),
+            java.util.List.of(new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton("Отмена"))
+        ));
+        when(keyboardService.createFilteredHourSelectionKeyboard(any(LocalDate.class), eq(user))).thenReturn(keyboard);
         when(messageBuilder.buildDateSelectedMessage(anyString())).thenReturn("Дата выбрана");
 
         // When
@@ -151,7 +170,7 @@ class DateTimeCallbackHandlerTest {
 
         // Then
         verify(conversationService).updateEventDate(eq(user.getId()), eq(LocalDate.of(2026, 1, 16)));
-        verify(keyboardService).createHourSelectionKeyboard();
+        verify(keyboardService).createFilteredHourSelectionKeyboard(eq(LocalDate.of(2026, 1, 16)), eq(user));
         verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), eq(keyboard));
         verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Дата выбрана"));
     }
@@ -167,15 +186,30 @@ class DateTimeCallbackHandlerTest {
         
         setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
         
+        // Мокируем режим создания нового события (не редактирование)
+        when(conversationStateService.isEditingEvent(user.getId())).thenReturn(false);
+        when(userService.findById(user.getId())).thenReturn(Optional.of(user));
+        
+        // Создаем черновик события с будущей датой
+        LocalDate futureDate = LocalDate.now().plusDays(1);
+        Event draft = createMockEvent(null, futureDate, null, user);
+        when(conversationService.getActiveDraft(user.getId())).thenReturn(draft);
+        
+        // Создаем клавиатуру с минимум 3 строками (заголовок + навигация + хотя бы одна минута)
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        when(keyboardService.createMinuteSelectionKeyboard(14)).thenReturn(keyboard);
+        keyboard.setKeyboard(java.util.List.of(
+            java.util.List.of(new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton("Заголовок")),
+            java.util.List.of(new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton("00")),
+            java.util.List.of(new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton("Назад"))
+        ));
+        when(keyboardService.createFilteredMinuteSelectionKeyboard(eq(14), eq(futureDate), eq(user))).thenReturn(keyboard);
         when(messageBuilder.buildHourSelectedMessage(14)).thenReturn("Час выбран");
 
         // When
         handler.handle(callbackQuery, user);
 
         // Then
-        verify(keyboardService).createMinuteSelectionKeyboard(14);
+        verify(keyboardService).createFilteredMinuteSelectionKeyboard(eq(14), eq(futureDate), eq(user));
         verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), eq(keyboard));
         verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Час выбран"));
     }
@@ -193,6 +227,11 @@ class DateTimeCallbackHandlerTest {
         
         // Мокируем режим создания нового события (не редактирование)
         when(conversationStateService.isEditingEvent(user.getId())).thenReturn(false);
+        when(userService.findById(user.getId())).thenReturn(Optional.of(user));
+        
+        // Мокируем черновик события с будущей датой
+        Event draft = createMockEvent(null, LocalDate.now().plusDays(1), LocalTime.of(10, 0), user);
+        when(conversationService.getActiveDraft(user.getId())).thenReturn(draft);
         
         when(messageBuilder.buildTimeSelectedMessage(anyString())).thenReturn("Время выбрано");
 
@@ -216,15 +255,24 @@ class DateTimeCallbackHandlerTest {
         
         setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
         
+        // Мокируем режим создания нового события (не редактирование)
+        when(conversationStateService.isEditingEvent(user.getId())).thenReturn(false);
+        when(userService.findById(user.getId())).thenReturn(Optional.of(user));
+        
+        // Создаем черновик события с будущей датой
+        LocalDate futureDate = LocalDate.now().plusDays(1);
+        Event draft = createMockEvent(null, futureDate, null, user);
+        when(conversationService.getActiveDraft(user.getId())).thenReturn(draft);
+        
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        when(keyboardService.createHourSelectionKeyboard()).thenReturn(keyboard);
+        when(keyboardService.createFilteredHourSelectionKeyboard(eq(futureDate), eq(user))).thenReturn(keyboard);
         when(messageBuilder.buildSelectHourMessage()).thenReturn("Выберите час");
 
         // When
         handler.handle(callbackQuery, user);
 
         // Then
-        verify(keyboardService).createHourSelectionKeyboard();
+        verify(keyboardService).createFilteredHourSelectionKeyboard(eq(futureDate), eq(user));
         verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), eq(keyboard));
         verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq(""));
     }
@@ -240,6 +288,8 @@ class DateTimeCallbackHandlerTest {
         
         setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
         
+        // Мокируем режим создания нового события (не редактирование)
+        when(conversationStateService.isEditingEvent(user.getId())).thenReturn(false);
         when(messageBuilder.buildEventCancelledMessage()).thenReturn("Отменено");
 
         // When
@@ -248,7 +298,7 @@ class DateTimeCallbackHandlerTest {
         // Then
         verify(conversationService).cancelEventCreation(user.getId());
         verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), isNull());
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Отменено"));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Создание отменено"));
     }
 
     /**
@@ -261,5 +311,164 @@ class DateTimeCallbackHandlerTest {
         when(callbackQuery.getId()).thenReturn(callbackQueryId);
         when(message.getChatId()).thenReturn(chatId);
         when(message.getMessageId()).thenReturn(messageId);
+    }
+    
+    /**
+     * Создает mock User с указанной timezone для тестов.
+     * 
+     * @param userId ID пользователя
+     * @param timezone timezone пользователя
+     * @return mock User
+     */
+    private User createMockUser(Long userId, String timezone) {
+        Family family = Family.builder().id(1L).name("Test Family").build();
+        return User.builder()
+                .id(userId)
+                .telegramId(123456789L)
+                .firstName("Тест")
+                .family(family)
+                .timezone(timezone)
+                .build();
+    }
+    
+    /**
+     * Создает mock Event для тестов.
+     * 
+     * @param eventId ID события
+     * @param eventDate дата события
+     * @param eventTime время события
+     * @param user пользователь-владелец события
+     * @return mock Event
+     */
+    private Event createMockEvent(Long eventId, LocalDate eventDate, LocalTime eventTime, User user) {
+        return Event.builder()
+                .id(eventId)
+                .user(user)
+                .family(user.getFamily())
+                .eventDate(eventDate)
+                .eventTime(eventTime)
+                .status(Event.EventStatus.ACTIVE)
+                .build();
+    }
+    
+    // ========== Тесты валидации времени ==========
+    
+    @Test
+    @DisplayName("Должен принять будущее время для сегодняшнего дня при создании нового события")
+    void shouldAcceptFutureTimeForTodayWhenCreatingNewEvent() throws Exception {
+        // Given
+        User mockUser = createMockUser(1L, "Europe/Moscow");
+        LocalDate today = mockUser.getCurrentDate();
+        LocalTime currentTime = mockUser.getCurrentDateTime().toLocalTime();
+        LocalTime futureTime = currentTime.plusHours(2);
+        
+        String callbackData = "time_" + futureTime.toString();
+        Long chatId = 100L;
+        Integer messageId = 1;
+        String callbackQueryId = "query123";
+        
+        setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
+        
+        // Мокируем режим создания нового события (не редактирование)
+        when(conversationStateService.isEditingEvent(mockUser.getId())).thenReturn(false);
+        when(userService.findById(mockUser.getId())).thenReturn(Optional.of(mockUser));
+        
+        // Создаем черновик события с сегодняшней датой
+        Event draft = createMockEvent(null, today, null, mockUser);
+        when(conversationService.getActiveDraft(mockUser.getId())).thenReturn(draft);
+        
+        when(messageBuilder.buildTimeSelectedMessage(anyString())).thenReturn("Время выбрано");
+
+        // When
+        handler.handle(callbackQuery, mockUser);
+
+        // Then
+        // Проверяем, что время было обновлено
+        verify(conversationService).updateEventTime(eq(mockUser.getId()), eq(futureTime));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Время выбрано"));
+        verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), isNull());
+    }
+    
+    @Test
+    @DisplayName("Должен принять любое время для будущей даты при создании нового события")
+    void shouldAcceptAnyTimeForFutureDateWhenCreatingNewEvent() throws Exception {
+        // Given
+        User mockUser = createMockUser(1L, "Europe/Moscow");
+        LocalDate futureDate = mockUser.getCurrentDate().plusDays(1);
+        LocalTime anyTime = LocalTime.of(8, 0); // Раннее утро
+        
+        String callbackData = "time_" + anyTime.toString();
+        Long chatId = 100L;
+        Integer messageId = 1;
+        String callbackQueryId = "query123";
+        
+        setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
+        
+        // Мокируем режим создания нового события (не редактирование)
+        when(conversationStateService.isEditingEvent(mockUser.getId())).thenReturn(false);
+        when(userService.findById(mockUser.getId())).thenReturn(Optional.of(mockUser));
+        
+        // Создаем черновик события с будущей датой
+        Event draft = createMockEvent(null, futureDate, null, mockUser);
+        when(conversationService.getActiveDraft(mockUser.getId())).thenReturn(draft);
+        
+        when(messageBuilder.buildTimeSelectedMessage(anyString())).thenReturn("Время выбрано");
+
+        // When
+        handler.handle(callbackQuery, mockUser);
+
+        // Then
+        // Проверяем, что время было обновлено без валидации
+        verify(conversationService).updateEventTime(eq(mockUser.getId()), eq(anyTime));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Время выбрано"));
+        verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), isNull());
+    }
+    
+    @Test
+    @DisplayName("Должен принять будущее время для сегодняшнего дня при редактировании события")
+    void shouldAcceptFutureTimeForTodayWhenEditingEvent() throws Exception {
+        // Given
+        User mockUser = createMockUser(1L, "Europe/Moscow");
+        LocalDate today = mockUser.getCurrentDate();
+        LocalTime currentTime = mockUser.getCurrentDateTime().toLocalTime();
+        LocalTime futureTime = currentTime.plusHours(1);
+        
+        String callbackData = "time_" + futureTime.toString();
+        Long chatId = 100L;
+        Integer messageId = 1;
+        String callbackQueryId = "query123";
+        Long eventId = 101L;
+        
+        setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
+        
+        // Мокируем режим редактирования события
+        when(conversationStateService.isEditingEvent(mockUser.getId())).thenReturn(true);
+        when(userService.findById(mockUser.getId())).thenReturn(Optional.of(mockUser));
+        ConversationStateService.EditingContext context = new ConversationStateService.EditingContext(
+                eventId, chatId, ConversationStateService.EditField.TIME, messageId);
+        when(conversationStateService.getEditingContext(mockUser.getId())).thenReturn(context);
+        
+        // Создаем событие с сегодняшней датой
+        Event event = createMockEvent(eventId, today, LocalTime.of(10, 0), mockUser);
+        when(eventService.getEventById(eventId)).thenReturn(event);
+        
+        // Мокируем обновленное событие
+        Event updatedEvent = createMockEvent(eventId, today, futureTime, mockUser);
+        when(eventService.updateEventTime(eq(eventId), eq(mockUser.getId()), eq(futureTime)))
+                .thenReturn(updatedEvent);
+        
+        when(eventService.getActiveEventsCount(mockUser.getId())).thenReturn(1);
+        when(messageBuilder.buildEventMessageWithHeader(any(Event.class), anyInt()))
+                .thenReturn("Событие обновлено");
+        when(keyboardService.createEventActionsKeyboard(any(Event.class), eq(mockUser.getId())))
+                .thenReturn(new InlineKeyboardMarkup());
+
+        // When
+        handler.handle(callbackQuery, mockUser);
+
+        // Then
+        // Проверяем, что событие было обновлено
+        verify(eventService).updateEventTime(eq(eventId), eq(mockUser.getId()), eq(futureTime));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Время обновлено"));
     }
 }

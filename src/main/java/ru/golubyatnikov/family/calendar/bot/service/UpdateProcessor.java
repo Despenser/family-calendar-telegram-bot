@@ -1418,6 +1418,52 @@ public class UpdateProcessor {
                     updatedEvent = eventService.updateEventDescription(eventId, userId, text);
                     log.debug("Описание события обновлено: eventId={}", eventId);
                 }
+                case TIME, DATE -> {
+                    // Время и дата редактируются через inline-кнопки, а не через текстовый ввод
+                    // Если пользователь отправил текст в режиме редактирования TIME/DATE,
+                    // это означает, что он нажал кнопку, которая была преобразована в текст
+                    // (например, "➕ Добавить" из ReplyKeyboard)
+                    // Игнорируем такой ввод и очищаем состояние редактирования
+                    log.info("Игнорируем текстовый ввод для поля '{}', так как оно редактируется через inline-кнопки: eventId={}, userId={}", 
+                            field, eventId, userId);
+                    
+                    // Удаляем сообщение пользователя
+                    messageService.deleteMessageSilently(chatId, userMessageId);
+                    
+                    // Очищаем состояние редактирования
+                    conversationStateService.clearEventEditing(userId);
+                    
+                    // Получаем событие и показываем его карточку
+                    try {
+                        ru.golubyatnikov.family.calendar.bot.model.Event event = eventService.getEventById(eventId);
+                        
+                        if (editingMessageId != null) {
+                            // Возвращаем карточку события
+                            int eventCount = eventService.getActiveEventsCount(event.getUser().getId());
+                            String eventMessage = botMessageBuilder.buildEventMessageWithHeader(event, eventCount);
+                            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
+                            
+                            try {
+                                messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
+                                log.debug("Карточка события восстановлена после игнорирования текстового ввода: eventId={}, messageId={}", 
+                                        eventId, editingMessageId);
+                            } catch (TelegramApiException e) {
+                                log.warn("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
+                                        eventId, editingMessageId, e.getMessage());
+                                // Fallback: отправляем новое сообщение
+                                eventService.sendOrUpdateEventMessage(event, chatId);
+                            }
+                        } else {
+                            // Fallback: отправляем новое сообщение
+                            eventService.sendOrUpdateEventMessage(event, chatId);
+                        }
+                    } catch (Exception e) {
+                        log.error("Ошибка при восстановлении карточки события: eventId={}, error={}", 
+                                eventId, e.getMessage());
+                    }
+                    
+                    return;
+                }
                 default -> {
                     log.warn("Неподдерживаемое поле для текстового ввода: {}", field);
                     return;

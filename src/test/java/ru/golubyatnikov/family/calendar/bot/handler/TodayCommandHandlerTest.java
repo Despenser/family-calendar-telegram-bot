@@ -53,6 +53,9 @@ class TodayCommandHandlerTest {
     @Mock
     private TelegramMessageService messageService;
     
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
+    
     @InjectMocks
     private TodayCommandHandler handler;
     
