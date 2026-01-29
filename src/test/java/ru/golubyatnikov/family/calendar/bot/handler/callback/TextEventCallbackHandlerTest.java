@@ -135,7 +135,7 @@ class TextEventCallbackHandlerTest {
         verify(conversationService).updateEventTitle(user.getId(), title);
         verify(conversationService).completeEventCreation(user.getId(), null);
         verify(eventService).sendOrUpdateEventMessage(eq(createdEvent), eq(chatId));
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), contains("Событие создано"));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("✅ Создано"));
     }
 
     @Test
@@ -156,7 +156,7 @@ class TextEventCallbackHandlerTest {
 
         // Then
         verify(messageService).editMessageText(eq(chatId), eq(messageId), eq("Отменено"), isNull());
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Отменено"));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("🚫 Отменено"));
         verifyNoInteractions(conversationService);
     }
 

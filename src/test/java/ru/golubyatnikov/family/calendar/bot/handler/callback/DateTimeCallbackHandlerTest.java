@@ -172,7 +172,7 @@ class DateTimeCallbackHandlerTest {
         verify(conversationService).updateEventDate(eq(user.getId()), eq(LocalDate.of(2026, 1, 16)));
         verify(keyboardService).createFilteredHourSelectionKeyboard(eq(LocalDate.of(2026, 1, 16)), eq(user));
         verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), eq(keyboard));
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Дата выбрана"));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("✅ Дата выбрано"));
     }
 
     @Test
@@ -211,7 +211,7 @@ class DateTimeCallbackHandlerTest {
         // Then
         verify(keyboardService).createFilteredMinuteSelectionKeyboard(eq(14), eq(futureDate), eq(user));
         verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), eq(keyboard));
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Час выбран"));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("✅ Час выбрано"));
     }
 
     @Test
@@ -241,7 +241,7 @@ class DateTimeCallbackHandlerTest {
         // Then
         verify(conversationService).updateEventTime(eq(user.getId()), eq(LocalTime.of(14, 30)));
         verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), isNull());
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Время выбрано"));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("✅ Время выбрано"));
     }
 
     @Test
@@ -298,7 +298,7 @@ class DateTimeCallbackHandlerTest {
         // Then
         verify(conversationService).cancelEventCreation(user.getId());
         verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), isNull());
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Создание отменено"));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("🚫 Создание отменено"));
     }
 
     /**
@@ -385,7 +385,7 @@ class DateTimeCallbackHandlerTest {
         // Then
         // Проверяем, что время было обновлено
         verify(conversationService).updateEventTime(eq(mockUser.getId()), eq(futureTime));
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Время выбрано"));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("✅ Время выбрано"));
         verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), isNull());
     }
     
@@ -420,7 +420,7 @@ class DateTimeCallbackHandlerTest {
         // Then
         // Проверяем, что время было обновлено без валидации
         verify(conversationService).updateEventTime(eq(mockUser.getId()), eq(anyTime));
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Время выбрано"));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("✅ Время выбрано"));
         verify(messageService).editMessageText(eq(chatId), eq(messageId), anyString(), isNull());
     }
     
@@ -469,6 +469,6 @@ class DateTimeCallbackHandlerTest {
         // Then
         // Проверяем, что событие было обновлено
         verify(eventService).updateEventTime(eq(eventId), eq(mockUser.getId()), eq(futureTime));
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Время обновлено"));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("✅ Обновлено"));
     }
 }

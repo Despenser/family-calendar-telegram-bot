@@ -11,6 +11,8 @@ import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 import java.time.ZoneId;
 import java.util.List;
@@ -48,6 +50,7 @@ public class EventCallbackHandler implements CallbackHandler {
     private final ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
     private final ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder botMessageBuilder;
     private final ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
+    private final ru.golubyatnikov.family.calendar.bot.service.UserService userService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -61,6 +64,7 @@ public class EventCallbackHandler implements CallbackHandler {
         }
         
         return CallbackPrefix.VIEW_EVENT.matches(callbackData) ||
+               CallbackPrefix.VIEW_EVENT_FROM_REMINDER.matches(callbackData) ||
                CallbackPrefix.EDIT_EVENT.matches(callbackData) ||
                CallbackPrefix.DELETE_EVENT.matches(callbackData) ||
                CallbackPrefix.EDIT_FIELD.matches(callbackData) ||
@@ -82,7 +86,9 @@ public class EventCallbackHandler implements CallbackHandler {
         log.debug("Обработка callback для события: data='{}', userId={}", 
                 callbackData, user.getId());
         
-        if (CallbackPrefix.VIEW_EVENT.matches(callbackData)) {
+        if (CallbackPrefix.VIEW_EVENT_FROM_REMINDER.matches(callbackData)) {
+            handleViewEventFromReminder(callbackData, user.getId(), chatId, messageId, callbackQueryId);
+        } else if (CallbackPrefix.VIEW_EVENT.matches(callbackData)) {
             handleViewEvent(callbackData, user.getId(), chatId, messageId, callbackQueryId);
         } else if (CallbackPrefix.EDIT_EVENT.matches(callbackData)) {
             handleEditEvent(callbackData, user, chatId, messageId, callbackQueryId);
@@ -106,12 +112,10 @@ public class EventCallbackHandler implements CallbackHandler {
     /**
      * Обрабатывает просмотр деталей события.
      * 
-     * <p>Метод обновляет текущее сообщение с полной информацией о событии.
-     * Если вызван из уведомления о напоминании, показывает упрощенную клавиатуру
-     * только с кнопкой "Назад к напоминанию". Если вызван из других частей приложения,
-     * показывает стандартную клавиатуру с действиями над событием.</p>
+     * <p>Метод обновляет текущее сообщение с полной информацией о событии
+     * и стандартной клавиатурой с действиями над событием.</p>
      * 
-     * <p><b>Требования:</b> 2.1, 2.2, 2.3, 2.4, 2.5, 8.1, 8.4, 8.5, 9.2, 9.3, 9.4</p>
+     * <p><b>Требования:</b> 2.2, 2.4, 8.1, 8.2</p>
      * 
      * @param callbackData данные callback (формат: view_event_{eventId})
      * @param userId идентификатор пользователя
@@ -131,46 +135,33 @@ public class EventCallbackHandler implements CallbackHandler {
             Event event = eventService.getEventById(eventId);
             
             log.debug("Событие загружено: eventId={}, userId={}", eventId, userId);
+            log.debug("Определен контекст: Standard_Context, eventId={}, userId={}", 
+                     eventId, userId);
             
             // Формируем текст сообщения с полной информацией о событии
             String eventMessage = botMessageBuilder.buildEventMessage(event);
             
-            // Определяем, вызван ли метод из напоминания
-            // Проверяем, есть ли активные напоминания для этого события
-            boolean isFromReminder = hasActiveReminders(event);
+            // Используем стандартную клавиатуру с действиями
+            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
             
-            InlineKeyboardMarkup keyboard;
-            if (isFromReminder) {
-                // Если из напоминания: используем упрощенную клавиатуру с кнопкой "Назад"
-                // Получаем первое активное напоминание для формирования callback data
-                Long reminderId = getFirstActiveReminderId(event);
-                keyboard = createDetailsKeyboard(eventId, reminderId);
-                
-                log.debug("Используется упрощенная клавиатура для напоминания: eventId={}, reminderId={}, userId={}", 
-                         eventId, reminderId, userId);
-            } else {
-                // Если из другого места: используем стандартную клавиатуру с действиями
-                keyboard = keyboardService.createEventActionsKeyboard(event, userId);
-                
-                log.debug("Используется стандартная клавиатура с действиями: eventId={}, userId={}", 
-                         eventId, userId);
-            }
+            log.debug("Используется стандартная клавиатура с действиями: eventId={}, userId={}", 
+                     eventId, userId);
             
             // Обновляем сообщение
             messageService.editMessageText(chatId, messageId, eventMessage, keyboard);
             
-            log.info("Детали события отображены: eventId={}, messageId={}, userId={}, fromReminder={}", 
-                    eventId, messageId, userId, isFromReminder);
+            log.info("Детали события отображены: eventId={}, messageId={}, userId={}", 
+                    eventId, messageId, userId);
             
             // Отвечаем на callback query
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
         } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
             log.warn("Событие не найдено при просмотре деталей: eventId={}, userId={}", 
                     eventId, userId, e);
             
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Событие не найдено");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.notFound("Событие"));
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
                 log.error("Ошибка отправки callback query answer: eventId={}, userId={}, error={}", 
                          eventId, userId, ex.getMessage());
@@ -181,7 +172,7 @@ public class EventCallbackHandler implements CallbackHandler {
                     eventId, messageId, userId, e.getMessage());
             
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
                 log.error("Ошибка отправки callback query answer: eventId={}, userId={}, error={}", 
                          eventId, userId, ex.getMessage());
@@ -192,7 +183,7 @@ public class EventCallbackHandler implements CallbackHandler {
                      eventId, userId, e.getMessage(), e);
             
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
                 log.error("Ошибка отправки callback query answer: eventId={}, userId={}, error={}", 
                          eventId, userId, ex.getMessage());
@@ -201,16 +192,129 @@ public class EventCallbackHandler implements CallbackHandler {
     }
     
     /**
-     * Проверяет, есть ли у события активные напоминания.
+     * Обрабатывает просмотр деталей события из уведомления о напоминании.
      * 
-     * @param event событие для проверки
-     * @return true если у события есть хотя бы одно активное напоминание
+     * <p>Метод обновляет текущее сообщение с полной информацией о событии
+     * и упрощенной клавиатурой с одной кнопкой "Назад к напоминанию".</p>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.3, 3.1, 3.2, 7.1, 7.2, 7.4, 10.1, 10.2</p>
+     * 
+     * @param callbackData данные callback (формат: view_event_from_reminder_{eventId}_{reminderId})
+     * @param userId идентификатор пользователя
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для обновления
+     * @param callbackQueryId идентификатор callback query
      */
-    private boolean hasActiveReminders(Event event) {
-        return event.getReminders() != null && 
-               !event.getReminders().isEmpty() &&
-               event.getReminders().stream()
-                   .anyMatch(reminder -> reminder.getSent() != null && !reminder.getSent());
+    private void handleViewEventFromReminder(String callbackData, Long userId, Long chatId, 
+                                            Integer messageId, String callbackQueryId) {
+        log.debug("Просмотр деталей события из напоминания: callbackData='{}', userId={}, messageId={}", 
+                 callbackData, userId, messageId);
+        
+        try {
+            // Извлекаем payload из callback data
+            String payload = CallbackPrefix.VIEW_EVENT_FROM_REMINDER.extractPayload(callbackData);
+            
+            // Разделяем payload на eventId и reminderId
+            String[] parts = payload.split("_", 2);
+            
+            // Валидация формата
+            if (parts.length != 2) {
+                log.error("Некорректный формат callback data для view_event_from_reminder: " +
+                         "ожидается 2 части, получено {}. CallbackData='{}', userId={}", 
+                         parts.length, callbackData, userId);
+                
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.INVALID_REQUEST);
+                return;
+            }
+            
+            Long eventId;
+            Long reminderId;
+            
+            // Парсинг eventId и reminderId с обработкой NumberFormatException
+            try {
+                eventId = Long.parseLong(parts[0]);
+                reminderId = Long.parseLong(parts[1]);
+                
+                log.debug("Успешно извлечены данные: eventId={}, reminderId={}, userId={}", 
+                         eventId, reminderId, userId);
+            } catch (NumberFormatException e) {
+                log.error("Некорректный eventId или reminderId в callback data: " +
+                         "eventId='{}', reminderId='{}', callbackData='{}', userId={}, error={}", 
+                         parts[0], parts[1], callbackData, userId, e.getMessage());
+                
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.INVALID_REQUEST);
+                return;
+            }
+            
+            // Получаем событие
+            Event event = eventService.getEventById(eventId);
+            
+            log.debug("Событие загружено: eventId={}, userId={}", eventId, userId);
+            log.debug("Определен контекст: Reminder_Context, eventId={}, reminderId={}, userId={}", 
+                     eventId, reminderId, userId);
+            
+            // Загружаем напоминание из базы данных с eager загрузкой события
+            ru.golubyatnikov.family.calendar.bot.model.Reminder reminder = 
+                reminderService.getReminderWithEventById(reminderId);
+            
+            log.debug("Напоминание загружено: reminderId={}, eventId={}, userId={}", 
+                     reminderId, eventId, userId);
+            
+            // Загружаем пользователя для получения timezone
+            User eventOwner = userService.findById(userId)
+                .orElseThrow(() -> new ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException(
+                    "Пользователь не найден: userId=" + userId));
+            
+            // Получаем timezone пользователя для форматирования
+            ZoneId userTimezone = eventOwner.getTimezone() != null 
+                ? ZoneId.of(eventOwner.getTimezone()) 
+                : ZoneId.of("UTC");
+            
+            // Формируем текст сообщения с ПОЛНОЙ информацией о напоминании (с датой, временем, описанием)
+            String eventMessage = reminderService.formatReminderMessageByType(reminder, userTimezone);
+            
+            // Создаем упрощенную клавиатуру с кнопкой "Назад к напоминанию"
+            InlineKeyboardMarkup keyboard = createDetailsKeyboard(eventId, reminderId);
+            
+            log.debug("Создана упрощенная клавиатура для напоминания: eventId={}, reminderId={}, userId={}", 
+                     eventId, reminderId, userId);
+            
+            // Обновляем сообщение
+            messageService.editMessageText(chatId, messageId, eventMessage, keyboard);
+            
+            log.info("Детали события отображены из напоминания: eventId={}, reminderId={}, " +
+                    "messageId={}, userId={}", eventId, reminderId, messageId, userId);
+            
+            // Отвечаем на callback query
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
+            
+        } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
+            log.warn("Событие не найдено при просмотре деталей из напоминания: userId={}", userId, e);
+            try {
+                messageService.answerCallbackQuery(callbackQueryId, 
+                    CallbackMessageFormatter.notFound("Событие"));
+            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
+                log.error("Ошибка при отправке callback answer: {}", ex.getMessage());
+            }
+                
+        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+            log.warn("Ошибка Telegram API при просмотре деталей из напоминания: " +
+                    "messageId={}, userId={}, error={}", messageId, userId, e.getMessage());
+            try {
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
+            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
+                log.error("Ошибка при отправке callback answer: {}", ex.getMessage());
+            }
+            
+        } catch (Exception e) {
+            log.error("Неожиданная ошибка при просмотре деталей из напоминания: " +
+                     "userId={}, error={}", userId, e.getMessage(), e);
+            try {
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
+            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
+                log.error("Ошибка при отправке callback answer: {}", ex.getMessage());
+            }
+        }
     }
     
     /**
@@ -281,7 +385,7 @@ public class EventCallbackHandler implements CallbackHandler {
                          "CallbackData='{}', userId={}", parts.length, callbackData, userId);
                 
                 try {
-                    messageService.answerCallbackQuery(callbackQueryId, "❌ Некорректный запрос");
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.INVALID_REQUEST);
                 } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
                     log.error("Ошибка отправки callback query answer: userId={}, error={}", 
                              userId, ex.getMessage());
@@ -305,7 +409,7 @@ public class EventCallbackHandler implements CallbackHandler {
                          parts[0], parts[1], callbackData, userId, e.getMessage());
                 
                 try {
-                    messageService.answerCallbackQuery(callbackQueryId, "❌ Некорректный запрос");
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.INVALID_REQUEST);
                 } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
                     log.error("Ошибка отправки callback query answer: userId={}, error={}", 
                              userId, ex.getMessage());
@@ -313,34 +417,36 @@ public class EventCallbackHandler implements CallbackHandler {
                 return;
             }
             
-            // Загружаем событие из базы данных
-            Event event = eventService.getEventById(eventId);
-            
-            log.debug("Событие загружено: eventId={}, userId={}", eventId, userId);
-            
-            // Загружаем напоминание из базы данных
+            // Загружаем напоминание с eager загрузкой события и пользователя
             ru.golubyatnikov.family.calendar.bot.model.Reminder reminder = 
-                reminderService.getReminderById(reminderId);
+                reminderService.getReminderWithEventAndUser(reminderId);
             
-            log.debug("Напоминание загружено: reminderId={}, eventId={}, userId={}", 
-                     reminderId, eventId, userId);
+            log.debug("Напоминание загружено с событием и пользователем: reminderId={}, eventId={}, userId={}", 
+                     reminderId, reminder.getEvent().getId(), userId);
             
-            // Получаем timezone пользователя для форматирования
-            ZoneId userTimezone = event.getUser().getTimezone() != null 
+            // Получаем событие из напоминания
+            Event event = reminder.getEvent();
+            
+            // Получаем timezone создателя события
+            ZoneId creatorTimezone = event.getUser().getTimezone() != null 
                 ? ZoneId.of(event.getUser().getTimezone()) 
                 : ZoneId.of("UTC");
             
-            // Восстанавливаем текст напоминания
-            String reminderMessage = reminderService.formatReminderMessageByType(reminder, userTimezone);
+            log.debug("Timezone создателя события получен: eventId={}, creatorTimezone={}, userId={}", 
+                     event.getId(), creatorTimezone, userId);
+            
+            // Восстанавливаем КОРОТКИЙ текст напоминания
+            String reminderMessage = reminderService.formatShortReminderMessage(reminder, creatorTimezone);
             
             log.debug("Текст напоминания восстановлен: eventId={}, reminderId={}, userId={}", 
                      eventId, reminderId, userId);
             
             // Создаем упрощенную клавиатуру
             org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup keyboard = 
-                reminderService.createSimplifiedReminderKeyboard(event);
+                reminderService.createSimplifiedReminderKeyboard(event, reminderId);
             
-            log.debug("Упрощенная клавиатура создана: eventId={}, userId={}", eventId, userId);
+            log.debug("Упрощенная клавиатура создана: eventId={}, reminderId={}, userId={}", 
+                     eventId, reminderId, userId);
             
             // Обновляем сообщение
             messageService.editMessageText(chatId, messageId, reminderMessage, keyboard);
@@ -349,23 +455,13 @@ public class EventCallbackHandler implements CallbackHandler {
                     eventId, reminderId, messageId, userId);
             
             // Отвечаем на callback query с подтверждением
-            messageService.answerCallbackQuery(callbackQueryId, "");
-            
-        } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
-            log.warn("Событие не найдено при возврате к напоминанию: userId={}", userId, e);
-            
-            try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Событие не найдено");
-            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
-                log.error("Ошибка отправки callback query answer: userId={}, error={}", 
-                         userId, ex.getMessage());
-            }
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
         } catch (ru.golubyatnikov.family.calendar.bot.exception.ReminderNotFoundException e) {
             log.warn("Напоминание не найдено при возврате к напоминанию: userId={}", userId, e);
             
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Напоминание не найдено");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.notFound("Напоминание"));
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
                 log.error("Ошибка отправки callback query answer: userId={}, error={}", 
                          userId, ex.getMessage());
@@ -376,7 +472,7 @@ public class EventCallbackHandler implements CallbackHandler {
                     messageId, userId, e.getMessage());
             
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
                 log.error("Ошибка отправки callback query answer: userId={}, error={}", 
                          userId, ex.getMessage());
@@ -387,7 +483,7 @@ public class EventCallbackHandler implements CallbackHandler {
                      userId, e.getMessage(), e);
             
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
                 log.error("Ошибка отправки callback query answer: userId={}, error={}", 
                          userId, ex.getMessage());
@@ -421,8 +517,7 @@ public class EventCallbackHandler implements CallbackHandler {
             if (!event.getUser().getId().equals(userId)) {
                 log.warn("Пользователь ID={} не имеет прав для редактирования события ID={}", 
                         userId, eventId);
-                messageService.answerCallbackQuery(callbackQueryId, 
-                    "У вас нет прав для редактирования этого события");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.NO_ACCESS);
                 return;
             }
             
@@ -435,7 +530,7 @@ public class EventCallbackHandler implements CallbackHandler {
             
             // ИЗМЕНЕНИЕ: Обновляем ТЕКУЩЕЕ сообщение вместо отправки нового
             messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
             log.debug("Начато редактирование события ID={} в сообщении ID={} пользователем ID={}", 
                      eventId, messageId, userId);
@@ -498,7 +593,7 @@ public class EventCallbackHandler implements CallbackHandler {
             eventService.deleteEvent(eventId, userId);
             
             // Отвечаем на callback query с подтверждением
-            messageService.answerCallbackQuery(callbackQueryId, "Событие удалено");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.DELETED);
             
             log.debug("Событие ID={} успешно удалено пользователем ID={}", eventId, userId);
             
@@ -545,7 +640,7 @@ public class EventCallbackHandler implements CallbackHandler {
                          "CallbackData='{}', userId={}", parts.length, callbackData, userId);
                 messageService.editMessageText(chatId, messageId, 
                     "❌ Произошла ошибка при обработке запроса", null);
-                messageService.answerCallbackQuery(callbackQueryId, "");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
                 return;
             }
             
@@ -562,7 +657,7 @@ public class EventCallbackHandler implements CallbackHandler {
                          "userId={}, error={}", parts[1], callbackData, userId, e.getMessage());
                 messageService.editMessageText(chatId, messageId, 
                     "❌ Произошла ошибка при обработке запроса", null);
-                messageService.answerCallbackQuery(callbackQueryId, "");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
                 return;
             }
             
@@ -631,7 +726,7 @@ public class EventCallbackHandler implements CallbackHandler {
             
             // ИЗМЕНЕНИЕ: Обновляем ТЕКУЩЕЕ сообщение вместо отправки нового
             messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка Telegram API при редактировании поля: userId={}, callbackData='{}', error={}", 
@@ -833,7 +928,7 @@ public class EventCallbackHandler implements CallbackHandler {
                      eventId, updatedMessageId, userId);
             
             // Отвечаем на callback query
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
         } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
             // Обработка ошибок без отправки сообщений
@@ -911,7 +1006,7 @@ public class EventCallbackHandler implements CallbackHandler {
             }
             
             // Отвечаем на callback query
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка Telegram API при обработке добавления заметки: eventId={}, userId={}, error={}", 
@@ -979,7 +1074,7 @@ public class EventCallbackHandler implements CallbackHandler {
                 // Отправляем сообщение об ошибке
                 String errorMessage = formatMessage("❌ Время ожидания истекло. Попробуйте снова.");
                 messageService.sendMessage(chatId, errorMessage);
-                messageService.answerCallbackQuery(callbackQueryId, "");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
                 return;
             }
             
@@ -1036,7 +1131,7 @@ public class EventCallbackHandler implements CallbackHandler {
                     eventId, userId);
             
             // Отвечаем на callback query
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
         } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
             log.error("Событие не найдено при пропуске заметки: userId={}", userId, e);
@@ -1048,7 +1143,7 @@ public class EventCallbackHandler implements CallbackHandler {
             try {
                 String errorMessage = formatMessage("❌ Событие не найдено.");
                 messageService.sendMessage(chatId, errorMessage);
-                messageService.answerCallbackQuery(callbackQueryId, "");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
                 log.error("Ошибка отправки сообщения об ошибке: userId={}", userId, ex);
             }
@@ -1115,7 +1210,7 @@ public class EventCallbackHandler implements CallbackHandler {
             }
             
             // Отвечаем на callback query
-            messageService.answerCallbackQuery(callbackQueryId, "Редактирование отменено");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.actionCancelled("Редактирование"));
             
             log.info("Редактирование события ID={} успешно отменено пользователем ID={}", eventId, userId);
             

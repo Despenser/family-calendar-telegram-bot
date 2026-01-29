@@ -22,6 +22,8 @@ import java.util.Set;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.italic;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 
 /**
  * Обработчик callback-запросов для управления напоминаниями о событиях.
@@ -86,13 +88,13 @@ public class ReminderCallbackHandler {
             InlineKeyboardMarkup keyboard = createReminderTypesKeyboard(eventId);
             
             messageService.editMessageText(chatId, messageId, message.toString(), keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "Выберите типы напоминаний");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.selectPrompt("типы напоминаний"));
             
         } catch (Exception e) {
             log.error("Ошибка при настройке напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
                     eventId, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка при настройке напоминаний");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             } catch (Exception ex) {
                 log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
                         callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
@@ -134,7 +136,7 @@ public class ReminderCallbackHandler {
                 message.append("Например: 30 (за 30 минут), 120 (за 2 часа), 1440 (за 1 день)");
                 
                 messageService.editMessageText(chatId, messageId, message.toString(), null);
-                messageService.answerCallbackQuery(callbackQueryId, "Введите количество минут");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ENTER_MINUTES);
                 return;
             }
             
@@ -144,13 +146,13 @@ public class ReminderCallbackHandler {
             
             messageService.editMessageText(chatId, messageId, message, keyboard);
             messageService.answerCallbackQuery(callbackQueryId, 
-                selectedReminders.contains(key) ? "✅ Выбрано" : "Отменено");
+                selectedReminders.contains(key) ? CallbackMessages.SELECTED : CallbackMessages.CANCELLED);
             
         } catch (Exception e) {
             log.error("Ошибка при выборе типа напоминания: eventId={}, type={}, chatId={}, error={}, stackTrace={}", 
                     eventId, type, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             } catch (Exception ex) {
                 log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
                         callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
@@ -278,7 +280,7 @@ public class ReminderCallbackHandler {
         try {
             reminderService.deleteReminder(reminderId);
             
-            messageService.answerCallbackQuery(callbackQueryId, "✅ Напоминание удалено");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.DELETED);
             
             StringBuilder message = new StringBuilder();
             message.append("✅ ").append(bold("Напоминание удалено")).append("\n\n");
@@ -292,7 +294,7 @@ public class ReminderCallbackHandler {
             log.error("Ошибка при удалении напоминания: reminderId={}, chatId={}, error={}, stackTrace={}", 
                     reminderId, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка при удалении");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             } catch (Exception ex) {
                 log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
                         callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
@@ -324,7 +326,7 @@ public class ReminderCallbackHandler {
             reminderService.disableRemindersForEvent(eventId);
             
             // Отвечаем на callback query
-            messageService.answerCallbackQuery(callbackQueryId, "✅ Напоминания отключены");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.SUCCESS);
             
             // Обновляем сообщение события с новой клавиатурой
             if (messageId != null) {
@@ -358,7 +360,7 @@ public class ReminderCallbackHandler {
             log.error("Ошибка при отключении напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
                     eventId, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка при отключении напоминаний");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             } catch (Exception ex) {
                 log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
                         callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
@@ -395,7 +397,7 @@ public class ReminderCallbackHandler {
             // Проверяем, что User инициализирован
             if (user == null) {
                 log.error("User is null для события ID {}", eventId);
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: пользователь не найден");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.notFound("Пользователь"));
                 return;
             }
             
@@ -406,12 +408,12 @@ public class ReminderCallbackHandler {
             String responseMessage;
             if (createdReminders.isEmpty()) {
                 if (event.getEventTime() == null) {
-                    responseMessage = "ℹ️ Добавьте время события для автоматических напоминаний";
+                    responseMessage = CallbackMessages.REMINDER_NEEDS_TIME;
                 } else {
-                    responseMessage = "ℹ️ Событие уже скоро, напоминания не созданы";
+                    responseMessage = CallbackMessages.REMINDER_TOO_SOON;
                 }
             } else {
-                responseMessage = "✅ Напоминания включены";
+                responseMessage = CallbackMessages.SUCCESS;
             }
             
             // Отвечаем на callback query
@@ -445,8 +447,7 @@ public class ReminderCallbackHandler {
             log.error("LazyInitializationException при включении напоминаний: eventId={}, chatId={}, error={}", 
                     eventId, chatId, e.getMessage(), e);
             try {
-                messageService.answerCallbackQuery(callbackQueryId, 
-                    "❌ Ошибка загрузки данных. Попробуйте еще раз.");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             } catch (Exception ex) {
                 log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
                         callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
@@ -455,7 +456,7 @@ public class ReminderCallbackHandler {
             log.error("Ошибка при включении напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
                     eventId, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка при включении напоминаний");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             } catch (Exception ex) {
                 log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
                         callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
@@ -492,7 +493,8 @@ public class ReminderCallbackHandler {
             }
             
             if (selectedTypes.isEmpty()) {
-                messageService.answerCallbackQuery(callbackQueryId, "Выберите хотя бы один тип");
+                messageService.answerCallbackQuery(callbackQueryId, 
+                    String.format(CallbackMessages.VALIDATION_REQUIRED, "один тип"));
                 return;
             }
             
@@ -512,7 +514,7 @@ public class ReminderCallbackHandler {
             }
             
             messageService.editMessageText(chatId, messageId, message.toString(), null);
-            messageService.answerCallbackQuery(callbackQueryId, "✅ Напоминания созданы");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.CREATED);
             
             log.debug("Создано {} напоминаний для события ID={}", createdReminders.size(), eventId);
             
@@ -520,7 +522,7 @@ public class ReminderCallbackHandler {
             log.error("Ошибка при создании напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
                     eventId, chatId, e.getMessage(), getStackTraceString(e), e);
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: " + e.getMessage());
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError(e.getMessage()));
             } catch (Exception ex) {
                 log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
                         callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);

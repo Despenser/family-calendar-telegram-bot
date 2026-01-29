@@ -1,6 +1,7 @@
 package ru.golubyatnikov.family.calendar.bot.repository;
 
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -87,4 +88,41 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
      * @return список неотправленных напоминаний события
      */
     List<Reminder> findByEventIdAndSentFalse(Long eventId);
+    
+    /**
+     * Находит напоминание по ID с eager загрузкой связанного события.
+     * Использует EntityGraph для предотвращения LazyInitializationException.
+     * 
+     * <p>Загружает напоминание вместе со связанным событием в одном запросе,
+     * что позволяет использовать event вне транзакции.</p>
+     * 
+     * @param id идентификатор напоминания
+     * @return напоминание с загруженным событием или empty если не найдено
+     */
+    @EntityGraph(attributePaths = {"event"})
+    Optional<Reminder> findWithEventById(Long id);
+    
+    /**
+     * Находит напоминание по ID с eager загрузкой события и пользователя.
+     * 
+     * <p>Использует @EntityGraph для загрузки связанных сущностей в одном запросе.
+     * Это предотвращает LazyInitializationException при доступе к event.user
+     * вне транзакции.</p>
+     * 
+     * <p>Загружаемые связи:</p>
+     * <ul>
+     *   <li>event - событие напоминания</li>
+     *   <li>event.user - пользователь-создатель события</li>
+     * </ul>
+     * 
+     * <p>Метод используется в сценариях, где необходим доступ к timezone
+     * пользователя-создателя события для корректного форматирования времени.</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 2.1</p>
+     * 
+     * @param id идентификатор напоминания
+     * @return напоминание с загруженным событием и пользователем или empty если не найдено
+     */
+    @EntityGraph(attributePaths = {"event", "event.user"})
+    Optional<Reminder> findWithEventAndUserById(Long id);
 }

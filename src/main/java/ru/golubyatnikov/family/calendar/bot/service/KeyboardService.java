@@ -1343,7 +1343,7 @@ public class KeyboardService {
         
         // Кнопка "Персональное событие"
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton personalBtn = new InlineKeyboardButton("🔒 Персональное событие");
+        InlineKeyboardButton personalBtn = new InlineKeyboardButton("👤 Персональное событие");
         personalBtn.setCallbackData("event_type_personal");
         row2.add(personalBtn);
         rows.add(row2);

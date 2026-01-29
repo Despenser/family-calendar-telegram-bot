@@ -12,6 +12,7 @@ import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.ConversationService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -201,7 +202,7 @@ public class TextEventCallbackHandler implements CallbackHandler {
                     eventService.sendOrUpdateEventMessage(createdEvent, chatId);
                     log.debug("Сообщение о созданном событии отправлено и messageId сохранён: eventId={}", 
                             createdEvent.getId());
-                    messageService.answerCallbackQuery(callbackQueryId, "✅ Событие создано");
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.CREATED);
                 } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
                     log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
                             createdEvent.getId(), e.getMessage());
@@ -216,7 +217,7 @@ public class TextEventCallbackHandler implements CallbackHandler {
                         createdEvent.getTitle()
                     );
                     messageService.editMessageText(chatId, messageId, response, null);
-                    messageService.answerCallbackQuery(callbackQueryId, "✅ Событие создано");
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.CREATED);
                 }
             } else {
                 // Ошибка создания
@@ -226,7 +227,7 @@ public class TextEventCallbackHandler implements CallbackHandler {
                                 "Детали ошибки: " + escape(errorMessage);
                 
                 messageService.editMessageText(chatId, messageId, response, null);
-                messageService.answerCallbackQuery(callbackQueryId, "❌ " + escape("Ошибка"));
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             }
         } catch (Exception ex) {
             // Логируем ошибку Telegram API, но не откатываем транзакцию (она уже закоммичена)
@@ -248,7 +249,7 @@ public class TextEventCallbackHandler implements CallbackHandler {
         String message = messageBuilder.buildEventCancelledMessage();
         try {
             messageService.editMessageText(chatId, messageId, message, null);
-            messageService.answerCallbackQuery(callbackQueryId, "Отменено");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.CANCELLED);
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при отмене создания события из текста: chatId={}, error={}", 
                      chatId, e.getMessage());

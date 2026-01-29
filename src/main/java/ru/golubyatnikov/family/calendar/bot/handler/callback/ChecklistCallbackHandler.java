@@ -8,6 +8,7 @@ import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 /**
  * Обработчик callback queries для работы с чек-листами событий.
@@ -72,7 +73,7 @@ public class ChecklistCallbackHandler implements CallbackHandler {
                 String message = "✅ Добавление пункта в чек-лист\n\n" +
                                "Отправьте текст нового пункта:";
                 messageService.editMessageText(chatId, messageId, message, null);
-                messageService.answerCallbackQuery(callbackQueryId, "");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             } else if (action.startsWith("toggle_")) {
                 // Переключаем статус пункта чек-листа
                 Long itemId = Long.parseLong(action.substring("toggle_".length()));
@@ -80,7 +81,7 @@ public class ChecklistCallbackHandler implements CallbackHandler {
                 
                 // TODO: Переключить статус пункта чек-листа через ChecklistService
                 
-                messageService.answerCallbackQuery(callbackQueryId, "✅ Статус изменен");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.UPDATED);
             } else if (action.startsWith("delete_")) {
                 // Удаляем пункт чек-листа
                 Long itemId = Long.parseLong(action.substring("delete_".length()));
@@ -88,10 +89,10 @@ public class ChecklistCallbackHandler implements CallbackHandler {
                 
                 // TODO: Удалить пункт чек-листа через ChecklistService
                 
-                messageService.answerCallbackQuery(callbackQueryId, "🗑️ Пункт удален");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.DELETED);
             } else {
                 log.warn("Неизвестное действие с чек-листом: {}", action);
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Неизвестное действие");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.UNKNOWN_ACTION);
             }
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при обработке чек-листа: userId={}, action={}, error={}", 

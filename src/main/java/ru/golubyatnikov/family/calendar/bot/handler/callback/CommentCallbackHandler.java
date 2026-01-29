@@ -8,6 +8,7 @@ import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 /**
  * Обработчик callback queries для работы с комментариями к событиям.
@@ -80,7 +81,7 @@ public class CommentCallbackHandler implements CallbackHandler {
         
         try {
             messageService.editMessageText(chatId, messageId, message, null);
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при отправке сообщения о комментарии: userId={}, error={}", 
                      userId, e.getMessage());

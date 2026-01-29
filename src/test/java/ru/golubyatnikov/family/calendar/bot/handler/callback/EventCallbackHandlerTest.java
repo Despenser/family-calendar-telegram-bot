@@ -53,6 +53,9 @@ class EventCallbackHandlerTest {
     private ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
 
     @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.UserService userService;
+
+    @Mock
     private CallbackQuery callbackQuery;
 
     @Mock
@@ -63,7 +66,7 @@ class EventCallbackHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new EventCallbackHandler(myEventsCommandHandler, messageService, conversationStateService, keyboardService, eventService, botMessageBuilder, reminderService);
+        handler = new EventCallbackHandler(myEventsCommandHandler, messageService, conversationStateService, keyboardService, eventService, botMessageBuilder, reminderService, userService);
         
         user = new User();
         user.setId(1L);
@@ -81,6 +84,12 @@ class EventCallbackHandlerTest {
     @DisplayName("Должен обрабатывать callback с префиксом view_event_")
     void shouldHandleViewEventCallback() {
         assertTrue(handler.canHandle("view_event_123"));
+    }
+
+    @Test
+    @DisplayName("Должен обрабатывать callback с префиксом view_event_from_reminder_")
+    void shouldHandleViewEventFromReminderCallback() {
+        assertTrue(handler.canHandle("view_event_from_reminder_123_456"));
     }
 
     @Test
@@ -108,6 +117,12 @@ class EventCallbackHandlerTest {
     }
 
     @Test
+    @DisplayName("Должен обрабатывать callback с префиксом back_to_reminder_")
+    void shouldHandleBackToReminderCallback() {
+        assertTrue(handler.canHandle("back_to_reminder_123_456"));
+    }
+
+    @Test
     @DisplayName("Не должен обрабатывать неизвестный callback")
     void shouldNotHandleUnknownCallback() {
         assertFalse(handler.canHandle("unknown_callback"));
@@ -130,7 +145,7 @@ class EventCallbackHandlerTest {
         
         setupCallbackQueryMocks(callbackData, chatId, messageId, callbackQueryId);
         
-        // Создаем событие без активных напоминаний
+        // Создаем событие
         ru.golubyatnikov.family.calendar.bot.model.Event event = new ru.golubyatnikov.family.calendar.bot.model.Event();
         event.setId(123L);
         event.setTitle("Тестовое событие");
@@ -210,7 +225,7 @@ class EventCallbackHandlerTest {
 
         // Then
         verify(eventService).deleteEvent(789L, user.getId());
-        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("Событие удалено"));
+        verify(messageService).answerCallbackQuery(eq(callbackQueryId), eq("✅ Удалено"));
     }
 
     @Test

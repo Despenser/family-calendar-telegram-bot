@@ -8,6 +8,7 @@ import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 /**
  * Обработчик callback queries для настройки повторений событий.
@@ -92,7 +93,7 @@ public class RecurrenceCallbackHandler implements CallbackHandler {
         
         try {
             messageService.editMessageText(chatId, messageId, message, null);
-            messageService.answerCallbackQuery(callbackQueryId, "Повторение настроено");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.SUCCESS);
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при настройке повторения: userId={}, type={}, error={}", 
                      userId, recurrenceType, e.getMessage());
@@ -124,7 +125,7 @@ public class RecurrenceCallbackHandler implements CallbackHandler {
         
         try {
             messageService.editMessageText(chatId, messageId, message, null);
-            messageService.answerCallbackQuery(callbackQueryId, "Обработано");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.SUCCESS);
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при обработке действия с серией: userId={}, action={}, error={}", 
                      userId, action, e.getMessage());

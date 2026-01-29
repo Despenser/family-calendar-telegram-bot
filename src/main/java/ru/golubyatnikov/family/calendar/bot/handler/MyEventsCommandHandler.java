@@ -595,7 +595,7 @@ public class MyEventsCommandHandler implements CommandHandler {
             // Тип события
             details.append("\n");
             if (event.getIsPersonal()) {
-                details.append("🔒 ").append(bold("Персональное событие")).append("\n");
+                details.append("👤 ").append(bold("Персональное событие")).append("\n");
             } else {
                 details.append(formatMessage("👨‍👩‍👧‍👦 Семейное событие (создал: %s)\n", 
                     event.getUser().getFirstName()));

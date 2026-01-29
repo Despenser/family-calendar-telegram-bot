@@ -11,6 +11,8 @@ import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 /**
  * Обработчик callback queries для навигации по календарю.
@@ -127,7 +129,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
                             // Очищаем состояние редактирования
                             conversationStateService.clearEventEditing(user.getId());
                             
-                            messageService.answerCallbackQuery(callbackQueryId, "Редактирование отменено");
+                            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.actionCancelled("Редактирование"));
                             log.info("Редактирование даты отменено пользователем {}, eventId={}", 
                                     user.getId(), context.getEventId());
                             
@@ -151,7 +153,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
                     
                     String message = messageBuilder.buildEventCancelledMessage();
                     messageService.editMessageText(chatId, messageId, message, null);
-                    messageService.answerCallbackQuery(callbackQueryId, "Создание отменено");
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.actionCancelled("Создание"));
                     
                     log.info("Создание события отменено пользователем {}", user.getId());
                 }

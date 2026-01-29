@@ -17,6 +17,8 @@ import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 import ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter;
 
 import java.time.format.DateTimeFormatter;
@@ -76,7 +78,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
         // Проверка на null или пустые callback-данные
         if (callbackData == null || callbackData.isEmpty()) {
             log.error("Получены null или пустые callback-данные: userId={}", user.getId());
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: некорректные данные");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректные данные"));
             return;
         }
         
@@ -88,7 +90,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
         if (payload == null || payload.isEmpty()) {
             log.error("Получен null или пустой payload после извлечения префикса: callbackData='{}', userId={}", 
                     callbackData, user.getId());
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: некорректный формат данных");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат данных"));
             return;
         }
         
@@ -99,7 +101,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
         if (parts.length < 2) {
             log.warn("Некорректный формат callback data (недостаточно частей): callbackData='{}', parts={}, userId={}", 
                     callbackData, java.util.Arrays.toString(parts), user.getId());
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: некорректный формат данных");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат данных"));
             return;
         }
         
@@ -113,7 +115,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                     if (parts.length < 2) {
                         log.warn("Недостаточно частей для действия 'list': callbackData='{}', parts={}, userId={}", 
                                 callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: не указан ID события");
+                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("не указан ID события"));
                         return;
                     }
                     Long eventId = Long.parseLong(parts[1]);
@@ -125,7 +127,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                     if (parts.length < 2) {
                         log.warn("Недостаточно частей для действия 'add': callbackData='{}', parts={}, userId={}", 
                                 callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: не указан ID события");
+                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("не указан ID события"));
                         return;
                     }
                     Long eventId = Long.parseLong(parts[1]);
@@ -137,7 +139,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                     if (parts.length < 3) {
                         log.warn("Недостаточно частей для действия 'view': callbackData='{}', parts={}, userId={}", 
                                 callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: не указан ID вложения");
+                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("не указан ID вложения"));
                         return;
                     }
                     Long eventId = Long.parseLong(parts[1]);
@@ -150,7 +152,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                     if (parts.length < 3) {
                         log.warn("Недостаточно частей для действия 'delete': callbackData='{}', parts={}, userId={}", 
                                 callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: не указан ID вложения");
+                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("не указан ID вложения"));
                         return;
                     }
                     Long eventId = Long.parseLong(parts[1]);
@@ -163,13 +165,13 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                     if (parts.length < 4) {
                         log.warn("Недостаточно частей для действия 'confirm': callbackData='{}', parts={}, userId={}", 
                                 callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: некорректный формат данных");
+                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат данных"));
                         return;
                     }
                     if (!parts[1].equals("delete")) {
                         log.warn("Некорректный subAction для 'confirm': ожидается 'delete', получено '{}', callbackData='{}', userId={}", 
                                 parts[1], callbackData, user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: неподдерживаемое действие");
+                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("неподдерживаемое действие"));
                         return;
                     }
                     Long eventId = Long.parseLong(parts[2]);
@@ -183,7 +185,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                     if (parts.length < 3) {
                         log.warn("Недостаточно частей для действия 'cancel': callbackData='{}', parts={}, userId={}", 
                                 callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: некорректный формат данных");
+                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат данных"));
                         return;
                     }
                     
@@ -199,7 +201,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                     } else {
                         log.warn("Некорректный subAction для 'cancel': ожидается 'delete' или 'add', получено '{}', callbackData='{}', userId={}", 
                                 subAction, callbackData, user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: неподдерживаемое действие");
+                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("неподдерживаемое действие"));
                     }
                 }
                 case "back" -> {
@@ -207,7 +209,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                     if (parts.length < 2) {
                         log.warn("Недостаточно частей для действия 'back': callbackData='{}', parts={}, userId={}", 
                                 callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: не указан ID события");
+                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("не указан ID события"));
                         return;
                     }
                     Long eventId = Long.parseLong(parts[1]);
@@ -217,21 +219,21 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                 default -> {
                     log.warn("Неизвестное действие: action='{}', callbackData='{}', userId={}", 
                             action, callbackData, user.getId());
-                    messageService.answerCallbackQuery(callbackQueryId, "❌ Неизвестное действие");
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.UNKNOWN_ACTION);
                 }
             }
         } catch (NumberFormatException e) {
             log.error("Ошибка парсинга числа в callback data: callbackData='{}', parts={}, userId={}, error={}", 
                     callbackData, java.util.Arrays.toString(parts), user.getId(), e.getMessage());
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: некорректный формат ID");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат ID"));
         } catch (ArrayIndexOutOfBoundsException e) {
             log.error("Ошибка доступа к элементу массива в callback data: callbackData='{}', parts={}, userId={}, error={}", 
                     callbackData, java.util.Arrays.toString(parts), user.getId(), e.getMessage());
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка: некорректный формат данных");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат данных"));
         } catch (Exception e) {
             log.error("Неожиданная ошибка при обработке callback вложения: callbackData='{}', userId={}, error={}", 
                     callbackData, user.getId(), e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка при обработке запроса");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             throw e;
         }
     }
@@ -323,7 +325,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
         log.debug("Список вложений отображен: eventId={}, userId={}, messageId={}", 
                 eventId, user.getId(), resultMessageId);
         
-        messageService.answerCallbackQuery(callbackQueryId, "");
+        messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
     }
     
     /**
@@ -426,7 +428,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             if (!event.getUser().getId().equals(user.getId())) {
                 log.warn("Пользователь ID={} попытался добавить вложение к чужому событию ID={}", 
                         user.getId(), eventId);
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Нет прав доступа");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.NO_ACCESS);
                 return;
             }
             
@@ -464,7 +466,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             log.debug("Состояние ожидания файла установлено: userId={}, eventId={}, chatId={}, messageId={}", 
                     user.getId(), eventId, chatId, messageId);
             
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
             log.info("Пользователь ID={} переведен в режим ожидания файла для события ID={}", 
                     user.getId(), eventId);
@@ -472,7 +474,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
         } catch (Exception e) {
             log.error("Ошибка при начале добавления файла: eventId={}, userId={}, error={}", 
                     eventId, user.getId(), e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             throw e;
         }
     }
@@ -612,7 +614,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             }
             
             // Отправка callback ответа
-            messageService.answerCallbackQuery(callbackQueryId, "Отменено");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.CANCELLED);
             
             log.info("Добавление файла отменено для события ID={}, пользователь ID={}", 
                     eventId, user.getId());
@@ -620,11 +622,11 @@ public class AttachmentCallbackHandler implements CallbackHandler {
         } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
             log.error("Событие ID={} не найдено при отмене добавления файла: userId={}", 
                     eventId, user.getId());
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Событие не найдено");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.notFound("Событие"));
         } catch (Exception e) {
             log.error("Ошибка при отмене добавления файла: eventId={}, userId={}, error={}", 
                     eventId, user.getId(), e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             throw e;
         }
     }
@@ -703,21 +705,21 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                 // Не пробрасываем исключение - файл уже отправлен пользователю
             }
             
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
         } catch (ru.golubyatnikov.family.calendar.bot.exception.AttachmentNotFoundException e) {
             log.error("Вложение ID={} не найдено", attachmentId);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Вложение не найдено");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.notFound("Вложение"));
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка Telegram API при отправке файла ID={}: {}", 
                     attachmentId, e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка отправки файла");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             messageService.sendMessage(chatId, 
                     "❌ Не удалось отправить файл\\. Попробуйте позже\\.");
         } catch (Exception e) {
             log.error("Неожиданная ошибка при просмотре файла ID={}: {}", 
                     attachmentId, e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             throw e;
         }
     }
@@ -754,7 +756,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             if (!event.getUser().getId().equals(user.getId())) {
                 log.warn("Пользователь ID={} попытался удалить вложение ID={} из чужого события ID={}", 
                         user.getId(), attachmentId, eventId);
-                messageService.answerCallbackQuery(callbackQueryId, "❌ Нет прав доступа");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.NO_ACCESS);
                 messageService.sendMessage(chatId, 
                         "❌ Только создатель события может удалять вложения\\.");
                 return;
@@ -781,15 +783,15 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             log.debug("Запрос подтверждения удаления отображен: attachmentId={}, userId={}, messageId={}", 
                     attachmentId, user.getId(), resultMessageId);
             
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
         } catch (ru.golubyatnikov.family.calendar.bot.exception.AttachmentNotFoundException e) {
             log.error("Вложение ID={} не найдено", attachmentId);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Вложение не найдено");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.notFound("Вложение"));
         } catch (Exception e) {
             log.error("Ошибка при запросе удаления файла ID={}: {}", 
                     attachmentId, e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             throw e;
         }
     }
@@ -820,7 +822,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             attachmentService.deleteAttachment(attachmentId, user.getId());
             
             // Отправляем callback answer с подтверждением
-            messageService.answerCallbackQuery(callbackQueryId, "✅ Вложение удалено");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.DELETED);
             
             log.info("Вложение ID={} успешно удалено пользователем ID={}", 
                     attachmentId, user.getId());
@@ -882,17 +884,17 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             
         } catch (ru.golubyatnikov.family.calendar.bot.exception.AttachmentNotFoundException e) {
             log.error("Вложение ID={} не найдено при попытке удаления", attachmentId);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Вложение не найдено");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.notFound("Вложение"));
         } catch (ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException e) {
             log.warn("Пользователь ID={} попытался удалить вложение ID={} без прав доступа", 
                     user.getId(), attachmentId);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Нет прав доступа");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.NO_ACCESS);
             messageService.sendMessage(chatId, 
                     "❌ Только создатель события может удалять вложения\\.");
         } catch (Exception e) {
             log.error("Ошибка при удалении файла ID={}: {}", 
                     attachmentId, e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             throw e;
         }
     }
@@ -917,7 +919,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                 eventId, user.getId());
         
         // Отправляем callback answer
-        messageService.answerCallbackQuery(callbackQueryId, "Удаление отменено");
+        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.actionCancelled("Удаление"));
         
         // Возвращаем к списку вложений через handleAttachmentList
         // который использует editOrSendMessage для редактирования
@@ -1134,7 +1136,7 @@ public class AttachmentCallbackHandler implements CallbackHandler {
                 } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
                     log.error("Ошибка Telegram API при отправке нового сообщения: " +
                             "chatId={}, eventId={}, error={}", chatId, eventId, e.getMessage(), e);
-                    messageService.answerCallbackQuery(callbackQueryId, "❌ Ошибка отправки сообщения");
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
                     throw e;
                 }
                 
@@ -1163,12 +1165,12 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             log.debug("Список вложений отображен при возврате: eventId={}, userId={}, messageId={}", 
                     eventId, user.getId(), resultMessageId);
             
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
         } catch (Exception e) {
             log.error("Ошибка при возврате к списку вложений: eventId={}, userId={}, error={}", 
                     eventId, user.getId(), e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             throw e;
         }
     }
@@ -1240,12 +1242,12 @@ public class AttachmentCallbackHandler implements CallbackHandler {
             
             log.debug("Attachment message context очищен для пользователя ID={}", user.getId());
             
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             
         } catch (Exception e) {
             log.error("Критическая ошибка при возврате к карточке события ID={}, пользователь ID={}: {}", 
                     eventId, user.getId(), e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, "❌ Произошла ошибка");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
             throw e;
         }
     }

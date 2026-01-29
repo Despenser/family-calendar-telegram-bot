@@ -4,11 +4,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
 import org.springframework.dao.PessimisticLockingFailureException;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
+import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.User;
@@ -55,6 +55,29 @@ public class ReminderService {
     private final EventRepository eventRepository;
     private final TelegramMessageService telegramMessageService;
     private final ru.golubyatnikov.family.calendar.bot.config.DefaultReminderConfig defaultReminderConfig;
+    
+    /**
+     * Вспомогательный класс для хранения информации о напоминании.
+     * Используется при пересоздании напоминаний после изменения даты/времени события.
+     * 
+     * <p>Хранит только тип напоминания и параметры (customMinutes для CUSTOM типа),
+     * без привязки к конкретному экземпляру Reminder.</p>
+     * 
+     * <p><b>Требования:</b> 2.3, 3.3</p>
+     */
+    @lombok.Data
+    @lombok.AllArgsConstructor
+    private static class ReminderInfo {
+        /**
+         * Тип напоминания (MORNING_OF_DAY, ONE_HOUR_BEFORE, CUSTOM и т.д.)
+         */
+        private Reminder.ReminderType reminderType;
+        
+        /**
+         * Количество минут для CUSTOM типа (null для других типов)
+         */
+        private Integer customMinutes;
+    }
     
     /**
      * Создает стандартные напоминания для события.
@@ -239,53 +262,28 @@ public class ReminderService {
      * @param eventId идентификатор события
      * @param minutesBefore количество минут до события
      * @return созданное напоминание
-     * @throws EventNotFoundException если событие не найдено
-     * @throws IllegalArgumentException если minutesBefore некорректно или событие не имеет даты/времени
+     * @throws UnsupportedOperationException всегда, так как функционал кастомных напоминаний удален
+     * @deprecated Кастомные напоминания больше не поддерживаются.
+     *             Используйте фиксированные типы: EVENING_BEFORE, ONE_HOUR_BEFORE, FIFTEEN_MINUTES_BEFORE
      */
+    @Deprecated
     public Reminder createCustomReminder(Long eventId, int minutesBefore) {
-        log.debug("Создание кастомного напоминания для события ID {}: за {} минут", eventId, minutesBefore);
-        
-        if (minutesBefore < 1) {
-            log.error("Некорректное количество минут для напоминания: {}", minutesBefore);
-            throw new IllegalArgumentException("Количество минут должно быть >= 1");
-        }
-        
-        Event event = eventRepository.findById(eventId)
-            .orElseThrow(() -> new EventNotFoundException(eventId));
-        
-        if (event.getEventDate() == null || event.getEventTime() == null) {
-            log.error("Попытка создать напоминание для события ID {} без даты или времени", eventId);
-            throw new IllegalArgumentException("Событие должно иметь дату и время для создания напоминания");
-        }
-        
-        LocalDateTime reminderTime = calculateReminderTime(event, Reminder.ReminderType.CUSTOM, minutesBefore);
-        
-        // Не создавать напоминание для прошедшего времени
-        if (reminderTime.isBefore(LocalDateTime.now())) {
-            log.error("Попытка создать напоминание для прошедшего времени: eventId={}, reminderTime={}", 
-                     eventId, reminderTime);
-            throw new IllegalArgumentException("Время напоминания не может быть в прошлом");
-        }
-        
-        Reminder reminder = Reminder.builder()
-            .event(event)
-            .reminderType(Reminder.ReminderType.CUSTOM)
-            .customMinutes(minutesBefore)
-            .reminderTime(reminderTime)
-            .sent(false)
-            .build();
-        
-        Reminder saved = reminderRepository.save(reminder);
-        log.info("Кастомное напоминание ID {} создано для события ID {} (за {} минут)", 
-                 saved.getId(), eventId, minutesBefore);
-        
-        return saved;
+        log.error("Попытка создать кастомное напоминание для события ID {}: " +
+                 "функционал удален (minutesBefore={})", eventId, minutesBefore);
+        throw new UnsupportedOperationException(
+            "Кастомные напоминания больше не поддерживаются. " +
+            "Используйте фиксированные типы: EVENING_BEFORE, ONE_HOUR_BEFORE, FIFTEEN_MINUTES_BEFORE"
+        );
     }
     
     /**
      * Автоматически отправляет напоминания по расписанию.
      * 
-     * <p>Выполняется каждую минуту. Находит все неотправленные напоминания,
+     * <p><b>ВАЖНО:</b> Этот метод НЕ должен иметь аннотацию @Scheduled.
+     * Он вызывается только из ReminderScheduler.checkAndSendReminders(),
+     * который имеет единственную аннотацию @Scheduled для отправки напоминаний.</p>
+     * 
+     * <p>Находит все неотправленные напоминания,
      * время которых наступило, и отправляет уведомления.</p>
      * 
      * <p>Использует UTC для всех операций со временем:</p>
@@ -321,11 +319,8 @@ public class ReminderService {
      * <p>Для персональных событий напоминание отправляется только создателю.
      * Для семейных событий - всем членам семьи.</p>
      * 
-     * <p>Расписание: каждую минуту</p>
-     * 
      * <p><b>Требования:</b> 1.1, 1.2, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 3.3, 3.4, 5.2, 4.2, 4.3, 4.4, 4.5, 6.1, 6.2, 6.3, 6.4, 6.5, 11.1, 11.3, 11.4</p>
      */
-    @Scheduled(fixedRate = 60000) // Каждую минуту
     public void sendReminders() {
         // Получаем текущее время в UTC (Требование 1.1, 1.2)
         LocalDateTime nowUTC = LocalDateTime.now(ZoneId.of("UTC"));
@@ -649,17 +644,6 @@ public class ReminderService {
             ZonedDateTime reminderZonedDateTime;
             
             switch (type) {
-                case MORNING_OF_DAY:
-                    // Утром в день события в 9:00 в timezone пользователя
-                    reminderZonedDateTime = ZonedDateTime.of(
-                        event.getEventDate(), 
-                        LocalTime.of(9, 0), 
-                        userTimezone
-                    );
-                    log.debug("MORNING_OF_DAY в User TZ: reminderDateTime={}, timezone={}", 
-                             reminderZonedDateTime.toLocalDateTime(), userTimezone);
-                    break;
-                    
                 case EVENING_BEFORE:
                     // Вечером накануне в 20:00 в timezone пользователя
                     reminderZonedDateTime = ZonedDateTime.of(
@@ -680,15 +664,6 @@ public class ReminderService {
                              userTimezone);
                     break;
                     
-                case TEN_MINUTES_BEFORE:
-                    // За 10 минут до события (deprecated)
-                    reminderZonedDateTime = eventZonedDateTime.minusMinutes(10);
-                    log.debug("TEN_MINUTES_BEFORE в User TZ: eventDateTime={}, reminderDateTime={}, timezone={}", 
-                             eventZonedDateTime.toLocalDateTime(), 
-                             reminderZonedDateTime.toLocalDateTime(), 
-                             userTimezone);
-                    break;
-                    
                 case FIFTEEN_MINUTES_BEFORE:
                     // За 15 минут до события
                     reminderZonedDateTime = eventZonedDateTime.minusMinutes(15);
@@ -698,21 +673,11 @@ public class ReminderService {
                              userTimezone);
                     break;
                     
-                case CUSTOM:
-                    // За указанное количество минут до события
-                    if (customMinutes == null || customMinutes < 1) {
-                        throw new IllegalArgumentException("Для CUSTOM типа необходимо указать customMinutes >= 1");
-                    }
-                    reminderZonedDateTime = eventZonedDateTime.minusMinutes(customMinutes);
-                    log.debug("CUSTOM ({}min) в User TZ: eventDateTime={}, reminderDateTime={}, timezone={}", 
-                             customMinutes,
-                             eventZonedDateTime.toLocalDateTime(), 
-                             reminderZonedDateTime.toLocalDateTime(), 
-                             userTimezone);
-                    break;
-                    
                 default:
-                    throw new IllegalArgumentException("Неподдерживаемый тип напоминания: " + type);
+                    throw new IllegalArgumentException(
+                        "Неподдерживаемый тип напоминания: " + type + ". " +
+                        "Поддерживаются только: EVENING_BEFORE, ONE_HOUR_BEFORE, FIFTEEN_MINUTES_BEFORE"
+                    );
             }
             
             // Шаг 3: Конвертируем время напоминания в UTC
@@ -863,19 +828,17 @@ public class ReminderService {
      * <p>Включает inline-кнопки для взаимодействия с событием:</p>
      * <ul>
      *   <li>📋 Посмотреть детали - для всех пользователей</li>
-     *   <li>✏️ Редактировать - только для создателя события</li>
-     *   <li>🗑️ Удалить - только для создателя события</li>
      * </ul>
      * 
      * <p>Обработка timezone:</p>
      * <ul>
      *   <li>Для каждого получателя получает его timezone из user.getTimezone()</li>
-     *   <li>Передает timezone в метод formatReminderMessageByType()</li>
+     *   <li>Передает timezone в метод formatShortReminderMessage()</li>
      *   <li>Использует ZonedDateTime для конвертации времени события в timezone получателя</li>
      *   <li>При ошибке конвертации использует fallback на UTC с логированием</li>
      * </ul>
      * 
-     * <p><b>Требования:</b> 2.4, 2.5, 8.1, 8.2, 8.3, 8.4, 14.1, 14.2, 14.3, 14.4, 14.5</p>
+     * <p><b>Требования:</b> 2.4, 2.5, 8.1, 8.2, 8.3, 8.4, 14.1, 14.2, 14.3, 14.4, 14.5, 5.1, 5.2</p>
      * 
      * @param reminder напоминание для отправки
      * @throws TelegramApiException если не удалось отправить уведомление
@@ -891,13 +854,13 @@ public class ReminderService {
             try {
                 // Получаем timezone получателя
                 ZoneId recipientTimezone = getUserTimezone(event.getUser());
-                log.debug("Форматирование сообщения для пользователя ID {} в timezone {}", 
+                log.debug("Форматирование короткого сообщения для пользователя ID {} в timezone {}", 
                          event.getUser().getId(), recipientTimezone);
                 
-                // Форматируем сообщение с учетом timezone получателя
-                String message = formatReminderMessageByType(reminder, recipientTimezone);
+                // Форматируем КОРОТКОЕ сообщение с учетом timezone получателя
+                String message = formatShortReminderMessage(reminder, recipientTimezone);
                 
-                var keyboard = createReminderKeyboard(event, event.getUser().getId());
+                var keyboard = createReminderKeyboard(event, event.getUser().getId(), reminder.getId());
                 telegramMessageService.sendMessageWithInlineKeyboard(event.getUser().getTelegramId(), message, keyboard);
                 
             } catch (java.time.DateTimeException e) {
@@ -910,8 +873,8 @@ public class ReminderService {
                 // Fallback: пытаемся отправить с UTC
                 try {
                     log.warn("Fallback на UTC для пользователя ID {} после DateTimeException", event.getUser().getId());
-                    String message = formatReminderMessageByType(reminder, ZoneId.of("UTC"));
-                    var keyboard = createReminderKeyboard(event, event.getUser().getId());
+                    String message = formatShortReminderMessage(reminder, ZoneId.of("UTC"));
+                    var keyboard = createReminderKeyboard(event, event.getUser().getId(), reminder.getId());
                     telegramMessageService.sendMessageWithInlineKeyboard(event.getUser().getTelegramId(), message, keyboard);
                 } catch (Exception fallbackError) {
                     log.error("Критическая ошибка {} при отправке напоминания пользователю ID {} даже с UTC: {}", 
@@ -939,8 +902,8 @@ public class ReminderService {
                 try {
                     log.warn("Fallback на UTC для пользователя ID {} после непредвиденной ошибки {}", 
                             event.getUser().getId(), e.getClass().getSimpleName());
-                    String message = formatReminderMessageByType(reminder, ZoneId.of("UTC"));
-                    var keyboard = createReminderKeyboard(event, event.getUser().getId());
+                    String message = formatShortReminderMessage(reminder, ZoneId.of("UTC"));
+                    var keyboard = createReminderKeyboard(event, event.getUser().getId(), reminder.getId());
                     telegramMessageService.sendMessageWithInlineKeyboard(event.getUser().getTelegramId(), message, keyboard);
                 } catch (Exception fallbackError) {
                     log.error("Критическая ошибка {} при отправке напоминания пользователю ID {} даже с UTC: {}", 
@@ -959,13 +922,13 @@ public class ReminderService {
                     try {
                         // Получаем timezone получателя
                         ZoneId recipientTimezone = getUserTimezone(member);
-                        log.debug("Форматирование сообщения для члена семьи ID {} в timezone {}", 
+                        log.debug("Форматирование короткого сообщения для члена семьи ID {} в timezone {}", 
                                  member.getId(), recipientTimezone);
                         
-                        // Форматируем сообщение с учетом timezone каждого получателя
-                        String message = formatReminderMessageByType(reminder, recipientTimezone);
+                        // Форматируем КОРОТКОЕ сообщение с учетом timezone каждого получателя
+                        String message = formatShortReminderMessage(reminder, recipientTimezone);
                         
-                        var keyboard = createReminderKeyboard(event, member.getId());
+                        var keyboard = createReminderKeyboard(event, member.getId(), reminder.getId());
                         telegramMessageService.sendMessageWithInlineKeyboard(member.getTelegramId(), message, keyboard);
                         
                     } catch (java.time.DateTimeException e) {
@@ -978,8 +941,8 @@ public class ReminderService {
                         // Fallback: пытаемся отправить с UTC
                         try {
                             log.warn("Fallback на UTC для члена семьи ID {} после DateTimeException", member.getId());
-                            String message = formatReminderMessageByType(reminder, ZoneId.of("UTC"));
-                            var keyboard = createReminderKeyboard(event, member.getId());
+                            String message = formatShortReminderMessage(reminder, ZoneId.of("UTC"));
+                            var keyboard = createReminderKeyboard(event, member.getId(), reminder.getId());
                             telegramMessageService.sendMessageWithInlineKeyboard(member.getTelegramId(), message, keyboard);
                         } catch (Exception fallbackError) {
                             log.error("Критическая ошибка {} при отправке напоминания члену семьи ID {} даже с UTC: {}", 
@@ -1007,8 +970,8 @@ public class ReminderService {
                         try {
                             log.warn("Fallback на UTC для члена семьи ID {} после непредвиденной ошибки {}", 
                                     member.getId(), e.getClass().getSimpleName());
-                            String message = formatReminderMessageByType(reminder, ZoneId.of("UTC"));
-                            var keyboard = createReminderKeyboard(event, member.getId());
+                            String message = formatShortReminderMessage(reminder, ZoneId.of("UTC"));
+                            var keyboard = createReminderKeyboard(event, member.getId(), reminder.getId());
                             telegramMessageService.sendMessageWithInlineKeyboard(member.getTelegramId(), message, keyboard);
                         } catch (Exception fallbackError) {
                             log.error("Критическая ошибка {} при отправке напоминания члену семьи ID {} даже с UTC: {}", 
@@ -1032,26 +995,30 @@ public class ReminderService {
      * <ul>
      *   <li>1 ряд с 1 кнопкой</li>
      *   <li>Кнопка: "📋 Посмотреть детали"</li>
-     *   <li>Callback data: "view_event_{eventId}"</li>
+     *   <li>Callback data: "view_event_from_reminder_{eventId}_{reminderId}"</li>
      * </ul>
      * 
-     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 9.1</p>
+     * <p><b>Требования:</b> 1.1, 1.3, 5.1, 5.2</p>
      * 
      * @param event событие для создания клавиатуры
+     * @param reminderId идентификатор напоминания для возврата к нему
      * @return inline-клавиатура с одной кнопкой
      */
     public org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup createSimplifiedReminderKeyboard(
-            Event event) {
+            Event event, Long reminderId) {
         
-        log.debug("Создание упрощенной клавиатуры напоминания для события ID {}", event.getId());
+        log.debug("Создание упрощенной клавиатуры напоминания для события ID {} и напоминания ID {}", 
+                 event.getId(), reminderId);
         
         var keyboard = new org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup();
         var rows = new java.util.ArrayList<java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton>>();
         
         // Единственная кнопка: "Посмотреть детали"
+        // Используем новый формат callback data с eventId и reminderId
         var viewButton = org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton.builder()
             .text("📋 Посмотреть детали")
-            .callbackData("view_event_" + event.getId())
+            .callbackData(CallbackPrefix.VIEW_EVENT_FROM_REMINDER.withPayload(
+                event.getId() + "_" + reminderId))
             .build();
         
         // Один ряд с одной кнопкой
@@ -1059,7 +1026,9 @@ public class ReminderService {
         
         keyboard.setKeyboard(rows);
         
-        log.debug("Упрощенная клавиатура создана для события ID {}: 1 ряд, 1 кнопка", event.getId());
+        log.debug("Упрощенная клавиатура создана для события ID {} и напоминания ID {}: " +
+                 "1 ряд, 1 кнопка, callback format: view_event_from_reminder_{}_{}",
+                 event.getId(), reminderId, event.getId(), reminderId);
         
         return keyboard;
     }
@@ -1076,36 +1045,177 @@ public class ReminderService {
      *   <li>📋 Посмотреть детали - единственная кнопка для всех пользователей</li>
      * </ul>
      * 
-     * <p><b>Требования:</b> 1.1, 1.2, 1.3</p>
+     * <p><b>Требования:</b> 1.1, 1.3, 5.1, 5.2, 5.4</p>
      * 
      * @param event событие
      * @param userId идентификатор пользователя, которому отправляется уведомление (не используется)
+     * @param reminderId идентификатор напоминания для возврата к нему
      * @return inline-клавиатура с одной кнопкой
      */
     private org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup createReminderKeyboard(
-            Event event, Long userId) {
+            Event event, Long userId, Long reminderId) {
         
         // Используем упрощенную клавиатуру с одной кнопкой "Посмотреть детали"
-        return createSimplifiedReminderKeyboard(event);
+        return createSimplifiedReminderKeyboard(event, reminderId);
     }
     
     /**
-     * Форматирует текст уведомления о напоминании с уникальным форматом по типу.
+     * Форматирует короткую версию уведомления о напоминании.
      * 
-     * <p>Создает персонализированное сообщение в зависимости от типа напоминания:</p>
+     * <p>Создает минималистичное сообщение с только заголовком и названием события:</p>
      * <ul>
-     *   <li>EVENING_BEFORE: "🌙 Напоминание: завтра в [время] у вас событие **[название]**"</li>
-     *   <li>ONE_HOUR_BEFORE: "⏰ Напоминание: через 1 час начнется событие **[название]** ([дата] в [время])"</li>
-     *   <li>FIFTEEN_MINUTES_BEFORE: "⚡ Напоминание: через 15 минут начнется событие **[название]** ([время])"</li>
+     *   <li>EVENING_BEFORE: "🌙 **Напоминание: завтра в [время] у вас событие - [название]**"</li>
+     *   <li>ONE_HOUR_BEFORE: "⚡ **Напоминание: через 1 час начнется событие - [название]**"</li>
+     *   <li>FIFTEEN_MINUTES_BEFORE: "🔥 **Напоминание: через 15 минут начнется событие - [название]**"</li>
+     * </ul>
+     * 
+     * <p>Короткая версия НЕ включает:</p>
+     * <ul>
+     *   <li>Дату и время события</li>
+     *   <li>Описание события</li>
+     *   <li>Информацию о создателе</li>
+     *   <li>Эмодзи типа события (👤/👨‍👩‍👧‍👦)</li>
+     * </ul>
+     * 
+     * <p>Обработка ошибок:</p>
+     * <ul>
+     *   <li>При ошибке конвертации timezone используется UTC с логированием предупреждения</li>
+     * </ul>
+     * 
+     * <p><b>ВАЖНО:</b> Метод использует только переданный recipientTimezone и НЕ обращается к event.getUser().
+     * Это предотвращает LazyInitializationException при работе вне транзакции.</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6</p>
+     * 
+     * @param reminder напоминание
+     * @param recipientTimezone часовой пояс получателя для форматирования времени
+     * @return короткое отформатированное сообщение
+     */
+    public String formatShortReminderMessage(Reminder reminder, ZoneId recipientTimezone) {
+        Event event = reminder.getEvent();
+        
+        try {
+            log.debug("Форматирование короткого сообщения напоминания ID {} для получателя: " +
+                     "eventId={}, eventDate={}, eventTime={}, recipientTimezone={}", 
+                     reminder.getId(), event.getId(), event.getEventDate(), event.getEventTime(), 
+                     recipientTimezone);
+            
+            // Создаем ZonedDateTime для времени события напрямую в timezone получателя
+            ZonedDateTime eventInRecipientTZ = ZonedDateTime.of(
+                event.getEventDate(), 
+                event.getEventTime(), 
+                recipientTimezone
+            );
+            
+            log.debug("Время события для короткого напоминания ID {}: " +
+                     "eventTimeRecipientTZ={}, recipientTZ={}", 
+                     reminder.getId(), eventInRecipientTZ.toLocalDateTime(), recipientTimezone);
+            
+            // Форматтер для времени
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+            String formattedTime = eventInRecipientTZ.format(timeFormatter);
+            
+            StringBuilder message = new StringBuilder();
+            
+            // Логируем тип напоминания для отладки
+            log.info("Форматирование короткого напоминания ID {}: reminderType={}", 
+                     reminder.getId(), reminder.getReminderType());
+            
+            // Уникальный заголовок в зависимости от типа напоминания (Требования 1.1, 1.2, 1.3, 2.2, 2.3)
+            switch (reminder.getReminderType()) {
+                case EVENING_BEFORE:
+                    log.debug("Используется формат EVENING_BEFORE для напоминания ID {}", reminder.getId());
+                    message.append("🌙 ").append(bold("Напоминание: завтра в " + formattedTime + " у вас событие - "));
+                    break;
+                    
+                case ONE_HOUR_BEFORE:
+                    log.debug("Используется формат ONE_HOUR_BEFORE для напоминания ID {}", reminder.getId());
+                    message.append("⚡ ").append(bold("Напоминание: через 1 час начнется событие - "));
+                    break;
+                    
+                case FIFTEEN_MINUTES_BEFORE:
+                    log.debug("Используется формат FIFTEEN_MINUTES_BEFORE для напоминания ID {}", reminder.getId());
+                    message.append("🔥 ").append(bold("Напоминание: через 15 минут начнется событие - "));
+                    break;
+                    
+                // Fallback для старых типов напоминаний в БД
+                default:
+                    log.warn("Используется fallback формат для напоминания ID {}: reminderType={}", 
+                            reminder.getId(), reminder.getReminderType());
+                    message.append("🔔 ").append(bold("Напоминание о событии - "));
+            }
+            
+            // Название события БЕЗ эмодзи типа события (Требование 2.1)
+            message.append(bold(event.getTitle()));
+            
+            log.debug("Сформировано короткое уведомление для напоминания ID {} в timezone {}: " +
+                     "eventTimeRecipientTZ={}, recipientTZ={}, длина={}", 
+                     reminder.getId(), recipientTimezone, eventInRecipientTZ.toLocalDateTime(), 
+                     recipientTimezone, message.length());
+            
+            return message.toString();
+            
+        } catch (java.time.DateTimeException e) {
+            // Ошибка при работе с датами/временем
+            log.error("Ошибка DateTimeException при форматировании короткого сообщения напоминания ID {} в timezone {}: " +
+                     "eventId={}, eventDate={}, eventTime={}, error={}", 
+                     reminder.getId(), recipientTimezone, event.getId(), 
+                     event.getEventDate(), event.getEventTime(), e.getMessage(), e);
+            
+            // Fallback на UTC
+            if (!recipientTimezone.equals(ZoneId.of("UTC"))) {
+                log.warn("Fallback на UTC для форматирования короткого сообщения напоминания ID {} после DateTimeException", 
+                        reminder.getId());
+                return formatShortReminderMessage(reminder, ZoneId.of("UTC"));
+            }
+            
+            // Если и с UTC ошибка, используем базовый формат
+            log.error("Критическая ошибка форматирования короткого напоминания ID {} даже с UTC, используется базовый формат", 
+                     reminder.getId(), e);
+            return "🔔 " + bold("Напоминание о событии - " + event.getTitle());
+            
+        } catch (Exception e) {
+            // Любая другая непредвиденная ошибка
+            log.error("Непредвиденная ошибка {} при форматировании короткого сообщения напоминания ID {} в timezone {}: " +
+                     "eventId={}, eventDate={}, eventTime={}, error={}", 
+                     e.getClass().getSimpleName(), reminder.getId(), recipientTimezone, 
+                     event.getId(), event.getEventDate(), event.getEventTime(), e.getMessage(), e);
+            
+            // Fallback на UTC
+            if (!recipientTimezone.equals(ZoneId.of("UTC"))) {
+                log.warn("Fallback на UTC для форматирования короткого сообщения напоминания ID {} после непредвиденной ошибки {}", 
+                        reminder.getId(), e.getClass().getSimpleName());
+                return formatShortReminderMessage(reminder, ZoneId.of("UTC"));
+            }
+            
+            // Если и с UTC ошибка, используем базовый формат
+            log.error("Критическая ошибка {} форматирования короткого напоминания ID {} даже с UTC, используется базовый формат", 
+                     e.getClass().getSimpleName(), reminder.getId(), e);
+            return "🔔 " + bold("Напоминание о событии - " + event.getTitle());
+        }
+    }
+    
+    /**
+     * Форматирует полную версию уведомления о напоминании с эмодзи 🔔 и всей информацией.
+     * 
+     * <p>Создает детальное сообщение в едином формате для всех типов напоминаний:</p>
+     * <ul>
+     *   <li>Заголовок: "🔔 **Напоминание о событии**"</li>
+     *   <li>Название события</li>
+     *   <li>Дата и время события</li>
+     *   <li>Описание события (если есть)</li>
+     *   <li>Тип события (персональное/семейное)</li>
+     *   <li>Тип напоминания</li>
      * </ul>
      * 
      * <p>Включает в сообщение:</p>
      * <ul>
-     *   <li>Уникальный эмодзи и текст для каждого типа напоминания</li>
+     *   <li>Эмодзи 🔔 в заголовке</li>
      *   <li>Название события (жирным шрифтом)</li>
      *   <li>Дату и время события в timezone получателя</li>
-     *   <li>Описание события (обрезанное до 100 символов)</li>
-     *   <li>Эмодзи типа события: 👤 для персональных, 👨‍👩‍👧‍👦 для семейных</li>
+     *   <li>Описание события (полное, без обрезки)</li>
+     *   <li>Информацию о типе события (персональное/семейное)</li>
+     *   <li>Информацию о типе напоминания</li>
      * </ul>
      * 
      * <p>Обработка ошибок:</p>
@@ -1117,16 +1227,16 @@ public class ReminderService {
      * 
      * @param reminder напоминание
      * @param recipientTimezone часовой пояс получателя для форматирования времени
-     * @return отформатированное сообщение с уникальным форматом по типу
+     * @return отформатированное сообщение с полной информацией
      */
     public String formatReminderMessageByType(Reminder reminder, ZoneId recipientTimezone) {
         Event event = reminder.getEvent();
         
         try {
-            // Получаем timezone создателя события (Требование 4.4)
+            // Получаем timezone создателя события
             ZoneId creatorTimezone = getUserTimezone(event.getUser());
             
-            log.debug("Форматирование сообщения напоминания ID {} для получателя: " +
+            log.debug("Форматирование полного сообщения напоминания ID {} для получателя: " +
                      "eventId={}, eventDate={}, eventTime={}, creatorTimezone={}, recipientTimezone={}", 
                      reminder.getId(), event.getId(), event.getEventDate(), event.getEventTime(), 
                      creatorTimezone, recipientTimezone);
@@ -1138,10 +1248,10 @@ public class ReminderService {
                 creatorTimezone
             );
             
-            // Конвертируем время события из timezone создателя в timezone получателя (Требование 4.4)
+            // Конвертируем время события из timezone создателя в timezone получателя
             ZonedDateTime eventInRecipientTZ = eventInCreatorTZ.withZoneSameInstant(recipientTimezone);
             
-            log.debug("Конвертация времени события для напоминания ID {}: " +
+            log.debug("Конвертация времени события для полного напоминания ID {}: " +
                      "eventTimeCreatorTZ={}, eventTimeRecipientTZ={}, creatorTZ={}, recipientTZ={}", 
                      reminder.getId(), eventInCreatorTZ.toLocalDateTime(), 
                      eventInRecipientTZ.toLocalDateTime(), creatorTimezone, recipientTimezone);
@@ -1155,81 +1265,35 @@ public class ReminderService {
             
             StringBuilder message = new StringBuilder();
             
-            // Уникальный заголовок в зависимости от типа напоминания (Требования 14.1, 14.2, 14.3)
-            switch (reminder.getReminderType()) {
-                case EVENING_BEFORE:
-                    message.append("🌙 ").append(bold("Напоминание: завтра в " + formattedTime + " у вас событие "));
-                    break;
-                    
-                case ONE_HOUR_BEFORE:
-                    message.append("⏰ ").append(bold("Напоминание: через 1 час начнется событие "));
-                    break;
-                    
-                case FIFTEEN_MINUTES_BEFORE:
-                    message.append("⚡ ").append(bold("Напоминание: через 15 минут начнется событие "));
-                    break;
-                    
-                case MORNING_OF_DAY:
-                    message.append("☀️ ").append(bold("Напоминание: сегодня в " + formattedTime + " у вас событие "));
-                    break;
-                    
-                case TEN_MINUTES_BEFORE:
-                    message.append("⚡ ").append(bold("Напоминание: через 10 минут начнется событие "));
-                    break;
-                    
-                case CUSTOM:
-                    message.append("🔔 ").append(bold("Напоминание: через " + reminder.getCustomMinutes() + " минут начнется событие "));
-                    break;
-                    
-                default:
-                    message.append("🔔 ").append(bold("Напоминание о событии "));
-            }
+            // Заголовок с эмодзи 🔔 (единый для всех типов)
+            message.append("🔔 ").append(bold("Напоминание о событии")).append("\n\n");
             
-            // Эмодзи типа события + название события (Требования 14.6, 14.7, 14.4)
-            if (event.getIsPersonal()) {
-                message.append("👤 ");
-            } else {
-                message.append("👨‍👩‍👧‍👦 ");
-            }
+            // Название события
+            message.append(formatMessage("📅 Событие: %s\n", event.getTitle()));
             
-            message.append(bold(event.getTitle())).append("\n\n");
+            // Дата
+            message.append(formatMessage("🕐 Дата: %s\n", formattedDate));
             
-            // Дата и время в зависимости от типа напоминания (Требование 14.5)
-            switch (reminder.getReminderType()) {
-                case EVENING_BEFORE:
-                case MORNING_OF_DAY:
-                    // Для напоминаний накануне/утром показываем только дату
-                    message.append(formatMessage("📅 Дата: %s\n", formattedDate));
-                    message.append(formatMessage("⏰ Время: %s\n", formattedTime));
-                    break;
-                    
-                case ONE_HOUR_BEFORE:
-                    // Для напоминания за 1 час показываем дату и время
-                    message.append(formatMessage("📅 %s в %s\n", formattedDate, formattedTime));
-                    break;
-                    
-                case FIFTEEN_MINUTES_BEFORE:
-                case TEN_MINUTES_BEFORE:
-                case CUSTOM:
-                    // Для коротких напоминаний показываем только время
-                    message.append(formatMessage("⏰ %s\n", formattedTime));
-                    break;
-            }
+            // Время
+            message.append(formatMessage("⏰ Время: %s\n", formattedTime));
             
-            // Описание события (обрезка до 100 символов) (Требование 14.4)
+            // Описание события (полное, без обрезки)
             if (event.getDescription() != null && !event.getDescription().isBlank()) {
-                String truncatedDesc = event.getDescription().length() > 100 
-                    ? event.getDescription().substring(0, 100) + "..." 
-                    : event.getDescription();
-                message.append(formatMessage("\n📝 %s\n", truncatedDesc));
+                message.append(formatMessage("📝 Описание: %s\n", event.getDescription()));
             }
             
-            // Информация о создателе для семейных событий
-            if (!event.getIsPersonal()) {
-                message.append(formatMessage("\n👤 Создал: %s", event.getUser().getFirstName()));
+            // Тип события (персональное/семейное)
+            if (event.getIsPersonal()) {
+                message.append("👤 Персональное событие\n");
+            } else {
+                message.append("👨‍👩‍👧‍👦 Семейное событие\n");
             }
             
-            log.debug("Сформировано уведомление для напоминания ID {} в timezone {}: " +
+            // Тип напоминания
+            String reminderTypeText = getReminderTimeInfo(reminder);
+            message.append(formatMessage("⏱ Напоминание: %s", reminderTypeText));
+            
+            log.debug("Сформировано полное уведомление для напоминания ID {} в timezone {}: " +
                      "eventTimeCreatorTZ={}, eventTimeRecipientTZ={}, creatorTZ={}, recipientTZ={}, длина={}", 
                      reminder.getId(), recipientTimezone, eventInCreatorTZ.toLocalDateTime(), 
                      eventInRecipientTZ.toLocalDateTime(), creatorTimezone, recipientTimezone, message.length());
@@ -1238,39 +1302,39 @@ public class ReminderService {
             
         } catch (java.time.DateTimeException e) {
             // Ошибка при работе с датами/временем
-            log.error("Ошибка DateTimeException при форматировании сообщения напоминания ID {} в timezone {}: " +
+            log.error("Ошибка DateTimeException при форматировании полного сообщения напоминания ID {} в timezone {}: " +
                      "eventId={}, eventDate={}, eventTime={}, error={}", 
                      reminder.getId(), recipientTimezone, event.getId(), 
                      event.getEventDate(), event.getEventTime(), e.getMessage(), e);
             
             // Fallback на UTC
             if (!recipientTimezone.equals(ZoneId.of("UTC"))) {
-                log.warn("Fallback на UTC для форматирования сообщения напоминания ID {} после DateTimeException", 
+                log.warn("Fallback на UTC для форматирования полного сообщения напоминания ID {} после DateTimeException", 
                         reminder.getId());
                 return formatReminderMessageByType(reminder, ZoneId.of("UTC"));
             }
             
             // Если и с UTC ошибка, используем старый метод форматирования
-            log.error("Критическая ошибка форматирования напоминания ID {} даже с UTC, используется базовый формат", 
+            log.error("Критическая ошибка форматирования полного напоминания ID {} даже с UTC, используется базовый формат", 
                      reminder.getId(), e);
             return formatReminderMessage(reminder);
             
         } catch (Exception e) {
             // Любая другая непредвиденная ошибка
-            log.error("Непредвиденная ошибка {} при форматировании сообщения напоминания ID {} в timezone {}: " +
+            log.error("Непредвиденная ошибка {} при форматировании полного сообщения напоминания ID {} в timezone {}: " +
                      "eventId={}, eventDate={}, eventTime={}, error={}", 
                      e.getClass().getSimpleName(), reminder.getId(), recipientTimezone, 
                      event.getId(), event.getEventDate(), event.getEventTime(), e.getMessage(), e);
             
             // Fallback на UTC
             if (!recipientTimezone.equals(ZoneId.of("UTC"))) {
-                log.warn("Fallback на UTC для форматирования сообщения напоминания ID {} после непредвиденной ошибки {}", 
+                log.warn("Fallback на UTC для форматирования полного сообщения напоминания ID {} после непредвиденной ошибки {}", 
                         reminder.getId(), e.getClass().getSimpleName());
                 return formatReminderMessageByType(reminder, ZoneId.of("UTC"));
             }
             
             // Если и с UTC ошибка, используем старый метод форматирования
-            log.error("Критическая ошибка {} форматирования напоминания ID {} даже с UTC, используется базовый формат", 
+            log.error("Критическая ошибка {} форматирования полного напоминания ID {} даже с UTC, используется базовый формат", 
                      e.getClass().getSimpleName(), reminder.getId(), e);
             return formatReminderMessage(reminder);
         }
@@ -1285,7 +1349,7 @@ public class ReminderService {
      *   <li>Название события</li>
      *   <li>Дату и время (включая время окончания если указано)</li>
      *   <li>Описание события (обрезанное до 100 символов)</li>
-     *   <li>Маркер персонального события (🔒) или семейного (👨‍👩‍👧‍👦 с именем создателя)</li>
+     *   <li>Маркер персонального события (👤) или семейного (👨‍👩‍👧‍👦 с именем создателя)</li>
      *   <li>Тип напоминания</li>
      * </ul>
      * 
@@ -1336,7 +1400,7 @@ public class ReminderService {
         
         // Маркер типа события (Требования 5.4, 5.5)
         if (event.getIsPersonal()) {
-            message.append("🔒 ").append(bold("Персональное событие")).append("\n");
+            message.append("👤 ").append(bold("Персональное событие")).append("\n");
         } else {
             message.append(formatMessage("👨‍👩‍👧‍👦 Семейное событие (создал: %s)\n", 
                 event.getUser().getFirstName()));
@@ -1356,20 +1420,14 @@ public class ReminderService {
      */
     private String getReminderTimeInfo(Reminder reminder) {
         switch (reminder.getReminderType()) {
-            case MORNING_OF_DAY:
-                return "Напоминание: утром в день события";
             case EVENING_BEFORE:
-                return "Напоминание: вечером накануне";
+                return "накануне вечером";
             case ONE_HOUR_BEFORE:
-                return "Напоминание: за 1 час до события";
-            case TEN_MINUTES_BEFORE:
-                return "Напоминание: за 10 минут до события";
+                return "за 1 час до события";
             case FIFTEEN_MINUTES_BEFORE:
-                return "Напоминание: за 15 минут до события";
-            case CUSTOM:
-                return formatMessage("Напоминание: за %d минут до события", reminder.getCustomMinutes());
+                return "за 15 минут до события";
             default:
-                return "Напоминание о событии";
+                return "о событии";
         }
     }
     
@@ -1409,6 +1467,62 @@ public class ReminderService {
     }
     
     /**
+     * Получает напоминание по идентификатору с eager загрузкой связанного события.
+     * Использует EntityGraph для предотвращения LazyInitializationException.
+     * 
+     * <p>Этот метод следует использовать когда необходимо работать с событием
+     * вне транзакции, например при форматировании сообщений.</p>
+     * 
+     * @param reminderId идентификатор напоминания
+     * @return напоминание с загруженным событием
+     * @throws ru.golubyatnikov.family.calendar.bot.exception.ReminderNotFoundException если напоминание не найдено
+     */
+    @Transactional(readOnly = true)
+    public Reminder getReminderWithEventById(Long reminderId) {
+        log.debug("Получение напоминания с событием по ID {}", reminderId);
+        
+        return reminderRepository.findWithEventById(reminderId)
+            .orElseThrow(() -> {
+                log.error("Напоминание с ID {} не найдено", reminderId);
+                return new ru.golubyatnikov.family.calendar.bot.exception.ReminderNotFoundException(reminderId);
+            });
+    }
+    
+    /**
+     * Получает напоминание по идентификатору с eager загрузкой события и пользователя.
+     * 
+     * <p>Использует специальный метод репозитория с @EntityGraph для загрузки
+     * всех необходимых связей в одном запросе. Это позволяет безопасно
+     * обращаться к event.user вне транзакции.</p>
+     * 
+     * <p>Загружаемые связи:</p>
+     * <ul>
+     *   <li>event - событие напоминания</li>
+     *   <li>event.user - пользователь-создатель события</li>
+     * </ul>
+     * 
+     * <p>Метод используется в сценариях, где необходим доступ к timezone
+     * пользователя-создателя события для корректного форматирования времени,
+     * например при возврате к напоминанию из детального просмотра события.</p>
+     * 
+     * <p><b>Требования:</b> 1.1, 2.1</p>
+     * 
+     * @param reminderId идентификатор напоминания
+     * @return напоминание с загруженным событием и пользователем
+     * @throws ru.golubyatnikov.family.calendar.bot.exception.ReminderNotFoundException если напоминание не найдено
+     */
+    @Transactional(readOnly = true)
+    public Reminder getReminderWithEventAndUser(Long reminderId) {
+        log.debug("Получение напоминания с событием и пользователем по ID {}", reminderId);
+        
+        return reminderRepository.findWithEventAndUserById(reminderId)
+            .orElseThrow(() -> {
+                log.error("Напоминание с ID {} не найдено", reminderId);
+                return new ru.golubyatnikov.family.calendar.bot.exception.ReminderNotFoundException(reminderId);
+            });
+    }
+    
+    /**
      * Удаляет напоминание по идентификатору.
      * 
      * @param reminderId идентификатор напоминания
@@ -1427,57 +1541,281 @@ public class ReminderService {
     }
     
     /**
-     * Пересчитывает время отправки для всех неотправленных напоминаний события.
-     * Используется при изменении даты или времени события.
+     * Удаляет все неотправленные напоминания для события.
+     * 
+     * <p>Используется при пересоздании напоминаний после изменения даты/времени события.
+     * Удаляет только неотправленные напоминания, оставляя уже отправленные для истории.</p>
+     * 
+     * <p>Алгоритм работы:</p>
+     * <ul>
+     *   <li>Получает все неотправленные напоминания события</li>
+     *   <li>Логирует количество и типы удаляемых напоминаний</li>
+     *   <li>Удаляет все напоминания одной операцией</li>
+     *   <li>Возвращает количество удаленных напоминаний</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 2.1, 3.1, 5.2</p>
      * 
      * @param eventId идентификатор события
-     * @throws EventNotFoundException если событие не найдено
+     * @return количество удаленных напоминаний
      */
-    public void recalculateReminders(Long eventId) {
-        log.debug("Пересчет напоминаний для события ID {}", eventId);
-        
-        Event event = eventRepository.findById(eventId)
-            .orElseThrow(() -> new EventNotFoundException(eventId));
-        
-        if (event.getEventDate() == null || event.getEventTime() == null) {
-            log.warn("Невозможно пересчитать напоминания для события ID {} без даты или времени", eventId);
-            return;
-        }
+    private int deleteOldReminders(Long eventId) {
+        log.debug("Удаление старых неотправленных напоминаний для события ID {}", eventId);
         
         List<Reminder> reminders = reminderRepository.findByEventIdAndSentFalse(eventId);
         
         if (reminders.isEmpty()) {
-            log.debug("Нет неотправленных напоминаний для пересчета для события ID {}", eventId);
-            return;
+            log.debug("Нет неотправленных напоминаний для удаления для события ID {}", eventId);
+            return 0;
         }
         
-        int recalculatedCount = 0;
+        // Логируем типы удаляемых напоминаний
+        String reminderTypes = reminders.stream()
+            .map(r -> r.getReminderType().toString() + 
+                     (r.getCustomMinutes() != null ? "(" + r.getCustomMinutes() + "min)" : ""))
+            .toList()
+            .toString();
+        
+        log.info("Удаление {} неотправленных напоминаний для события ID {}: типы={}", 
+                reminders.size(), eventId, reminderTypes);
+        
+        reminderRepository.deleteAll(reminders);
+        
+        log.info("Удалено {} неотправленных напоминаний для события ID {}", reminders.size(), eventId);
+        
+        return reminders.size();
+    }
+    
+    /**
+     * Извлекает информацию о напоминаниях для последующего пересоздания.
+     * 
+     * <p>Создает список ReminderInfo из существующих напоминаний,
+     * сохраняя только типы и параметры (customMinutes для CUSTOM типа).</p>
+     * 
+     * <p>Алгоритм работы:</p>
+     * <ul>
+     *   <li>Проходит по всем напоминаниям</li>
+     *   <li>Для каждого напоминания создает ReminderInfo с типом и customMinutes</li>
+     *   <li>Логирует извлеченную информацию</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 2.3, 3.3, 5.2</p>
+     * 
+     * @param reminders список напоминаний для извлечения информации
+     * @return список ReminderInfo с типами и параметрами напоминаний
+     */
+    private List<ReminderInfo> extractReminderInfo(List<Reminder> reminders) {
+        log.debug("Извлечение информации из {} напоминаний", reminders.size());
+        
+        List<ReminderInfo> reminderInfos = new ArrayList<>();
+        
         for (Reminder reminder : reminders) {
+            ReminderInfo info = new ReminderInfo(
+                reminder.getReminderType(),
+                reminder.getCustomMinutes()
+            );
+            reminderInfos.add(info);
+            
+            log.debug("Извлечена информация о напоминании ID {}: type={}, customMinutes={}", 
+                     reminder.getId(), info.getReminderType(), info.getCustomMinutes());
+        }
+        
+        log.info("Извлечена информация из {} напоминаний: типы={}", 
+                reminderInfos.size(),
+                reminderInfos.stream()
+                    .map(info -> info.getReminderType().toString() + 
+                         (info.getCustomMinutes() != null ? "(" + info.getCustomMinutes() + "min)" : ""))
+                    .toList());
+        
+        return reminderInfos;
+    }
+    
+    /**
+     * Создает новые напоминания на основе сохраненной информации.
+     * 
+     * <p>Пересоздает напоминания с новыми временами на основе ReminderInfo.
+     * Пропускает напоминания, время которых оказалось в прошлом.</p>
+     * 
+     * <p>Алгоритм работы:</p>
+     * <ul>
+     *   <li>Получает текущее время в UTC для сравнения</li>
+     *   <li>Для каждого ReminderInfo рассчитывает новое время напоминания</li>
+     *   <li>Пропускает напоминания с временем в прошлом (логирует с уровнем WARN)</li>
+     *   <li>Создает новые объекты Reminder с рассчитанными временами</li>
+     *   <li>Сохраняет все напоминания одной операцией</li>
+     *   <li>Логирует созданные и пропущенные напоминания</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 2.2, 2.4, 3.2, 3.4, 5.3, 5.4</p>
+     * 
+     * @param event событие для создания напоминаний
+     * @param reminderInfos список информации о напоминаниях
+     * @return список созданных напоминаний
+     */
+    private List<Reminder> createNewReminders(Event event, List<ReminderInfo> reminderInfos) {
+        log.debug("Создание {} новых напоминаний для события ID {}", reminderInfos.size(), event.getId());
+        
+        // Получаем текущее время в UTC для корректного сравнения
+        LocalDateTime nowUTC = LocalDateTime.now(ZoneId.of("UTC"));
+        
+        List<Reminder> newReminders = new ArrayList<>();
+        int skippedCount = 0;
+        
+        for (ReminderInfo info : reminderInfos) {
             try {
-                LocalDateTime newReminderTime = calculateReminderTime(
-                    event, 
-                    reminder.getReminderType(), 
-                    reminder.getCustomMinutes()
+                // Рассчитываем новое время напоминания
+                LocalDateTime reminderTimeUTC = calculateReminderTime(
+                    event,
+                    info.getReminderType(),
+                    info.getCustomMinutes()
                 );
                 
-                // Пропускаем напоминания, время которых оказалось в прошлом
-                if (newReminderTime.isBefore(LocalDateTime.now())) {
-                    log.warn("Пропуск пересчета напоминания ID {} для события ID {}: новое время в прошлом", 
-                            reminder.getId(), eventId);
+                // Пропускаем напоминания, время которых в прошлом
+                if (reminderTimeUTC.isBefore(nowUTC)) {
+                    log.warn("Пропуск создания напоминания типа {} для события ID {}: " +
+                            "новое время {} UTC в прошлом (nowUTC={})",
+                            info.getReminderType(), event.getId(), reminderTimeUTC, nowUTC);
+                    skippedCount++;
                     continue;
                 }
                 
-                reminder.setReminderTime(newReminderTime);
-                reminderRepository.save(reminder);
-                recalculatedCount++;
+                // Создаем новое напоминание
+                Reminder reminder = Reminder.builder()
+                    .event(event)
+                    .reminderType(info.getReminderType())
+                    .customMinutes(info.getCustomMinutes())
+                    .reminderTime(reminderTimeUTC)
+                    .sent(false)
+                    .build();
+                
+                newReminders.add(reminder);
+                
+                log.debug("Подготовлено новое напоминание типа {} для события ID {}: reminderTimeUTC={}",
+                         info.getReminderType(), event.getId(), reminderTimeUTC);
                 
             } catch (Exception e) {
-                log.error("Ошибка при пересчете напоминания ID {}: {}", 
-                         reminder.getId(), e.getMessage(), e);
+                log.error("Ошибка при создании напоминания типа {} для события ID {}: {}",
+                         info.getReminderType(), event.getId(), e.getMessage(), e);
+                skippedCount++;
             }
         }
         
-        log.info("Пересчитано {} напоминаний для события ID {}", recalculatedCount, eventId);
+        // Сохраняем все новые напоминания
+        if (!newReminders.isEmpty()) {
+            List<Reminder> saved = reminderRepository.saveAll(newReminders);
+            
+            String createdTypes = saved.stream()
+                .map(r -> r.getReminderType().toString() +
+                         (r.getCustomMinutes() != null ? "(" + r.getCustomMinutes() + "min)" : ""))
+                .toList()
+                .toString();
+            
+            log.info("Создано {} новых напоминаний для события ID {}: типы={}, пропущено={}",
+                    saved.size(), event.getId(), createdTypes, skippedCount);
+            
+            return saved;
+        } else {
+            log.warn("Не создано ни одного нового напоминания для события ID {} " +
+                    "(все времена в прошлом или ошибки создания), пропущено={}",
+                    event.getId(), skippedCount);
+            return newReminders;
+        }
+    }
+    
+    /**
+     * Пересчитывает время отправки для всех неотправленных напоминаний события.
+     * Используется при изменении даты или времени события.
+     * 
+     * <p>Новая реализация удаляет старые напоминания и создает новые вместо обновления существующих.
+     * Это гарантирует корректность данных и отсутствие дублирования.</p>
+     * 
+     * <p>Алгоритм работы:</p>
+     * <ul>
+     *   <li>Проверяет наличие даты и времени у события</li>
+     *   <li>Получает все неотправленные напоминания</li>
+     *   <li>Извлекает информацию о типах и параметрах напоминаний</li>
+     *   <li>Удаляет все старые неотправленные напоминания</li>
+     *   <li>Создает новые напоминания с пересчитанными временами</li>
+     *   <li>Все операции выполняются в одной транзакции для атомарности</li>
+     * </ul>
+     * 
+     * <p>Обработка edge cases:</p>
+     * <ul>
+     *   <li>Событие без даты/времени - логирует предупреждение и завершается</li>
+     *   <li>Событие без напоминаний - логирует debug и завершается</li>
+     *   <li>Все новые времена в прошлом - удаляет старые, не создает новые</li>
+     *   <li>Ошибка при создании - откатывает транзакцию</li>
+     * </ul>
+     * 
+     * <p><b>Требования:</b> 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 
+     * 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4, 5.5, 6.1, 6.2, 6.3, 6.4, 6.5</p>
+     * 
+     * @param eventId идентификатор события
+     * @throws EventNotFoundException если событие не найдено
+     */
+    @Transactional
+    public void recalculateReminders(Long eventId) {
+        log.info("Начало пересчета напоминаний для события ID {}", eventId);
+        
+        try {
+            // Шаг 1: Получаем событие
+            Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new EventNotFoundException(eventId));
+            
+            // Шаг 2: Проверяем наличие даты и времени
+            if (event.getEventDate() == null || event.getEventTime() == null) {
+                log.warn("Невозможно пересчитать напоминания для события ID {} без даты или времени: " +
+                        "eventDate={}, eventTime={}",
+                        eventId, event.getEventDate(), event.getEventTime());
+                return;
+            }
+            
+            log.debug("Событие ID {} имеет дату и время: eventDate={}, eventTime={}",
+                     eventId, event.getEventDate(), event.getEventTime());
+            
+            // Шаг 3: Получаем все неотправленные напоминания
+            List<Reminder> oldReminders = reminderRepository.findByEventIdAndSentFalse(eventId);
+            
+            if (oldReminders.isEmpty()) {
+                log.debug("Нет неотправленных напоминаний для пересчета для события ID {}", eventId);
+                return;
+            }
+            
+            log.info("Найдено {} неотправленных напоминаний для пересчета для события ID {}",
+                    oldReminders.size(), eventId);
+            
+            // Шаг 4: Извлекаем информацию о напоминаниях (типы и параметры)
+            List<ReminderInfo> reminderInfos = extractReminderInfo(oldReminders);
+            
+            // Шаг 5: Удаляем все старые неотправленные напоминания
+            int deletedCount = deleteOldReminders(eventId);
+            
+            log.info("Удалено {} старых напоминаний для события ID {}", deletedCount, eventId);
+            
+            // Шаг 6: Создаем новые напоминания с пересчитанными временами
+            List<Reminder> newReminders = createNewReminders(event, reminderInfos);
+            
+            // Шаг 7: Итоговое логирование
+            if (newReminders.isEmpty()) {
+                log.warn("Пересчет напоминаний для события ID {} завершен: " +
+                        "удалено={}, создано=0 (все новые времена в прошлом)",
+                        eventId, deletedCount);
+            } else {
+                log.info("Пересчет напоминаний для события ID {} успешно завершен: " +
+                        "удалено={}, создано={}",
+                        eventId, deletedCount, newReminders.size());
+            }
+            
+        } catch (EventNotFoundException e) {
+            log.error("Событие ID {} не найдено при пересчете напоминаний", eventId);
+            throw e;
+            
+        } catch (Exception e) {
+            log.error("Ошибка при пересчете напоминаний для события ID {}: {}",
+                     eventId, e.getMessage(), e);
+            // Транзакция будет откачена автоматически благодаря @Transactional
+            throw new RuntimeException("Не удалось пересчитать напоминания для события ID " + eventId, e);
+        }
     }
     
     /**

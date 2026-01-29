@@ -84,7 +84,7 @@ class AttachmentCallbackHandlerParsingTest {
         
         // Assert
         // Проверяем, что метод answerCallbackQuery был вызван с правильным сообщением
-        verify(messageService).answerCallbackQuery(eq("callback-123"), eq("Удаление отменено"));
+        verify(messageService).answerCallbackQuery(eq("callback-123"), eq("🚫 Удаление отменено"));
         
         // Проверяем, что eventService.getEventById был вызван с правильным eventId
         verify(eventService, atLeastOnce()).getEventById(eq(eventId));
@@ -129,7 +129,7 @@ class AttachmentCallbackHandlerParsingTest {
         verify(attachmentService).deleteAttachment(eq(attachmentId), eq(user.getId()));
         
         // Проверяем, что answerCallbackQuery был вызван с подтверждением
-        verify(messageService).answerCallbackQuery(eq("callback-123"), eq("✅ Вложение удалено"));
+        verify(messageService).answerCallbackQuery(eq("callback-123"), eq("✅ Удалено"));
         
         // Проверяем, что eventService.getEventById был вызван с правильным eventId
         verify(eventService, atLeastOnce()).getEventById(eq(eventId));
@@ -282,7 +282,7 @@ class AttachmentCallbackHandlerParsingTest {
         verify(conversationStateService).clearAwaitingFile(eq(user.getId()));
         
         // Проверяем, что метод answerCallbackQuery был вызван с правильным сообщением
-        verify(messageService).answerCallbackQuery(eq("callback-123"), eq("Отменено"));
+        verify(messageService).answerCallbackQuery(eq("callback-123"), eq("🚫 Отменено"));
         
         // Проверяем, что eventService.getEventById был вызван с правильным eventId
         verify(eventService).getEventById(eq(eventId));

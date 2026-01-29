@@ -459,4 +459,24 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Query("SELECT e FROM Event e WHERE e.id = :id")
     @EntityGraph(attributePaths = {"user"})
     Optional<Event> findByIdWithUser(@Param("id") Long id);
+    
+    /**
+     * Находит событие по ID с eager загрузкой напоминаний.
+     * 
+     * <p>Используется в случаях, когда необходим доступ к коллекции reminders вне транзакции,
+     * например, при просмотре деталей события для определения наличия активных напоминаний.
+     * Eager загрузка reminders предотвращает LazyInitializationException при попытке
+     * доступа к коллекции после закрытия сессии Hibernate.</p>
+     * 
+     * <p>Аннотация {@code @EntityGraph} указывает Hibernate загрузить связанную
+     * коллекцию reminders в том же запросе, используя JOIN вместо отдельного запроса.</p>
+     * 
+     * @param id идентификатор события
+     *
+     * @return Optional с событием и инициализированной коллекцией reminders, или empty если событие не найдено
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    @Query("SELECT e FROM Event e WHERE e.id = :id")
+    @EntityGraph(attributePaths = {"reminders"})
+    Optional<Event> findByIdWithReminders(@Param("id") Long id);
 }

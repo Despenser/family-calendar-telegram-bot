@@ -15,6 +15,8 @@ import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.UserService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -171,7 +173,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                     // ИЗМЕНЕНИЕ: Очищаем состояние редактирования после успешного обновления
                     conversationStateService.clearEventEditing(userId);
                     
-                    messageService.answerCallbackQuery(callbackQueryId, "Дата обновлена");
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.UPDATED);
                     
                     log.info("Дата события обновлена: eventId={}, userId={}, date={}", 
                             context.getEventId(), userId, date);
@@ -196,7 +198,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                 
                 try {
                     messageService.editMessageText(chatId, messageId, message, null);
-                    messageService.answerCallbackQuery(callbackQueryId, "Слишком поздно для сегодня");
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.TOO_LATE_TODAY);
                     log.warn("Попытка создать событие на сегодня, когда все часы прошли: userId={}, date={}", 
                             userId, date);
                 } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
@@ -215,7 +217,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                 messageService.editMessageText(chatId, messageId, message, keyboard);
                 log.debug("Сообщение создания обновлено после выбора даты с фильтрацией часов: userId={}, messageId={}, date={}", 
                          userId, messageId, date);
-                messageService.answerCallbackQuery(callbackQueryId, "Дата выбрана");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.itemSelected("Дата"));
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
                 log.error("Ошибка при выборе даты: userId={}, date={}, error={}", 
                          userId, date, e.getMessage());
@@ -274,7 +276,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                 // Показываем сообщение и возвращаем к выбору часа
                 messageService.editMessageText(chatId, messageId, message, 
                         keyboardService.createFilteredHourSelectionKeyboard(eventDate, user));
-                messageService.answerCallbackQuery(callbackQueryId, "Выберите следующий час");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.SELECT_NEXT_HOUR);
                 log.warn("Попытка выбрать час, для которого все минуты прошли: userId={}, hour={}, eventDate={}", 
                         userId, hour, eventDate);
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
@@ -292,7 +294,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
             messageService.editMessageText(chatId, messageId, message, keyboard);
             log.debug("Сообщение создания обновлено после выбора часа с фильтрацией минут: messageId={}, hour={}", 
                      messageId, hour);
-            messageService.answerCallbackQuery(callbackQueryId, "Час выбран");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.itemSelected("Час"));
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при выборе часа: hour={}, error={}", hour, e.getMessage());
             throw new RuntimeException("Ошибка при выборе часа", e);
@@ -365,7 +367,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                     // ИЗМЕНЕНИЕ: Очищаем состояние редактирования после успешного обновления
                     conversationStateService.clearEventEditing(userId);
                     
-                    messageService.answerCallbackQuery(callbackQueryId, "Время обновлено");
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.UPDATED);
                     
                     log.info("Время события обновлено: eventId={}, userId={}, time={}", 
                             context.getEventId(), userId, time);
@@ -388,7 +390,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                 messageService.editMessageText(chatId, messageId, message, null);
                 log.debug("Сообщение создания обновлено после выбора времени: userId={}, messageId={}, time={}", 
                          userId, messageId, time);
-                messageService.answerCallbackQuery(callbackQueryId, "Время выбрано");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.itemSelected("Время"));
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
                 log.error("Ошибка при выборе времени: userId={}, time={}, error={}", 
                          userId, time, e.getMessage());
@@ -434,7 +436,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         
         try {
             messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
             log.debug("Возврат к выбору часа с пересчетом доступных часов: userId={}, eventDate={}", 
                      userId, eventDate);
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
@@ -502,7 +504,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                     // Очищаем состояние редактирования
                     conversationStateService.clearEventEditing(userId);
                     
-                    messageService.answerCallbackQuery(callbackQueryId, "Редактирование отменено");
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.actionCancelled("Редактирование"));
                     log.info("Редактирование времени отменено пользователем {}, eventId={}", 
                             userId, context.getEventId());
                     
@@ -527,7 +529,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
             String message = messageBuilder.buildEventCancelledMessage();
             try {
                 messageService.editMessageText(chatId, messageId, message, null);
-                messageService.answerCallbackQuery(callbackQueryId, "Создание отменено");
+                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.actionCancelled("Создание"));
             } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
                 log.error("Ошибка при отмене создания события: userId={}, error={}", 
                          userId, e.getMessage());

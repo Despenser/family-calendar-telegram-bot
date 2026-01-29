@@ -41,6 +41,9 @@ public enum CallbackPrefix {
     /** Просмотр деталей события (формат: view_event_{eventId}) */
     VIEW_EVENT("view_event_"),
     
+    /** Просмотр деталей события из напоминания (формат: view_event_from_reminder_{eventId}_{reminderId}) */
+    VIEW_EVENT_FROM_REMINDER("view_event_from_reminder_"),
+    
     /** Редактирование события (формат: edit_event_{eventId}) */
     EDIT_EVENT("edit_event_"),
     

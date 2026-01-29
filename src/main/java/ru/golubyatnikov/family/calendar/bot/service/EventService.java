@@ -333,6 +333,33 @@ public class EventService {
     }
     
     /**
+     * Получает событие по его идентификатору с загрузкой напоминаний.
+     * 
+     * <p>Метод используется для получения события с инициализированной коллекцией reminders,
+     * что предотвращает LazyInitializationException при доступе к напоминаниям вне транзакции.</p>
+     * 
+     * <p><b>Требования:</b> 8.1</p>
+     * 
+     * @param eventId идентификатор события
+     * @return событие с указанным ID и загруженными напоминаниями
+     * @throws EventNotFoundException если событие с указанным ID не найдено
+     */
+    @Transactional(readOnly = true)
+    public Event getEventByIdWithReminders(Long eventId) {
+        log.debug("Получение события по ID={} с напоминаниями", eventId);
+        
+        Event event = eventRepository.findByIdWithReminders(eventId)
+            .orElseThrow(() -> {
+                log.error("Событие с ID={} не найдено", eventId);
+                return new EventNotFoundException(eventId);
+            });
+        
+        log.debug("Событие ID={} успешно получено с {} напоминаниями: title='{}'", 
+                 eventId, event.getReminders().size(), event.getTitle());
+        return event;
+    }
+    
+    /**
      * Сохраняет событие в базе данных.
      * 
      * <p>Этот метод используется для сохранения изменений в существующем событии

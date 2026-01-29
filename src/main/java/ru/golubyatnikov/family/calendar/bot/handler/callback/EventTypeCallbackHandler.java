@@ -15,6 +15,7 @@ import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.UserService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 import java.time.LocalDate;
 
@@ -111,7 +112,7 @@ public class EventTypeCallbackHandler implements CallbackHandler {
             messageService.editMessageText(chatId, messageId, message, calendar);
             log.debug("Сообщение создания обновлено после выбора типа: userId={}, messageId={}, type={}", 
                      user.getId(), messageId, eventType);
-            messageService.answerCallbackQuery(callbackQueryId, "Тип события выбран");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.SELECTED);
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при выборе типа события: userId={}, type={}, error={}", 
                      user.getId(), eventType, e.getMessage());
@@ -153,7 +154,7 @@ public class EventTypeCallbackHandler implements CallbackHandler {
                 messageService.sendMessage(chatId, response, keyboard);
             }
             
-            messageService.answerCallbackQuery(callbackQueryId, "Событие создано");
+            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.CREATED);
         } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
             log.error("Ошибка при создании события: userId={}, eventId={}, error={}", 
                      userId, completedEvent.getId(), e.getMessage());

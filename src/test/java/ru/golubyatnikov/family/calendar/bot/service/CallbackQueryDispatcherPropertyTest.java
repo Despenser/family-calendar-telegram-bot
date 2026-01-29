@@ -323,9 +323,11 @@ class CallbackQueryDispatcherPropertyTest {
         // EventCallbackHandler
         handlers.add(createMockHandler(CallbackPrefix.VIEW_EVENT, callbackData ->
             CallbackPrefix.VIEW_EVENT.matches(callbackData) ||
+            CallbackPrefix.VIEW_EVENT_FROM_REMINDER.matches(callbackData) ||
             CallbackPrefix.EDIT_EVENT.matches(callbackData) ||
             CallbackPrefix.DELETE_EVENT.matches(callbackData) ||
-            CallbackPrefix.EDIT_FIELD.matches(callbackData)
+            CallbackPrefix.EDIT_FIELD.matches(callbackData) ||
+            CallbackPrefix.BACK_TO_REMINDER.matches(callbackData)
         ));
         
         // EventTypeCallbackHandler
