@@ -372,12 +372,6 @@ class CallbackQueryDispatcherPropertyTest {
             CallbackPrefix.CHECKLIST.matches(callbackData)
         ));
         
-        // CommentCallbackHandler
-        handlers.add(createMockHandler(CallbackPrefix.COMMENT, callbackData ->
-            CallbackPrefix.COMMENT.matches(callbackData) ||
-            CallbackPrefix.ADD_COMPLETION_NOTE.matches(callbackData)
-        ));
-        
         // DateActionsCallbackHandler (через NavigationCallbackHandler)
         handlers.add(createMockHandler(CallbackPrefix.DATE_ACTIONS, callbackData ->
             CallbackPrefix.DATE_ACTIONS.matches(callbackData)

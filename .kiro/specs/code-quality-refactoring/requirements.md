@@ -1,134 +1,192 @@
-# Requirements Document
+# Требования к комплексному рефакторингу проекта
 
-## Introduction
+## Введение
 
-Данный документ описывает требования к рефакторингу кодовой базы Telegram-бота Family Calendar Bot. Цель рефакторинга — устранение архитектурных проблем, улучшение поддерживаемости, тестируемости и производительности кода без изменения функциональности приложения.
+Данная спецификация описывает комплексный рефакторинг Spring Boot приложения семейного календаря на основе результатов архитектурного аудита. Цель - привести код к уровню production-ready с соблюдением всех best practices и устранением критических проблем.
 
-## Glossary
+## Глоссарий
 
-- **UpdateProcessor**: Центральный сервис обработки входящих обновлений от Telegram API
-- **CallbackQuery**: Событие нажатия на inline-кнопку в Telegram
-- **CallbackHandler**: Компонент, обрабатывающий определённый тип callback query
-- **CallbackPrefix**: Префикс строки callback data для маршрутизации обработки
-- **MessageBuilder**: Компонент для централизованного форматирования сообщений бота
-- **EntityGraph**: JPA-аннотация для оптимизации загрузки связанных сущностей
-- **AOP**: Aspect-Oriented Programming — аспектно-ориентированное программирование
+- **System**: Приложение семейного календаря (Spring Boot)
+- **EventService**: Сервис для работы с событиями
+- **ReminderService**: Сервис для работы с напоминаниями  
+- **WebhookRegistrar**: Компонент регистрации webhook Telegram
+- **Repository**: Слой доступа к данным (JPA репозитории)
+- **Entity**: JPA сущности (Event, User, Reminder и др.)
+- **LazyInitializationException**: Исключение при обращении к lazy-загруженным данным вне сессии
+- **N+1_Problem**: Проблема производительности с множественными запросами к БД
+- **God_Service**: Антипаттерн - сервис с избыточной ответственностью
+- **Correlation_ID**: Уникальный идентификатор для трейсинга запросов
 
-## Requirements
+## Требования
 
-### Requirement 1: Декомпозиция God-класса UpdateProcessor
+### Требование 1: Архитектурная реорганизация
 
-**User Story:** Как разработчик, я хочу иметь модульную архитектуру обработки callback queries, чтобы код был легко тестируемым, расширяемым и поддерживаемым.
+**User Story:** Как разработчик, я хочу иметь чистую архитектуру с правильным разделением ответственности, чтобы код был поддерживаемым и расширяемым.
 
-#### Acceptance Criteria
+#### Критерии приемки
 
-1. THE UpdateProcessor SHALL делегировать обработку callback queries специализированному CallbackQueryDispatcher
-2. WHEN callback query поступает в систему, THE CallbackQueryDispatcher SHALL маршрутизировать его к соответствующему CallbackHandler на основе префикса callback data
-3. THE System SHALL содержать отдельные CallbackHandler компоненты для каждой функциональной области:
-   - DateTimeCallbackHandler для выбора даты и времени
-   - EventCallbackHandler для операций с событиями (просмотр, редактирование, удаление)
-   - NavigationCallbackHandler для навигации по календарю
-   - EventTypeCallbackHandler для выбора типа события
-   - ChecklistCallbackHandler для работы с чек-листами
-   - CommentCallbackHandler для работы с комментариями
-   - AttachmentCallbackHandler для работы с вложениями
-   - RecurrenceCallbackHandler для настройки повторений
-4. WHEN новый тип callback добавляется в систему, THE System SHALL позволять добавить его без модификации существующих классов (Open/Closed Principle)
-5. THE UpdateProcessor SHALL иметь не более 300 строк кода после рефакторинга
-6. THE каждый CallbackHandler SHALL реализовывать единый интерфейс CallbackHandler с методами getPrefix() и handle()
+1. WHEN EventService содержит более 500 строк кода, THEN THE System SHALL разделить его на специализированные сервисы
+2. WHEN существуют циклические зависимости между компонентами, THEN THE System SHALL устранить их через события Spring
+3. WHEN сервис выполняет более одной ответственности, THEN THE System SHALL применить принцип Single Responsibility
+4. THE System SHALL использовать слоистую архитектуру Controller → Service → Repository
+5. THE System SHALL применять принципы SOLID во всех компонентах
 
-### Requirement 2: Централизованная обработка ошибок callback queries
+### Требование 2: Устранение критических проблем безопасности
 
-**User Story:** Как разработчик, я хочу иметь единую точку обработки ошибок для callback queries, чтобы избежать дублирования кода и обеспечить консистентное поведение при ошибках.
+**User Story:** Как системный администратор, я хочу устранить все уязвимости безопасности, чтобы приложение было защищено от атак.
 
-#### Acceptance Criteria
+#### Критерии приемки
 
-1. THE System SHALL использовать AOP-аспект CallbackErrorHandlingAspect для перехвата исключений в методах обработки callback
-2. WHEN исключение возникает при обработке callback query, THE System SHALL логировать ошибку с контекстом (callbackData, userId, chatId)
-3. WHEN исключение возникает при обработке callback query, THE System SHALL отправлять пользователю информативное сообщение об ошибке
-4. WHEN исключение возникает при обработке callback query, THE System SHALL отвечать на callback query с текстом ошибки
-5. THE System SHALL НЕ содержать дублирующихся блоков try-catch для обработки ошибок callback в handler-классах
-6. THE CallbackErrorHandlingAspect SHALL поддерживать аннотацию @HandleCallbackErrors для маркировки методов
+1. WHEN webhook регистрируется в Telegram, THEN THE System SHALL использовать secret token вместо токена в URL
+2. WHEN происходит критическая ошибка, THEN THE System SHALL выполнить graceful shutdown вместо System.exit()
+3. WHEN логируется информация о пользователях, THEN THE System SHALL маскировать персональные данные
+4. THE System SHALL валидировать все входящие данные на уровне контроллеров
+5. THE System SHALL использовать HTTPS для всех внешних соединений
 
-### Requirement 3: Типизация callback data через enum
+### Требование 3: Оптимизация производительности базы данных
 
-**User Story:** Как разработчик, я хочу использовать типизированные константы для callback prefixes, чтобы избежать опечаток и упростить рефакторинг.
+**User Story:** Как пользователь системы, я хочу быстрой работы приложения, чтобы операции выполнялись без задержек.
 
-#### Acceptance Criteria
+#### Критерии приемки
 
-1. THE System SHALL содержать enum CallbackPrefix со всеми используемыми префиксами callback data
-2. THE CallbackPrefix enum SHALL содержать методы matches(String data) и extractPayload(String data)
-3. WHEN callback data проверяется на соответствие префиксу, THE System SHALL использовать методы CallbackPrefix enum вместо строковых литералов
-4. THE System SHALL НЕ содержать захардкоженных строковых литералов для callback prefixes в коде обработчиков
-5. THE CallbackPrefix enum SHALL содержать все существующие префиксы: date_, calendar_, hour_, time_, edit_event_, delete_event_, view_event_, filter_, trash_, event_type_, edit_field_, setup_reminders_, toggle_reminder_, confirm_reminders_, view_reminders_, delete_reminder_, reminder_, recurrence_, series_action_, date_actions_, attach_file_, checklist_, comment_, add_completion_note_, confirm_text_event, cancel_text_event
+1. WHEN выполняется запрос к связанным сущностям, THEN THE Repository SHALL использовать @EntityGraph для предотвращения N+1
+2. WHEN метод только читает данные, THEN THE Service SHALL использовать @Transactional(readOnly = true)
+3. WHEN запрашивается список данных, THEN THE Repository SHALL поддерживать пагинацию
+4. WHEN данные запрашиваются часто, THEN THE System SHALL использовать кэширование
+5. THE System SHALL оптимизировать все SQL запросы с использованием индексов
 
-### Requirement 4: Выделение MessageBuilder для форматирования сообщений
+### Требование 4: Правильное управление транзакциями
 
-**User Story:** Как разработчик, я хочу иметь централизованный компонент для форматирования сообщений бота, чтобы обеспечить консистентный стиль и упростить изменение формата.
+**User Story:** Как разработчик, я хочу корректного управления транзакциями, чтобы обеспечить целостность данных и производительность.
 
-#### Acceptance Criteria
+#### Критерии приемки
 
-1. THE System SHALL содержать компонент BotMessageBuilder для формирования типовых сообщений бота
-2. THE BotMessageBuilder SHALL предоставлять методы для формирования:
-   - Сообщений об успешном создании события
-   - Сообщений об ошибках
-   - Сообщений справки
-   - Сообщений с предпросмотром события
-   - Сообщений о выборе даты/времени
-3. WHEN handler формирует сообщение для пользователя, THE handler SHALL использовать BotMessageBuilder вместо inline-форматирования
-4. THE BotMessageBuilder SHALL использовать MarkdownFormatter для экранирования специальных символов
-5. THE BotMessageBuilder SHALL поддерживать локализацию сообщений через конфигурацию
+1. WHEN метод только читает данные, THEN THE Service SHALL использовать @Transactional(readOnly = true)
+2. WHEN метод изменяет данные, THEN THE Service SHALL использовать @Transactional без readOnly
+3. WHEN класс содержит методы с разными типами транзакций, THEN THE System SHALL применять аннотации на уровне методов
+4. THE System SHALL НЕ использовать @Transactional на уровне класса для сервисов со смешанными операциями
+5. WHEN происходит исключение в транзакции, THEN THE System SHALL корректно откатывать изменения
 
-### Requirement 5: Оптимизация запросов к БД через EntityGraph
+### Требование 5: Улучшение системы логирования и мониторинга
 
-**User Story:** Как разработчик, я хочу избежать N+1 проблемы при загрузке событий, чтобы обеспечить высокую производительность приложения.
+**User Story:** Как DevOps инженер, я хочу качественного логирования и мониторинга, чтобы эффективно отслеживать работу системы.
 
-#### Acceptance Criteria
+#### Критерии приемки
 
-1. THE EventRepository SHALL использовать @EntityGraph для всех методов, возвращающих события с доступом к связанным сущностям user или family
-2. WHEN метод репозитория возвращает List<Event>, THE метод SHALL загружать связанные сущности в одном запросе через @EntityGraph
-3. THE следующие методы SHALL быть дополнены @EntityGraph:
-   - findByUserIdOrderByEventDateAsc
-   - findAllByUserIdAndStatus
-   - findByUserIdAndStatusOrderByDeletedAtDesc
-   - searchByTitleOrDescription
-   - findUpcomingEvents
-   - findBySeriesIdAndStatus
-4. IF метод не требует доступа к связанным сущностям, THEN @EntityGraph НЕ SHALL применяться
+1. WHEN обрабатывается запрос, THEN THE System SHALL генерировать уникальный correlation ID
+2. WHEN записывается лог, THEN THE System SHALL включать correlation ID для трейсинга
+3. WHEN происходят частые события, THEN THE System SHALL использовать метрики вместо избыточного логирования
+4. THE System SHALL логировать на уровне INFO только важные бизнес-события
+5. THE System SHALL использовать структурированное логирование с контекстом
 
-### Requirement 6: Оптимизация логирования
+### Требование 6: Внедрение кэширования
 
-**User Story:** Как разработчик, я хочу иметь оптимизированное логирование, чтобы не влиять на производительность в production и не раскрывать чувствительные данные.
+**User Story:** Как пользователь, я хочу быстрого отклика системы, чтобы часто запрашиваемые данные загружались мгновенно.
 
-#### Acceptance Criteria
+#### Критерии приемки
 
-1. THE System SHALL НЕ логировать полные тексты сообщений на уровне INFO
-2. WHEN отладочная информация логируется, THE System SHALL использовать уровень DEBUG
-3. THE System SHALL НЕ содержать блоков отладочного логирования вида "=== ОТЛАДКА ===" в production коде
-4. WHEN логируется ошибка, THE System SHALL включать: тип ошибки, сообщение, контекст (userId, chatId, command/callbackData)
-5. THE System SHALL использовать параметризованное логирование вместо конкатенации строк
-6. WHEN логируется чувствительная информация (токены, пароли), THE System SHALL маскировать её
+1. WHEN запрашиваются предстоящие события, THEN THE System SHALL кэшировать результат на 5 минут
+2. WHEN запрашивается информация о пользователе, THEN THE System SHALL кэшировать данные пользователя
+3. WHEN изменяются данные, THEN THE System SHALL инвалидировать соответствующий кэш
+4. THE System SHALL использовать Caffeine для локального кэширования
+5. THE System SHALL настроить TTL и размер кэша для каждого типа данных
 
-### Requirement 7: Исправление транзакций с внешними вызовами
+### Требование 7: Добавление пагинации
 
-**User Story:** Как разработчик, я хочу корректно управлять транзакциями, чтобы избежать блокировки соединений БД при вызовах внешних API.
+**User Story:** Как пользователь с большим количеством событий, я хочу постраничной загрузки данных, чтобы избежать долгого ожидания.
 
-#### Acceptance Criteria
+#### Критерии приемки
 
-1. THE методы с @Transactional SHALL НЕ содержать вызовов внешних API (Telegram API) внутри транзакции
-2. WHEN метод требует и транзакцию, и вызов внешнего API, THE System SHALL разделять их на отдельные методы
-3. THE вызовы Telegram API SHALL выполняться после коммита транзакции
-4. IF ошибка происходит при вызове Telegram API после коммита, THE System SHALL логировать ошибку без отката транзакции
-5. THE метод handleConfirmTextEvent SHALL быть рефакторен для соблюдения этого требования
+1. WHEN запрашивается список событий, THEN THE Repository SHALL поддерживать Pageable параметр
+2. WHEN возвращается список данных, THEN THE System SHALL возвращать Page<T> вместо List<T>
+3. WHEN клиент не указывает размер страницы, THEN THE System SHALL использовать размер по умолчанию 20 элементов
+4. THE System SHALL поддерживать сортировку в пагинации
+5. THE System SHALL возвращать метаданные пагинации (общее количество, номер страницы)
 
-### Requirement 8: Добавление Bean Validation
+### Требование 8: Расширение тестового покрытия
 
-**User Story:** Как разработчик, я хочу валидировать входные данные на уровне контроллера, чтобы отсекать невалидные запросы как можно раньше.
+**User Story:** Как разработчик, я хочу комплексного тестирования, чтобы гарантировать корректность работы системы.
 
-#### Acceptance Criteria
+#### Критерии приемки
 
-1. THE входные параметры методов сервисов SHALL быть аннотированы валидационными аннотациями (@NotNull, @NotBlank, @Size, @Future)
-2. WHEN невалидные данные передаются в сервис, THE System SHALL выбрасывать ConstraintViolationException
-3. THE GlobalExceptionHandler SHALL обрабатывать ConstraintViolationException и возвращать понятное сообщение об ошибке
-4. THE валидация SHALL применяться к параметрам: title события, description события, eventDateTime
-5. THE System SHALL использовать @Validated на уровне сервисов для активации валидации параметров методов
+1. WHEN создается новый сервис, THEN THE System SHALL включать unit тесты для всех публичных методов
+2. WHEN тестируется работа с БД, THEN THE System SHALL использовать интеграционные тесты с Testcontainers
+3. WHEN тестируется конкурентный доступ, THEN THE System SHALL включать тесты на race conditions
+4. THE System SHALL достичь покрытия кода тестами не менее 80%
+5. THE System SHALL включать property-based тесты для критичной бизнес-логики
+
+### Требование 9: Внедрение метрик и мониторинга
+
+**User Story:** Как системный администратор, я хочу детального мониторинга приложения, чтобы проактивно выявлять проблемы.
+
+#### Критерии приемки
+
+1. THE System SHALL экспортировать метрики в формате Prometheus
+2. WHEN происходит бизнес-событие, THEN THE System SHALL записывать соответствующую метрику
+3. WHEN происходит ошибка, THEN THE System SHALL увеличивать счетчик ошибок
+4. THE System SHALL мониторить производительность БД (время запросов, количество соединений)
+5. THE System SHALL предоставлять health checks для всех критичных компонентов
+
+### Требование 10: Оптимизация конфигурации
+
+**User Story:** Как DevOps инженер, я хочу оптимальной конфигурации приложения, чтобы обеспечить стабильную работу в production.
+
+#### Критерии приемки
+
+1. THE System SHALL использовать отдельные профили для dev, test и prod окружений
+2. THE System SHALL выносить все магические числа в конфигурационные константы
+3. THE System SHALL использовать @ConfigurationProperties для типизированной конфигурации
+4. THE System SHALL настроить connection pool для оптимальной работы с БД
+5. THE System SHALL настроить graceful shutdown с таймаутом
+6. WHEN в коде используются критические параметры (хосты, порты, таймауты, задержки планировщиков), THEN THE System SHALL выносить их в application.yml
+7. WHEN планировщик использует fixedDelay или fixedRate, THEN THE System SHALL читать значения из конфигурации через @Value или @ConfigurationProperties
+8. WHEN используются URL внешних API, THEN THE System SHALL выносить их в конфигурацию
+
+### Требование 11: Устранение технического долга
+
+**User Story:** Как разработчик, я хочу чистого и поддерживаемого кода, чтобы легко вносить изменения и исправления.
+
+#### Критерии приемки
+
+1. WHEN в коде используются магические числа, THEN THE System SHALL заменить их на именованные константы
+2. WHEN метод содержит более 50 строк, THEN THE System SHALL разбить его на более мелкие методы
+3. WHEN класс содержит более 500 строк, THEN THE System SHALL рассмотреть его разделение
+4. THE System SHALL использовать meaningful names для всех переменных и методов
+5. THE System SHALL добавить лаконичные JavaDoc комментарии для всех публичных API
+
+### Требование 12: Оптимизация JavaDoc документации
+
+**User Story:** Как разработчик, я хочу лаконичной и структурированной JavaDoc документации, чтобы быстро понимать назначение классов и методов без избыточной информации.
+
+#### Критерии приемки
+
+1. WHEN класс имеет JavaDoc, THEN THE System SHALL включать краткое описание назначения, @author и @since с текущей датой
+2. WHEN метод имеет JavaDoc, THEN THE System SHALL включать краткое описание, @param для каждого параметра, @return для возвращаемого значения и @throws для исключений
+3. WHEN JavaDoc описывает параметр, THEN THE System SHALL использовать краткое описание без избыточных деталей
+4. THE System SHALL НЕ дублировать информацию, очевидную из сигнатуры метода
+5. THE System SHALL удалить избыточные теги @version если они не несут смысловой нагрузки
+
+### Требование 13: Устойчивость к ошибкам
+
+**User Story:** Как пользователь системы, я хочу стабильной работы приложения, чтобы временные сбои не приводили к полному отказу.
+
+#### Критерии приемки
+
+1. WHEN происходит временная ошибка сети, THEN THE System SHALL повторить операцию с exponential backoff
+2. WHEN внешний сервис недоступен, THEN THE System SHALL использовать circuit breaker pattern
+3. WHEN происходит критическая ошибка, THEN THE System SHALL логировать детали и продолжить работу
+4. THE System SHALL использовать глобальный обработчик исключений для всех контроллеров
+5. THE System SHALL возвращать структурированные ответы об ошибках с кодами и описаниями
+
+### Требование 14: Очистка мертвого кода и технического долга
+
+**User Story:** Как разработчик, я хочу чистого кода без мертвых участков и технического долга, чтобы поддерживать высокое качество кодовой базы.
+
+#### Критерии приемки
+
+1. WHEN в коде присутствуют TODO/FIXME комментарии, THEN THE System SHALL либо реализовать функциональность, либо удалить комментарии
+2. WHEN в коде используются System.out.println или printStackTrace, THEN THE System SHALL заменить их на proper logging
+3. WHEN присутствуют неиспользуемые импорты, THEN THE System SHALL удалить их
+4. WHEN используются wildcard импорты (import .*), THEN THE System SHALL заменить их на конкретные импорты
+5. THE System SHALL удалить все закомментированный код, который не используется более 30 дней
+6. WHEN в проекте есть неиспользуемые сервисы, сущности или репозитории, THEN THE System SHALL удалить их вместе со всеми зависимостями

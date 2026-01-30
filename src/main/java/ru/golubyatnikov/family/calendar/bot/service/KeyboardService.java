@@ -1800,43 +1800,6 @@ public class KeyboardService {
     }
     
     /**
-     * Создает inline-клавиатуру для добавления комментария к событию.
-     * 
-     * <p>Позволяет добавить комментарий или отменить действие.</p>
-     * 
-     * <p><b>Требования:</b> 21.1</p>
-     * 
-     * @param eventId идентификатор события
-     * @return настроенная InlineKeyboardMarkup с опциями комментария
-     */
-    public InlineKeyboardMarkup createCommentKeyboard(Long eventId) {
-        log.debug("Создание inline-клавиатуры для комментария события {}", eventId);
-        
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        
-        // Кнопка "Добавить комментарий"
-        List<InlineKeyboardButton> row1 = new ArrayList<>();
-        InlineKeyboardButton addBtn = new InlineKeyboardButton("💬 Добавить комментарий");
-        addBtn.setCallbackData("comment_add_" + eventId);
-        row1.add(addBtn);
-        rows.add(row1);
-        
-        // Кнопка "Отмена"
-        List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
-        cancelBtn.setCallbackData("comment_cancel_" + eventId);
-        row2.add(cancelBtn);
-        rows.add(row2);
-        
-        keyboard.setKeyboard(rows);
-        
-        log.debug("Inline-клавиатура для комментария создана");
-        
-        return keyboard;
-    }
-    
-    /**
      * Создает inline-клавиатуру для фильтрации событий.
      * 
      * <p>Позволяет пользователю выбрать тип событий для отображения:

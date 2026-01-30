@@ -14,7 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import ru.golubyatnikov.family.calendar.bot.util.SensitiveDataMasker;
+import ru.golubyatnikov.family.calendar.bot.service.WebhookSecurityService;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -22,9 +22,9 @@ import java.util.Map;
 /**
  * Компонент для регистрации Webhook при старте приложения.
  * Компонент активируется только когда свойство telegram.bot.webhook.enabled=true (по умолчанию true)
+ * Использует secret token для безопасной валидации webhook запросов.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
  */
 @Component
@@ -36,9 +36,11 @@ public class WebhookRegistrar {
     private final BotConfig botConfig;
     private final ApplicationContext applicationContext;
     private final RestTemplate restTemplate;
+    private final WebhookSecurityService webhookSecurityService;
 
     /**
      * Регистрирует webhook в Telegram Bot API при старте приложения.
+     * Использует secret token для безопасной валидации webhook запросов.
      */
     @PostConstruct
     public void registerWebhook() {
@@ -49,11 +51,14 @@ public class WebhookRegistrar {
             // Формируем URL для Telegram Bot API
             String apiUrl = String.format("https://api.telegram.org/bot%s/setWebhook", botConfig.getToken());
 
+            // Генерируем secret token для безопасной валидации webhook запросов
+            String secretToken = webhookSecurityService.generateSecretToken();
+            
             // Подготавливаем тело запроса
-            // Добавляем токен бота в путь webhook URL для дополнительной безопасности
-            String webhookUrlWithToken = botConfig.getWebhookUrl() + "/" + botConfig.getToken();
+            // Используем secret_token вместо токена в URL для безопасности
             Map<String, String> requestBody = new HashMap<>();
-            requestBody.put("url", webhookUrlWithToken);
+            requestBody.put("url", botConfig.getWebhookUrl());
+            requestBody.put("secret_token", secretToken);
 
             // Настраиваем заголовки
             HttpHeaders headers = new HttpHeaders();
@@ -74,7 +79,7 @@ public class WebhookRegistrar {
             Map<String, Object> responseBody = response.getBody();
             if (responseBody != null && Boolean.TRUE.equals(responseBody.get("ok"))) {
                 log.info("✓ Webhook успешно зарегистрирован для бота: {}", botConfig.getUsername());
-                log.info("✓ URL: {}/{}", botConfig.getWebhookUrl(), SensitiveDataMasker.maskToken(botConfig.getToken()));
+                log.info("✓ URL: {}", botConfig.getWebhookUrl());
                 log.debug("✓ Ответ от Telegram API: {}", responseBody);
             } else {
                 String errorDescription = responseBody != null ? 
@@ -99,9 +104,7 @@ public class WebhookRegistrar {
 
     /**
      * Останавливает приложение с указанной причиной.
-     * 
-     * <p>Метод логирует критическую ошибку и инициирует graceful shutdown
-     * Spring приложения с кодом выхода 1, что указывает на ошибку.
+     * Выполняет graceful shutdown через Spring Application Context.
      * 
      * @param reason причина остановки приложения
      */
@@ -111,8 +114,16 @@ public class WebhookRegistrar {
         log.error("Причина: {}", reason);
         log.error("═══════════════════════════════════════════════════════════");
         
-        // Останавливаем приложение с кодом ошибки
-        int exitCode = SpringApplication.exit(applicationContext, () -> 1);
-        System.exit(exitCode);
+        // Выполняем graceful shutdown в отдельном потоке
+        // чтобы позволить текущему методу завершиться корректно
+        new Thread(() -> {
+            try {
+                Thread.sleep(1000); // Даем время на завершение логирования
+                SpringApplication.exit(applicationContext, () -> 1);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("Прерван процесс graceful shutdown", e);
+            }
+        }, "webhook-shutdown-thread").start();
     }
 }

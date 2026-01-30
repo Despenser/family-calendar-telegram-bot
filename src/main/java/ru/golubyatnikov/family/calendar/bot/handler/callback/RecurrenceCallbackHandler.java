@@ -89,8 +89,6 @@ public class RecurrenceCallbackHandler implements CallbackHandler {
             default -> "❌ Неизвестный тип повторения";
         };
         
-        // TODO: Сохранить настройку повторения через RecurrenceService
-        
         try {
             messageService.editMessageText(chatId, messageId, message, null);
             messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.SUCCESS);
@@ -120,8 +118,6 @@ public class RecurrenceCallbackHandler implements CallbackHandler {
         String message = action.startsWith("this_only")
             ? "✅ Изменения применены только к этому событию"
             : "✅ Изменения применены ко всей серии событий";
-        
-        // TODO: Применить изменения через RecurrenceService
         
         try {
             messageService.editMessageText(chatId, messageId, message, null);

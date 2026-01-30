@@ -13,6 +13,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
+import ru.golubyatnikov.family.calendar.bot.service.WebhookSecurityService;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -24,8 +25,8 @@ import static org.mockito.Mockito.*;
 /**
  * Unit тесты для {@link WebhookRegistrar}.
  * 
- * <p>Проверяет корректность регистрации webhook при старте приложения.
- * Тестируются только успешные сценарии, так как неуспешные приводят к System.exit().
+ * <p>Проверяет корректность регистрации webhook при старте приложения
+ * с использованием secret token для безопасности.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("WebhookRegistrar Unit Tests")
@@ -40,6 +41,9 @@ class WebhookRegistrarTest {
     @Mock
     private RestTemplate restTemplate;
 
+    @Mock
+    private WebhookSecurityService webhookSecurityService;
+
     private WebhookRegistrar webhookRegistrar;
 
     @BeforeEach
@@ -49,7 +53,10 @@ class WebhookRegistrarTest {
         when(botConfig.getUsername()).thenReturn("TestBot");
         when(botConfig.getWebhookUrl()).thenReturn("https://example.com/webhook");
 
-        webhookRegistrar = new WebhookRegistrar(botConfig, applicationContext, restTemplate);
+        // Настраиваем мок для WebhookSecurityService
+        when(webhookSecurityService.generateSecretToken()).thenReturn("test-secret-token");
+
+        webhookRegistrar = new WebhookRegistrar(botConfig, applicationContext, restTemplate, webhookSecurityService);
     }
 
     @Test
@@ -95,11 +102,14 @@ class WebhookRegistrarTest {
                 "URL должен содержать токен бота");
         assertTrue(capturedUrl.contains("setWebhook"), 
                 "URL должен содержать метод setWebhook");
+        
+        // Проверяем, что был сгенерирован secret token
+        verify(webhookSecurityService, times(1)).generateSecretToken();
     }
 
     @Test
-    @DisplayName("Должен проверять, что webhook URL передается в запросе")
-    void shouldSendWebhookUrlInRequest() {
+    @DisplayName("Должен отправлять secret token в запросе вместо токена в URL")
+    void shouldSendSecretTokenInRequest() {
         // Given
         Map<String, Object> successResponse = new HashMap<>();
         successResponse.put("ok", true);
@@ -129,9 +139,12 @@ class WebhookRegistrarTest {
         Map<String, String> requestBody = capturedRequest.getBody();
 
         assertNotNull(requestBody, "Тело запроса не должно быть null");
-        // URL webhook должен содержать токен бота для дополнительной безопасности
-        assertEquals("https://example.com/webhook/test-bot-token", requestBody.get("url"),
-                "URL webhook должен совпадать с конфигурацией");
+        // URL webhook НЕ должен содержать токен бота (используется secret_token)
+        assertEquals("https://example.com/webhook", requestBody.get("url"),
+                "URL webhook не должен содержать токен бота");
+        // Должен присутствовать secret_token
+        assertEquals("test-secret-token", requestBody.get("secret_token"),
+                "Запрос должен содержать secret_token");
     }
 
     @Test

@@ -271,20 +271,6 @@ public class Event {
     private List<Attachment> attachments = new ArrayList<>();
 
     /**
-     * Комментарии к событию от членов семьи.
-     */
-    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<Comment> comments = new ArrayList<>();
-
-    /**
-     * Пункты чек-листа события.
-     */
-    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<ChecklistItem> checklistItems = new ArrayList<>();
-
-    /**
      * Напоминания о событии.
      */
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)

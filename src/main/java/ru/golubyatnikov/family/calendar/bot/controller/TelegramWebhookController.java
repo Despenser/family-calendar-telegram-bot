@@ -7,14 +7,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import ru.golubyatnikov.family.calendar.bot.config.BotConfig;
 import ru.golubyatnikov.family.calendar.bot.service.UpdateProcessor;
+import ru.golubyatnikov.family.calendar.bot.service.WebhookSecurityService;
 
 /**
  * REST контроллер для приема webhook обновлений от Telegram Bot API.
+ * Валидирует входящие запросы с помощью secret token.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
  */
 @RestController
@@ -23,42 +23,35 @@ import ru.golubyatnikov.family.calendar.bot.service.UpdateProcessor;
 @Slf4j
 public class TelegramWebhookController {
 
-    private final BotConfig botConfig;
+    private static final String SECRET_TOKEN_HEADER = "X-Telegram-Bot-Api-Secret-Token";
+    
     private final UpdateProcessor updateProcessor;
+    private final WebhookSecurityService webhookSecurityService;
 
     /**
      * Обрабатывает входящие webhook обновления от Telegram Bot API.
      * Этот метод вызывается Telegram каждый раз, когда происходит событие,
      * связанное с ботом (новое сообщение, команда, callback и т.д.)
      * 
-     * @param botToken токен бота из URL пути, используется для валидации запроса
+     * @param secretToken secret token из заголовка X-Telegram-Bot-Api-Secret-Token
      * @param update объект Update от Telegram, содержащий информацию о событии
-     * @return ResponseEntity с HTTP 200 OK при успешной обработке, или HTTP 401 Unauthorized при неверном токене
+     * @return ResponseEntity с HTTP 200 OK при успешной обработке, или HTTP 401 Unauthorized при невалидном токене
      */
-    @PostMapping("/{botToken}")
-    public ResponseEntity<Void> onUpdateReceived(@NonNull @PathVariable String botToken,
-                                                 @RequestBody Update update) {
+    @PostMapping
+    public ResponseEntity<Void> onUpdateReceived(
+            @RequestHeader(value = SECRET_TOKEN_HEADER, required = false) String secretToken,
+            @RequestBody Update update) {
         
-        log.debug("Получен webhook запрос с токеном: {}...", 
-                 botToken.substring(0, Math.min(10, botToken.length())));
+        log.debug("Получен webhook запрос. Update ID: {}", update.getUpdateId());
 
-        if (!isValidToken(botToken)) {
-            log.warn("Попытка доступа с неверным токеном. Update ID: {}", update.getUpdateId());
+        if (!webhookSecurityService.validateSecretToken(secretToken)) {
+            log.warn("Попытка доступа с невалидным secret token. Update ID: {}", update.getUpdateId());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
+        
         logUpdate(update);
         updateProcessor.processUpdate(update);
         return ResponseEntity.ok().build();
-    }
-
-    /**
-     * Валидирует токен бота из URL.
-     * 
-     * @param token токен из URL пути
-     * @return true, если токен совпадает с настроенным, false в противном случае
-     */
-    private boolean isValidToken(String token) {
-        return botConfig.getToken().equals(token);
     }
 
     /**

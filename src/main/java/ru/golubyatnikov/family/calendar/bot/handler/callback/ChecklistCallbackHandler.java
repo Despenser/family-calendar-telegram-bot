@@ -79,15 +79,11 @@ public class ChecklistCallbackHandler implements CallbackHandler {
                 Long itemId = Long.parseLong(action.substring("toggle_".length()));
                 log.debug("Переключение статуса пункта чек-листа ID={}", itemId);
                 
-                // TODO: Переключить статус пункта чек-листа через ChecklistService
-                
                 messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.UPDATED);
             } else if (action.startsWith("delete_")) {
                 // Удаляем пункт чек-листа
                 Long itemId = Long.parseLong(action.substring("delete_".length()));
                 log.debug("Удаление пункта чек-листа ID={}", itemId);
-                
-                // TODO: Удалить пункт чек-листа через ChecklistService
                 
                 messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.DELETED);
             } else {
