@@ -46,7 +46,6 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * @see ReminderRepository
  */
 @Service
-@Transactional
 @Slf4j
 @RequiredArgsConstructor
 public class ReminderService {
@@ -90,6 +89,8 @@ public class ReminderService {
      * @throws EventNotFoundException если событие не найдено
      * @throws IllegalArgumentException если список типов пустой или событие не имеет даты/времени
      */
+    @Transactional
+
     public List<Reminder> createReminders(Long eventId, List<Reminder.ReminderType> reminderTypes) {
         log.debug("Создание напоминаний для события ID {}: типы={}", eventId, reminderTypes);
         
@@ -168,6 +169,8 @@ public class ReminderService {
      * @param user пользователь-создатель события (используется его timezone)
      * @return список созданных напоминаний (может быть пустым)
      */
+    @Transactional
+
     public List<Reminder> createDefaultReminders(Event event, User user) {
         log.debug("Попытка создания автоматических напоминаний для события ID {} пользователем ID {}", 
                  event.getId(), user.getId());
@@ -321,6 +324,8 @@ public class ReminderService {
      * 
      * <p><b>Требования:</b> 1.1, 1.2, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 3.3, 3.4, 5.2, 4.2, 4.3, 4.4, 4.5, 6.1, 6.2, 6.3, 6.4, 6.5, 11.1, 11.3, 11.4</p>
      */
+    @Transactional
+
     public void sendReminders() {
         // Получаем текущее время в UTC (Требование 1.1, 1.2)
         LocalDateTime nowUTC = LocalDateTime.now(ZoneId.of("UTC"));

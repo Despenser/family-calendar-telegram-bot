@@ -61,7 +61,6 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape
  * @since 2025-12-30
  */
 @Service
-@Transactional
 @Validated
 @Slf4j
 public class EventService {
@@ -121,6 +120,7 @@ public class EventService {
      * @throws InvalidDateException если дата события находится в прошлом
      * @throws jakarta.validation.ConstraintViolationException если параметры не прошли валидацию
      */
+    @Transactional
     public Event createEvent(
             @NotNull(message = "userId не может быть null") Long userId, 
             @NotBlank(message = "Название события не может быть пустым") 
@@ -156,6 +156,7 @@ public class EventService {
      * @throws InvalidDateException если дата события находится в прошлом или endTime раньше eventTime
      * @throws jakarta.validation.ConstraintViolationException если параметры не прошли валидацию
      */
+    @Transactional
     public Event createEvent(
             @NotNull(message = "userId не может быть null") Long userId, 
             @NotBlank(message = "Название события не может быть пустым") 
@@ -371,6 +372,7 @@ public class EventService {
      * @param event событие для сохранения
      * @return сохраненное событие
      */
+    @Transactional
     public Event saveEvent(@NotNull(message = "event не может быть null") Event event) {
         log.debug("Сохранение события ID={}", event.getId());
         Event savedEvent = eventRepository.save(event);
@@ -403,6 +405,7 @@ public class EventService {
      * @throws InvalidDateException если новая дата находится в прошлом
      * @throws jakarta.validation.ConstraintViolationException если параметры не прошли валидацию
      */
+    @Transactional
     public Event updateEvent(
             @NotNull(message = "eventId не может быть null") Long eventId, 
             @NotNull(message = "userId не может быть null") Long userId, 
@@ -440,6 +443,7 @@ public class EventService {
      * @throws InvalidDateException если новая дата находится в прошлом или endTime раньше eventTime
      * @throws jakarta.validation.ConstraintViolationException если параметры не прошли валидацию
      */
+    @Transactional
     public Event updateEvent(
             @NotNull(message = "eventId не может быть null") Long eventId, 
             @NotNull(message = "userId не может быть null") Long userId, 
@@ -547,6 +551,7 @@ public class EventService {
      * @throws EventNotFoundException если событие с указанным ID не найдено
      * @throws UnauthorizedAccessException если пользователь не является создателем события
      */
+    @Transactional
     public Event deleteEvent(Long eventId, Long userId) {
         log.debug("Перемещение события ID={} в корзину пользователем ID={}", eventId, userId);
         
@@ -627,6 +632,8 @@ public class EventService {
      * @throws UnauthorizedAccessException если пользователь не является создателем
      * @throws IllegalStateException если событие не в статусе ACTIVE
      */
+    @Transactional
+
     public Event completeEvent(
             @NotNull(message = "eventId не может быть null") Long eventId,
             @NotNull(message = "userId не может быть null") Long userId) {
@@ -735,6 +742,8 @@ public class EventService {
      * @throws UnauthorizedAccessException если пользователь не является создателем
      * @throws IllegalStateException если событие не в статусе ACTIVE
      */
+    @Transactional
+
     public Event completeEventWithoutDeletion(
             @NotNull(message = "eventId не может быть null") Long eventId,
             @NotNull(message = "userId не может быть null") Long userId) {
@@ -831,6 +840,8 @@ public class EventService {
      * @throws UnauthorizedAccessException если пользователь не является создателем
      * @throws IllegalStateException если событие не в статусе ACTIVE
      */
+    @Transactional
+
     public Event completeEventWithoutHeaderUpdate(
             @NotNull(message = "eventId не может быть null") Long eventId,
             @NotNull(message = "userId не может быть null") Long userId) {
@@ -1030,6 +1041,8 @@ public class EventService {
      * @throws IllegalStateException если событие не завершено
      * @throws IllegalArgumentException если заметка пустая
      */
+    @Transactional
+
     public Event addCompletionNote(Long eventId, Long userId, String note) {
         log.debug("Добавление заметки к завершенному событию ID={} пользователем ID={}", eventId, userId);
         
@@ -1104,6 +1117,8 @@ public class EventService {
      * @param event созданное событие
      * @param user пользователь, создавший событие
      */
+    @Transactional
+
     public void handleEventCreated(Event event, User user) {
         log.debug("Обработка создания события ID={} пользователем ID={}", event.getId(), user.getId());
         
@@ -1143,6 +1158,8 @@ public class EventService {
      * @throws UnauthorizedAccessException если нет прав на редактирование
      * @throws jakarta.validation.ConstraintViolationException если название пустое или слишком длинное
      */
+    @Transactional
+
     public Event updateEventTitle(
             @NotNull(message = "eventId не может быть null") Long eventId, 
             @NotNull(message = "userId не может быть null") Long userId, 
@@ -1201,6 +1218,8 @@ public class EventService {
      * @throws InvalidDateException если дата в прошлом
      * @throws jakarta.validation.ConstraintViolationException если параметры null
      */
+    @Transactional
+
     public Event updateEventDate(
             @NotNull(message = "eventId не может быть null") Long eventId, 
             @NotNull(message = "userId не может быть null") Long userId, 
@@ -1266,6 +1285,8 @@ public class EventService {
      * @throws UnauthorizedAccessException если нет прав на редактирование
      * @throws jakarta.validation.ConstraintViolationException если параметры null
      */
+    @Transactional
+
     public Event updateEventTime(
             @NotNull(message = "eventId не может быть null") Long eventId, 
             @NotNull(message = "userId не может быть null") Long userId, 
@@ -1323,6 +1344,8 @@ public class EventService {
      * @throws UnauthorizedAccessException если нет прав на редактирование
      * @throws jakarta.validation.ConstraintViolationException если описание слишком длинное
      */
+    @Transactional
+
     public Event updateEventDescription(
             @NotNull(message = "eventId не может быть null") Long eventId, 
             @NotNull(message = "userId не может быть null") Long userId, 
@@ -1445,6 +1468,8 @@ public class EventService {
      * 
      * @param eventId идентификатор события
      */
+    @Transactional
+
     public void handleEventDateTimeChange(Long eventId) {
         log.info("Обработка изменения даты/времени события ID={}", eventId);
         
@@ -1465,6 +1490,8 @@ public class EventService {
      * 
      * @param eventId идентификатор события
      */
+    @Transactional
+
     public void handleEventCompletion(Long eventId) {
         log.info("Обработка завершения события ID={}", eventId);
         
@@ -1669,6 +1696,7 @@ public class EventService {
      * @param userId идентификатор пользователя
      * @return количество активных событий пользователя со статусом ACTIVE
      */
+    @Transactional(readOnly = true)
     public int getActiveEventsCount(Long userId) {
         int count = eventRepository.countByUserIdAndStatus(userId, Event.EventStatus.ACTIVE);
         log.debug("Подсчитано активных событий (статус ACTIVE) для пользователя ID={}: {}", userId, count);
@@ -1704,6 +1732,8 @@ public class EventService {
      * @throws TelegramApiException при критических ошибках отправки
      * @throws IllegalArgumentException если event или chatId равны null
      */
+    @Transactional
+
     public Event sendOrUpdateEventMessage(
             @NotNull(message = "event не может быть null") Event event,
             @NotNull(message = "chatId не может быть null") Long chatId) throws TelegramApiException {

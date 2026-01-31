@@ -37,7 +37,6 @@ import java.util.List;
  * @since 2025-12-30
  */
 @Service
-@Transactional
 @Slf4j
 @RequiredArgsConstructor
 public class ConversationService {
@@ -192,6 +191,8 @@ public class ConversationService {
      * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#sendMessageWithInlineKeyboardAndGet
      * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#editMessageText
      */
+    @Transactional
+
     public void setCreationMessageId(Long userId, Long messageId) {
         Event draft = getActiveDraft(userId);
         draft.setMessageId(messageId);
@@ -238,6 +239,8 @@ public class ConversationService {
      * 
      * @param userId идентификатор пользователя
      */
+    @Transactional
+
     public void cancelEventCreation(Long userId) {
         log.debug("Attempting to cancel event creation for user {}", userId);
         
@@ -276,6 +279,8 @@ public class ConversationService {
      * @param userId идентификатор пользователя
      * @return true если есть активный черновик, иначе false
      */
+    @Transactional(readOnly = true)
+
     public boolean hasActiveDraft(Long userId) {
         return eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT)
             .isPresent();

@@ -35,7 +35,6 @@ import java.util.List;
  * @see AttachmentRepository
  */
 @Service
-@Transactional
 @Slf4j
 @RequiredArgsConstructor
 public class AttachmentService {
@@ -159,6 +158,8 @@ public class AttachmentService {
      * @throws AttachmentNotFoundException если вложение не найдено
      * @throws UnauthorizedAccessException если пользователь не является создателем события
      */
+    @Transactional
+
     public void deleteAttachment(Long attachmentId, Long userId) {
         log.debug("Удаление вложения ID {} пользователем ID {}", attachmentId, userId);
         

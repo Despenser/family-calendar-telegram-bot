@@ -32,7 +32,7 @@
   - **Property 9: EntityGraph для связанных сущностей**
   - **Validates: Requirements 3.1**
 
-- [ ] 3. Исправить неправильные транзакции
+- [x] 3. Исправить неправильные транзакции
   - Убрать @Transactional с уровня класса в следующих сервисах:
     - EventService (имеет методы чтения: getEventById, getEventByIdWithReminders, isToday, isTomorrow, getActiveEventsCount)
     - ReminderService (имеет методы чтения: getReminderById, getReminderWithEventById, getReminderWithEventAndUser, hasActiveReminders)
