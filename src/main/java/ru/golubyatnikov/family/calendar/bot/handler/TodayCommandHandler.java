@@ -70,7 +70,8 @@ public class TodayCommandHandler implements CommandHandler {
         
         try {
             // Получение событий на сегодня (1 день от текущей даты)
-            List<Event> todayEvents = eventService.getUpcomingEvents(user.getFamily().getId(), 1);
+            List<Event> todayEvents = eventService.getUpcomingEvents(
+                user.getFamily().getId(), 1, user.getZoneId());
             
             log.debug("Найдено {} событий до фильтрации для семьи ID={}", 
                     todayEvents.size(), user.getFamily().getId());

@@ -639,7 +639,7 @@ public class KeyboardService {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         
         YearMonth yearMonth = YearMonth.of(year, month);
-        YearMonth currentYearMonth = YearMonth.now();
+        YearMonth currentYearMonth = YearMonth.now(userZone);
         LocalDate firstDay = yearMonth.atDay(1);
         int daysInMonth = yearMonth.lengthOfMonth();
         int firstDayOfWeek = firstDay.getDayOfWeek().getValue(); // 1=Monday, 7=Sunday

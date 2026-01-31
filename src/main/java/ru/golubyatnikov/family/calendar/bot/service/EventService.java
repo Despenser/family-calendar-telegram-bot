@@ -168,8 +168,16 @@ public class EventService {
         log.debug("Создание события для пользователя ID={}: title='{}', dateTime={}, endTime={}, isPersonal={}", 
                   userId, title, eventDateTime, endTime, isPersonal);
         
+        // Поиск пользователя (нужен для проверки временной зоны)
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> {
+                log.error("Пользователь с ID={} не найден при создании события", userId);
+                return new UserNotFoundException(userId);
+            });
+        
         // Валидация даты - событие не должно быть в прошлом (сравниваем только даты без времени)
-        if (eventDateTime.toLocalDate().isBefore(LocalDate.now())) {
+        // Используем текущую дату в таймзоне пользователя
+        if (eventDateTime.toLocalDate().isBefore(user.getCurrentDate())) {
             log.warn("Попытка создать событие с датой в прошлом: {} для пользователя ID={}", 
                      eventDateTime, userId);
             throw new InvalidDateException("Дата события не может быть в прошлом");
@@ -181,13 +189,6 @@ public class EventService {
                      eventDateTime.toLocalTime(), endTime);
             throw new InvalidDateException("Время окончания не может быть раньше времени начала");
         }
-        
-        // Поиск пользователя
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> {
-                log.error("Пользователь с ID={} не найден при создании события", userId);
-                return new UserNotFoundException(userId);
-            });
         
         // Проверка наличия семьи у пользователя
         if (user.getFamily() == null) {
@@ -243,18 +244,20 @@ public class EventService {
      * 
      * @param familyId идентификатор семьи
      * @param days количество дней для поиска событий (от текущей даты)
+     * @param zoneId временная зона для определения текущей даты
      * @return список активных предстоящих событий, отсортированный по дате и времени
      * @throws IllegalArgumentException если days меньше или равно 0
      */
     @Transactional(readOnly = true)
-    public List<Event> getUpcomingEvents(Long familyId, int days) {
-        log.debug("Получение активных предстоящих событий для семьи ID={} на {} дней", familyId, days);
+    public List<Event> getUpcomingEvents(Long familyId, int days, java.time.ZoneId zoneId) {
+        log.debug("Получение активных предстоящих событий для семьи ID={} на {} дней, timezone={}", 
+                  familyId, days, zoneId);
         
         if (days <= 0) {
             throw new IllegalArgumentException("Количество дней должно быть больше 0");
         }
         
-        LocalDate startDate = LocalDate.now();
+        LocalDate startDate = LocalDate.now(zoneId);
         LocalDate endDate = startDate.plusDays(days);
         
         List<Event> events = eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
@@ -454,8 +457,19 @@ public class EventService {
             LocalTime endTime) {
         log.debug("Обновление события ID={} пользователем ID={}, endTime={}", eventId, userId, endTime);
         
+        // Поиск события для получения пользователя и проверки временной зоны
+        Event event = eventRepository.findById(eventId)
+            .orElseThrow(() -> {
+                log.error("Событие с ID={} не найдено при попытке обновления", eventId);
+                return new EventNotFoundException(eventId);
+            });
+        
+        // Проверка прав доступа
+        checkEditPermission(event, userId);
+        
         // Валидация даты (сравниваем только даты без времени)
-        if (eventDateTime.toLocalDate().isBefore(LocalDate.now())) {
+        // Используем текущую дату в таймзоне пользователя
+        if (eventDateTime.toLocalDate().isBefore(event.getUser().getCurrentDate())) {
             log.warn("Попытка обновить событие ID={} с датой в прошлом: {}", eventId, eventDateTime);
             throw new InvalidDateException("Дата события не может быть в прошлом");
         }
@@ -465,21 +479,6 @@ public class EventService {
             log.warn("Попытка обновить событие ID={} с временем окончания раньше времени начала: start={}, end={}", 
                      eventId, eventDateTime.toLocalTime(), endTime);
             throw new InvalidDateException("Время окончания не может быть раньше времени начала");
-        }
-        
-        // Поиск события
-        Event event = eventRepository.findById(eventId)
-            .orElseThrow(() -> {
-                log.error("Событие с ID={} не найдено при попытке обновления", eventId);
-                return new EventNotFoundException(eventId);
-            });
-        
-        // Проверка прав доступа - только создатель может редактировать
-        if (!event.belongsToUser(userId)) {
-            log.warn("Пользователь ID={} попытался обновить чужое событие ID={} (владелец: ID={})", 
-                     userId, eventId, event.getUser().getId());
-            throw new UnauthorizedAccessException(
-                "Только создатель события может его редактировать");
         }
         
         // Сохранение старых значений для истории
@@ -1226,15 +1225,16 @@ public class EventService {
             @NotNull(message = "Дата события не может быть null") LocalDate newDate) {
         log.debug("Обновление даты события ID={} пользователем ID={}", eventId, userId);
         
-        // Валидация даты - не должна быть в прошлом (сравниваем только даты без времени)
-        if (newDate.isBefore(LocalDate.now())) {
-            log.warn("Попытка установить дату в прошлом для события ID={}: {}", eventId, newDate);
-            throw new InvalidDateException("Дата события не может быть в прошлом");
-        }
-        
         // Получение события и проверка прав
         Event event = getEventById(eventId);
         checkEditPermission(event, userId);
+        
+        // Валидация даты - не должна быть в прошлом (сравниваем только даты без времени)
+        // Используем текущую дату в таймзоне пользователя
+        if (newDate.isBefore(event.getUser().getCurrentDate())) {
+            log.warn("Попытка установить дату в прошлом для события ID={}: {}", eventId, newDate);
+            throw new InvalidDateException("Дата события не может быть в прошлом");
+        }
         
         // Сохранение старого значения
         LocalDate oldDate = event.getEventDate();

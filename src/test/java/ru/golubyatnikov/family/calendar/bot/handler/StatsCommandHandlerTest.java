@@ -57,12 +57,13 @@ class StatsCommandHandlerTest {
         user.setTelegramId(123456789L);
         user.setFirstName("Тест");
         user.setFamily(family);
+        user.setTimezone("Europe/Moscow"); // Устанавливаем временную зону
     }
     
     @Test
     void handle_withStatistics_returnsFormattedMessage() {
         // Given
-        YearMonth currentMonth = YearMonth.now();
+        YearMonth currentMonth = YearMonth.now(user.getZoneId());
         StatisticsService.EventStatistics stats = new StatisticsService.EventStatistics(
             user.getId(),           // userId
             currentMonth.getYear(), // year
@@ -113,7 +114,7 @@ class StatsCommandHandlerTest {
     @Test
     void handle_withNoEvents_returnsMessageWithHint() {
         // Given
-        YearMonth currentMonth = YearMonth.now();
+        YearMonth currentMonth = YearMonth.now(user.getZoneId());
         StatisticsService.EventStatistics stats = new StatisticsService.EventStatistics(
             user.getId(),
             currentMonth.getYear(),
@@ -144,7 +145,7 @@ class StatsCommandHandlerTest {
     @Test
     void handle_withAllEventsCompleted_returnsSuccessMessage() {
         // Given
-        YearMonth currentMonth = YearMonth.now();
+        YearMonth currentMonth = YearMonth.now(user.getZoneId());
         StatisticsService.EventStatistics stats = new StatisticsService.EventStatistics(
             user.getId(),
             currentMonth.getYear(),
@@ -170,7 +171,7 @@ class StatsCommandHandlerTest {
     @Test
     void handle_withActiveEvents_returnsActiveEventsMessage() {
         // Given
-        YearMonth currentMonth = YearMonth.now();
+        YearMonth currentMonth = YearMonth.now(user.getZoneId());
         StatisticsService.EventStatistics stats = new StatisticsService.EventStatistics(
             user.getId(),
             currentMonth.getYear(),

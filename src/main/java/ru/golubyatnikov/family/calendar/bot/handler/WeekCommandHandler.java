@@ -75,7 +75,8 @@ public class WeekCommandHandler implements CommandHandler {
         
         try {
             // Получение событий на неделю (7 дней от текущей даты)
-            List<Event> weekEvents = eventService.getUpcomingEvents(user.getFamily().getId(), WEEK_DAYS);
+            List<Event> weekEvents = eventService.getUpcomingEvents(
+                user.getFamily().getId(), WEEK_DAYS, user.getZoneId());
             
             log.debug("Найдено {} событий до фильтрации для семьи ID={}", 
                     weekEvents.size(), user.getFamily().getId());

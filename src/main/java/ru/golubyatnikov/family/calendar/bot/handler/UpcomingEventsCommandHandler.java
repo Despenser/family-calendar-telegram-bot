@@ -133,7 +133,8 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
         log.debug("Получение предстоящих событий для семьи ID={}", familyId);
 
         // Получаем предстоящие события семьи
-        List<Event> upcomingEvents = eventService.getUpcomingEvents(familyId, DEFAULT_DAYS);
+        List<Event> upcomingEvents = eventService.getUpcomingEvents(
+            familyId, DEFAULT_DAYS, user.getZoneId());
 
         log.debug("Найдено {} событий до фильтрации для семьи ID={}", 
                 upcomingEvents.size(), familyId);

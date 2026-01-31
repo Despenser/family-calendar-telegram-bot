@@ -70,8 +70,8 @@ public class StatsCommandHandler implements CommandHandler {
                   user.getId(), user.getFamily().getId());
         
         try {
-            // Получение статистики за текущий месяц
-            YearMonth currentMonth = YearMonth.now();
+            // Получение статистики за текущий месяц в таймзоне пользователя
+            YearMonth currentMonth = YearMonth.now(user.getZoneId());
             StatisticsService.EventStatistics stats = statisticsService.getMonthlyStatistics(
                 user.getFamily().getId(),
                 user.getId(),
