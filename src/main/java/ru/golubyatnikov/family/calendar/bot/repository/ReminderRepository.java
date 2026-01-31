@@ -32,6 +32,7 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
      * @param endTime конец временного диапазона
      * @return список неотправленных напоминаний в указанном диапазоне
      */
+    @EntityGraph(attributePaths = {"event", "event.user"})
     List<Reminder> findBySentFalseAndReminderTimeBetween(LocalDateTime startTime, LocalDateTime endTime);
     
     /**
@@ -52,6 +53,7 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
      * @param oneHourAgo время час назад в UTC (для фильтрации старых напоминаний)
      * @return список напоминаний для отправки
      */
+    @EntityGraph(attributePaths = {"event", "event.user"})
     List<Reminder> findBySentFalseAndReminderTimeLessThanEqualAndReminderTimeGreaterThanEqual(
         LocalDateTime nowUTC, 
         LocalDateTime oneHourAgo
@@ -79,6 +81,7 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
      * @param eventId идентификатор события
      * @return список всех напоминаний события
      */
+    @EntityGraph(attributePaths = {"event"})
     List<Reminder> findByEventId(Long eventId);
     
     /**
@@ -87,6 +90,7 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
      * @param eventId идентификатор события
      * @return список неотправленных напоминаний события
      */
+    @EntityGraph(attributePaths = {"event"})
     List<Reminder> findByEventIdAndSentFalse(Long eventId);
     
     /**

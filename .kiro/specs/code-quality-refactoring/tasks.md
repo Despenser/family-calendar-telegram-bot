@@ -22,7 +22,7 @@
   - **Property 5: Graceful shutdown**
   - **Validates: Requirements 2.2**
 
-- [ ] 2. Исправить N+1 проблемы в репозиториях
+- [x] 2. Исправить N+1 проблемы в репозиториях
   - Добавить @EntityGraph во все методы репозиториев без него, если он требуется
   - Исправить ReminderRepository.findPendingReminders с @EntityGraph
   - Добавить @EntityGraph в методы других репозиториев с связанными сущностями

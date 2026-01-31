@@ -99,6 +99,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @return список событий, требующих отправки уведомлений
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
+    @EntityGraph(attributePaths = {"user", "family"})
     @Query(value = """
                         SELECT * FROM events e
                         WHERE e.notified = false
@@ -121,6 +122,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @return Optional с черновиком события, если найден
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
+    @EntityGraph(attributePaths = {"user", "family"})
     Optional<Event> findByUserIdAndStatus(Long userId, Event.EventStatus status);
     
     /**
@@ -159,6 +161,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @return список старых удаленных событий для окончательного удаления
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
+    @EntityGraph(attributePaths = {"user", "family"})
     List<Event> findByStatusAndDeletedAtBefore(Event.EventStatus status, LocalDateTime deletedBefore);
     
     /**
@@ -170,6 +173,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @return список активных событий, которые должны быть завершены
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
+    @EntityGraph(attributePaths = {"user", "family"})
     @Query("""
                 SELECT e FROM Event e
                 WHERE e.status = 'ACTIVE'
@@ -225,6 +229,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @return список семейных событий с указанным статусом
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
+    @EntityGraph(attributePaths = {"user", "family"})
     List<Event> findByFamilyIdAndIsPersonalFalseAndStatus(Long familyId, Event.EventStatus status);
     
     /**
@@ -236,6 +241,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @return список персональных событий пользователя с указанным статусом
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
+    @EntityGraph(attributePaths = {"user", "family"})
     List<Event> findByUserIdAndIsPersonalTrueAndStatus(Long userId, Event.EventStatus status);
     
     /**
@@ -247,6 +253,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @return список событий семьи с указанным статусом
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
+    @EntityGraph(attributePaths = {"user", "family"})
     List<Event> findByFamilyIdAndStatus(Long familyId, Event.EventStatus status);
     
     /**

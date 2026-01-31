@@ -1,5 +1,6 @@
 package ru.golubyatnikov.family.calendar.bot.repository;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
@@ -23,5 +24,6 @@ public interface EventHistoryRepository extends JpaRepository<EventHistory, Long
      * @param eventId идентификатор события
      * @return список записей истории, отсортированный по дате изменения (новые первыми)
      */
+    @EntityGraph(attributePaths = {"user"})
     List<EventHistory> findByEventIdOrderByChangedAtDesc(Long eventId);
 }
