@@ -1402,8 +1402,17 @@ public class ReminderService {
         if (event.getIsPersonal()) {
             message.append("👤 ").append(bold("Персональное событие")).append("\n");
         } else {
-            message.append(formatMessage("👨‍👩‍👧‍👦 Семейное событие (создал: %s)\n", 
-                event.getUser().getFirstName()));
+            // Безопасное получение имени пользователя с проверкой на Hibernate proxy
+            String creatorName = "пользователь";
+            try {
+                if (event.getUser() != null && Hibernate.isInitialized(event.getUser())) {
+                    creatorName = event.getUser().getFirstName();
+                }
+            } catch (Exception e) {
+                log.warn("Не удалось получить имя создателя события ID {} для напоминания ID {}: {}", 
+                        event.getId(), reminder.getId(), e.getMessage());
+            }
+            message.append(formatMessage("👨‍👩‍👧‍👦 Семейное событие (создал: %s)\n", creatorName));
         }
         
         // Тип напоминания

@@ -253,21 +253,21 @@ public class EventCallbackHandler implements CallbackHandler {
             log.debug("Определен контекст: Reminder_Context, eventId={}, reminderId={}, userId={}", 
                      eventId, reminderId, userId);
             
-            // Загружаем напоминание из базы данных с eager загрузкой события
+            // Загружаем напоминание из базы данных с eager загрузкой события И пользователя
             ru.golubyatnikov.family.calendar.bot.model.Reminder reminder = 
-                reminderService.getReminderWithEventById(reminderId);
+                reminderService.getReminderWithEventAndUser(reminderId);
             
-            log.debug("Напоминание загружено: reminderId={}, eventId={}, userId={}", 
+            log.debug("Напоминание загружено с событием и пользователем: reminderId={}, eventId={}, userId={}", 
                      reminderId, eventId, userId);
             
-            // Загружаем пользователя для получения timezone
-            User eventOwner = userService.findById(userId)
+            // Загружаем пользователя-получателя для получения timezone
+            User recipient = userService.findById(userId)
                 .orElseThrow(() -> new ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException(
                     "Пользователь не найден: userId=" + userId));
             
-            // Получаем timezone пользователя для форматирования
-            ZoneId userTimezone = eventOwner.getTimezone() != null 
-                ? ZoneId.of(eventOwner.getTimezone()) 
+            // Получаем timezone получателя для форматирования
+            ZoneId userTimezone = recipient.getTimezone() != null 
+                ? ZoneId.of(recipient.getTimezone()) 
                 : ZoneId.of("UTC");
             
             // Формируем текст сообщения с ПОЛНОЙ информацией о напоминании (с датой, временем, описанием)
