@@ -84,20 +84,20 @@
   - **Property 1: Архитектурная целостность**
   - **Validates: Requirements 1.1, 11.2, 11.3**
 
-- [ ] 6. Разделить KeyboardService (2293 строки)
-- [ ] 6.1 Создать ReplyKeyboardService
+- [x] 6. Разделить KeyboardService (2293 строки)
+- [x] 6.1 Создать ReplyKeyboardService
   - Перенести создание обычных клавиатур
   - _Requirements: 1.1_
 
-- [ ] 6.2 Создать InlineKeyboardService
+- [x] 6.2 Создать InlineKeyboardService
   - Перенести создание inline клавиатур
   - _Requirements: 1.1_
 
-- [ ] 6.3 Создать KeyboardButtonFactory
+- [x] 6.3 Создать KeyboardButtonFactory
   - Создать фабрику для создания кнопок
   - _Requirements: 1.1_
 
-- [ ] 6.4 Создать KeyboardLayoutService
+- [x] 6.4 Создать KeyboardLayoutService
   - Перенести логику компоновки клавиатур
   - _Requirements: 1.1_
 

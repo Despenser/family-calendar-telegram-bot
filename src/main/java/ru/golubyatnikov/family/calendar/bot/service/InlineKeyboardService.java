@@ -1,0 +1,871 @@
+package ru.golubyatnikov.family.calendar.bot.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import ru.golubyatnikov.family.calendar.bot.model.Attachment;
+import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.User;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Сервис для создания inline клавиатур (InlineKeyboardMarkup) в Telegram.
+ * 
+ * <p>InlineKeyboardService предоставляет методы для создания inline клавиатур,
+ * которые отображаются непосредственно под сообщениями.</p>
+ * 
+ * <p><b>Требования:</b> 1.1</p>
+ * 
+ * @author Family Calendar Bot Team
+ * @since 2026-02-02
+ */
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class InlineKeyboardService {
+
+    private final AttachmentService attachmentService;
+    private final ReminderService reminderService;
+
+    /**
+     * Создает inline клавиатуру для управления событием.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если eventId некорректен
+     */
+    public InlineKeyboardMarkup createEventActionsKeyboard(Long eventId) {
+        if (eventId == null || eventId <= 0) {
+            log.error("Попытка создать клавиатуру с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом");
+        }
+        
+        log.debug("Создание inline клавиатуры для события ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Первый ряд: кнопки редактирования и удаления
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        
+        InlineKeyboardButton editBtn = new InlineKeyboardButton("✏️ Редактировать");
+        editBtn.setCallbackData("edit_event_" + eventId);
+        row1.add(editBtn);
+        
+        InlineKeyboardButton deleteBtn = new InlineKeyboardButton("🗑️ Удалить");
+        deleteBtn.setCallbackData("delete_event_" + eventId);
+        row1.add(deleteBtn);
+        
+        rows.add(row1);
+        
+        // Второй ряд: кнопка вложений
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        
+        long attachmentsCount = attachmentService.countEventAttachments(eventId);
+        String attachmentsButtonText = attachmentsCount > 0 
+            ? "📎 Вложения (" + attachmentsCount + ")" 
+            : "📎 Вложения";
+        
+        InlineKeyboardButton attachmentsBtn = new InlineKeyboardButton(attachmentsButtonText);
+        attachmentsBtn.setCallbackData("attach_file_list_" + eventId);
+        row2.add(attachmentsBtn);
+        
+        rows.add(row2);
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline клавиатура для события ID={} создана", eventId);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для управления событием с учетом статуса и прав доступа.
+     * 
+     * @param event событие
+     * @param userId идентификатор пользователя
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если параметры некорректны
+     */
+    public InlineKeyboardMarkup createEventActionsKeyboard(Event event, Long userId) {
+        if (event == null || event.getId() == null) {
+            log.error("Попытка создать клавиатуру с некорректным event");
+            throw new IllegalArgumentException("Event и Event ID не могут быть null");
+        }
+        
+        if (userId == null || userId <= 0) {
+            log.error("Попытка создать клавиатуру с некорректным userId: {}", userId);
+            throw new IllegalArgumentException("UserId должен быть положительным числом");
+        }
+        
+        Long eventId = event.getId();
+        log.debug("Создание inline клавиатуры для события ID={} с учетом прав пользователя ID={}", 
+                eventId, userId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Первый ряд: кнопки редактирования и удаления
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        
+        InlineKeyboardButton editBtn = new InlineKeyboardButton("✏️ Редактировать");
+        editBtn.setCallbackData("edit_event_" + eventId);
+        row1.add(editBtn);
+        
+        InlineKeyboardButton deleteBtn = new InlineKeyboardButton("🗑️ Удалить");
+        deleteBtn.setCallbackData("delete_event_" + eventId);
+        row1.add(deleteBtn);
+        
+        rows.add(row1);
+        
+        boolean isActive = event.getStatus() == Event.EventStatus.ACTIVE;
+        boolean isOwner = event.belongsToUser(userId);
+        
+        // Второй ряд: кнопка вложений и кнопка управления напоминаниями
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        
+        long attachmentsCount = attachmentService.countEventAttachments(event.getId());
+        String attachmentsButtonText = attachmentsCount > 0 
+            ? "📎 Вложения (" + attachmentsCount + ")" 
+            : "📎 Вложения";
+        
+        InlineKeyboardButton attachmentsBtn = new InlineKeyboardButton(attachmentsButtonText);
+        attachmentsBtn.setCallbackData("attach_file_list_" + eventId);
+        row2.add(attachmentsBtn);
+        
+        if (isActive && isOwner) {
+            boolean hasReminders = reminderService.hasActiveReminders(eventId);
+            
+            InlineKeyboardButton remindersBtn;
+            if (hasReminders) {
+                remindersBtn = new InlineKeyboardButton("🔕 Откл. напоминания");
+                remindersBtn.setCallbackData("disable_reminders_" + eventId);
+            } else {
+                remindersBtn = new InlineKeyboardButton("🔔 Вкл. напоминания");
+                remindersBtn.setCallbackData("enable_reminders_" + eventId);
+            }
+            
+            row2.add(remindersBtn);
+        }
+        
+        rows.add(row2);
+        
+        // Третий ряд: кнопка завершения (только для активных событий создателя)
+        if (isActive && isOwner) {
+            List<InlineKeyboardButton> row3 = new ArrayList<>();
+            
+            InlineKeyboardButton completeBtn = new InlineKeyboardButton("✅ Завершить");
+            completeBtn.setCallbackData("complete_event_" + eventId);
+            row3.add(completeBtn);
+            
+            rows.add(row3);
+        }
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline клавиатура для события ID={} создана с {} рядами", eventId, rows.size());
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для подтверждения удаления события.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createDeleteConfirmationKeyboard(Long eventId) {
+        log.debug("Создание inline клавиатуры подтверждения удаления для события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        
+        InlineKeyboardButton confirmBtn = new InlineKeyboardButton("✅ Да, удалить");
+        confirmBtn.setCallbackData("confirm_delete_" + eventId);
+        row1.add(confirmBtn);
+        
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("cancel_delete_" + eventId);
+        row1.add(cancelBtn);
+        
+        rows.add(row1);
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру с кнопкой "Пропустить" для описания события.
+     * 
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createSkipDescriptionKeyboard() {
+        log.debug("Создание inline клавиатуры с кнопкой 'Пропустить'");
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        
+        InlineKeyboardButton skipBtn = new InlineKeyboardButton("⏭️ Пропустить");
+        skipBtn.setCallbackData("skip_description");
+        row1.add(skipBtn);
+        
+        rows.add(row1);
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для выбора типа события.
+     * 
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createEventTypeSelectionKeyboard() {
+        log.debug("Создание inline клавиатуры для выбора типа события");
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton familyBtn = new InlineKeyboardButton("👨‍👩‍👧‍👦 Семейное событие");
+        familyBtn.setCallbackData("event_type_family");
+        row1.add(familyBtn);
+        rows.add(row1);
+        
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton personalBtn = new InlineKeyboardButton("👤 Персональное событие");
+        personalBtn.setCallbackData("event_type_personal");
+        row2.add(personalBtn);
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру меню редактирования события.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createEditEventMenuKeyboard(Long eventId) {
+        log.debug("Создание inline клавиатуры меню редактирования для события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton dateBtn = new InlineKeyboardButton("📅 Изменить дату");
+        dateBtn.setCallbackData("edit_field_date_" + eventId);
+        row1.add(dateBtn);
+        rows.add(row1);
+        
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton timeBtn = new InlineKeyboardButton("🕐 Изменить время");
+        timeBtn.setCallbackData("edit_field_time_" + eventId);
+        row2.add(timeBtn);
+        rows.add(row2);
+        
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton titleBtn = new InlineKeyboardButton("✏️ Изменить название");
+        titleBtn.setCallbackData("edit_field_title_" + eventId);
+        row3.add(titleBtn);
+        rows.add(row3);
+        
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру с действиями для выбранной даты.
+     * 
+     * @param date выбранная дата
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createDateActionsKeyboard(LocalDate date) {
+        log.debug("Создание inline клавиатуры действий для даты {}", date);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        String dateStr = date.toString();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton viewBtn = new InlineKeyboardButton("👀 Посмотреть события");
+        viewBtn.setCallbackData("date_actions_view_" + dateStr);
+        row1.add(viewBtn);
+        rows.add(row1);
+        
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton createBtn = new InlineKeyboardButton("➕ Создать новое");
+        createBtn.setCallbackData("date_actions_create_" + dateStr);
+        row2.add(createBtn);
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для прикрепления файла к событию.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createAttachmentKeyboard(Long eventId) {
+        log.debug("Создание inline клавиатуры для вложений события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton attachBtn = new InlineKeyboardButton("📎 Прикрепить файл");
+        attachBtn.setCallbackData("attach_file_" + eventId);
+        row1.add(attachBtn);
+        rows.add(row1);
+        
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("attach_cancel_" + eventId);
+        row2.add(cancelBtn);
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для добавления чек-листа к событию.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createChecklistKeyboard(Long eventId) {
+        log.debug("Создание inline клавиатуры для чек-листа события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton addBtn = new InlineKeyboardButton("✅ Добавить чек-лист");
+        addBtn.setCallbackData("checklist_add_" + eventId);
+        row1.add(addBtn);
+        rows.add(row1);
+        
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("checklist_cancel_" + eventId);
+        row2.add(cancelBtn);
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для фильтрации событий.
+     * 
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createFilterKeyboard() {
+        log.debug("Создание inline клавиатуры для фильтрации событий");
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton allBtn = new InlineKeyboardButton("📋 Все события");
+        allBtn.setCallbackData("filter_all");
+        row1.add(allBtn);
+        rows.add(row1);
+        
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        
+        InlineKeyboardButton familyBtn = new InlineKeyboardButton("👨‍👩‍👧‍👦 Семейные");
+        familyBtn.setCallbackData("filter_family");
+        row2.add(familyBtn);
+        
+        InlineKeyboardButton personalBtn = new InlineKeyboardButton("👤 Личные");
+        personalBtn.setCallbackData("filter_personal");
+        row2.add(personalBtn);
+        
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для управления событием в корзине.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если eventId некорректен
+     */
+    public InlineKeyboardMarkup createTrashActionsKeyboard(Long eventId) {
+        if (eventId == null || eventId <= 0) {
+            log.error("Попытка создать клавиатуру корзины с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом");
+        }
+        
+        log.debug("Создание inline клавиатуры для события в корзине ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        
+        InlineKeyboardButton restoreBtn = new InlineKeyboardButton("♻️ Восстановить");
+        restoreBtn.setCallbackData("trash_restore_" + eventId);
+        row1.add(restoreBtn);
+        
+        InlineKeyboardButton deleteBtn = new InlineKeyboardButton("❌ Удалить навсегда");
+        deleteBtn.setCallbackData("trash_delete_" + eventId);
+        row1.add(deleteBtn);
+        
+        rows.add(row1);
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для списка вложений события.
+     * 
+     * @param eventId идентификатор события
+     * @param attachments список вложений
+     * @param isCreator является ли пользователь создателем
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если eventId некорректен
+     */
+    public InlineKeyboardMarkup createAttachmentsListKeyboard(Long eventId, List<Attachment> attachments, boolean isCreator) {
+        if (eventId == null || eventId <= 0) {
+            log.error("Попытка создать клавиатуру вложений с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом");
+        }
+        
+        log.debug("Создание inline клавиатуры списка вложений для события ID={}, isCreator={}, attachmentsCount={}", 
+                eventId, isCreator, attachments != null ? attachments.size() : 0);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        if (attachments != null && !attachments.isEmpty()) {
+            for (Attachment attachment : attachments) {
+                List<InlineKeyboardButton> row = new ArrayList<>();
+                
+                String emoji = switch (attachment.getFileType()) {
+                    case "photo" -> "🖼️";
+                    case "video" -> "🎥";
+                    case "audio" -> "🎵";
+                    default -> "📄";
+                };
+                
+                String buttonText = emoji + " " + (attachment.getFileName() != null ? attachment.getFileName() : "Файл");
+                InlineKeyboardButton viewBtn = new InlineKeyboardButton(buttonText);
+                viewBtn.setCallbackData("attach_file_view_" + eventId + "_" + attachment.getId());
+                row.add(viewBtn);
+                
+                if (isCreator) {
+                    InlineKeyboardButton deleteBtn = new InlineKeyboardButton("🗑️");
+                    deleteBtn.setCallbackData("attach_file_delete_" + eventId + "_" + attachment.getId());
+                    row.add(deleteBtn);
+                }
+                
+                rows.add(row);
+            }
+        }
+        
+        if (isCreator) {
+            List<InlineKeyboardButton> addRow = new ArrayList<>();
+            InlineKeyboardButton addBtn = new InlineKeyboardButton("➕ Добавить файл");
+            addBtn.setCallbackData("attach_file_add_" + eventId);
+            addRow.add(addBtn);
+            rows.add(addRow);
+        }
+        
+        List<InlineKeyboardButton> backRow = new ArrayList<>();
+        InlineKeyboardButton backBtn = new InlineKeyboardButton("🔙 Назад к событию");
+        backBtn.setCallbackData("attach_file_back_" + eventId);
+        backRow.add(backBtn);
+        rows.add(backRow);
+        
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для подтверждения удаления вложения.
+     * 
+     * @param eventId идентификатор события
+     * @param attachmentId идентификатор вложения
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если параметры некорректны
+     */
+    public InlineKeyboardMarkup createDeleteAttachmentConfirmationKeyboard(Long eventId, Long attachmentId) {
+        if (eventId == null || eventId <= 0) {
+            log.error("Попытка создать клавиатуру подтверждения удаления вложения с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом");
+        }
+        
+        if (attachmentId == null || attachmentId <= 0) {
+            log.error("Попытка создать клавиатуру подтверждения удаления вложения с некорректным attachmentId: {}", attachmentId);
+            throw new IllegalArgumentException("AttachmentId должен быть положительным числом");
+        }
+        
+        log.debug("Создание inline клавиатуры подтверждения удаления вложения ID={} для события ID={}", 
+                attachmentId, eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        
+        InlineKeyboardButton confirmBtn = new InlineKeyboardButton("✅ Да, удалить");
+        confirmBtn.setCallbackData("attach_file_confirm_delete_" + eventId + "_" + attachmentId);
+        row1.add(confirmBtn);
+        
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("attach_file_cancel_delete_" + eventId);
+        row1.add(cancelBtn);
+        
+        rows.add(row1);
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для просмотра файла вложения.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если eventId некорректен
+     */
+    public InlineKeyboardMarkup createFileViewKeyboard(Long eventId) {
+        if (eventId == null || eventId <= 0) {
+            log.error("Попытка создать клавиатуру просмотра файла с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом");
+        }
+        
+        log.debug("Создание inline клавиатуры для просмотра файла события ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton backBtn = new InlineKeyboardButton("⬅️ Назад к вложениям");
+        backBtn.setCallbackData("attach_file_list_" + eventId);
+        row1.add(backBtn);
+        
+        rows.add(row1);
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для режима загрузки вложения.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если eventId некорректен
+     */
+    public InlineKeyboardMarkup createAttachmentUploadKeyboard(Long eventId) {
+        if (eventId == null || eventId <= 0) {
+            log.error("Попытка создать клавиатуру с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом");
+        }
+        
+        log.debug("Создание inline клавиатуры для загрузки вложения к событию ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("attach_file_cancel_add_" + eventId);
+        row.add(cancelBtn);
+        
+        rows.add(row);
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для добавления заметки к завершённому событию.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если eventId некорректен
+     */
+    public InlineKeyboardMarkup createCompletionNoteKeyboard(Long eventId) {
+        if (eventId == null || eventId <= 0) {
+            log.error("Попытка создать клавиатуру заметки о завершении с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом");
+        }
+        
+        log.debug("Создание inline клавиатуры для добавления заметки к завершённому событию ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton addNoteButton = new InlineKeyboardButton("📝 Добавить заметку");
+        addNoteButton.setCallbackData(CallbackPrefix.ADD_COMPLETION_NOTE.withPayload(eventId.toString()));
+        row1.add(addNoteButton);
+        rows.add(row1);
+        
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton skipButton = new InlineKeyboardButton("⏭️ Пропустить");
+        skipButton.setCallbackData(CallbackPrefix.SKIP_COMPLETION_NOTE.withPayload(""));
+        row2.add(skipButton);
+        rows.add(row2);
+        
+        keyboard.setKeyboard(rows);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для выбора поля редактирования события.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если eventId некорректен
+     */
+    public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId) {
+        if (eventId == null || eventId <= 0) {
+            log.error("Попытка создать клавиатуру выбора поля с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом");
+        }
+        
+        log.debug("Создание inline клавиатуры выбора поля для редактирования события ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Ряд 1: Название и Дата
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton titleBtn = new InlineKeyboardButton("📝 Название");
+        titleBtn.setCallbackData("edit_field_title_" + eventId);
+        row1.add(titleBtn);
+        
+        InlineKeyboardButton dateBtn = new InlineKeyboardButton("📅 Дата");
+        dateBtn.setCallbackData("edit_field_date_" + eventId);
+        row1.add(dateBtn);
+        rows.add(row1);
+        
+        // Ряд 2: Время и Описание
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton timeBtn = new InlineKeyboardButton("🕐 Время");
+        timeBtn.setCallbackData("edit_field_time_" + eventId);
+        row2.add(timeBtn);
+        
+        InlineKeyboardButton descBtn = new InlineKeyboardButton("📄 Описание");
+        descBtn.setCallbackData("edit_field_description_" + eventId);
+        row2.add(descBtn);
+        rows.add(row2);
+        
+        // Ряд 3: Отмена
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("edit_cancel_" + eventId);
+        row3.add(cancelBtn);
+        rows.add(row3);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline клавиатура выбора поля для события ID={} создана: {} рядов", eventId, rows.size());
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для завершения редактирования события.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если eventId некорректен
+     */
+    public InlineKeyboardMarkup createEditCompletionKeyboard(Long eventId) {
+        if (eventId == null || eventId <= 0) {
+            log.error("Попытка создать клавиатуру завершения с некорректным eventId: {}", eventId);
+            throw new IllegalArgumentException("EventId должен быть положительным числом");
+        }
+        
+        log.debug("Создание inline клавиатуры завершения редактирования для события ID={}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton moreBtn = new InlineKeyboardButton("✏️ Редактировать еще");
+        moreBtn.setCallbackData("edit_more_" + eventId);
+        row1.add(moreBtn);
+        
+        InlineKeyboardButton completeBtn = new InlineKeyboardButton("✅ Завершить");
+        completeBtn.setCallbackData("edit_complete_" + eventId);
+        row1.add(completeBtn);
+        
+        rows.add(row1);
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline клавиатура завершения для события ID={} создана", eventId);
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для настройки напоминаний.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createReminderSettingsKeyboard(Long eventId) {
+        log.debug("Создание inline клавиатуры настройки напоминаний для события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton morningBtn = new InlineKeyboardButton("🌅 Утром в день события");
+        morningBtn.setCallbackData("reminder_morning_" + eventId);
+        row1.add(morningBtn);
+        rows.add(row1);
+        
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton eveningBtn = new InlineKeyboardButton("🌆 Вечером накануне");
+        eveningBtn.setCallbackData("reminder_evening_" + eventId);
+        row2.add(eveningBtn);
+        rows.add(row2);
+        
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton hourBtn = new InlineKeyboardButton("⏰ За час до события");
+        hourBtn.setCallbackData("reminder_hour_" + eventId);
+        row3.add(hourBtn);
+        rows.add(row3);
+        
+        List<InlineKeyboardButton> row4 = new ArrayList<>();
+        InlineKeyboardButton tenMinBtn = new InlineKeyboardButton("⏱️ За 10 минут");
+        tenMinBtn.setCallbackData("reminder_ten_min_" + eventId);
+        row4.add(tenMinBtn);
+        rows.add(row4);
+        
+        List<InlineKeyboardButton> row5 = new ArrayList<>();
+        InlineKeyboardButton customBtn = new InlineKeyboardButton("⚙️ Свое время");
+        customBtn.setCallbackData("reminder_custom_" + eventId);
+        row5.add(customBtn);
+        rows.add(row5);
+        
+        List<InlineKeyboardButton> row6 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("reminder_cancel_" + eventId);
+        row6.add(cancelBtn);
+        rows.add(row6);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline клавиатура настройки напоминаний создана");
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру меню настройки повторения события.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createRecurrenceMenuKeyboard(Long eventId) {
+        log.debug("Создание inline клавиатуры меню повторения для события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton dailyBtn = new InlineKeyboardButton("📆 Ежедневно");
+        dailyBtn.setCallbackData("recurrence_daily_" + eventId);
+        row1.add(dailyBtn);
+        rows.add(row1);
+        
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton weeklyBtn = new InlineKeyboardButton("📅 Еженедельно");
+        weeklyBtn.setCallbackData("recurrence_weekly_" + eventId);
+        row2.add(weeklyBtn);
+        rows.add(row2);
+        
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton monthlyBtn = new InlineKeyboardButton("🗓️ Ежемесячно");
+        monthlyBtn.setCallbackData("recurrence_monthly_" + eventId);
+        row3.add(monthlyBtn);
+        rows.add(row3);
+        
+        List<InlineKeyboardButton> row4 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("recurrence_cancel_" + eventId);
+        row4.add(cancelBtn);
+        rows.add(row4);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline клавиатура меню повторения создана");
+        
+        return keyboard;
+    }
+
+    /**
+     * Создает inline клавиатуру для выбора действия с серией событий.
+     * 
+     * @param eventId идентификатор события
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createSeriesActionKeyboard(Long eventId) {
+        log.debug("Создание inline клавиатуры действия с серией для события {}", eventId);
+        
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton singleBtn = new InlineKeyboardButton("📌 Только это событие");
+        singleBtn.setCallbackData("series_action_single_" + eventId);
+        row1.add(singleBtn);
+        rows.add(row1);
+        
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton seriesBtn = new InlineKeyboardButton("📚 Всю серию");
+        seriesBtn.setCallbackData("series_action_all_" + eventId);
+        row2.add(seriesBtn);
+        rows.add(row2);
+        
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("series_action_cancel_" + eventId);
+        row3.add(cancelBtn);
+        rows.add(row3);
+        
+        keyboard.setKeyboard(rows);
+        
+        log.debug("Inline клавиатура действия с серией создана");
+        
+        return keyboard;
+    }
+}
