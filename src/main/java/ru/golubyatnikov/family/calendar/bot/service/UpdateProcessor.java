@@ -66,6 +66,7 @@ public class UpdateProcessor {
     private final AttachmentService attachmentService;
     private final AuthorizationService authorizationService;
     private final EventService eventService;
+    private final EventNotificationService eventNotificationService;
     private final BotMessageBuilder botMessageBuilder;
 
     /**
@@ -442,7 +443,7 @@ public class UpdateProcessor {
                     conversationService.cancelEventCreation(user.getId());
                     
                     String response = "❌ " + bold("Произошла ошибка") + "\\. " + 
-                                    italic("Попробуйте начать заново с команды ➕ " + escape("/add_event"));
+                                    italic("Попробуйте начать заново с команды ➕ /add_event");
                     ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
                     messageService.sendMessage(chatId, response, keyboard);
                 }
@@ -454,7 +455,7 @@ public class UpdateProcessor {
             
             try {
                 String response = "❌ " + bold("Произошла ошибка") + "\\. " + 
-                                italic("Попробуйте начать заново с команды ➕ " + escape("/add_event"));
+                                italic("Попробуйте начать заново с команды ➕ /add_event");
                 ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
                 messageService.sendMessage(message.getChatId(), response, keyboard);
             } catch (Exception ex) {
@@ -913,7 +914,7 @@ public class UpdateProcessor {
             
             try {
                 String response = bold("❌ Произошла ошибка при распознавании события") + ".\n\n" +
-                        italic("Используйте команду ➕ " + escape("/add_event") + " для пошагового создания.");
+                        italic("Используйте команду ➕ /add_event для пошагового создания.");
                 ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
                 messageService.sendMessage(message.getChatId(), response, keyboard);
             } catch (Exception ex) {
@@ -1113,7 +1114,7 @@ public class UpdateProcessor {
             // 1. Карточка завершенного события с заметкой
             // 2. Сообщение "У вас пока нет созданных событий" (если список активных событий пуст)
             // Требования: 2.2, 2.3
-            eventService.updateMyEventsHeaderAfterRemoval(userId);
+            eventNotificationService.updateMyEventsHeaderAfterRemoval(userId);
             log.info("Шапка /my_events обновлена после добавления заметки к событию ID={}: userId={}", 
                     eventId, userId);
             

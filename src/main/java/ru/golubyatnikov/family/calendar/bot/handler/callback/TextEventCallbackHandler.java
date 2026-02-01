@@ -222,8 +222,7 @@ public class TextEventCallbackHandler implements CallbackHandler {
             } else {
                 // Ошибка создания
                 String response = "❌ " + bold("Произошла ошибка при создании события") + "\\.\n\n" +
-                                italic("Попробуйте использовать команду " + escape("/add_event") + 
-                                       " для пошагового создания\\.") + "\n\n" +
+                                italic("Попробуйте использовать команду /add_event для пошагового создания.") + "\n\n" +
                                 "Детали ошибки: " + escape(errorMessage);
                 
                 messageService.editMessageText(chatId, messageId, response, null);

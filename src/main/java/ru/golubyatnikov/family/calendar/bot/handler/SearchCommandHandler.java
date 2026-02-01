@@ -275,7 +275,7 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
         
         // Заголовок результатов поиска
         messageBuilder.append("🔍 ").append(bold("Результаты поиска")).append("\n\n");
-        messageBuilder.append(italic("Запрос: " + escape("\"") + escape(query) + escape("\""))).append("\n\n");
+        messageBuilder.append(italic("Запрос: \"" + query + "\"")).append("\n\n");
         
         if (results.isEmpty()) {
             // Сообщение об отсутствии результатов

@@ -15,6 +15,7 @@ import ru.golubyatnikov.family.calendar.bot.service.EventService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -23,6 +24,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -108,7 +110,7 @@ class UpcomingEventsCommandHandlerTest {
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
-        when(eventService.getUpcomingEvents(familyId, 30)).thenReturn(events);
+        when(eventService.getUpcomingEvents(familyId, 30, ZoneId.of("UTC"))).thenReturn(events);
 
         // When
         String response = handler.handle(message, user);
@@ -121,7 +123,7 @@ class UpcomingEventsCommandHandlerTest {
         assertTrue(response.contains("18:00"));
         assertTrue(response.contains("Всего событий: 2"));
         
-        verify(eventService).getUpcomingEvents(familyId, 30);
+        verify(eventService).getUpcomingEvents(familyId, 30, ZoneId.of("UTC"));
     }
 
     @Test
@@ -134,7 +136,7 @@ class UpcomingEventsCommandHandlerTest {
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
-        when(eventService.getUpcomingEvents(familyId, 30)).thenReturn(Collections.emptyList());
+        when(eventService.getUpcomingEvents(familyId, 30, ZoneId.of("UTC"))).thenReturn(Collections.emptyList());
 
         // When
         String response = handler.handle(message, user);
@@ -144,7 +146,7 @@ class UpcomingEventsCommandHandlerTest {
         assertTrue(response.contains("Предстоящие события"), "Ответ должен содержать заголовок");
         assertTrue(response.contains("На ближайшие 30 дней событий не запланировано"), "Ответ должен содержать сообщение об отсутствии событий на 30 дней");
         
-        verify(eventService).getUpcomingEvents(familyId, 30);
+        verify(eventService).getUpcomingEvents(familyId, 30, ZoneId.of("UTC"));
     }
 
     @Test
@@ -165,7 +167,7 @@ class UpcomingEventsCommandHandlerTest {
         assertTrue(response.contains("не принадлежите ни одной семье"));
         assertTrue(response.contains("администратору"));
         
-        verify(eventService, never()).getUpcomingEvents(anyLong(), anyInt());
+        verify(eventService, never()).getUpcomingEvents(anyLong(), anyInt(), any(ZoneId.class));
     }
 
     @Test
@@ -208,7 +210,7 @@ class UpcomingEventsCommandHandlerTest {
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
-        when(eventService.getUpcomingEvents(familyId, 30)).thenReturn(events);
+        when(eventService.getUpcomingEvents(familyId, 30, ZoneId.of("UTC"))).thenReturn(events);
 
         // When
         String response = handler.handle(message, user);
@@ -231,7 +233,7 @@ class UpcomingEventsCommandHandlerTest {
         when(message.getFrom()).thenReturn(telegramUser);
         when(telegramUser.getId()).thenReturn(123456789L);
         when(telegramUser.getUserName()).thenReturn("test_user");
-        when(eventService.getUpcomingEvents(familyId, 30)).thenReturn(events);
+        when(eventService.getUpcomingEvents(familyId, 30, ZoneId.of("UTC"))).thenReturn(events);
 
         // When
         String response = handler.handle(message, user);

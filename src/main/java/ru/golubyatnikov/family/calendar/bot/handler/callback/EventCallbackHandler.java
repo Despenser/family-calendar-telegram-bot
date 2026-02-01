@@ -48,6 +48,7 @@ public class EventCallbackHandler implements CallbackHandler {
     private final ru.golubyatnikov.family.calendar.bot.service.ConversationStateService conversationStateService;
     private final ru.golubyatnikov.family.calendar.bot.service.KeyboardService keyboardService;
     private final ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
+    private final ru.golubyatnikov.family.calendar.bot.service.EventNotificationService eventNotificationService;
     private final ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder botMessageBuilder;
     private final ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
     private final ru.golubyatnikov.family.calendar.bot.service.UserService userService;
@@ -1125,7 +1126,7 @@ public class EventCallbackHandler implements CallbackHandler {
             // 1. Карточка завершенного события (без заметки)
             // 2. Сообщение "У вас пока нет созданных событий" (если список активных событий пуст)
             // Требования: 2.3
-            eventService.updateMyEventsHeaderAfterRemoval(userId);
+            eventNotificationService.updateMyEventsHeaderAfterRemoval(userId);
             
             log.info("Шапка /my_events обновлена после пропуска заметки к событию ID={}: userId={}", 
                     eventId, userId);

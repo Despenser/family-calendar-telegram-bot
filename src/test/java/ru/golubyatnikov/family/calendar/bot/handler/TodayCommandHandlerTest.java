@@ -17,6 +17,7 @@ import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,6 +27,7 @@ import java.util.Locale;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -87,7 +89,7 @@ class TodayCommandHandlerTest {
     void shouldNotDisplayDuplicateDayHeader() {
         // Given
         Event event = createTestEvent("Тестовое событие", today, false);
-        when(eventService.getUpcomingEvents(anyLong(), anyInt()))
+        when(eventService.getUpcomingEvents(anyLong(), anyInt(), any(ZoneId.class)))
             .thenReturn(Collections.singletonList(event));
         
         // When
@@ -113,7 +115,7 @@ class TodayCommandHandlerTest {
         // Given
         Event event1 = createTestEvent("Событие 1", today, false);
         Event event2 = createTestEvent("Событие 2", today, false);
-        when(eventService.getUpcomingEvents(anyLong(), anyInt()))
+        when(eventService.getUpcomingEvents(anyLong(), anyInt(), any(ZoneId.class)))
             .thenReturn(Arrays.asList(event1, event2));
         
         // When
@@ -130,7 +132,7 @@ class TodayCommandHandlerTest {
         // Given
         Event event1 = createTestEvent("Событие 1", today, false);
         Event event2 = createTestEvent("Событие 2", today, false);
-        when(eventService.getUpcomingEvents(anyLong(), anyInt()))
+        when(eventService.getUpcomingEvents(anyLong(), anyInt(), any(ZoneId.class)))
             .thenReturn(Arrays.asList(event1, event2));
         
         // When
@@ -146,7 +148,7 @@ class TodayCommandHandlerTest {
     void shouldDisplayCommandHeaderWithCorrectDate() {
         // Given
         Event event = createTestEvent("Тестовое событие", today, false);
-        when(eventService.getUpcomingEvents(anyLong(), anyInt()))
+        when(eventService.getUpcomingEvents(anyLong(), anyInt(), any(ZoneId.class)))
             .thenReturn(Collections.singletonList(event));
         
         // When
@@ -163,7 +165,7 @@ class TodayCommandHandlerTest {
     @DisplayName("Должен возвращать сообщение об отсутствии событий, когда событий нет")
     void shouldReturnNoEventsMessageWhenNoEvents() {
         // Given
-        when(eventService.getUpcomingEvents(anyLong(), anyInt()))
+        when(eventService.getUpcomingEvents(anyLong(), anyInt(), any(ZoneId.class)))
             .thenReturn(Collections.emptyList());
         
         // When
@@ -190,7 +192,7 @@ class TodayCommandHandlerTest {
         Event personalEvent = createTestEvent("Персональное событие", today, true);
         personalEvent.setUser(otherUser);
         
-        when(eventService.getUpcomingEvents(anyLong(), anyInt()))
+        when(eventService.getUpcomingEvents(anyLong(), anyInt(), any(ZoneId.class)))
             .thenReturn(Arrays.asList(familyEvent, personalEvent));
         
         // When
@@ -210,7 +212,7 @@ class TodayCommandHandlerTest {
     void shouldFormatDateWithRussianLocaleAndDash() {
         // Given
         Event event = createTestEvent("Тестовое событие", today, false);
-        when(eventService.getUpcomingEvents(anyLong(), anyInt()))
+        when(eventService.getUpcomingEvents(anyLong(), anyInt(), any(ZoneId.class)))
             .thenReturn(Collections.singletonList(event));
         
         // When

@@ -56,6 +56,9 @@ class EventCallbackHandlerTest {
     private ru.golubyatnikov.family.calendar.bot.service.UserService userService;
 
     @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.EventNotificationService eventNotificationService;
+
+    @Mock
     private CallbackQuery callbackQuery;
 
     @Mock
@@ -66,7 +69,7 @@ class EventCallbackHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new EventCallbackHandler(myEventsCommandHandler, messageService, conversationStateService, keyboardService, eventService, botMessageBuilder, reminderService, userService);
+        handler = new EventCallbackHandler(myEventsCommandHandler, messageService, conversationStateService, keyboardService, eventService, eventNotificationService, botMessageBuilder, reminderService, userService);
         
         user = new User();
         user.setId(1L);

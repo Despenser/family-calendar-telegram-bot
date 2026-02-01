@@ -23,6 +23,7 @@ import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -263,7 +264,7 @@ class EventServiceTest {
                 .thenReturn(expectedEvents);
 
         // When
-        List<Event> result = eventService.getUpcomingEvents(familyId, days);
+        List<Event> result = eventService.getUpcomingEvents(familyId, days, ZoneId.of("UTC"));
 
         // Then
         assertNotNull(result, "Результат не должен быть null");
@@ -288,7 +289,7 @@ class EventServiceTest {
                 .thenReturn(List.of());
 
         // When
-        List<Event> result = eventService.getUpcomingEvents(familyId, days);
+        List<Event> result = eventService.getUpcomingEvents(familyId, days, ZoneId.of("UTC"));
 
         // Then
         assertNotNull(result, "Результат не должен быть null");
@@ -306,7 +307,7 @@ class EventServiceTest {
         // When & Then
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> eventService.getUpcomingEvents(familyId, 0),
+                () -> eventService.getUpcomingEvents(familyId, 0, ZoneId.of("UTC")),
                 "Должно быть выброшено IllegalArgumentException"
         );
 
