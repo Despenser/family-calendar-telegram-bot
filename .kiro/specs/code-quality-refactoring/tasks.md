@@ -206,26 +206,73 @@
 
 ### Этап 4: Очистка технического долга
 
-- [ ] 15. Разделить оставшиеся God Services
-- [ ] 15.1 Разделить UpdateProcessor (1620 строк)
-  - Создать MessageUpdateProcessor, CallbackUpdateProcessor
-  - Создать AttachmentUpdateProcessor, ConversationUpdateProcessor
-  - _Requirements: 1.1_
+- [ ] 15. Разделить оставшиеся God Objects (5 классов)
+  - **Приоритет:** UpdateProcessor (критично) → EventCallbackHandler → AttachmentCallbackHandler → MyEventsCommandHandler → InlineKeyboardService
+  - **Оценка:** 9-13 дней
+  - _Requirements: 1.1, 1.3_
 
-- [ ] 15.2 Разделить AttachmentCallbackHandler (1341 строка)
-  - Создать AttachmentViewHandler, AttachmentUploadHandler
-  - Создать AttachmentDeleteHandler, AttachmentNavigationHandler
-  - _Requirements: 1.1_
+- [x] 15.1 Разделить UpdateProcessor (1621 строк, 14 зависимостей) - КРИТИЧНО
+  - **Фаза 1.1:** Создать MessageRouter для маршрутизации сообщений (~150 строк, 4 зависимости)
+  - **Фаза 1.2:** Создать ConversationMessageHandler для диалогов создания событий (~300 строк, 6 зависимостей)
+  - **Фаза 1.3:** Создать FileMessageHandler для обработки файлов (~250 строк, 5 зависимостей)
+  - **Фаза 1.4:** Создать TextEventMessageHandler для парсинга событий из текста (~200 строк, 6 зависимостей)
+  - **Фаза 1.5:** Создать EventEditingMessageHandler для редактирования (~250 строк, 6 зависимостей)
+  - **Фаза 1.6:** Создать CompletionNoteMessageHandler для заметок (~150 строк, 4 зависимости)
+  - **Фаза 1.7:** Создать SearchQueryMessageHandler для поиска (~150 строк, 4 зависимости)
+  - **Фаза 1.8:** Обновить UpdateProcessor до роли координатора (~200 строк, 5 зависимостей)
+  - **Результат:** 7 новых handlers + обновленный координатор
+  - **Оценка:** 3-4 дня
+  - _Requirements: 1.1, 1.3_
 
-- [ ] 15.3 Разделить EventCallbackHandler (1223 строки)
-  - Создать EventViewHandler, EventEditHandler
-  - Создать EventDeleteHandler, EventCompletionHandler
-  - _Requirements: 1.1_
+- [ ] 15.2 Разделить EventCallbackHandler (1225 строк, 9 зависимостей, 19 методов)
+  - **Фаза 2.1:** Создать EventCallbackRouter для маршрутизации (~150 строк, 6 зависимостей)
+  - **Фаза 2.2:** Создать EventViewHandler для просмотра событий (~250 строк, 5 зависимостей)
+  - **Фаза 2.3:** Создать EventEditHandler для редактирования (~200 строк, 5 зависимостей)
+  - **Фаза 2.4:** Создать EventDeleteHandler для удаления (~200 строк, 5 зависимостей)
+  - **Фаза 2.5:** Создать EventCompletionHandler для завершения (~250 строк, 6 зависимостей)
+  - **Фаза 2.6:** Создать EventFieldEditHandler для редактирования полей (~200 строк, 5 зависимостей)
+  - **Фаза 2.7:** Создать EventReminderNavigationHandler для навигации (~150 строк, 5 зависимостей)
+  - **Результат:** 6 новых handlers + router
+  - **Оценка:** 2-3 дня
+  - _Requirements: 1.1, 1.3_
 
-- [ ] 15.4 Разделить MyEventsCommandHandler (1032 строки)
-  - Создать MyEventsQueryService, MyEventsFormattingService
-  - Создать MyEventsNavigationService, MyEventsHeaderService
-  - _Requirements: 1.1_
+- [ ] 15.3 Разделить AttachmentCallbackHandler (1341 строк, 7 зависимостей, 16 методов)
+  - **Фаза 3.1:** Создать AttachmentCallbackRouter для маршрутизации (~150 строк, 5 зависимостей)
+  - **Фаза 3.2:** Создать AttachmentListHandler для просмотра списка (~250 строк, 5 зависимостей)
+  - **Фаза 3.3:** Создать AttachmentUploadHandler для загрузки (~150 строк, 4 зависимости)
+  - **Фаза 3.4:** Создать AttachmentViewHandler для просмотра файла (~200 строк, 5 зависимостей)
+  - **Фаза 3.5:** Создать AttachmentDeleteHandler для удаления (~200 строк, 5 зависимостей)
+  - **Фаза 3.6:** Создать AttachmentNavigationHandler для навигации (~150 строк, 4 зависимости)
+  - **Результат:** 5 новых handlers + router
+  - **Оценка:** 2 дня
+  - _Requirements: 1.1, 1.3_
+
+- [ ] 15.4 Разделить MyEventsCommandHandler (1024 строк, 6 зависимостей, 17 методов)
+  - **Фаза 4.1:** Создать MyEventsQueryService для получения данных (~150 строк, 2 зависимости)
+  - **Фаза 4.2:** Создать MyEventsFormattingService для форматирования (~200 строк, 2 зависимости)
+  - **Фаза 4.3:** Создать MyEventsNavigationService для навигации (~150 строк, 2 зависимости)
+  - **Фаза 4.4:** Обновить MyEventsCommandHandler до роли координатора (~200 строк, 4 зависимости)
+  - **Результат:** 3 новых сервиса + обновленный координатор
+  - **Оценка:** 1-2 дня
+  - _Requirements: 1.1, 1.3_
+
+- [ ] 15.5 Разделить InlineKeyboardService (871 строк, 2 зависимости, 21 метод)
+  - **Фаза 5.1:** Создать EventInlineKeyboardFactory для событий (~200 строк, 2 зависимости)
+  - **Фаза 5.2:** Создать AttachmentInlineKeyboardFactory для вложений (~150 строк, 1 зависимость)
+  - **Фаза 5.3:** Создать ReminderInlineKeyboardFactory для напоминаний (~150 строк, 1 зависимость)
+  - **Фаза 5.4:** Создать NavigationInlineKeyboardFactory для навигации (~100 строк, 0 зависимостей)
+  - **Фаза 5.5:** Создать ConfirmationInlineKeyboardFactory для подтверждений (~100 строк, 0 зависимостей)
+  - **Фаза 5.6:** Обновить InlineKeyboardService до роли фасада (~150 строк, 5 зависимостей)
+  - **Результат:** 5 новых фабрик + обновленный фасад
+  - **Оценка:** 1-2 дня
+  - _Requirements: 1.1, 1.3_
+
+- [ ] 15.6 Написать property тест для отсутствия god objects
+  - **Property 1: Архитектурная целостность (расширенная)**
+  - Проверить что все классы < 500 строк
+  - Проверить что все классы < 7 зависимостей
+  - Проверить что все классы < 15 методов
+  - **Validates: Requirements 1.1, 1.3, 11.2, 11.3**
 
 - [ ] 16. Очистить мертвый код
 - [x] 16.1 Удалить неиспользуемые сервисы и связанные файлы

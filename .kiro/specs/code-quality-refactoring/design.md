@@ -95,29 +95,138 @@ graph TB
 - **ReminderNotificationService** - отправка уведомлений
 - **ReminderConfigurationService** - настройка типов напоминаний
 
-#### 5. UpdateProcessor (1620 строк) → Разделить на:
-- **MessageUpdateProcessor** - обработка сообщений
-- **CallbackUpdateProcessor** - обработка callback queries
-- **AttachmentUpdateProcessor** - обработка вложений
-- **ConversationUpdateProcessor** - обработка диалогов
+#### 5. UpdateProcessor (1621 строк, 14 зависимостей) → Разделить на:
 
-#### 6. AttachmentCallbackHandler (1341 строка) → Разделить на:
-- **AttachmentViewHandler** - просмотр вложений
-- **AttachmentUploadHandler** - загрузка файлов
-- **AttachmentDeleteHandler** - удаление файлов
-- **AttachmentNavigationHandler** - навигация по вложениям
+**Текущие проблемы:**
+- 14 зависимостей (критично!)
+- Обрабатывает: команды, callback queries, файлы, текстовые события, редактирование, поиск, заметки
+- Нарушает принцип единственной ответственности
 
-#### 7. EventCallbackHandler (1223 строки) → Разделить на:
-- **EventViewHandler** - просмотр событий
-- **EventEditHandler** - редактирование событий
-- **EventDeleteHandler** - удаление событий
-- **EventCompletionHandler** - завершение событий
+**Новая структура:**
+- **MessageRouter** - маршрутизация входящих сообщений (~150 строк, 4 зависимости)
+- **ConversationMessageHandler** - диалоги создания событий (~300 строк, 6 зависимостей)
+- **FileMessageHandler** - обработка файлов и вложений (~250 строк, 5 зависимостей)
+- **TextEventMessageHandler** - парсинг событий из текста (~200 строк, 6 зависимостей)
+- **EventEditingMessageHandler** - редактирование событий (~250 строк, 6 зависимостей)
+- **CompletionNoteMessageHandler** - заметки к событиям (~150 строк, 4 зависимости)
+- **SearchQueryMessageHandler** - поисковые запросы (~150 строк, 4 зависимости)
+- **UpdateProcessor (обновленный)** - координатор (~200 строк, 5 зависимостей)
 
-#### 8. MyEventsCommandHandler (1032 строки) → Разделить на:
-- **MyEventsQueryService** - получение событий пользователя
-- **MyEventsFormattingService** - форматирование списков
-- **MyEventsNavigationService** - навигация по спискам
-- **MyEventsHeaderService** - управление заголовками
+#### 6. AttachmentCallbackHandler (1341 строк, 7 зависимостей) → Разделить на:
+
+**Текущие проблемы:**
+- Обрабатывает множество различных операций с вложениями
+- Сложная логика парсинга callback данных
+
+**Новая структура:**
+- **AttachmentCallbackRouter** - маршрутизация callback запросов (~150 строк, 5 зависимостей)
+- **AttachmentListHandler** - просмотр списка вложений (~250 строк, 5 зависимостей)
+- **AttachmentUploadHandler** - добавление файлов (~150 строк, 4 зависимости)
+- **AttachmentViewHandler** - просмотр файлов (~200 строк, 5 зависимостей)
+- **AttachmentDeleteHandler** - удаление файлов (~200 строк, 5 зависимостей)
+- **AttachmentNavigationHandler** - навигация между экранами (~150 строк, 4 зависимости)
+
+#### 7. EventCallbackHandler (1225 строк, 9 зависимостей) → Разделить на:
+
+**Текущие проблемы:**
+- 19 методов (слишком много)
+- Обрабатывает разные типы операций с событиями
+
+**Новая структура:**
+- **EventCallbackRouter** - маршрутизация callback запросов (~150 строк, 6 зависимостей)
+- **EventViewHandler** - просмотр событий (~250 строк, 5 зависимостей)
+- **EventEditHandler** - редактирование событий (~200 строк, 5 зависимостей)
+- **EventDeleteHandler** - удаление событий (~200 строк, 5 зависимостей)
+- **EventCompletionHandler** - завершение событий (~250 строк, 6 зависимостей)
+- **EventFieldEditHandler** - редактирование полей (~200 строк, 5 зависимостей)
+- **EventReminderNavigationHandler** - навигация с напоминаниями (~150 строк, 5 зависимостей)
+
+#### 8. MyEventsCommandHandler (1024 строк, 6 зависимостей) → Разделить на:
+
+**Текущие проблемы:**
+- Смешивает логику запросов, форматирования и навигации
+- 17 методов
+
+**Новая структура:**
+- **MyEventsQueryService** - получение данных о событиях (~150 строк, 2 зависимости)
+- **MyEventsFormattingService** - форматирование событий (~200 строк, 2 зависимости)
+- **MyEventsNavigationService** - навигация между событиями (~150 строк, 2 зависимости)
+- **MyEventsCommandHandler (обновленный)** - координатор (~200 строк, 4 зависимости)
+
+#### 9. InlineKeyboardService (871 строк, 21 метод) → Разделить на:
+
+**Текущие проблемы:**
+- 21 метод (критично!)
+- Создает клавиатуры для разных контекстов
+
+**Новая структура:**
+- **EventInlineKeyboardFactory** - клавиатуры для событий (~200 строк, 2 зависимости)
+- **AttachmentInlineKeyboardFactory** - клавиатуры для вложений (~150 строк, 1 зависимость)
+- **ReminderInlineKeyboardFactory** - клавиатуры для напоминаний (~150 строк, 1 зависимость)
+- **NavigationInlineKeyboardFactory** - клавиатуры навигации (~100 строк, 0 зависимостей)
+- **ConfirmationInlineKeyboardFactory** - клавиатуры подтверждений (~100 строк, 0 зависимостей)
+- **InlineKeyboardService (обновленный)** - фасад (~150 строк, 5 зависимостей)
+
+### Структура пакетов после рефакторинга God Objects
+
+```
+bot/
+├── service/
+│   ├── UpdateProcessor.java (координатор, ~200 строк)
+│   ├── message/
+│   │   ├── MessageRouter.java
+│   │   ├── ConversationMessageHandler.java
+│   │   ├── FileMessageHandler.java
+│   │   ├── TextEventMessageHandler.java
+│   │   ├── EventEditingMessageHandler.java
+│   │   ├── CompletionNoteMessageHandler.java
+│   │   └── SearchQueryMessageHandler.java
+│   ├── myevents/
+│   │   ├── MyEventsCommandHandler.java (координатор)
+│   │   ├── MyEventsQueryService.java
+│   │   ├── MyEventsFormattingService.java
+│   │   └── MyEventsNavigationService.java
+│   └── keyboard/
+│       ├── InlineKeyboardService.java (фасад)
+│       ├── EventInlineKeyboardFactory.java
+│       ├── AttachmentInlineKeyboardFactory.java
+│       ├── ReminderInlineKeyboardFactory.java
+│       ├── NavigationInlineKeyboardFactory.java
+│       └── ConfirmationInlineKeyboardFactory.java
+├── handler/
+│   └── callback/
+│       ├── attachment/
+│       │   ├── AttachmentCallbackRouter.java
+│       │   ├── AttachmentListHandler.java
+│       │   ├── AttachmentUploadHandler.java
+│       │   ├── AttachmentViewHandler.java
+│       │   ├── AttachmentDeleteHandler.java
+│       │   └── AttachmentNavigationHandler.java
+│       └── event/
+│           ├── EventCallbackRouter.java
+│           ├── EventViewHandler.java
+│           ├── EventEditHandler.java
+│           ├── EventDeleteHandler.java
+│           ├── EventCompletionHandler.java
+│           ├── EventFieldEditHandler.java
+│           └── EventReminderNavigationHandler.java
+```
+
+### Метрики успеха рефакторинга God Objects
+
+| Метрика | До рефакторинга | После рефакторинга | Улучшение |
+|---------|-----------------|-------------------|-----------|
+| Количество god objects | 5 | 0 | ✅ 100% |
+| Средний размер класса | 1216 строк | ~180 строк | ✅ 85% |
+| Средние зависимости | 7.6 | 3-4 | ✅ 50% |
+| Максимальные зависимости | 14 | 6 | ✅ 57% |
+| Максимальные методы | 21 | <10 | ✅ 52% |
+
+**Ожидаемые результаты:**
+- 31 специализированный класс вместо 5 god objects
+- Каждый класс имеет одну ответственность (SRP)
+- Код легче тестировать и поддерживать
+- Улучшенная расширяемость
 
 ## Компоненты и интерфейсы
 
