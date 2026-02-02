@@ -336,8 +336,9 @@ public class ReminderCallbackHandler {
                         .orElseThrow(() -> new EventNotFoundException(eventId));
                     User user = event.getUser();
                     
-                    // Формируем текст сообщения
-                    String messageText = botMessageBuilder.buildEventMessage(event);
+                    // Формируем текст сообщения с учетом флага isMyEventsHeader
+                    int eventCount = eventService.getActiveEventsCount(user.getId());
+                    String messageText = botMessageBuilder.buildEventMessageWithHeader(event, eventCount);
                     
                     // Создаем клавиатуру с обновленной кнопкой напоминаний
                     InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, user.getId());
@@ -422,8 +423,9 @@ public class ReminderCallbackHandler {
             // Обновляем сообщение события с новой клавиатурой
             if (messageId != null) {
                 try {
-                    // Формируем текст сообщения
-                    String messageText = botMessageBuilder.buildEventMessage(event);
+                    // Формируем текст сообщения с учетом флага isMyEventsHeader
+                    int eventCount = eventService.getActiveEventsCount(user.getId());
+                    String messageText = botMessageBuilder.buildEventMessageWithHeader(event, eventCount);
                     
                     // Создаем клавиатуру с обновленной кнопкой напоминаний
                     InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, user.getId());

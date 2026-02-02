@@ -139,8 +139,9 @@ public class EventCallbackHandler implements CallbackHandler {
             log.debug("Определен контекст: Standard_Context, eventId={}, userId={}", 
                      eventId, userId);
             
-            // Формируем текст сообщения с полной информацией о событии
-            String eventMessage = botMessageBuilder.buildEventMessage(event);
+            // Формируем текст сообщения с учетом флага isMyEventsHeader
+            int eventCount = eventService.getActiveEventsCount(userId);
+            String eventMessage = botMessageBuilder.buildEventMessageWithHeader(event, eventCount);
             
             // Используем стандартную клавиатуру с действиями
             InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
