@@ -118,20 +118,20 @@
   - Перенести обработку callback queries
   - _Requirements: 1.1_
 
-- [ ] 8. Разделить ReminderService (1893 строки)
-- [ ] 8.1 Создать ReminderCreationService
+- [x] 8. Разделить ReminderService (1893 строки)
+- [x] 8.1 Создать ReminderCreationService
   - Перенести создание напоминаний
   - _Requirements: 1.1_
 
-- [ ] 8.2 Создать ReminderSchedulingService
+- [x] 8.2 Создать ReminderSchedulingService
   - Перенести планирование отправки
   - _Requirements: 1.1_
 
-- [ ] 8.3 Создать ReminderNotificationService
+- [x] 8.3 Создать ReminderNotificationService
   - Перенести отправку уведомлений
   - _Requirements: 1.1_
 
-- [ ] 8.4 Создать ReminderConfigurationService
+- [x] 8.4 Создать ReminderConfigurationService
   - Перенести настройку типов напоминаний
   - _Requirements: 1.1_
 
