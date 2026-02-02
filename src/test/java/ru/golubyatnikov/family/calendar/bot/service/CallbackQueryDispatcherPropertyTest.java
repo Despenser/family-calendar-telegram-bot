@@ -320,7 +320,7 @@ class CallbackQueryDispatcherPropertyTest {
             CallbackPrefix.CALENDAR.matches(callbackData)
         ));
         
-        // EventCallbackHandler
+        // EventCallbackRouter
         handlers.add(createMockHandler(CallbackPrefix.VIEW_EVENT, callbackData ->
             CallbackPrefix.VIEW_EVENT.matches(callbackData) ||
             CallbackPrefix.VIEW_EVENT_FROM_REMINDER.matches(callbackData) ||

@@ -708,7 +708,7 @@ public class MyEventsCommandHandler implements CommandHandler {
      * <p>Выполняет удаление события через EventService.
      * Метод больше не возвращает сообщение для отправки,
      * так как подтверждение теперь отправляется через callback query ответ
-     * в {@link ru.golubyatnikov.family.calendar.bot.handler.callback.EventCallbackHandler}.</p>
+     * в {@link ru.golubyatnikov.family.calendar.bot.handler.callback.event.EventDeleteHandler}.</p>
      * 
      * <p>Метод делегирует удаление в {@link EventService#deleteEvent(Long, Long)},
      * который выполняет проверку прав доступа и перемещает событие в корзину.</p>
