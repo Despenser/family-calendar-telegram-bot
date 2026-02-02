@@ -473,16 +473,8 @@ public class MyEventsCommandHandler implements CommandHandler {
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
         
         // Отправляем сообщение без форматирования и получаем messageId
-        // Используем sendMessageAndGet, но без parseMode (plain text)
-        org.telegram.telegrambots.meta.api.methods.send.SendMessage sendMessage = 
-            org.telegram.telegrambots.meta.api.methods.send.SendMessage.builder()
-                .chatId(chatId.toString())
-                .text(plainText.toString())
-                .replyMarkup(keyboard)
-                .build();
-        
         org.telegram.telegrambots.meta.api.objects.Message sentMessage = 
-            messageService.execute(sendMessage);
+            messageService.sendMessageWithoutFormattingAndGet(chatId, plainText.toString(), keyboard);
         
         // Сохраняем messageId в базу данных
         event.setMessageId((long) sentMessage.getMessageId());

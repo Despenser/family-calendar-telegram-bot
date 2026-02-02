@@ -101,20 +101,20 @@
   - Перенести логику компоновки клавиатур
   - _Requirements: 1.1_
 
-- [ ] 7. Разделить TelegramMessageService (2237 строк)
-- [ ] 7.1 Создать MessageSender для базовой отправки
+- [x] 7. Разделить TelegramMessageService (2237 строк)
+- [x] 7.1 Создать MessageSender для базовой отправки
   - Перенести основную логику отправки сообщений
   - _Requirements: 1.1_
 
-- [ ] 7.2 Создать MessageFormatter для форматирования
+- [x] 7.2 Создать MessageFormatter для форматирования
   - Перенести логику форматирования сообщений
   - _Requirements: 1.1_
 
-- [ ] 7.3 Создать MessageRetryService для retry логики
+- [x] 7.3 Создать MessageRetryService для retry логики
   - Перенести retry механизм с exponential backoff
   - _Requirements: 1.1, 12.1_
 
-- [ ] 7.4 Создать CallbackQueryService
+- [x] 7.4 Создать CallbackQueryService
   - Перенести обработку callback queries
   - _Requirements: 1.1_
 
