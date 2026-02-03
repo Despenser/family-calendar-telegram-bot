@@ -256,7 +256,7 @@
   - **Оценка:** 1-2 дня
   - _Requirements: 1.1, 1.3_
 
-- [ ] 15.5 Разделить InlineKeyboardService (871 строк, 2 зависимости, 21 метод)
+- [x] 15.5 Разделить InlineKeyboardService (871 строк, 2 зависимости, 21 метод)
   - **Фаза 5.1:** Создать EventInlineKeyboardFactory для событий (~200 строк, 2 зависимости)
   - **Фаза 5.2:** Создать AttachmentInlineKeyboardFactory для вложений (~150 строк, 1 зависимость)
   - **Фаза 5.3:** Создать ReminderInlineKeyboardFactory для напоминаний (~150 строк, 1 зависимость)
