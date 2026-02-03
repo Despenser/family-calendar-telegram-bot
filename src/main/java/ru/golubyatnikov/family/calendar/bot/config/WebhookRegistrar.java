@@ -14,7 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import ru.golubyatnikov.family.calendar.bot.service.WebhookSecurityService;
+import ru.golubyatnikov.family.calendar.bot.service.authorization.WebhookSecurityService;
 
 import java.util.HashMap;
 import java.util.Map;

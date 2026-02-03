@@ -11,9 +11,11 @@ import org.mockito.quality.Strictness;
 import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
-import ru.golubyatnikov.family.calendar.bot.handler.CommandHandler;
+import ru.golubyatnikov.family.calendar.bot.handler.command.CommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.service.dispatcher.CommandDispatcher;
+import ru.golubyatnikov.family.calendar.bot.service.user.UserService;
 
 import java.util.Arrays;
 import java.util.List;

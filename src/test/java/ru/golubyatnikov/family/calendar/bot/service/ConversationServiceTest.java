@@ -14,6 +14,7 @@ import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -57,7 +58,7 @@ class ConversationServiceTest {
     private UserRepository userRepository;
     
     @Mock
-    private ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
+    private ru.golubyatnikov.family.calendar.bot.service.event.EventService eventService;
 
     @InjectMocks
     private ConversationService conversationService;

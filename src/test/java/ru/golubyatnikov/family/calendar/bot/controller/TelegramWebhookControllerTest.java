@@ -9,8 +9,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import ru.golubyatnikov.family.calendar.bot.service.UpdateProcessor;
-import ru.golubyatnikov.family.calendar.bot.service.WebhookSecurityService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.UpdateProcessor;
+import ru.golubyatnikov.family.calendar.bot.service.authorization.WebhookSecurityService;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;

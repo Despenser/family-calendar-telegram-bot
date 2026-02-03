@@ -3,6 +3,7 @@ package ru.golubyatnikov.family.calendar.bot.service;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import ru.golubyatnikov.family.calendar.bot.model.MessageCategory;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.UnauthorizedMessageService;
 
 import java.util.Map;
 

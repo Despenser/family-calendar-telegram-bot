@@ -7,8 +7,9 @@ import org.mockito.Mockito;
 import ru.golubyatnikov.family.calendar.bot.repository.ConversationStateRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
-import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditField;
-import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService.EditingContext;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService.EditField;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService.EditingContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

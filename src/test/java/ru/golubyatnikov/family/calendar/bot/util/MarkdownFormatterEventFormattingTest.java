@@ -91,7 +91,7 @@ class MarkdownFormatterEventFormattingTest {
         String time = "18:00";
         String description = "Празднование (дома)";
         
-        // When - форматируем как в MyEventsCommandHandler.formatEvent()
+        // When - форматируем как в PlannerCommandHandler.formatEvent()
         StringBuilder formatted = new StringBuilder();
         formatted.append(MarkdownFormatter.escape("📌 ")).append(MarkdownFormatter.bold(title)).append(MarkdownFormatter.escape("\n"));
         formatted.append(MarkdownFormatter.formatMessage("📅 Дата: %s\n", date));

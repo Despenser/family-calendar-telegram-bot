@@ -7,8 +7,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import ru.golubyatnikov.family.calendar.bot.handler.command.StartCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.UserService;
+import ru.golubyatnikov.family.calendar.bot.service.user.UserService;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;

@@ -7,11 +7,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import ru.golubyatnikov.family.calendar.bot.handler.command.SearchCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
-import ru.golubyatnikov.family.calendar.bot.service.SearchService;
-import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.search.SearchService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;

@@ -15,6 +15,7 @@ import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
+import ru.golubyatnikov.family.calendar.bot.service.attachment.AttachmentService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -43,16 +44,25 @@ class KeyboardServiceTest {
     private EventRepository eventRepository;
     
     @Mock
-    private AttachmentService attachmentService;
+    private ReplyKeyboardService replyKeyboardService;
     
     @Mock
-    private ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
+    private InlineKeyboardService inlineKeyboardService;
+    
+    @Mock
+    private KeyboardLayoutService keyboardLayoutService;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.attachment.AttachmentService attachmentService;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService reminderService;
 
     private KeyboardService keyboardService;
 
     @BeforeEach
     void setUp() {
-        keyboardService = new KeyboardService(eventRepository, attachmentService, reminderService);
+        keyboardService = new KeyboardService(replyKeyboardService, inlineKeyboardService, keyboardLayoutService);
     }
 
     /**

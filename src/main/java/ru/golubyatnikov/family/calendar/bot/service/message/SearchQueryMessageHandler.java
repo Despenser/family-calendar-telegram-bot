@@ -5,11 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import ru.golubyatnikov.family.calendar.bot.handler.SearchCommandHandler;
+import ru.golubyatnikov.family.calendar.bot.handler.command.SearchCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
-import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.italic;

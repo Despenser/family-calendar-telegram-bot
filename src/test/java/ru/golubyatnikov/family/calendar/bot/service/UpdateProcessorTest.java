@@ -13,6 +13,13 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationService;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.dispatcher.CallbackQueryDispatcher;
+import ru.golubyatnikov.family.calendar.bot.service.dispatcher.CommandDispatcher;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.UpdateProcessor;
+import ru.golubyatnikov.family.calendar.bot.service.user.UserService;
 import ru.golubyatnikov.family.calendar.bot.util.TextEventParser;
 
 import java.util.Optional;

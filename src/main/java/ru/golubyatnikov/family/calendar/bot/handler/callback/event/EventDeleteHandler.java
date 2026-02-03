@@ -9,8 +9,8 @@ import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessExceptio
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 /**

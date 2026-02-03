@@ -11,13 +11,17 @@ import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.InvalidDateException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
-import ru.golubyatnikov.family.calendar.bot.handler.MyEventsCommandHandler;
+import ru.golubyatnikov.family.calendar.bot.handler.command.PlannerCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
+import ru.golubyatnikov.family.calendar.bot.service.event.EventHistoryService;
+import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 
 import java.time.LocalDate;
@@ -78,7 +82,7 @@ class EventServiceTest {
     private BotMessageBuilder botMessageBuilder;
     
     @Mock
-    private MyEventsCommandHandler myEventsCommandHandler;
+    private PlannerCommandHandler plannerCommandHandler;
 
     @InjectMocks
     private EventService eventService;

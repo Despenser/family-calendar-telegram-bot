@@ -8,11 +8,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import ru.golubyatnikov.family.calendar.bot.handler.callback.textevent.TextEventCallbackHandler;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.ConversationService;
-import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 
 import java.time.LocalDate;
@@ -48,7 +49,7 @@ class TextEventCallbackHandlerTest {
     private BotMessageBuilder messageBuilder;
 
     @Mock
-    private ru.golubyatnikov.family.calendar.bot.service.EventService eventService;
+    private ru.golubyatnikov.family.calendar.bot.service.event.EventService eventService;
 
     @Mock
     private CallbackQuery callbackQuery;

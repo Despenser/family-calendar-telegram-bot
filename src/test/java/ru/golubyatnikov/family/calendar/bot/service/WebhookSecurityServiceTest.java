@@ -3,6 +3,7 @@ package ru.golubyatnikov.family.calendar.bot.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import ru.golubyatnikov.family.calendar.bot.service.authorization.WebhookSecurityService;
 
 import static org.junit.jupiter.api.Assertions.*;
 

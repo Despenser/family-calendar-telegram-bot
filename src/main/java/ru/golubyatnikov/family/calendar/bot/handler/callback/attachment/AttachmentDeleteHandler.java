@@ -7,11 +7,11 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import ru.golubyatnikov.family.calendar.bot.model.Attachment;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.AttachmentService;
-import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
-import ru.golubyatnikov.family.calendar.bot.service.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.attachment.AttachmentService;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
-import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 import ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter;

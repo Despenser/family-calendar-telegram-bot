@@ -228,8 +228,8 @@ public class Event {
      * <p>По умолчанию false - событие не является первым в списке и не должно
      * содержать шапку при обновлении.</p>
      * 
-     * @see ru.golubyatnikov.family.calendar.bot.handler.MyEventsCommandHandler
-     * @see ru.golubyatnikov.family.calendar.bot.service.EventService#sendOrUpdateEventMessage
+     * @see ru.golubyatnikov.family.calendar.bot.handler.command.PlannerCommandHandler
+     * @see ru.golubyatnikov.family.calendar.bot.service.event.EventService#sendOrUpdateEventMessage
      */
     @Column(name = "is_my_events_header")
     @Builder.Default

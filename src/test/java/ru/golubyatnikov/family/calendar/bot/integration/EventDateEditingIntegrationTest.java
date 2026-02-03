@@ -19,8 +19,8 @@ import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.FamilyRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
-import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
-import ru.golubyatnikov.family.calendar.bot.service.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;

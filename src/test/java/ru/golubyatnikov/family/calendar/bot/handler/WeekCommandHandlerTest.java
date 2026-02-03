@@ -8,10 +8,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.User;
+import ru.golubyatnikov.family.calendar.bot.handler.command.WeekCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
-import ru.golubyatnikov.family.calendar.bot.service.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -57,7 +58,7 @@ class WeekCommandHandlerTest {
     private TelegramMessageService messageService;
     
     @Mock
-    private ru.golubyatnikov.family.calendar.bot.service.ReminderService reminderService;
+    private ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService reminderService;
 
     @Mock
     private Message message;

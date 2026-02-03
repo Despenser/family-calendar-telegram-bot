@@ -7,8 +7,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
-import ru.golubyatnikov.family.calendar.bot.service.AttachmentService;
-import ru.golubyatnikov.family.calendar.bot.service.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.attachment.AttachmentService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
 
 import java.time.LocalDate;
 import java.util.ArrayList;

@@ -7,8 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import ru.golubyatnikov.family.calendar.bot.service.UpdateProcessor;
-import ru.golubyatnikov.family.calendar.bot.service.WebhookSecurityService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.UpdateProcessor;
+import ru.golubyatnikov.family.calendar.bot.service.authorization.WebhookSecurityService;
 
 /**
  * REST контроллер для приема webhook обновлений от Telegram Bot API.

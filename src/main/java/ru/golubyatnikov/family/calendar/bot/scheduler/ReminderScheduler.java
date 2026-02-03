@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import ru.golubyatnikov.family.calendar.bot.service.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
 
 /**
  * Планировщик для автоматической отправки напоминаний о событиях.

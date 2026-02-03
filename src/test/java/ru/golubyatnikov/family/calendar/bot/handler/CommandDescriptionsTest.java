@@ -2,6 +2,7 @@ package ru.golubyatnikov.family.calendar.bot.handler;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import ru.golubyatnikov.family.calendar.bot.handler.command.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

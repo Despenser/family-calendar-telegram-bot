@@ -10,8 +10,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
-import ru.golubyatnikov.family.calendar.bot.service.EventHistoryService;
-import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.event.EventHistoryService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 

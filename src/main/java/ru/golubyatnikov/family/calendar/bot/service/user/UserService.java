@@ -1,0 +1,280 @@
+package ru.golubyatnikov.family.calendar.bot.service.user;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
+import ru.golubyatnikov.family.calendar.bot.model.EventFilter;
+import ru.golubyatnikov.family.calendar.bot.model.Family;
+import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
+import java.time.DateTimeException;
+import java.time.ZoneId;
+import java.util.Optional;
+
+/**
+ * Сервис для управления пользователями Telegram бота.
+ *
+ * @author Family Calendar Bot Team
+ * @version 1.0.0
+ * @since 2025-12-30
+ */
+@Service
+@Transactional(readOnly = true)
+@Slf4j
+public class UserService {
+
+    private final UserRepository userRepository;
+
+    /**
+     * Конструктор для внедрения зависимостей.
+     * 
+     * @param userRepository репозиторий для работы с пользователями
+     */
+    public UserService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    /**
+     * Находит пользователя по его Telegram ID.
+     * 
+     * @param telegramId уникальный идентификатор пользователя в Telegram
+     *
+     * @return Optional содержащий пользователя, если найден, иначе пустой Optional
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    public Optional<User> findByTelegramId(Long telegramId) {
+        log.debug("Поиск пользователя по Telegram ID: {}", telegramId);
+        
+        Optional<User> user = userRepository.findByTelegramId(telegramId);
+        
+        if (user.isPresent()) {
+            User foundUser = user.get();
+            // Явно проверяем наличие семьи для отладки
+            boolean hasFamily = foundUser.hasFamily();
+            Family family = foundUser.getFamily();
+            log.info("Пользователь найден: telegramId={}, userId={}, username={}, hasFamily={}, familyId={}", 
+                    telegramId, foundUser.getId(), foundUser.getUsername(), hasFamily, 
+                    family != null ? family.getId() : null);
+        } else {
+            log.info("Пользователь не найден: telegramId={}", telegramId);
+        }
+        
+        return user;
+    }
+
+    /**
+     * Находит пользователя по его внутреннему ID.
+     * 
+     * @param userId внутренний идентификатор пользователя
+     *
+     * @return Optional содержащий пользователя, если найден, иначе пустой Optional
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    public Optional<User> findById(Long userId) {
+        log.debug("Поиск пользователя по ID: {}", userId);
+        
+        Optional<User> user = userRepository.findById(userId);
+        
+        if (user.isPresent()) {
+            log.info("Пользователь найден: userId={}, telegramId={}, username={}", 
+                    userId, user.get().getTelegramId(), user.get().getUsername());
+        } else {
+            log.info("Пользователь не найден: userId={}", userId);
+        }
+        
+        return user;
+    }
+
+    /**
+     * Создает нового пользователя в системе с указанной таймзоной.
+     *
+     * @param telegramId уникальный идентификатор пользователя в Telegram
+     * @param username username пользователя в Telegram (может быть null)
+     * @param firstName имя пользователя (обязательное поле)
+     * @param family семья, к которой принадлежит пользователь (может быть null)
+     * @param timezone часовой пояс пользователя в формате IANA (может быть null, тогда используется default)
+     *
+     * @return созданный и сохраненный пользователь
+     * @throws IllegalArgumentException если telegramId или firstName равны null
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    @Transactional
+    public User createUser(Long telegramId, String username, String firstName, Family family, String timezone) {
+        log.info("Создание нового пользователя: telegramId={}, username={}, firstName={}, familyId={}, timezone={}", 
+                telegramId, username, firstName, family != null ? family.getId() : null, timezone);
+        
+        if (telegramId == null) {
+            log.error("Попытка создать пользователя с null telegramId");
+            throw new IllegalArgumentException("Telegram ID не может быть null");
+        }
+        
+        if (firstName == null || firstName.isBlank()) {
+            log.error("Попытка создать пользователя с пустым firstName: telegramId={}", telegramId);
+            throw new IllegalArgumentException("Имя пользователя не может быть пустым");
+        }
+        
+        // Валидация timezone
+        String validatedTimezone = validateAndNormalizeTimezone(timezone);
+        
+        User user = User.builder()
+                .telegramId(telegramId)
+                .username(username)
+                .firstName(firstName)
+                .family(family)
+                .timezone(validatedTimezone)
+                .build();
+        
+        User savedUser = userRepository.save(user);
+        
+        log.info("Пользователь успешно создан: userId={}, telegramId={}, timezone={}", 
+                savedUser.getId(), savedUser.getTelegramId(), savedUser.getTimezone());
+        
+        return savedUser;
+    }
+
+    /**
+     * Проверяет, авторизован ли пользователь в системе.
+     * 
+     * @param telegramId уникальный идентификатор пользователя в Telegram
+     *
+     * @return true, если пользователь авторизован (найден в БД), иначе false
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    public boolean isUserAuthorized(Long telegramId) {
+        log.debug("Проверка авторизации пользователя: telegramId={}", telegramId);
+        
+        boolean isAuthorized = userRepository.findByTelegramId(telegramId).isPresent();
+        
+        log.info("Результат проверки авторизации: telegramId={}, authorized={}", 
+                telegramId, isAuthorized);
+        
+        return isAuthorized;
+    }
+
+    /**
+     * Устанавливает фильтр событий для пользователя.
+     * 
+     * <p>Сохраняет выбранный пользователем фильтр событий в базу данных.
+     * Фильтр определяет, какие события будут отображаться пользователю:
+     * все события, только семейные или только личные.</p>
+     * 
+     * <p><b>Требования:</b> 3.4</p>
+     * 
+     * @param userId внутренний идентификатор пользователя
+     * @param filter тип фильтра событий для установки
+     *
+     * @throws UserNotFoundException если пользователь с указанным ID не найден
+     * @throws IllegalArgumentException если userId или filter равны null
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    @Transactional
+    public void setEventFilter(Long userId, EventFilter filter) {
+        log.info("Установка фильтра событий: userId={}, filter={}", userId, filter);
+        
+        if (userId == null) {
+            log.error("Попытка установить фильтр с null userId");
+            throw new IllegalArgumentException("User ID не может быть null");
+        }
+        
+        if (filter == null) {
+            log.error("Попытка установить null фильтр для пользователя: userId={}", userId);
+            throw new IllegalArgumentException("Фильтр событий не может быть null");
+        }
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.error("Пользователь не найден при установке фильтра: userId={}", userId);
+                    return new UserNotFoundException("Пользователь не найден: userId=" + userId);
+                });
+        
+        user.setEventFilter(filter);
+        userRepository.save(user);
+        
+        log.info("Фильтр событий успешно установлен: userId={}, filter={}", userId, filter);
+    }
+
+    /**
+     * Получает текущий фильтр событий пользователя.
+     * 
+     * <p>Возвращает сохраненный фильтр событий для указанного пользователя.
+     * Если фильтр не был установлен явно, возвращается значение по умолчанию (ALL).</p>
+     * 
+     * <p><b>Требования:</b> 3.4</p>
+     * 
+     * @param userId внутренний идентификатор пользователя
+     *
+     * @return текущий фильтр событий пользователя
+     * @throws UserNotFoundException если пользователь с указанным ID не найден
+     * @throws IllegalArgumentException если userId равен null
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    public EventFilter getEventFilter(Long userId) {
+        log.debug("Получение фильтра событий: userId={}", userId);
+        
+        if (userId == null) {
+            log.error("Попытка получить фильтр с null userId");
+            throw new IllegalArgumentException("User ID не может быть null");
+        }
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.error("Пользователь не найден при получении фильтра: userId={}", userId);
+                    return new UserNotFoundException("Пользователь не найден: userId=" + userId);
+                });
+        
+        EventFilter filter = user.getEventFilter();
+        
+        log.info("Фильтр событий получен: userId={}, filter={}", userId, filter);
+        
+        return filter;
+    }
+
+    /**
+     * Обновляет timezone пользователя.
+     * 
+     * <p><b>Требования:</b> 1.4</p>
+     * 
+     * @param userId ID пользователя
+     * @param timezone новая timezone
+     * @throws UserNotFoundException если пользователь не найден
+     */
+    @Transactional
+    public void updateTimezone(Long userId, String timezone) {
+        log.info("Обновление timezone: userId={}, timezone={}", userId, timezone);
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("Пользователь не найден: " + userId));
+        
+        String validatedTimezone = validateAndNormalizeTimezone(timezone);
+        user.setTimezone(validatedTimezone);
+        userRepository.save(user);
+        
+        log.info("Timezone успешно обновлена: userId={}, timezone={}", userId, validatedTimezone);
+    }
+
+    /**
+     * Валидирует и нормализует timezone.
+     * Если timezone невалидна или null, возвращает default timezone.
+     * 
+     * <p><b>Требования:</b> 1.3</p>
+     * 
+     * @param timezone timezone для валидации
+     * @return валидная timezone
+     */
+    private String validateAndNormalizeTimezone(String timezone) {
+        if (timezone == null || timezone.isBlank()) {
+            log.debug("Timezone не указана, используется default: Europe/Moscow");
+            return "Europe/Moscow";
+        }
+        
+        try {
+            ZoneId.of(timezone);
+            log.debug("Timezone валидна: {}", timezone);
+            return timezone;
+        } catch (DateTimeException e) {
+            log.warn("Невалидная timezone: {}, используется default: Europe/Moscow", timezone);
+            return "Europe/Moscow";
+        }
+    }
+}

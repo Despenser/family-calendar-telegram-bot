@@ -8,6 +8,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.User;
+import ru.golubyatnikov.family.calendar.bot.handler.command.CommandHandler;
+import ru.golubyatnikov.family.calendar.bot.handler.command.HelpCommandHandler;
 
 import java.util.Arrays;
 import java.util.Collections;

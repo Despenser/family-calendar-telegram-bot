@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import ru.golubyatnikov.family.calendar.bot.model.MessageCategory;
+import ru.golubyatnikov.family.calendar.bot.service.authorization.AuthorizationMetricsService;
 
 import java.util.concurrent.TimeUnit;
 

@@ -7,10 +7,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import ru.golubyatnikov.family.calendar.bot.handler.command.StatsCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.StatisticsService;
-import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.statistics.StatisticsService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 
 import java.time.YearMonth;
 

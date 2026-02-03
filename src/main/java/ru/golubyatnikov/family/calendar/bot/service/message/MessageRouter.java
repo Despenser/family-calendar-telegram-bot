@@ -5,8 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.ConversationService;
-import ru.golubyatnikov.family.calendar.bot.service.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationService;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.util.TextEventParser;
 
 /**

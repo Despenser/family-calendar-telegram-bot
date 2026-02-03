@@ -15,10 +15,10 @@ import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.ReminderService;
-import ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.service.UserService;
+import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.user.UserService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 

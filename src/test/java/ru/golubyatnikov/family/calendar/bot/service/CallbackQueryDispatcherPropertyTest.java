@@ -7,6 +7,9 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.service.dispatcher.CallbackQueryDispatcher;
+import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.user.UserService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,8 +55,8 @@ class CallbackQueryDispatcherPropertyTest {
         UserService userService = mock(UserService.class);
         
         // Создаём mock FilterCallbackHandler
-        ru.golubyatnikov.family.calendar.bot.handler.callback.FilterCallbackHandler filterCallbackHandler = 
-            mock(ru.golubyatnikov.family.calendar.bot.handler.callback.FilterCallbackHandler.class);
+        ru.golubyatnikov.family.calendar.bot.handler.callback.filter.FilterCallbackHandler filterCallbackHandler = 
+            mock(ru.golubyatnikov.family.calendar.bot.handler.callback.filter.FilterCallbackHandler.class);
         when(filterCallbackHandler.canHandle(anyString())).thenAnswer(invocation -> {
             String data = invocation.getArgument(0);
             return data != null && data.startsWith("filter_");
@@ -98,8 +101,8 @@ class CallbackQueryDispatcherPropertyTest {
         UserService userService = mock(UserService.class);
         
         // Создаём mock FilterCallbackHandler
-        ru.golubyatnikov.family.calendar.bot.handler.callback.FilterCallbackHandler filterCallbackHandler = 
-            mock(ru.golubyatnikov.family.calendar.bot.handler.callback.FilterCallbackHandler.class);
+        ru.golubyatnikov.family.calendar.bot.handler.callback.filter.FilterCallbackHandler filterCallbackHandler = 
+            mock(ru.golubyatnikov.family.calendar.bot.handler.callback.filter.FilterCallbackHandler.class);
         when(filterCallbackHandler.canHandle(anyString())).thenAnswer(invocation -> {
             String data = invocation.getArgument(0);
             return data != null && data.startsWith("filter_");
@@ -135,8 +138,8 @@ class CallbackQueryDispatcherPropertyTest {
         UserService userService = mock(UserService.class);
         
         // Создаём mock FilterCallbackHandler
-        ru.golubyatnikov.family.calendar.bot.handler.callback.FilterCallbackHandler filterCallbackHandler = 
-            mock(ru.golubyatnikov.family.calendar.bot.handler.callback.FilterCallbackHandler.class);
+        ru.golubyatnikov.family.calendar.bot.handler.callback.filter.FilterCallbackHandler filterCallbackHandler = 
+            mock(ru.golubyatnikov.family.calendar.bot.handler.callback.filter.FilterCallbackHandler.class);
         when(filterCallbackHandler.canHandle(anyString())).thenAnswer(invocation -> {
             String data = invocation.getArgument(0);
             return data != null && data.startsWith("filter_");
@@ -167,8 +170,8 @@ class CallbackQueryDispatcherPropertyTest {
         UserService userService = mock(UserService.class);
         
         // Создаём mock FilterCallbackHandler
-        ru.golubyatnikov.family.calendar.bot.handler.callback.FilterCallbackHandler filterCallbackHandler = 
-            mock(ru.golubyatnikov.family.calendar.bot.handler.callback.FilterCallbackHandler.class);
+        ru.golubyatnikov.family.calendar.bot.handler.callback.filter.FilterCallbackHandler filterCallbackHandler = 
+            mock(ru.golubyatnikov.family.calendar.bot.handler.callback.filter.FilterCallbackHandler.class);
         when(filterCallbackHandler.canHandle(anyString())).thenAnswer(invocation -> {
             String data = invocation.getArgument(0);
             return data != null && data.startsWith("filter_");
@@ -201,8 +204,8 @@ class CallbackQueryDispatcherPropertyTest {
         UserService userService = mock(UserService.class);
         
         // Создаём mock FilterCallbackHandler
-        ru.golubyatnikov.family.calendar.bot.handler.callback.FilterCallbackHandler filterCallbackHandler = 
-            mock(ru.golubyatnikov.family.calendar.bot.handler.callback.FilterCallbackHandler.class);
+        ru.golubyatnikov.family.calendar.bot.handler.callback.filter.FilterCallbackHandler filterCallbackHandler = 
+            mock(ru.golubyatnikov.family.calendar.bot.handler.callback.filter.FilterCallbackHandler.class);
         when(filterCallbackHandler.canHandle(anyString())).thenAnswer(invocation -> {
             String data = invocation.getArgument(0);
             return data != null && data.startsWith("filter_");

@@ -172,7 +172,7 @@
   - **Validates: Requirements 3.4, 6.1, 6.2, 6.3, 6.5**
 
 - [ ] 12. Внедрить correlation ID и трейсинг
-- [ ] 12.1 Создать CorrelationIdFilter
+- [x] 12.1 Создать CorrelationIdFilter
   - Генерировать уникальный correlation ID для каждого запроса
   - Добавлять correlation ID в MDC
   - _Requirements: 5.1, 5.2_

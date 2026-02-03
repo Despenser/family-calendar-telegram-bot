@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
+import ru.golubyatnikov.family.calendar.bot.service.user.UserService;
 
 import java.util.Optional;
 

@@ -9,11 +9,13 @@
     <springProperty scope="context" name="LOG_LEVEL_ROOT" source="logging.level.root" defaultValue="INFO"/>
     <springProperty scope="context" name="LOG_LEVEL_APP" source="logging.level.ru.golubyatnikov.family.calendar.bot" defaultValue="DEBUG"/>
     
-    <!-- Паттерны логирования -->
+    <!-- Паттерны логирования с correlation ID для трейсинга запросов -->
+    <!-- Консольный паттерн с цветовым выделением для удобства разработки -->
     <property name="CONSOLE_LOG_PATTERN" 
-              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%thread]){magenta} %clr(%-5level){highlight} %clr(%logger{36}){cyan} %clr(-){faint} %msg%n%throwable"/>
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%thread]){magenta} %clr([%X{correlationId:-NO-CORRELATION-ID}]){blue} %clr(%-5level){highlight} %clr(%logger{36}){cyan} %clr(-){faint} %msg%n%throwable"/>
+    <!-- Файловый паттерн без цветов для парсинга логов -->
     <property name="FILE_LOG_PATTERN" 
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n%throwable"/>
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{correlationId:-NO-CORRELATION-ID}] %-5level %logger{36} - %msg%n%throwable"/>
     
     <!-- Консольный аппендер для всех профилей -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -45,6 +47,39 @@
     <!-- Асинхронный аппендер для улучшения производительности -->
     <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
         <appender-ref ref="FILE"/>
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+    
+    <!-- JSON аппендер для структурированного логирования с correlation ID -->
+    <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/${APP_NAME}-json.log</file>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Включаем correlation ID из MDC -->
+            <includeMdcKeyName>correlationId</includeMdcKeyName>
+            <!-- Включаем все ключи из MDC для полного контекста -->
+            <includeMdc>true</includeMdc>
+            <!-- Добавляем информацию о вызывающем коде -->
+            <includeCallerData>true</includeCallerData>
+            <!-- Добавляем имя потока -->
+            <includeContext>true</includeContext>
+            <!-- Кастомные поля для идентификации приложения -->
+            <customFields>{"application":"${APP_NAME}","environment":"${spring.profiles.active:-default}"}</customFields>
+            <!-- Форматирование для читаемости -->
+            <jsonGeneratorDecorator class="net.logstash.logback.decorate.PrettyPrintingJsonGeneratorDecorator"/>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/${APP_NAME}-json.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+    
+    <!-- Асинхронный JSON аппендер -->
+    <appender name="ASYNC_JSON_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="JSON_FILE"/>
         <queueSize>512</queueSize>
         <discardingThreshold>0</discardingThreshold>
         <includeCallerData>false</includeCallerData>
@@ -94,6 +129,7 @@
         <root level="WARN">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_JSON_FILE"/>
         </root>
     </springProfile>
     
@@ -125,6 +161,7 @@
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_JSON_FILE"/>
         </root>
     </springProfile>
     
