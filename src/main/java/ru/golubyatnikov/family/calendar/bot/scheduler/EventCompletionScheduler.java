@@ -12,6 +12,7 @@ import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventHistoryService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.CorrelationIdUtil;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
@@ -72,10 +73,11 @@ public class EventCompletionScheduler {
     @Scheduled(fixedDelay = 600000) // Каждые 10 минут
     @Transactional
     public void completeExpiredEvents() {
-        log.debug("Запуск проверки истекших событий");
-        
-        try {
-            LocalDateTime now = LocalDateTime.now();
+        CorrelationIdUtil.executeWithCorrelationId(() -> {
+            log.debug("Запуск проверки истекших событий");
+            
+            try {
+                LocalDateTime now = LocalDateTime.now();
             
             // Получаем все активные события, которые истекли
             List<Event> expiredEvents = eventRepository.findExpiredActiveEvents(now);
@@ -119,13 +121,14 @@ public class EventCompletionScheduler {
                 }
             }
             
-            log.info("Автоматическое завершение событий выполнено: {} из {} событий завершено", 
-                     completedCount, expiredEvents.size());
-            
-        } catch (Exception e) {
-            log.error("Ошибка при выполнении автоматического завершения событий: {}", 
-                     e.getMessage(), e);
-        }
+                log.info("Автоматическое завершение событий выполнено: {} из {} событий завершено", 
+                         completedCount, expiredEvents.size());
+                
+            } catch (Exception e) {
+                log.error("Ошибка при выполнении автоматического завершения событий: {}", 
+                         e.getMessage(), e);
+            }
+        });
     }
     
     /**

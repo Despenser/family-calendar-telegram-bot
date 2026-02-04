@@ -337,11 +337,6 @@ public class PlannerCommandHandler implements CommandHandler {
     }
 
     @Override
-    public boolean requiresAuth() {
-        return true;
-    }
-
-    @Override
     public String getCommand() {
         return "/my_events";
     }

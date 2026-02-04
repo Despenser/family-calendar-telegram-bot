@@ -61,10 +61,10 @@ public class DefaultReminderConfig {
     @PostConstruct
     public void init() {
         if (!enabled) {
-            log.warn("⚠️ Автоматические напоминания отключены глобально (reminder.defaults.enabled=false). " +
+            log.warn("Автоматические напоминания отключены глобально (reminder.defaults.enabled=false). " +
                     "Напоминания не будут создаваться автоматически при создании событий.");
         } else {
-            log.info("✅ Автоматические напоминания включены. Типы по умолчанию: {}", types);
+            log.info("Автоматические напоминания включены. Типы по умолчанию: {}", types);
         }
     }
 }

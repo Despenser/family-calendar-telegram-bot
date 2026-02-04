@@ -15,6 +15,7 @@ import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.user.UserService;
 import ru.golubyatnikov.family.calendar.bot.service.authorization.AuthorizationService;
 import ru.golubyatnikov.family.calendar.bot.service.message.MessageRouter;
+import ru.golubyatnikov.family.calendar.bot.util.CorrelationIdUtil;
 
 import java.util.Optional;
 
@@ -55,45 +56,47 @@ public class UpdateProcessor {
      */
     @Async
     public void processUpdate(Update update) {
-        if (update == null) {
-            log.error("Получено null обновление для обработки");
-            throw new IllegalArgumentException("Update не может быть null");
-        }
-        
-        log.debug("Начало асинхронной обработки обновления: updateId={}", update.getUpdateId());
-        
-        try {
-            // Делегируем обработку callback query
-            if (update.hasCallbackQuery()) {
-                log.debug("Обновление содержит callback query: updateId={}", update.getUpdateId());
-                callbackQueryDispatcher.dispatch(update.getCallbackQuery());
-                return;
+        CorrelationIdUtil.executeWithCorrelationId(() -> {
+            if (update == null) {
+                log.error("Получено null обновление для обработки");
+                throw new IllegalArgumentException("Update не может быть null");
             }
             
-            // Проверяем наличие сообщения
-            if (!update.hasMessage()) {
-                log.debug("Обновление не содержит сообщения: updateId={}, hasEditedMessage={}", 
-                        update.getUpdateId(), update.hasEditedMessage());
-                return;
+            log.debug("Начало асинхронной обработки обновления: updateId={}", update.getUpdateId());
+            
+            try {
+                // Делегируем обработку callback query
+                if (update.hasCallbackQuery()) {
+                    log.debug("Обновление содержит callback query: updateId={}", update.getUpdateId());
+                    callbackQueryDispatcher.dispatch(update.getCallbackQuery());
+                    return;
+                }
+                
+                // Проверяем наличие сообщения
+                if (!update.hasMessage()) {
+                    log.debug("Обновление не содержит сообщения: updateId={}, hasEditedMessage={}", 
+                            update.getUpdateId(), update.hasEditedMessage());
+                    return;
+                }
+                
+                Message message = update.getMessage();
+                
+                if (message == null) {
+                    log.warn("Обновление помечено как hasMessage=true, но message=null: updateId={}", 
+                            update.getUpdateId());
+                    return;
+                }
+                
+                // Обрабатываем сообщение
+                processMessage(message);
+                
+                log.debug("Обновление успешно обработано: updateId={}", update.getUpdateId());
+                
+            } catch (Exception e) {
+                log.error("Ошибка при обработке обновления: updateId={}, error={}", 
+                        update.getUpdateId(), e.getMessage(), e);
             }
-            
-            Message message = update.getMessage();
-            
-            if (message == null) {
-                log.warn("Обновление помечено как hasMessage=true, но message=null: updateId={}", 
-                        update.getUpdateId());
-                return;
-            }
-            
-            // Обрабатываем сообщение
-            processMessage(message);
-            
-            log.debug("Обновление успешно обработано: updateId={}", update.getUpdateId());
-            
-        } catch (Exception e) {
-            log.error("Ошибка при обработке обновления: updateId={}, error={}", 
-                    update.getUpdateId(), e.getMessage(), e);
-        }
+        });
     }
 
     /**

@@ -12,6 +12,7 @@ import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.FamilyRepository;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.util.CorrelationIdUtil;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
@@ -76,11 +77,12 @@ public class WeeklySummaryScheduler {
     @Scheduled(cron = "0 0 20 * * SUN")
     @Transactional(readOnly = true)
     public void sendWeeklySummary() {
-        log.info("Запуск отправки еженедельных сводок");
-        
-        try {
-            // Определяем период следующей недели (понедельник-воскресенье)
-            LocalDate today = LocalDate.now();
+        CorrelationIdUtil.executeWithCorrelationId(() -> {
+            log.info("Запуск отправки еженедельных сводок");
+            
+            try {
+                // Определяем период следующей недели (понедельник-воскресенье)
+                LocalDate today = LocalDate.now();
             LocalDate nextMonday = today.with(DayOfWeek.MONDAY).plusWeeks(1);
             LocalDate nextSunday = nextMonday.plusDays(6);
             
@@ -107,12 +109,13 @@ public class WeeklySummaryScheduler {
                 }
             }
             
-            log.info("Еженедельные сводки отправлены: {} из {} семей", sentCount, families.size());
-            
-        } catch (Exception e) {
-            log.error("Ошибка при выполнении отправки еженедельных сводок: {}", 
-                     e.getMessage(), e);
-        }
+                log.info("Еженедельные сводки отправлены: {} из {} семей", sentCount, families.size());
+                
+            } catch (Exception e) {
+                log.error("Ошибка при выполнении отправки еженедельных сводок: {}", 
+                         e.getMessage(), e);
+            }
+        });
     }
     
     /**

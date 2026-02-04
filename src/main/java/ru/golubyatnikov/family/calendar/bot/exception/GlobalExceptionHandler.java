@@ -38,8 +38,8 @@ public class GlobalExceptionHandler {
      * @return Map с информацией об ошибке
      */
     private @NonNull Map<String, Object> createErrorResponse(@NonNull HttpStatus status,
-                                                             String error,
-                                                             String message) {
+                                                                      String error,
+                                                                      String message) {
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now().toString());
         errorResponse.put("status", status.value());
@@ -127,41 +127,6 @@ public class GlobalExceptionHandler {
             bold("Некорректная дата"),
             ex.getMessage()
         );
-        
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(errorResponse);
-    }
-    
-    /**
-     * Обрабатывает исключение ConstraintViolationException (ошибки Bean Validation).
-     * 
-     * @param ex исключение ConstraintViolationException
-     * @return ResponseEntity с информацией об ошибке валидации
-     */
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<Map<String, Object>> handleConstraintViolationException(@NonNull ConstraintViolationException ex) {
-
-        String validationErrors = ex.getConstraintViolations().stream()
-            .map(ConstraintViolation::getMessage)
-            .collect(Collectors.joining(", "));
-        
-        log.warn("Ошибка валидации: {}", validationErrors);
-        
-        Map<String, Object> errorResponse = createErrorResponse(
-            HttpStatus.BAD_REQUEST,
-            bold("Ошибка валидации"),
-            validationErrors
-        );
-        
-        // Добавляем детальную информацию о нарушениях
-        errorResponse.put("violations", ex.getConstraintViolations().stream()
-            .map(violation -> Map.of(
-                "field", violation.getPropertyPath().toString(),
-                "message", violation.getMessage(),
-                "invalidValue", violation.getInvalidValue() != null ? 
-                    violation.getInvalidValue().toString() : "null"
-            ))
-            .collect(Collectors.toList()));
         
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(errorResponse);

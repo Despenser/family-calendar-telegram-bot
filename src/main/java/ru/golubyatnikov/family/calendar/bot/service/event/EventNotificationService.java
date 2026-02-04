@@ -22,6 +22,7 @@ import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventCommandService.EventCreatedEvent;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import ru.golubyatnikov.family.calendar.bot.util.CorrelationIdUtil;
 
 import java.util.List;
 
@@ -162,14 +163,16 @@ public class EventNotificationService {
     @EventListener
     @Async
     public void onEventCreated(EventCreatedEvent event) {
-        log.debug("Получено доменное событие EventCreatedEvent для события ID={}", event.event().getId());
-        
-        try {
-            handleEventCreated(event.event(), event.event().getUser());
-        } catch (Exception e) {
-            log.error("Ошибка при обработке EventCreatedEvent для события ID={}: {}", 
-                     event.event().getId(), e.getMessage(), e);
-        }
+        CorrelationIdUtil.executeWithCorrelationId(() -> {
+            log.debug("Получено доменное событие EventCreatedEvent для события ID={}", event.event().getId());
+            
+            try {
+                handleEventCreated(event.event(), event.event().getUser());
+            } catch (Exception e) {
+                log.error("Ошибка при обработке EventCreatedEvent для события ID={}: {}", 
+                         event.event().getId(), e.getMessage(), e);
+            }
+        });
     }
     
     /**

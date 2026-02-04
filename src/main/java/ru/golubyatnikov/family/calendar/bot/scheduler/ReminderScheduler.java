@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.util.CorrelationIdUtil;
 
 /**
  * Планировщик для автоматической отправки напоминаний о событиях.
@@ -49,14 +50,16 @@ public class ReminderScheduler {
      */
     @Scheduled(fixedRate = 60000) // Каждую минуту
     public void checkAndSendReminders() {
-        log.debug("Запуск планировщика напоминаний");
-        
-        try {
-            reminderService.sendReminders();
-            log.debug("Планировщик напоминаний завершил работу");
+        CorrelationIdUtil.executeWithCorrelationId(() -> {
+            log.debug("Запуск планировщика напоминаний");
             
-        } catch (Exception e) {
-            log.error("Ошибка при выполнении планировщика напоминаний: {}", e.getMessage(), e);
-        }
+            try {
+                reminderService.sendReminders();
+                log.debug("Планировщик напоминаний завершил работу");
+                
+            } catch (Exception e) {
+                log.error("Ошибка при выполнении планировщика напоминаний: {}", e.getMessage(), e);
+            }
+        });
     }
 }

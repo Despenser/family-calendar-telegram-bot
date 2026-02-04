@@ -272,12 +272,10 @@ public class BotMessageBuilder {
      * @return отформатированное сообщение
      */
     public String buildFileAttachedMessage(String fileName, double fileSizeMb) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("✅ ").append(bold("Файл успешно прикреплен!")).append("\n\n");
-        sb.append("📎 Название: ").append(escape(fileName)).append("\n");
-        sb.append("📊 Размер: ").append(escape(String.format("%.2f МБ", fileSizeMb))).append("\n\n");
-        sb.append(escape("Вы можете продолжить прикреплять файлы или завершить создание события."));
-        return sb.toString();
+        return "✅ " + bold("Файл успешно прикреплен!") + "\n\n" +
+                "📎 Название: " + escape(fileName) + "\n" +
+                "📊 Размер: " + escape(String.format("%.2f МБ", fileSizeMb)) + "\n\n" +
+                escape("Вы можете продолжить прикреплять файлы или завершить создание события.");
     }
     
     // ===== Сообщения о событиях из текста =====
@@ -291,13 +289,11 @@ public class BotMessageBuilder {
      * @return отформатированное сообщение
      */
     public String buildTextEventPreviewMessage(String title, String date, String time) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("✅ ").append(bold("Распознано событие из текста:")).append("\n\n");
-        sb.append("📝 Название: ").append(escape(title)).append("\n");
-        sb.append("📅 Дата: ").append(escape(date)).append("\n");
-        sb.append("🕐 Время: ").append(escape(time)).append("\n\n");
-        sb.append(escape("Подтвердите создание события:"));
-        return sb.toString();
+        return "✅ " + bold("Распознано событие из текста:") + "\n\n" +
+                "📝 Название: " + escape(title) + "\n" +
+                "📅 Дата: " + escape(date) + "\n" +
+                "🕐 Время: " + escape(time) + "\n\n" +
+                escape("Подтвердите создание события:");
     }
     
     /**
@@ -349,10 +345,8 @@ public class BotMessageBuilder {
      * @return отформатированный заголовок с использованием MarkdownV2
      */
     public String buildMyEventsHeader(int eventCount) {
-        StringBuilder header = new StringBuilder();
-        header.append("📋 ").append(bold("Мои события")).append("\n\n");
-        header.append(escape("Всего событий: ")).append(escape(String.valueOf(eventCount))).append(escape("\n"));
-        return header.toString();
+        return "📋 " + bold("Мои события") + "\n\n" +
+                escape("Всего событий: ") + escape(String.valueOf(eventCount)) + "\n";
     }
     
     /**
@@ -382,11 +376,9 @@ public class BotMessageBuilder {
      * @return отформатированное сообщение о пустом состоянии
      */
     public String buildEmptyMyEventsMessage() {
-        StringBuilder message = new StringBuilder();
-        message.append("📝 ").append(bold("Мои события")).append("\n\n");
-        message.append(escape("У вас пока нет созданных событий.\n\n"));
-        message.append(escape("Используйте ")).append(escape("➕ /add_event")).append(escape(" для добавления нового события."));
-        return message.toString();
+        return "📝 " + bold("Мои события") + "\n\n" +
+                escape("У вас пока нет созданных событий.\n\n") +
+                escape("Используйте ") + escape("➕ /add_event") + escape(" для добавления нового события.");
     }
     
     /**
@@ -419,11 +411,9 @@ public class BotMessageBuilder {
      * @return отформатированный заголовок с использованием MarkdownV2
      */
     public String buildTrashHeader(int eventCount) {
-        StringBuilder header = new StringBuilder();
-        header.append("🗑️ ").append(bold("Корзина")).append("\n\n");
-        header.append(italic("Удаленные события хранятся 30 дней")).append("\n\n");
-        header.append(escape("Всего событий: ")).append(escape(String.valueOf(eventCount))).append(escape("\n"));
-        return header.toString();
+        return "🗑️ " + bold("Корзина") + "\n\n" +
+                italic("Удаленные события хранятся 30 дней") + "\n\n" +
+                escape("Всего событий: ") + escape(String.valueOf(eventCount)) + escape("\n");
     }
     
     /**
@@ -535,13 +525,12 @@ public class BotMessageBuilder {
         if (event == null) {
             throw new IllegalArgumentException("Event не может быть null");
         }
+
+        String message = "✅ " + bold("Событие завершено!") + "\n\n" +
+                buildEventMessage(event) +
+                "\n\n" + escape("Хотите добавить заметку о том, как прошло событие?");
         
-        StringBuilder message = new StringBuilder();
-        message.append("✅ ").append(bold("Событие завершено!")).append("\n\n");
-        message.append(buildEventMessage(event));
-        message.append("\n\n").append(escape("Хотите добавить заметку о том, как прошло событие?"));
-        
-        return message.toString();
+        return message;
     }
     
     /**

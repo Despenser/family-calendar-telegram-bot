@@ -40,7 +40,7 @@ public class TelegramWebhookController {
     @PostMapping
     public ResponseEntity<Void> onUpdateReceived(
             @RequestHeader(value = SECRET_TOKEN_HEADER, required = false) String secretToken,
-            @RequestBody Update update) {
+            @NonNull @RequestBody Update update) {
         
         log.debug("Получен webhook запрос. Update ID: {}", update.getUpdateId());
 
