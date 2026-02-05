@@ -299,7 +299,7 @@ nginx/
 | `/start` | Начать работу с ботом и проверить авторизацию | ❌ | `/start` |
 | `/help` | Показать список всех доступных команд | ❌ | `/help` |
 | `/add_event` | Создать новое событие через интерактивный календарь | ✅ | `/add_event` → выберите дату и время |
-| `/upcoming_events` | Показать предстоящие события семьи на 7 дней | ✅ | `/upcoming_events` |
+| `/month` | Показать предстоящие события семьи на 30 дней | ✅ | `/month` |
 | `/my_events` | Показать ваши события с кнопками управления | ✅ | `/my_events` |
 
 ### Дополнительные команды
@@ -744,7 +744,7 @@ docker-compose logs app | grep "старше 1 часа"
      /start - Начать работу с ботом
      /help - Показать список команд
      🔒 /add_event - Создать новое событие
-     🔒 /upcoming_events - Показать предстоящие события
+     🔒 /month - Показать предстоящие события
      🔒 /my_events - Мои события
      ...
 
@@ -1151,7 +1151,7 @@ docker-compose logs app | grep "старше 1 часа"
 │      Command Handler Layer              │
 │  • StartCommandHandler                  │
 │  • AddEventCommandHandler               │
-│  • UpcomingEventsCommandHandler         │
+│  • MonthCommandHandler                   │
 │  • MyEventsCommandHandler               │
 │  • HelpCommandHandler                   │
 │  • TodayCommandHandler                  │
@@ -1623,7 +1623,7 @@ family-calendar-bot/
 │   │   │   │   ├── StartCommandHandler.java       # /start
 │   │   │   │   ├── HelpCommandHandler.java        # /help
 │   │   │   │   ├── AddEventCommandHandler.java    # /add_event
-│   │   │   │   ├── UpcomingEventsCommandHandler.java # /upcoming_events
+│   │   │   │   ├── MonthCommandHandler.java       # /month
 │   │   │   │   └── MyEventsCommandHandler.java    # /my_events
 │   │   │   ├── service/                           # Бизнес-логика
 │   │   │   │   ├── CommandDispatcher.java         # Маршрутизация команд

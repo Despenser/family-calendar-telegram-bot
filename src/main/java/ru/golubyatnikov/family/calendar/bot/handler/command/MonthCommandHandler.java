@@ -9,6 +9,8 @@ import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
 import ru.golubyatnikov.family.calendar.bot.util.EventFormatter;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -16,10 +18,10 @@ import java.util.stream.Collectors;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
- * Обработчик команды /upcoming_events для Telegram бота семейного календаря.
+ * Обработчик команды /month для Telegram бота семейного календаря.
  * 
- * <p>Команда /upcoming_events позволяет пользователям просматривать все предстоящие
- * события их семьи на ближайшие 30 дней в едином компактном формате. Она выполняет следующие функции:</p>
+ * <p>Команда /month позволяет пользователям просматривать все предстоящие
+ * события их семьи на месяц (от текущей даты до той же даты следующего месяца) в едином компактном формате. Она выполняет следующие функции:</p>
  * <ul>
  *   <li>Получает список предстоящих событий семьи пользователя</li>
  *   <li>Форматирует события с использованием {@link EventFormatter} для единообразия с другими командами</li>
@@ -35,7 +37,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * 
  * <p><b>Пример использования:</b></p>
  * <pre>
- * Пользователь отправляет: /upcoming_events
+ * Пользователь отправляет: /month
  * 
  * Если есть события:
  * Бот отвечает: "📅 **Предстоящие события** (30 дней)
@@ -69,9 +71,9 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  */
 @Component
 @Slf4j
-public class UpcomingEventsCommandHandler implements CommandHandler {
+public class MonthCommandHandler implements CommandHandler {
 
-    private static final int DEFAULT_DAYS = 30;
+    private static final DateTimeFormatter DATE_RANGE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     
     private final EventService eventService;
     private final ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService reminderService;
@@ -82,23 +84,23 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      * @param eventService сервис для работы с событиями
      * @param reminderService сервис для работы с напоминаниями
      */
-    public UpcomingEventsCommandHandler(EventService eventService, 
+    public MonthCommandHandler(EventService eventService, 
                                        ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService reminderService) {
         this.eventService = eventService;
         this.reminderService = reminderService;
     }
 
     /**
-     * Обрабатывает команду /upcoming_events от пользователя.
+     * Обрабатывает команду /month от пользователя.
      * 
      * <p>Метод получает список предстоящих событий семьи пользователя
-     * на ближайшие 30 дней и форматирует их в едином компактном формате с использованием
+     * на месяц (от текущей даты до той же даты следующего месяца) и форматирует их в едином компактном формате с использованием
      * {@link EventFormatter} для обеспечения единообразия с другими командами списка событий.</p>
      * 
      * <p>Если у пользователя нет семьи, возвращается сообщение об ошибке.
      * Если событий нет, возвращается соответствующее информационное сообщение.</p>
      * 
-     * @param message входящее сообщение от Telegram, содержащее команду /upcoming_events
+     * @param message входящее сообщение от Telegram, содержащее команду /month
      * @param user пользователь из базы данных, запросивший список событий.
      *             Не может быть null, так как команда требует авторизации.
      * @return текст со списком предстоящих событий в компактном формате или сообщение об их отсутствии
@@ -108,19 +110,19 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
     @Override
     public String handle(Message message, User user) {
         if (message == null) {
-            log.error("Получено null сообщение в UpcomingEventsCommandHandler");
+            log.error("Получено null сообщение в MonthCommandHandler");
             throw new IllegalArgumentException("Сообщение не может быть null");
         }
 
         if (user == null) {
-            log.error("Получен null пользователь в UpcomingEventsCommandHandler");
+            log.error("Получен null пользователь в MonthCommandHandler");
             throw new IllegalArgumentException("Пользователь не может быть null");
         }
 
         Long telegramId = message.getFrom().getId();
         String username = message.getFrom().getUserName();
 
-        log.info("Обработка команды /upcoming_events: telegramId={}, username={}, userId={}", 
+        log.info("Обработка команды /month: telegramId={}, username={}, userId={}", 
                 telegramId, username, user.getId());
 
         // Проверяем наличие семьи у пользователя
@@ -132,9 +134,16 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
         Long familyId = user.getFamily().getId();
         log.debug("Получение предстоящих событий для семьи ID={}", familyId);
 
+        // Вычисляем диапазон дат: от текущей даты до той же даты следующего месяца
+        LocalDate startDate = user.getCurrentDate();
+        LocalDate endDate = calculateEndDate(startDate);
+        int daysInPeriod = (int) ChronoUnit.DAYS.between(startDate, endDate) + 1;
+
+        log.debug("Диапазон дат для месяца: {} - {} ({} дней)", startDate, endDate, daysInPeriod);
+
         // Получаем предстоящие события семьи
         List<Event> upcomingEvents = eventService.getUpcomingEvents(
-            familyId, DEFAULT_DAYS, user.getZoneId());
+            familyId, daysInPeriod, user.getZoneId());
 
         log.debug("Найдено {} событий до фильтрации для семьи ID={}", 
                 upcomingEvents.size(), familyId);
@@ -161,10 +170,34 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
                 filteredEvents.size(), user.getId(), familyId);
 
         if (filteredEvents.isEmpty()) {
-            return buildNoEventsMessage();
+            return buildNoEventsMessage(startDate, endDate);
         }
 
-        return buildEventsListMessage(filteredEvents, user);
+        return buildEventsListMessage(filteredEvents, user, startDate, endDate);
+    }
+
+    /**
+     * Вычисляет конечную дату периода (та же дата следующего месяца).
+     * 
+     * <p>Если в следующем месяце нет такого же числа (например, 31 января → 28/29 февраля),
+     * берется последний день следующего месяца.</p>
+     * 
+     * @param startDate начальная дата
+     * @return конечная дата периода
+     */
+    private LocalDate calculateEndDate(LocalDate startDate) {
+        LocalDate nextMonth = startDate.plusMonths(1);
+        
+        // Проверяем, существует ли такое же число в следующем месяце
+        int dayOfMonth = startDate.getDayOfMonth();
+        int lastDayOfNextMonth = nextMonth.lengthOfMonth();
+        
+        if (dayOfMonth > lastDayOfNextMonth) {
+            // Если в следующем месяце нет такого числа, берем последний день месяца
+            return nextMonth.withDayOfMonth(lastDayOfNextMonth);
+        }
+        
+        return nextMonth;
     }
 
     /**
@@ -191,12 +224,16 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      * 
      * <p><b>Требования:</b> 4.3</p>
      * 
+     * @param startDate начальная дата периода
+     * @param endDate конечная дата периода
      * @return отформатированное сообщение об отсутствии событий
      */
-    private String buildNoEventsMessage() {
+    private String buildNoEventsMessage(LocalDate startDate, LocalDate endDate) {
+        String dateRange = startDate.format(DATE_RANGE_FORMATTER) + " - " + endDate.format(DATE_RANGE_FORMATTER);
         return EventFormatter.formatNoEventsMessage(
-                "Предстоящие события",
-                "На ближайшие " + DEFAULT_DAYS + " дней событий не запланировано."
+                "🗓️",
+                "События на месяц",
+                "На период " + dateRange + " событий не запланировано."
         );
     }
 
@@ -217,10 +254,13 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      * 
      * @param filteredEvents список отфильтрованных событий для форматирования
      * @param user текущий пользователь для определения создателя событий
+     * @param startDate начальная дата периода
+     * @param endDate конечная дата периода
      * @return отформатированное сообщение со списком событий, сгруппированных по дням
      */
-    private String buildEventsListMessage(List<Event> filteredEvents, User user) {
-        String header = EventFormatter.formatCommandHeader("Предстоящие события", DEFAULT_DAYS + " дней");
+    private String buildEventsListMessage(List<Event> filteredEvents, User user, LocalDate startDate, LocalDate endDate) {
+        String dateRange = startDate.format(DATE_RANGE_FORMATTER) + " - " + endDate.format(DATE_RANGE_FORMATTER);
+        String header = EventFormatter.formatCommandHeader("🗓️", "События на месяц", dateRange);
         
         // Группировка событий по датам
         Map<LocalDate, List<Event>> eventsByDate = filteredEvents.stream()
@@ -232,10 +272,9 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
         
         // Сортировка дат и вывод событий по дням
         LocalDate today = user.getCurrentDate();
-        LocalDate endDate = today.plusDays(DEFAULT_DAYS - 1);
         boolean firstDay = true;
         
-        for (LocalDate date = today; !date.isAfter(endDate); date = date.plusDays(1)) {
+        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
             List<Event> dayEvents = eventsByDate.get(date);
             
             if (dayEvents != null && !dayEvents.isEmpty()) {
@@ -266,11 +305,11 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
     /**
      * Возвращает команду, которую обрабатывает этот handler.
      * 
-     * @return строка "/upcoming_events"
+     * @return строка "/month"
      */
     @Override
     public String getCommand() {
-        return "/upcoming_events";
+        return "/month";
     }
 
     /**
@@ -280,13 +319,13 @@ public class UpcomingEventsCommandHandler implements CommandHandler {
      */
     @Override
     public String getDescription() {
-        return "Показать планы на 30 дней";
+        return "Показать события на месяц";
     }
 
     /**
      * Определяет, требуется ли авторизация для выполнения этой команды.
      * 
-     * <p>Команда /upcoming_events требует авторизации, так как она отображает
+     * <p>Команда /month требует авторизации, так как она отображает
      * события семьи, к которой принадлежит пользователь.</p>
      * 
      * @return true, так как команда требует авторизации

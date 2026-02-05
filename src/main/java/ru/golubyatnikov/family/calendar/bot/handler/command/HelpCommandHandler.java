@@ -33,8 +33,8 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * 
  * <p><b>Категории команд:</b></p>
  * <ul>
- *   <li>📅 Просмотр событий: /today, /week, /upcoming_events</li>
  *   <li>➕ Управление событиями: /add_event, /my_events</li>
+ *   <li>📅 Просмотр событий: /today, /week, /month</li>
  *   <li>🔍 Поиск и фильтрация: /search, /filter</li>
  *   <li>📊 Статистика и корзина: /stats, /trash</li>
  *   <li>ℹ️ Справка: /help, /start</li>
@@ -76,14 +76,14 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * 
  * *Доступные команды:*
  * 
- * *Просмотр событий*
- * 📅 /today - Показать события на сегодня
- * 📆 /week - Показать события на неделю (7 дней)
- * 📋 /upcoming_events - Показать планы на 30 дней
- * 
  * *Управление событиями*
  * ➕ /add_event - Добавить новое событие в календарь
- * 📝 /my_events - Управление моими событиями
+ * � /my_events - Управление моими событиями
+ * 
+ * *Просмотр событий*
+ * � /today - Показать события на сегодня
+ * 📆 /week - Показать события на неделю
+ * � /upcoming_events - Показать планы на 30 дней
  * 
  * *Поиск и фильтрация*
  * 🫧 /filter - Фильтрация событий по типу
@@ -116,14 +116,14 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * 
  * *Доступные команды:*
  * 
- * *📅 Просмотр событий*
- * 🔒 /today - Показать события на сегодня
- * 🔒 /week - Показать события на неделю (7 дней)
- * 🔒 /upcoming_events - Показать планы на 30 дней
- * 
- * *➕ Управление событиями*
+ * *Управление событиями*
  * 🔒 /add_event - Добавить новое событие в календарь
  * 🔒 /my_events - Управление моими событиями
+ * 
+ * *Просмотр событий*
+ * 📅 /today - Показать события на сегодня
+ * 📆 /week - Показать события на неделю
+ * 🗓️ /month - Показать события на месяц
  * 
  * ... (остальные категории)
  * 
@@ -151,7 +151,7 @@ public class HelpCommandHandler implements CommandHandler {
      * 
      * <p><b>Категории:</b></p>
      * <ul>
-     *   <li>VIEW_EVENTS - Команды для просмотра событий (today, week, upcoming_events)</li>
+     *   <li>VIEW_EVENTS - Команды для просмотра событий (today, week, month)</li>
      *   <li>MANAGE_EVENTS - Команды для управления событиями (add_event, my_events)</li>
      *   <li>SEARCH_FILTER - Команды для поиска и фильтрации (search, filter)</li>
      *   <li>STATS_TRASH - Команды для статистики и корзины (stats, trash)</li>
@@ -204,7 +204,7 @@ public class HelpCommandHandler implements CommandHandler {
     private static final Map<String, CommandCategory> COMMAND_CATEGORIES = Map.ofEntries(
             Map.entry("/today", CommandCategory.VIEW_EVENTS),
             Map.entry("/week", CommandCategory.VIEW_EVENTS),
-            Map.entry("/upcoming_events", CommandCategory.VIEW_EVENTS),
+            Map.entry("/month", CommandCategory.VIEW_EVENTS),
             Map.entry("/add_event", CommandCategory.MANAGE_EVENTS),
             Map.entry("/my_events", CommandCategory.MANAGE_EVENTS),
             Map.entry("/search", CommandCategory.SEARCH_FILTER),
@@ -228,7 +228,7 @@ public class HelpCommandHandler implements CommandHandler {
      *   <li>📚 /help - справка, документация</li>
      *   <li>➕ /add_event - добавление нового элемента</li>
      *   <li>📝 /my_events - список, управление</li>
-     *   <li>📋 /upcoming_events - календарь, предстоящие события</li>
+     *   <li>🗓️ /month - календарь, события на месяц</li>
      *   <li>📅 /today - сегодняшний день</li>
      *   <li>📆 /week - неделя</li>
      *   <li>🔍 /search - поиск</li>
@@ -246,7 +246,7 @@ public class HelpCommandHandler implements CommandHandler {
             Map.entry("/help", "📚"),
             Map.entry("/add_event", "➕"),
             Map.entry("/my_events", "📝"),
-            Map.entry("/upcoming_events", "📋"),
+            Map.entry("/month", "🗓️"),
             Map.entry("/today", "📅"),
             Map.entry("/week", "📆"),
             Map.entry("/search", "🔍"),
@@ -404,8 +404,8 @@ public class HelpCommandHandler implements CommandHandler {
         
         // Порядок отображения категорий
         CommandCategory[] categoryOrder = {
-                CommandCategory.VIEW_EVENTS,
                 CommandCategory.MANAGE_EVENTS,
+                CommandCategory.VIEW_EVENTS,
                 CommandCategory.SEARCH_FILTER,
                 CommandCategory.STATS_TRASH,
                 CommandCategory.HELP
@@ -427,8 +427,8 @@ public class HelpCommandHandler implements CommandHandler {
             // Для категории VIEW_EVENTS используем кастомный порядок, для остальных - алфавитный
             String categoryCommands;
             if (category == CommandCategory.VIEW_EVENTS) {
-                // Кастомный порядок для просмотра событий: today, week, upcoming_events
-                List<String> viewEventsOrder = List.of("/today", "/week", "/upcoming_events");
+                // Кастомный порядок для просмотра событий: today, week, month
+                List<String> viewEventsOrder = List.of("/today", "/week", "/month");
                 categoryCommands = handlers.stream()
                         .sorted(Comparator.comparingInt(handler -> {
                             int index = viewEventsOrder.indexOf(handler.getCommand());
@@ -692,7 +692,7 @@ public class HelpCommandHandler implements CommandHandler {
      *   <li>/help - 📚 (справка, документация)</li>
      *   <li>/add_event - ➕ (добавление нового элемента)</li>
      *   <li>/my_events - 📝 (список, управление)</li>
-     *   <li>/upcoming_events - 📋 (календарь, предстоящие события)</li>
+     *   <li>/month - 🗓️ (календарь, события на месяц)</li>
      *   <li>/today - 📅 (сегодняшний день)</li>
      *   <li>/week - 📆 (неделя)</li>
      *   <li>/search - 🔍 (поиск)</li>

@@ -35,8 +35,8 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * <ul>
  *   <li>/add_event - Добавить новое событие (всегда первая команда)</li>
  *   <li>/today - Показать события на сегодня</li>
- *   <li>/week - Показать события на неделю (7 дней)</li>
- *   <li>/upcoming_events - Показать планы на 30 дней</li>
+ *   <li>/week - Показать события на неделю</li>
+ *   <li>/month - Показать события на месяц</li>
  *   <li>/my_events - Управление моими событиями</li>
  *   <li>/search - Поиск событий по тексту</li>
  *   <li>/filter - Фильтрация событий по типу</li>
@@ -46,7 +46,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * 
  * <p><b>Категории команд:</b> Команды представляют все основные категории функционала:</p>
  * <ul>
- *   <li>📅 Просмотр событий: /today, /week, /upcoming_events</li>
+ *   <li>📅 Просмотр событий: /today, /week, /month</li>
  *   <li>➕ Управление событиями: /add_event, /my_events</li>
  *   <li>🔍 Поиск и фильтрация: /search, /filter</li>
  *   <li>📊 Статистика и корзина: /stats, /trash</li>
@@ -75,8 +75,8 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  *                Основные команды:
  *                /add_event - Добавить новое событие
  *                /today - Показать события на сегодня
- *                /week - Показать события на неделю (7 дней)
- *                /upcoming_events - Показать планы на 30 дней
+ *                /week - Показать события на неделю
+ *                /month - Показать планы на 30 дней
  *                /my_events - Управление моими событиями
  *                /search - Поиск событий по тексту
  *                /filter - Фильтрация событий по типу
@@ -248,7 +248,7 @@ public class StartCommandHandler implements CommandHandler {
      * представляют все категории функционала:</p>
      * <ul>
      *   <li>Управление событиями: /add_event (первая), /my_events</li>
-     *   <li>Просмотр событий: /today, /week, /upcoming_events</li>
+     *   <li>Просмотр событий: /today, /week, /month</li>
      *   <li>Поиск и фильтрация: /search, /filter</li>
      *   <li>Статистика и корзина: /stats, /trash</li>
      * </ul>
@@ -277,8 +277,8 @@ public class StartCommandHandler implements CommandHandler {
                 bold("Основные команды:") + "\n" +
                 escape("➕ /add_event - Добавить новое событие") + "\n" +
                 escape("📅 /today - Показать события на сегодня") + "\n" +
-                escape("📆 /week - Показать события на неделю (7 дней)") + "\n" +
-                escape("📋 /upcoming_events - Показать планы на 30 дней") + "\n" +
+                escape("📆 /week - Показать события на неделю") + "\n" +
+                escape("🗓️ /month - Показать события на месяц") + "\n" +
                 escape("📝 /my_events - Управление моими событиями") + "\n" +
                 escape("🔍 /search - Поиск событий по тексту") + "\n" +
                 escape("🫧 /filter - Фильтрация событий по типу") + "\n" +

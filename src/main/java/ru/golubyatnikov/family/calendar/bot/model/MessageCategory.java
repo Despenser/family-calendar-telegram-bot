@@ -17,7 +17,7 @@ public enum MessageCategory {
     
     /**
      * Просмотр событий календаря.
-     * Используется для команд /my_events, /upcoming_events, /today, /week.
+     * Используется для команд /my_events, /month, /today, /week.
      */
     EVENT_VIEWING,
     

@@ -343,7 +343,7 @@ public class UpdateProcessor {
     private MessageCategory determineMessageCategory(String command) {
         return switch (command) {
             case "/add_event" -> MessageCategory.EVENT_CREATION;
-            case "/my_events", "/upcoming_events", "/today", "/week" -> MessageCategory.EVENT_VIEWING;
+            case "/my_events", "/month", "/today", "/week" -> MessageCategory.EVENT_VIEWING;
             case "/search", "/filter" -> MessageCategory.SEARCH_FILTER;
             case "/trash" -> MessageCategory.TRASH_MANAGEMENT;
             case "/stats" -> MessageCategory.STATISTICS;

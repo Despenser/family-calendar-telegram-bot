@@ -90,7 +90,7 @@ class WeekCommandHandlerTest {
         String description = handler.getDescription();
 
         // Then
-        assertEquals("Показать события на неделю (7 дней)", description);
+        assertEquals("Показать события на неделю", description);
     }
 
     @Test

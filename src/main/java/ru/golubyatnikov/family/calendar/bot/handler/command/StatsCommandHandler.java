@@ -118,17 +118,20 @@ public class StatsCommandHandler implements CommandHandler {
             if (stats.getTotalEvents() > 0) {
                 double completionRate = (stats.getCompletedEvents() * 100.0) / stats.getTotalEvents();
                 messageBuilder.append(escape("✅ "))
-                              .append(bold("Процент завершения:"))
+                              .append("Процент завершения:")
                               .append(escape(" "))
                               .append(bold(String.format("%.1f%%", completionRate)))
-                              .append(escape("\n\n"));
+                              .append(escape("\n"));
             }
             
             // Дополнительная информация
             if (stats.getTotalEvents() == 0) {
                 messageBuilder.append(italic("В этом месяце нет событий. Создайте первое событие с помощью /add_event"));
             } else if (stats.getActiveEvents() > 0) {
-                messageBuilder.append(italic(String.format("Активных событий в этом месяце - %d", stats.getActiveEvents())));
+                messageBuilder.append(escape("🗃️ "))
+                              .append("Активных событий в этом месяце:")
+                              .append(escape(" "))
+                              .append(bold(String.valueOf(stats.getActiveEvents())));
             } else {
                 messageBuilder.append(italic("Все события этого месяца завершены! 🎉"));
             }

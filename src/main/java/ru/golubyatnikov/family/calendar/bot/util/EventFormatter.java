@@ -13,7 +13,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * Утилитный класс для единообразного форматирования событий в командах списка событий.
  * 
  * <p>Этот класс обеспечивает централизованное форматирование событий для команд
- * /today, /week и /upcoming_events, гарантируя единообразный пользовательский опыт.</p>
+ * /today, /week и /month, гарантируя единообразный пользовательский опыт.</p>
  * 
  * <p>Класс предоставляет методы для:</p>
  * <ul>
@@ -153,28 +153,32 @@ public final class EventFormatter {
     }
     
     /**
-     * Форматирует заголовок команды списка событий.
+     * Форматирует заголовок команды списка событий с эмодзи.
      * 
      * <p>Формат вывода:</p>
      * <pre>
-     * 📅 **[Название]** ([дополнительная информация])
+     * [эмодзи] **[Название]** ([дополнительная информация])
      * </pre>
      * 
      * <p>Примеры:</p>
      * <pre>
      * 📅 **События на сегодня** (25.01.2026 (Воскресенье))
-     * 📅 **События на неделю** (25.01.2026 - 31.01.2026)
-     * 📅 **Предстоящие события** (30 дней)
+     * � **События на неделю** (25.01.2026 - 31.01.2026)
+     * �️ **События на месяц** (05.02.2026 - 05.03.2026)
      * </pre>
      * 
      * <p><b>Требования:</b> 1.1, 1.2, 1.3, 1.4</p>
      * 
+     * @param emoji эмодзи для заголовка (например, "📅", "📆", "🗓️"), не может быть null или пустым
      * @param commandName название команды (например, "События на сегодня"), не может быть null или пустым
      * @param additionalInfo дополнительная информация в скобках (например, дата или диапазон), не может быть null или пустым
      * @return отформатированный заголовок команды
-     * @throws IllegalArgumentException если commandName или additionalInfo равны null или пустым
+     * @throws IllegalArgumentException если emoji, commandName или additionalInfo равны null или пустым
      */
-    public static String formatCommandHeader(String commandName, String additionalInfo) {
+    public static String formatCommandHeader(String emoji, String commandName, String additionalInfo) {
+        if (emoji == null || emoji.isBlank()) {
+            throw new IllegalArgumentException("Эмодзи не может быть null или пустым");
+        }
         if (commandName == null || commandName.isBlank()) {
             throw new IllegalArgumentException("Название команды не может быть null или пустым");
         }
@@ -182,15 +186,15 @@ public final class EventFormatter {
             throw new IllegalArgumentException("Дополнительная информация не может быть null или пустой");
         }
         
-        return escape("📅 ") + bold(commandName) + escape(" (") + escape(additionalInfo) + escape(")");
+        return escape(emoji + " ") + bold(commandName) + escape(" (") + escape(additionalInfo) + escape(")");
     }
     
     /**
-     * Форматирует сообщение об отсутствии событий.
+     * Форматирует сообщение об отсутствии событий с эмодзи.
      * 
      * <p>Формат вывода:</p>
      * <pre>
-     * 📅 **[Название команды]**
+     * [эмодзи] **[Название команды]**
      * 
      * [Сообщение об отсутствии]
      * </pre>
@@ -201,19 +205,27 @@ public final class EventFormatter {
      * 
      * На сегодня событий не запланировано.
      * 
-     * 📅 **События на неделю**
+     * � **События на неделю**
      * 
      * На ближайшую неделю событий не запланировано.
+     * 
+     * 🗓️ **События на месяц**
+     * 
+     * На период 05.02.2026 - 05.03.2026 событий не запланировано.
      * </pre>
      * 
      * <p><b>Требования:</b> 4.1, 4.2, 4.3, 4.4</p>
      * 
+     * @param emoji эмодзи для заголовка (например, "📅", "📆", "🗓️"), не может быть null или пустым
      * @param commandName название команды (например, "События на сегодня"), не может быть null или пустым
      * @param message сообщение об отсутствии событий, не может быть null или пустым
      * @return отформатированное сообщение об отсутствии событий
-     * @throws IllegalArgumentException если commandName или message равны null или пустым
+     * @throws IllegalArgumentException если emoji, commandName или message равны null или пустым
      */
-    public static String formatNoEventsMessage(String commandName, String message) {
+    public static String formatNoEventsMessage(String emoji, String commandName, String message) {
+        if (emoji == null || emoji.isBlank()) {
+            throw new IllegalArgumentException("Эмодзи не может быть null или пустым");
+        }
         if (commandName == null || commandName.isBlank()) {
             throw new IllegalArgumentException("Название команды не может быть null или пустым");
         }
@@ -221,7 +233,7 @@ public final class EventFormatter {
             throw new IllegalArgumentException("Сообщение не может быть null или пустым");
         }
         
-        return escape("📅 ") + bold(commandName) + escape("\n\n") + escape(message);
+        return escape(emoji + " ") + bold(commandName) + escape("\n\n") + escape(message);
     }
     
     /**

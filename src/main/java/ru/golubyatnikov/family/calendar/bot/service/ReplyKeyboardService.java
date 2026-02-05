@@ -33,7 +33,7 @@ public class ReplyKeyboardService {
 
     // Константы для текста кнопок
     private static final String BTN_START = "🚀 Начать";
-    private static final String BTN_UPCOMING = "📋 Планы";
+    private static final String BTN_MONTH = "🗓️ Месяц";
     private static final String BTN_ADD = "➕ Добавить";
     private static final String BTN_MY = "📝 Мои события";
     private static final String BTN_HELP = "❓ Помощь";
@@ -53,7 +53,7 @@ public class ReplyKeyboardService {
      *   <li>➕ Добавить - создание нового события</li>
      *   <li>📅 Сегодня - события на текущий день</li>
      *   <li>📆 Неделя - события на текущую неделю</li>
-     *   <li>📋 Планы - просмотр событий на ближайшие 30 дней</li>
+     *   <li>🗓️ Месяц - просмотр событий на месяц</li>
      *   <li>🔍 Поиск - поиск событий</li>
      *   <li>🎯 Фильтр - фильтрация событий</li>
      *   <li>📊 Статистика - статистика по событиям</li>
@@ -77,11 +77,11 @@ public class ReplyKeyboardService {
         row1.add(new KeyboardButton(BTN_ADD));
         rows.add(row1);
         
-        // Ряд 2: Сегодня | Неделя | Предстоящие
+        // Ряд 2: Сегодня | Неделя | Месяц
         KeyboardRow row2 = new KeyboardRow();
         row2.add(new KeyboardButton(BTN_TODAY));
         row2.add(new KeyboardButton(BTN_WEEK));
-        row2.add(new KeyboardButton(BTN_UPCOMING));
+        row2.add(new KeyboardButton(BTN_MONTH));
         rows.add(row2);
         
         // Ряд 3: Поиск | Фильтр | Статистика
@@ -144,7 +144,7 @@ public class ReplyKeyboardService {
      * <p>Поддерживаемые преобразования:</p>
      * <ul>
      *   <li>"🚀 Начать" → "/start"</li>
-     *   <li>"📋 Планы" → "/upcoming_events"</li>
+     *   <li>"🗓️ Месяц" → "/month"</li>
      *   <li>"➕ Добавить" → "/add_event"</li>
      *   <li>"📝 Мои события" → "/my_events"</li>
      *   <li>"❓ Помощь" → "/help"</li>
@@ -170,7 +170,7 @@ public class ReplyKeyboardService {
         
         String command = switch (buttonText) {
             case BTN_START -> "/start";
-            case BTN_UPCOMING -> "/upcoming_events";
+            case BTN_MONTH -> "/month";
             case BTN_ADD -> "/add_event";
             case BTN_MY -> "/my_events";
             case BTN_HELP -> "/help";

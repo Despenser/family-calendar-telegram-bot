@@ -211,26 +211,26 @@ class UpdateProcessorTest {
         // 1. Первый вызов возвращает оригинальный текст кнопки
         // 2. После setText() последующие вызовы возвращают команду
         when(message.getText())
-                .thenReturn("📋 Планы")  // Первый вызов
-                .thenReturn("/upcoming_events");        // Последующие вызовы после setText()
+                .thenReturn("🗓️ Месяц")  // Первый вызов
+                .thenReturn("/month");        // Последующие вызовы после setText()
         
         // Настраиваем KeyboardService для преобразования текста кнопки
-        when(keyboardService.buttonTextToCommand("📋 Планы"))
-                .thenReturn("/upcoming_events");
+        when(keyboardService.buttonTextToCommand("🗓️ Месяц"))
+                .thenReturn("/month");
         
         // Мокируем userService, conversationStateService и conversationService
         when(userService.findByTelegramId(123456L)).thenReturn(Optional.empty());
         
-        when(commandDispatcher.hasHandler("/upcoming_events")).thenReturn(true);
+        when(commandDispatcher.hasHandler("/month")).thenReturn(true);
         when(commandDispatcher.dispatch(any(Message.class))).thenReturn("Список событий");
 
         // When
         updateProcessor.processUpdate(update);
 
         // Then
-        verify(keyboardService).buttonTextToCommand("📋 Планы");
-        verify(message).setText("/upcoming_events");
-        verify(commandDispatcher).hasHandler("/upcoming_events");
+        verify(keyboardService).buttonTextToCommand("🗓️ Месяц");
+        verify(message).setText("/month");
+        verify(commandDispatcher).hasHandler("/month");
         verify(commandDispatcher).dispatch(message);
     }
 

@@ -110,7 +110,7 @@ class KeyboardServiceTest {
         KeyboardRow row2 = new KeyboardRow();
         row2.add("📅 Сегодня");
         row2.add("📆 Неделя");
-        row2.add("📋 Планы");
+        row2.add("🗓️ Месяц");
         rows.add(row2);
         
         KeyboardRow row3 = new KeyboardRow();
@@ -150,7 +150,7 @@ class KeyboardServiceTest {
         assertEquals(3, resultRow2.size(), "Второй ряд должен содержать 3 кнопки");
         assertEquals("📅 Сегодня", resultRow2.get(0).getText());
         assertEquals("📆 Неделя", resultRow2.get(1).getText());
-        assertEquals("📋 Планы", resultRow2.get(2).getText());
+        assertEquals("🗓️ Месяц", resultRow2.get(2).getText());
         
         // Проверяем третий ряд
         KeyboardRow resultRow3 = resultRows.get(2);
@@ -326,11 +326,11 @@ class KeyboardServiceTest {
     }
 
     @Test
-    @DisplayName("Должен преобразовать '📋 Планы' в '/upcoming_events'")
+    @DisplayName("Должен преобразовать '🗓️ Месяц' в '/month'")
     void shouldConvertUpcomingEventsButtonToCommand() {
         // Given
-        String buttonText = "📋 Планы";
-        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/upcoming_events");
+        String buttonText = "🗓️ Месяц";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/month");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -526,7 +526,7 @@ class KeyboardServiceTest {
         KeyboardRow row2 = new KeyboardRow();
         row2.add("📅 Сегодня");
         row2.add("📆 Неделя");
-        row2.add("📋 Планы");
+        row2.add("🗓️ Месяц");
         rows.add(row2);
         
         KeyboardRow row3 = new KeyboardRow();
@@ -565,8 +565,8 @@ class KeyboardServiceTest {
                 "Должна быть кнопка 'Сегодня'");
         assertTrue(buttonTexts.contains("📆 Неделя"), 
                 "Должна быть кнопка 'Неделя'");
-        assertTrue(buttonTexts.contains("📋 Планы"), 
-                "Должна быть кнопка 'Планы'");
+        assertTrue(buttonTexts.contains("🗓️ Месяц"), 
+                "Должна быть кнопка 'Месяц'");
         assertTrue(buttonTexts.contains("🔍 Поиск"), 
                 "Должна быть кнопка 'Поиск'");
         assertTrue(buttonTexts.contains("🎯 Фильтр"), 
@@ -619,8 +619,8 @@ class KeyboardServiceTest {
         assertEquals(2, buttonTexts.size(), "Должно быть ровно 2 кнопки");
         
         // Проверяем отсутствие кнопок для авторизованных пользователей
-        assertFalse(buttonTexts.contains("📋 Планы"), 
-                "Не должно быть кнопки 'Планы'");
+        assertFalse(buttonTexts.contains("🗓️ Месяц"), 
+                "Не должно быть кнопки 'Месяц'");
         assertFalse(buttonTexts.contains("➕ Добавить"), 
                 "Не должно быть кнопки 'Добавить'");
         assertFalse(buttonTexts.contains("📝 Мои события"), 
