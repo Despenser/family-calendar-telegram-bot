@@ -2235,16 +2235,6 @@ Cannot write to directory
    sudo chown -R $USER:$USER .
    ```
 
-## 📚 Дополнительная документация
-
-- [SETUP.md](SETUP.md) - Подробные инструкции по настройке
-- [SCRIPTS.md](SCRIPTS.md) - Описание управляющих скриптов
-- [CHANGELOG.md](CHANGELOG.md) - История изменений проекта
-- [docs/MARKDOWN_FORMATTING.md](docs/MARKDOWN_FORMATTING.md) - Руководство по форматированию сообщений MarkdownV2
-- [.kiro/specs/telegram-spring-bot/requirements.md](.kiro/specs/telegram-spring-bot/requirements.md) - Требования к системе
-- [.kiro/specs/telegram-spring-bot/design.md](.kiro/specs/telegram-spring-bot/design.md) - Документ проектирования
-- [.kiro/specs/telegram-spring-bot/tasks.md](.kiro/specs/telegram-spring-bot/tasks.md) - План реализации
-
 ## 🤝 Вклад в проект
 
 Мы приветствуем вклад в проект! Пожалуйста:
