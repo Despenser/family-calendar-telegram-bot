@@ -20,23 +20,11 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape
 
 /**
  * Обработчик команды /today для отображения событий на текущий день.
- * 
- * <p>Этот обработчик показывает все события семьи, запланированные на сегодня,
- * включая семейные события и персональные события пользователя.</p>
- * 
- * <p>События отображаются с использованием единообразного форматирования через
- * {@link EventFormatter} для обеспечения консистентного пользовательского опыта
- * во всех командах списка событий.</p>
- * 
- * <p><b>Требования:</b> 1.1, 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 4.1, 5.1, 5.2, 6.1, 6.2, 6.3, 6.4</p>
- * 
- * @see CommandHandler
- * @see EventService
- * @see EventFormatter
- * @author Family Calendar Bot Team
- * @version 2.0.0
+ *
+ * @author Golubyatnikov Aleksey
  * @since 2026-01-08
  */
+//TODO Исправить проблему с deprecated сервисом
 @Component
 @RequiredArgsConstructor
 @Slf4j

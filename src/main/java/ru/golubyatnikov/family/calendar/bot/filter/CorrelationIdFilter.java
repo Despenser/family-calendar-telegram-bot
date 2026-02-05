@@ -9,19 +9,11 @@ import org.slf4j.MDC;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
 import java.io.IOException;
 import java.util.UUID;
 
 /**
  * Фильтр для генерации и управления correlation ID для каждого HTTP запроса.
- * Correlation ID используется для трейсинга запросов через всю систему и связывания логов.
- * 
- * Фильтр выполняет следующие действия:
- * - Генерирует уникальный correlation ID для каждого запроса
- * - Добавляет correlation ID в MDC для автоматического включения в логи
- * - Добавляет correlation ID в заголовок ответа для клиентского трейсинга
- * - Очищает MDC после обработки запроса
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-02-03
@@ -54,24 +46,16 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
-        
         try {
-            // Получаем correlation ID из заголовка запроса или генерируем новый
             String correlationId = extractOrGenerateCorrelationId(request);
-            
-            // Добавляем correlation ID в MDC для логирования
             MDC.put(CORRELATION_ID_MDC_KEY, correlationId);
-            
-            // Добавляем correlation ID в заголовок ответа
             response.setHeader(CORRELATION_ID_HEADER_NAME, correlationId);
             
             log.debug("Обработка запроса с correlation ID: {}", correlationId);
-            
-            // Продолжаем обработку запроса
+
             filterChain.doFilter(request, response);
             
         } finally {
-            // Очищаем MDC после обработки запроса
             MDC.remove(CORRELATION_ID_MDC_KEY);
         }
     }

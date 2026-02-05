@@ -7,9 +7,9 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.EventFormatter;
-
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -20,48 +20,24 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
  * Обработчик команды /week для отображения событий на текущую неделю.
- * 
- * <p>Этот обработчик показывает все события семьи на ближайшие 7 дней,
- * сгруппированные по дням недели с разделителями между днями. Включает семейные 
- * события и персональные события пользователя.</p>
- * 
- * <p>События отображаются в едином компактном формате без отступов с использованием
- * {@link EventFormatter}, что обеспечивает согласованный пользовательский опыт
- * во всех командах списка событий. Между группами событий разных дней добавляются
- * визуальные разделители для улучшения читаемости.</p>
- * 
- * <p><b>Требования:</b> 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 4.2, 5.1, 5.2,
- * 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6</p>
- * 
- * @see CommandHandler
- * @see EventService
- * @see EventFormatter
- * @author Family Calendar Bot Team
- * @version 2.0.0
+ *
+ * @author Golubyatnikov Aleksey
  * @since 2026-01-08
  */
+//TODO Исправить проблему с deprecated сервисом
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class WeekCommandHandler implements CommandHandler {
+
+    private static final DateTimeFormatter DATE_RANGE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    private static final int WEEK_DAYS = 7;
     
     private final EventService eventService;
-    private final TelegramMessageService messageService;
-    private final ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService reminderService;
-    
-    private static final int WEEK_DAYS = 7;
-    private static final DateTimeFormatter DATE_RANGE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-    
+    private final ReminderService reminderService;
+
     /**
      * Обрабатывает команду /week.
-     * 
-     * <p>Получает все события семьи на ближайшие 7 дней, группирует их
-     * по датам и отправляет отформатированный список пользователю. События
-     * отображаются в едином компактном формате без отступов, с разделителями
-     * между группами разных дней.</p>
-     * 
-     * <p>Использует {@link EventFormatter} для единообразного форматирования
-     * заголовков, событий, разделителей и счетчиков.</p>
      * 
      * @param message сообщение от пользователя с командой
      * @param user пользователь, отправивший команду
@@ -69,35 +45,18 @@ public class WeekCommandHandler implements CommandHandler {
      */
     @Override
     public String handle(Message message, User user) {
-        Long chatId = message.getChatId();
         log.debug("Обработка команды /week для пользователя ID={}, семья ID={}", 
                   user.getId(), user.getFamily().getId());
         
         try {
-            // Получение событий на неделю (7 дней от текущей даты)
-            List<Event> weekEvents = eventService.getUpcomingEvents(
-                user.getFamily().getId(), WEEK_DAYS, user.getZoneId());
+            List<Event> weekEvents = eventService.getUpcomingEvents(user.getFamily().getId(), WEEK_DAYS, user.getZoneId());
             
             log.debug("Найдено {} событий до фильтрации для семьи ID={}", 
                     weekEvents.size(), user.getFamily().getId());
-            
-            // ========== ФИЛЬТРАЦИЯ ПЕРСОНАЛЬНЫХ СОБЫТИЙ ==========
-            // Применяется единая логика фильтрации для обеспечения корректного отображения событий:
-            //
-            // Правила видимости:
-            // 1. Семейные события (isPersonal = false) - видны ВСЕМ членам семьи
-            // 2. Персональные события (isPersonal = true) - видны ТОЛЬКО создателю
-            //
-            // Логика фильтра: !event.getIsPersonal() || event.belongsToUser(user.getId())
-            // - Если событие НЕ персональное (!event.getIsPersonal()) -> показываем
-            // - ИЛИ если событие принадлежит текущему пользователю (event.belongsToUser(user.getId())) -> показываем
-            // - В остальных случаях (персональное событие другого пользователя) -> скрываем
-            //
-            // Требования: 1.4, 4.1, 4.2, 5.4
-            // =====================================================
+
             List<Event> filteredEvents = weekEvents.stream()
                 .filter(event -> !event.getIsPersonal() || event.belongsToUser(user.getId()))
-                .collect(Collectors.toList());
+                .toList();
             
             log.debug("После фильтрации осталось {} событий на неделю для пользователя ID={}", 
                     filteredEvents.size(), user.getId());
@@ -160,8 +119,7 @@ public class WeekCommandHandler implements CommandHandler {
             
         } catch (Exception e) {
             log.error("Ошибка при обработке команды /week для пользователя ID={}", user.getId(), e);
-            String errorMessage = escape("❌ Произошла ошибка при получении событий на неделю. Попробуйте позже.");
-            return errorMessage;
+            return escape("❌ Произошла ошибка при получении событий на неделю. Попробуйте позже.");
         }
     }
     
@@ -173,10 +131,5 @@ public class WeekCommandHandler implements CommandHandler {
     @Override
     public String getDescription() {
         return "Показать события на неделю";
-    }
-    
-    @Override
-    public boolean requiresAuth() {
-        return true;
     }
 }
