@@ -70,9 +70,15 @@ Telegram бот для управления семейным календаре�
 
 - Docker 20.10+ и Docker Compose 2.0+
 - Telegram бот токен (получите от [@BotFather](https://t.me/BotFather))
-- Публичный HTTPS URL для webhook (можно использовать ngrok для разработки)
+- Сервер с публичным IP адресом (для production)
+- SSL сертификаты для HTTPS (самоподписанные или от CA)
+- Открытые порты: 80 (HTTP), 443 (HTTPS)
+
+> **Примечание:** Telegram Bot API требует HTTPS для webhook. Для локальной разработки можно использовать ngrok (см. раздел ниже).
 
 ### Шаги запуска
+
+#### Вариант A: Production с HTTPS (рекомендуется)
 
 1. **Клонируйте репозиторий**
    ```bash
@@ -80,12 +86,27 @@ Telegram бот для управления семейным календаре�
    cd family-calendar-bot
    ```
 
-2. **Создайте файл .env из примера**
+2. **Сгенерируйте SSL сертификаты**
+   ```bash
+   # Unix (Linux/macOS)
+   chmod +x scripts/unix/generate-ssl-certs.sh
+   ./scripts/unix/generate-ssl-certs.sh <ВАШ_ПУБЛИЧНЫЙ_IP> [DAYS]
+   
+   # Windows
+   scripts\windows\generate-ssl-certs.bat <ВАШ_ПУБЛИЧНЫЙ_IP> [DAYS]
+   
+   # Примеры:
+   ./scripts/unix/generate-ssl-certs.sh 176.108.254.68        # 10 лет (по умолчанию)
+   ./scripts/unix/generate-ssl-certs.sh 176.108.254.68 365    # 1 год
+   ./scripts/unix/generate-ssl-certs.sh 176.108.254.68 90     # 90 дней
+   ```
+
+3. **Создайте файл .env из примера**
    ```bash
    cp .env.example .env
    ```
 
-3. **Настройте переменные окружения в .env**
+4. **Настройте переменные окружения в .env**
    ```env
    # База данных
    DB_PASSWORD=your_secure_password_here
@@ -94,11 +115,14 @@ Telegram бот для управления семейным календаре�
    TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
    TELEGRAM_BOT_USERNAME=YourFamilyCalendarBot
    
-   # Webhook URL (должен быть доступен из интернета по HTTPS)
-   TELEGRAM_BOT_WEBHOOK_URL=https://your-domain.com/webhook
+   # Webhook URL (HTTPS обязателен!)
+   TELEGRAM_BOT_WEBHOOK_URL=https://<ВАШ_ПУБЛИЧНЫЙ_IP>/webhook
+   
+   # Spring профиль
+   SPRING_PROFILES_ACTIVE=prod
    ```
 
-4. **Запустите приложение**
+5. **Запустите приложение**
    ```bash
    # Unix (Linux/macOS)
    scripts/unix/start.sh
@@ -110,7 +134,17 @@ Telegram бот для управления семейным календаре�
    docker-compose up -d
    ```
 
-5. **Проверьте статус и логи**
+6. **Проверьте статус webhook**
+   ```bash
+   # Проверка регистрации webhook в Telegram
+   curl https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo
+   
+   # Проверка доступности
+   curl -v https://<ВАШ_ПУБЛИЧНЫЙ_IP>/actuator/health
+   ```
+
+
+#### Вариант B: Локальная разработка с ngrok
    ```bash
    # Статус контейнеров
    docker-compose ps
@@ -125,17 +159,77 @@ Telegram бот для управления семейным календаре�
    docker-compose logs -f app
    ```
 
-6. **Остановите приложение**
+#### Вариант B: Локальная разработка с ngrok
+
+Для локальной разработки используйте [ngrok](https://ngrok.com/) для создания HTTPS туннеля:
+
+1. **Установите и настройте ngrok**
    ```bash
-   # Unix (Linux/macOS)
-   scripts/unix/stop.sh
+   # macOS (Homebrew)
+   brew install ngrok/ngrok/ngrok
    
-   # Windows
-   scripts\windows\stop.bat
+   # Windows (Chocolatey)
+   choco install ngrok
    
-   # Или напрямую через Docker Compose
-   docker-compose down
+   # Или скачайте с https://ngrok.com/download
+   
+   # Зарегистрируйтесь и добавьте authtoken
+   ngrok config add-authtoken YOUR_AUTH_TOKEN
    ```
+
+2. **Запустите ngrok туннель**
+   ```bash
+   ngrok http 8080
+   ```
+   
+   Скопируйте HTTPS URL (например, `https://abc123def456.ngrok.io`)
+
+3. **Обновите .env с ngrok URL**
+   ```env
+   TELEGRAM_BOT_WEBHOOK_URL=https://abc123def456.ngrok.io/webhook
+   SPRING_PROFILES_ACTIVE=dev
+   ```
+
+4. **Запустите приложение**
+   ```bash
+   docker-compose up -d
+   ```
+
+> **Важно:** При каждом перезапуске ngrok генерирует новый URL (в бесплатной версии), поэтому нужно обновлять `.env` и перезапускать приложение.
+
+### Проверка статуса и логи
+   ```bash
+### Проверка статуса и логи
+
+```bash
+# Статус контейнеров
+docker-compose ps
+
+# Логи приложения (Unix)
+scripts/unix/logs.sh
+
+# Логи приложения (Windows)
+scripts\windows\logs.bat
+
+# Или напрямую
+docker-compose logs -f app
+
+# Логи nginx (для production с HTTPS)
+docker-compose logs -f nginx
+```
+
+### Остановка приложения
+
+```bash
+# Unix (Linux/macOS)
+scripts/unix/stop.sh
+
+# Windows
+scripts\windows\stop.bat
+
+# Или напрямую через Docker Compose
+docker-compose down
+```
 
 ### Управляющие скрипты
 
@@ -153,54 +247,48 @@ Telegram бот для управления семейным календаре�
 - `scripts\windows\logs.bat` - просмотр логов
 - `scripts\windows\clean.bat` - полная очистка (удаление volumes с данными)
 
-### 🔧 Локальная разработка с ngrok
+## 🔐 HTTPS и безопасность
 
-Для локальной разработки с webhook используйте [ngrok](https://ngrok.com/) для создания публичного HTTPS туннеля:
+Telegram Bot API требует HTTPS для webhook. Проект включает полную настройку nginx с SSL/TLS для production окружения.
 
-1. **Установите ngrok**
-   ```bash
-   # macOS (Homebrew)
-   brew install ngrok/ngrok/ngrok
-   
-   # Windows (Chocolatey)
-   choco install ngrok
-   
-   # Linux или скачайте с https://ngrok.com/download
-   ```
+### Основные возможности
 
-2. **Зарегистрируйтесь на ngrok.com и получите authtoken**
-   ```bash
-   ngrok config add-authtoken YOUR_AUTH_TOKEN
-   ```
+- ✅ **Nginx reverse proxy** - проксирование HTTPS запросов к Spring Boot
+- ✅ **SSL/TLS сертификаты** - поддержка самоподписанных и CA сертификатов
+- ✅ **Автоматическая генерация сертификатов** - удобные скрипты для создания
+- ✅ **Ограничение доступа по IP** - только Telegram IP адреса
+- ✅ **Secret token валидация** - дополнительная защита webhook
+- ✅ **Современные SSL настройки** - TLS 1.2/1.3, безопасные cipher suites
+- ✅ **Security headers** - HSTS, X-Frame-Options, CSP
 
-3. **Запустите ngrok туннель**
-   ```bash
-   ngrok http 8080
-   ```
-   
-   Вы увидите вывод вроде:
-   ```
-   Forwarding  https://abc123def456.ngrok.io -> http://localhost:8080
-   ```
+### Быстрая настройка
 
-4. **Скопируйте HTTPS URL** (например, `https://abc123def456.ngrok.io`)
+```bash
+# 1. Генерация SSL сертификатов (по умолчанию на 10 лет)
+./scripts/unix/generate-ssl-certs.sh <ВАШ_ПУБЛИЧНЫЙ_IP>
 
-5. **Обновите .env файл с ngrok URL**
-   ```env
-   TELEGRAM_BOT_WEBHOOK_URL=https://abc123def456.ngrok.io/webhook
-   ```
+# Или с указанием срока действия
+./scripts/unix/generate-ssl-certs.sh <ВАШ_ПУБЛИЧНЫЙ_IP> 365  # 1 год
 
-6. **Перезапустите приложение**
-   ```bash
-   docker-compose restart app
-   ```
+# 2. Настройка .env
+TELEGRAM_BOT_WEBHOOK_URL=https://<ВАШ_ПУБЛИЧНЫЙ_IP>/webhook
 
-7. **Проверьте регистрацию webhook в логах**
-   ```bash
-   docker-compose logs app | grep -i webhook
-   ```
+# 3. Запуск с nginx
+docker-compose up -d
+```
 
-**Важно:** При каждом перезапуске ngrok генерирует новый URL (в бесплатной версии), поэтому нужно обновлять `.env` и перезапускать приложение.
+### Структура
+
+```
+nginx/
+├── ssl/
+│   ├── cert.pem  (генерируется скриптом)
+│   └── key.pem   (генерируется скриптом)
+└── nginx.conf    (готовая конфигурация)
+```
+
+> **Примечание:** Используется официальный образ nginx:1.27-alpine без отдельного Dockerfile.
+
 
 ## 📱 Команды бота
 
