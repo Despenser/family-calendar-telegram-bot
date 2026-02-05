@@ -340,7 +340,7 @@ public class EventReminderNavigationHandler implements CallbackHandler {
         
         List<InlineKeyboardButton> row = new ArrayList<>();
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("◀️ Назад к напоминанию");
+        backButton.setText("🔙 Назад к напоминанию");
         backButton.setCallbackData(CallbackPrefix.BACK_TO_REMINDER.withPayload(eventId + "_" + reminderId));
         row.add(backButton);
         keyboard.add(row);

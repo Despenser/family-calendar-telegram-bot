@@ -590,29 +590,29 @@ public class ReminderNotificationService {
             message.append("🔔 ").append(bold("Напоминание о событии")).append("\n\n");
             
             // Название события
-            message.append(formatMessage("📅 Событие: %s\n", event.getTitle()));
+            message.append(formatMessage("📌 Событие: %s\n", event.getTitle()));
             
             // Дата
-            message.append(formatMessage("🕐 Дата: %s\n", formattedDate));
+            message.append(formatMessage("📅 Дата: %s\n", formattedDate));
             
             // Время
-            message.append(formatMessage("⏰ Время: %s\n", formattedTime));
-            
-            // Описание события (полное, без обрезки)
-            if (event.getDescription() != null && !event.getDescription().isBlank()) {
-                message.append(formatMessage("📝 Описание: %s\n", event.getDescription()));
-            }
+            message.append(formatMessage("🕐 Время: %s\n", formattedTime));
             
             // Тип события (персональное/семейное)
             if (event.getIsPersonal()) {
-                message.append("👤 Персональное событие\n");
+                message.append("👤 Тип: Персональное\n");
             } else {
-                message.append("👨‍👩‍👧‍👦 Семейное событие\n");
+                message.append("👨‍👩‍👧‍👦 Тип: Семейное\n");
+            }
+            
+            // Описание события (полное, без обрезки)
+            if (event.getDescription() != null && !event.getDescription().isBlank()) {
+                message.append(formatMessage("📝 Описание: %s\n\n", event.getDescription()));
             }
             
             // Тип напоминания
             String reminderTypeText = getReminderTimeInfo(reminder);
-            message.append(formatMessage("⏱ Напоминание: %s", reminderTypeText));
+            message.append(formatMessage("⏰ Напоминание: %s", reminderTypeText));
             
             log.debug("Сформировано полное уведомление для напоминания ID {} в timezone {}: " +
                      "eventTimeCreatorTZ={}, eventTimeRecipientTZ={}, creatorTZ={}, recipientTZ={}, длина={}", 

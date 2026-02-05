@@ -83,6 +83,21 @@ class EventServiceTest {
     
     @Mock
     private PlannerCommandHandler plannerCommandHandler;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.event.EventQueryService eventQueryService;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.event.EventCommandService eventCommandService;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.event.EventDeletionService eventDeletionService;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.event.EventValidationService eventValidationService;
+    
+    @Mock
+    private ru.golubyatnikov.family.calendar.bot.service.event.EventNotificationService eventNotificationService;
 
     @InjectMocks
     private EventService eventService;
@@ -140,9 +155,7 @@ class EventServiceTest {
         String description = "John's birthday celebration";
         LocalDateTime eventDateTime = LocalDateTime.now().plusDays(7);
 
-        when(userRepository.findById(testUser.getId()))
-                .thenReturn(Optional.of(testUser));
-        when(eventRepository.save(any(Event.class)))
+        when(eventCommandService.createEvent(testUser.getId(), title, description, eventDateTime))
                 .thenReturn(testEvent);
 
         // When
@@ -151,8 +164,7 @@ class EventServiceTest {
 
         // Then
         assertNotNull(result, "Созданное событие не должно быть null");
-        verify(userRepository).findById(testUser.getId());
-        verify(eventRepository).save(any(Event.class));
+        verify(eventCommandService).createEvent(testUser.getId(), title, description, eventDateTime);
     }
 
     @Test
@@ -163,6 +175,9 @@ class EventServiceTest {
         String description = "This should fail";
         LocalDateTime pastDateTime = LocalDateTime.now().minusDays(1);
 
+        when(eventCommandService.createEvent(testUser.getId(), title, description, pastDateTime))
+                .thenThrow(new InvalidDateException("Дата события не может быть в прошлом"));
+
         // When & Then
         InvalidDateException exception = assertThrows(
                 InvalidDateException.class,
@@ -172,8 +187,7 @@ class EventServiceTest {
         );
 
         assertEquals("Дата события не может быть в прошлом", exception.getMessage());
-        verify(userRepository, never()).findById(any());
-        verify(eventRepository, never()).save(any(Event.class));
+        verify(eventCommandService).createEvent(testUser.getId(), title, description, pastDateTime);
     }
 
     // Примечание: Тесты на пустой/null title перенесены в EventServiceBeanValidationPropertyTest,
@@ -188,8 +202,8 @@ class EventServiceTest {
         String description = "Test Description";
         LocalDateTime eventDateTime = LocalDateTime.now().plusDays(1);
 
-        when(userRepository.findById(nonExistentUserId))
-                .thenReturn(Optional.empty());
+        when(eventCommandService.createEvent(nonExistentUserId, title, description, eventDateTime))
+                .thenThrow(new UserNotFoundException("Пользователь не найден"));
 
         // When & Then
         UserNotFoundException exception = assertThrows(
@@ -199,8 +213,7 @@ class EventServiceTest {
                 "Должно быть выброшено UserNotFoundException"
         );
 
-        verify(userRepository).findById(nonExistentUserId);
-        verify(eventRepository, never()).save(any(Event.class));
+        verify(eventCommandService).createEvent(nonExistentUserId, title, description, eventDateTime);
     }
 
     @Test
@@ -219,8 +232,8 @@ class EventServiceTest {
         String description = "Test Description";
         LocalDateTime eventDateTime = LocalDateTime.now().plusDays(1);
 
-        when(userRepository.findById(userWithoutFamily.getId()))
-                .thenReturn(Optional.of(userWithoutFamily));
+        when(eventCommandService.createEvent(userWithoutFamily.getId(), title, description, eventDateTime))
+                .thenThrow(new IllegalStateException("Пользователь должен принадлежать семье для создания событий"));
 
         // When & Then
         IllegalStateException exception = assertThrows(
@@ -232,8 +245,7 @@ class EventServiceTest {
 
         assertEquals("Пользователь должен принадлежать семье для создания событий", 
                      exception.getMessage());
-        verify(userRepository).findById(userWithoutFamily.getId());
-        verify(eventRepository, never()).save(any(Event.class));
+        verify(eventCommandService).createEvent(userWithoutFamily.getId(), title, description, eventDateTime);
     }
 
     // ========== Тесты для getUpcomingEvents ==========
@@ -244,27 +256,24 @@ class EventServiceTest {
         // Given
         Long familyId = testFamily.getId();
         int days = 7;
-        LocalDate startDate = LocalDate.now();
-        LocalDate endDate = startDate.plusDays(days);
 
         Event event1 = Event.builder()
                 .id(1L)
                 .title("Event 1")
-                .eventDate(startDate.plusDays(1))
+                .eventDate(LocalDate.now().plusDays(1))
                 .eventTime(LocalTime.of(10, 0))
                 .build();
 
         Event event2 = Event.builder()
                 .id(2L)
                 .title("Event 2")
-                .eventDate(startDate.plusDays(3))
+                .eventDate(LocalDate.now().plusDays(3))
                 .eventTime(LocalTime.of(14, 0))
                 .build();
 
         List<Event> expectedEvents = Arrays.asList(event1, event2);
 
-        when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
-                familyId, startDate, endDate, Event.EventStatus.ACTIVE))
+        when(eventQueryService.getUpcomingEvents(familyId, days, ZoneId.of("UTC")))
                 .thenReturn(expectedEvents);
 
         // When
@@ -275,8 +284,7 @@ class EventServiceTest {
         assertEquals(2, result.size(), "Должно быть найдено 2 события");
         assertEquals("Event 1", result.get(0).getTitle());
         assertEquals("Event 2", result.get(1).getTitle());
-        verify(eventRepository).findByFamilyIdAndEventDateBetweenAndStatus(
-                familyId, startDate, endDate, Event.EventStatus.ACTIVE);
+        verify(eventQueryService).getUpcomingEvents(familyId, days, ZoneId.of("UTC"));
     }
 
     @Test
@@ -285,11 +293,8 @@ class EventServiceTest {
         // Given
         Long familyId = testFamily.getId();
         int days = 7;
-        LocalDate startDate = LocalDate.now();
-        LocalDate endDate = startDate.plusDays(days);
 
-        when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
-                familyId, startDate, endDate, Event.EventStatus.ACTIVE))
+        when(eventQueryService.getUpcomingEvents(familyId, days, ZoneId.of("UTC")))
                 .thenReturn(List.of());
 
         // When
@@ -298,8 +303,7 @@ class EventServiceTest {
         // Then
         assertNotNull(result, "Результат не должен быть null");
         assertTrue(result.isEmpty(), "Список должен быть пустым");
-        verify(eventRepository).findByFamilyIdAndEventDateBetweenAndStatus(
-                familyId, startDate, endDate, Event.EventStatus.ACTIVE);
+        verify(eventQueryService).getUpcomingEvents(familyId, days, ZoneId.of("UTC"));
     }
 
     @Test
@@ -307,6 +311,9 @@ class EventServiceTest {
     void shouldThrowExceptionWhenDaysIsZeroOrNegative() {
         // Given
         Long familyId = testFamily.getId();
+
+        when(eventQueryService.getUpcomingEvents(familyId, 0, ZoneId.of("UTC")))
+                .thenThrow(new IllegalArgumentException("Количество дней должно быть больше 0"));
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
@@ -316,7 +323,7 @@ class EventServiceTest {
         );
 
         assertEquals("Количество дней должно быть больше 0", exception.getMessage());
-        verify(eventRepository, never()).findByFamilyIdAndEventDateBetween(any(), any(), any());
+        verify(eventQueryService).getUpcomingEvents(familyId, 0, ZoneId.of("UTC"));
     }
 
     // ========== Тесты для getUserEvents ==========
@@ -343,7 +350,7 @@ class EventServiceTest {
 
         List<Event> expectedEvents = Arrays.asList(event1, event2);
 
-        when(eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE))
+        when(eventQueryService.getUserEvents(userId))
                 .thenReturn(expectedEvents);
 
         // When
@@ -354,7 +361,7 @@ class EventServiceTest {
         assertEquals(2, result.size(), "Должно быть найдено 2 события");
         assertEquals("User Event 1", result.get(0).getTitle());
         assertEquals("User Event 2", result.get(1).getTitle());
-        verify(eventRepository).findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE);
+        verify(eventQueryService).getUserEvents(userId);
     }
 
     @Test
@@ -363,7 +370,7 @@ class EventServiceTest {
         // Given
         Long userId = testUser.getId();
 
-        when(eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE))
+        when(eventQueryService.getUserEvents(userId))
                 .thenReturn(List.of());
 
         // When
@@ -372,7 +379,7 @@ class EventServiceTest {
         // Then
         assertNotNull(result, "Результат не должен быть null");
         assertTrue(result.isEmpty(), "Список должен быть пустым");
-        verify(eventRepository).findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE);
+        verify(eventQueryService).getUserEvents(userId);
     }
 
     // ========== Тесты для updateEvent ==========
@@ -387,9 +394,7 @@ class EventServiceTest {
         String newDescription = "Updated Description";
         LocalDateTime newDateTime = LocalDateTime.now().plusDays(10);
 
-        when(eventRepository.findById(eventId))
-                .thenReturn(Optional.of(testEvent));
-        when(eventRepository.save(any(Event.class)))
+        when(eventCommandService.updateEvent(eventId, userId, newTitle, newDescription, newDateTime))
                 .thenReturn(testEvent);
 
         // When
@@ -398,8 +403,7 @@ class EventServiceTest {
 
         // Then
         assertNotNull(result, "Обновленное событие не должно быть null");
-        verify(eventRepository).findById(eventId);
-        verify(eventRepository).save(any(Event.class));
+        verify(eventCommandService).updateEvent(eventId, userId, newTitle, newDescription, newDateTime);
     }
 
     @Test
@@ -412,8 +416,8 @@ class EventServiceTest {
         String newDescription = "Updated Description";
         LocalDateTime newDateTime = LocalDateTime.now().plusDays(10);
 
-        when(eventRepository.findById(eventId))
-                .thenReturn(Optional.of(testEvent));
+        when(eventCommandService.updateEvent(eventId, unauthorizedUserId, newTitle, newDescription, newDateTime))
+                .thenThrow(new UnauthorizedAccessException("Только создатель события может его редактировать"));
 
         // When & Then
         UnauthorizedAccessException exception = assertThrows(
@@ -425,8 +429,7 @@ class EventServiceTest {
 
         assertEquals("Только создатель события может его редактировать", 
                      exception.getMessage());
-        verify(eventRepository).findById(eventId);
-        verify(eventRepository, never()).save(any(Event.class));
+        verify(eventCommandService).updateEvent(eventId, unauthorizedUserId, newTitle, newDescription, newDateTime);
     }
 
     @Test
@@ -439,8 +442,8 @@ class EventServiceTest {
         String newDescription = "Updated Description";
         LocalDateTime newDateTime = LocalDateTime.now().plusDays(10);
 
-        when(eventRepository.findById(nonExistentEventId))
-                .thenReturn(Optional.empty());
+        when(eventCommandService.updateEvent(nonExistentEventId, userId, newTitle, newDescription, newDateTime))
+                .thenThrow(new EventNotFoundException("Событие не найдено"));
 
         // When & Then
         EventNotFoundException exception = assertThrows(
@@ -450,8 +453,7 @@ class EventServiceTest {
                 "Должно быть выброшено EventNotFoundException"
         );
 
-        verify(eventRepository).findById(nonExistentEventId);
-        verify(eventRepository, never()).save(any(Event.class));
+        verify(eventCommandService).updateEvent(nonExistentEventId, userId, newTitle, newDescription, newDateTime);
     }
 
     @Test
@@ -464,6 +466,9 @@ class EventServiceTest {
         String newDescription = "Updated Description";
         LocalDateTime pastDateTime = LocalDateTime.now().minusDays(1);
 
+        when(eventCommandService.updateEvent(eventId, userId, newTitle, newDescription, pastDateTime))
+                .thenThrow(new InvalidDateException("Дата события не может быть в прошлом"));
+
         // When & Then
         InvalidDateException exception = assertThrows(
                 InvalidDateException.class,
@@ -473,9 +478,7 @@ class EventServiceTest {
         );
 
         assertEquals("Дата события не может быть в прошлом", exception.getMessage());
-        // Валидация даты происходит до поиска события, поэтому репозиторий не вызывается
-        verify(eventRepository, never()).findById(any());
-        verify(eventRepository, never()).save(any(Event.class));
+        verify(eventCommandService).updateEvent(eventId, userId, newTitle, newDescription, pastDateTime);
     }
 
     // Примечание: Тест на пустой title при обновлении перенесен в EventServiceBeanValidationPropertyTest,
@@ -490,21 +493,11 @@ class EventServiceTest {
         Long eventId = testEvent.getId();
         Long userId = testUser.getId();
 
-        when(eventRepository.findById(eventId))
-                .thenReturn(Optional.of(testEvent));
-        when(eventRepository.save(any(Event.class))).thenReturn(testEvent);
-        when(userRepository.findById(userId))
-                .thenReturn(Optional.of(testUser));
-        when(eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE))
-                .thenReturn(List.of());
-
         // When
         eventService.deleteEvent(eventId, userId);
 
         // Then
-        verify(eventRepository).findById(eventId);
-        verify(eventRepository).save(any(Event.class));
-        verify(eventHistoryService).recordDeletion(eq(eventId), eq(userId));
+        verify(eventDeletionService).deleteEvent(eventId, userId);
     }
 
     @Test
@@ -514,8 +507,8 @@ class EventServiceTest {
         Long eventId = testEvent.getId();
         Long unauthorizedUserId = anotherUser.getId();
 
-        when(eventRepository.findById(eventId))
-                .thenReturn(Optional.of(testEvent));
+        doThrow(new UnauthorizedAccessException("Только создатель события может его удалить"))
+                .when(eventDeletionService).deleteEvent(eventId, unauthorizedUserId);
 
         // When & Then
         UnauthorizedAccessException exception = assertThrows(
@@ -526,8 +519,7 @@ class EventServiceTest {
 
         assertEquals("Только создатель события может его удалить", 
                      exception.getMessage());
-        verify(eventRepository).findById(eventId);
-        verify(eventRepository, never()).delete(any(Event.class));
+        verify(eventDeletionService).deleteEvent(eventId, unauthorizedUserId);
     }
 
     @Test
@@ -537,8 +529,8 @@ class EventServiceTest {
         Long nonExistentEventId = 999L;
         Long userId = testUser.getId();
 
-        when(eventRepository.findById(nonExistentEventId))
-                .thenReturn(Optional.empty());
+        doThrow(new EventNotFoundException("Событие не найдено"))
+                .when(eventDeletionService).deleteEvent(nonExistentEventId, userId);
 
         // When & Then
         EventNotFoundException exception = assertThrows(
@@ -547,8 +539,7 @@ class EventServiceTest {
                 "Должно быть выброшено EventNotFoundException"
         );
 
-        verify(eventRepository).findById(nonExistentEventId);
-        verify(eventRepository, never()).delete(any(Event.class));
+        verify(eventDeletionService).deleteEvent(nonExistentEventId, userId);
     }
 
     // ========== Тесты для completeEvent ==========
@@ -561,30 +552,15 @@ class EventServiceTest {
         Long userId = testUser.getId();
         testEvent.setStatus(Event.EventStatus.ACTIVE);
 
-        when(eventRepository.findById(eventId))
-                .thenReturn(Optional.of(testEvent));
-        when(eventRepository.save(any(Event.class)))
+        when(eventDeletionService.completeEvent(eventId, userId))
                 .thenReturn(testEvent);
-        when(userRepository.findById(userId))
-                .thenReturn(Optional.of(testUser));
-        when(eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(userId, Event.EventStatus.ACTIVE))
-                .thenReturn(List.of());
 
         // When
         Event result = eventService.completeEvent(eventId, userId);
 
         // Then
         assertNotNull(result, "Завершенное событие не должно быть null");
-        verify(eventRepository).findById(eventId);
-        verify(eventRepository).save(any(Event.class));
-        verify(eventHistoryService).recordChange(
-                eq(eventId),
-                eq(userId),
-                eq(EventHistory.ActionType.UPDATED),
-                eq("status"),
-                eq("ACTIVE"),
-                eq("COMPLETED")
-        );
+        verify(eventDeletionService).completeEvent(eventId, userId);
     }
 
     @Test
@@ -595,8 +571,8 @@ class EventServiceTest {
         Long unauthorizedUserId = anotherUser.getId();
         testEvent.setStatus(Event.EventStatus.ACTIVE);
 
-        when(eventRepository.findById(eventId))
-                .thenReturn(Optional.of(testEvent));
+        when(eventDeletionService.completeEvent(eventId, unauthorizedUserId))
+                .thenThrow(new UnauthorizedAccessException("Только создатель события может его завершить"));
 
         // When & Then
         UnauthorizedAccessException exception = assertThrows(
@@ -607,8 +583,7 @@ class EventServiceTest {
 
         assertEquals("Только создатель события может его завершить",
                 exception.getMessage());
-        verify(eventRepository).findById(eventId);
-        verify(eventRepository, never()).save(any(Event.class));
+        verify(eventDeletionService).completeEvent(eventId, unauthorizedUserId);
     }
 
     @Test
@@ -618,8 +593,8 @@ class EventServiceTest {
         Long nonExistentEventId = 999L;
         Long userId = testUser.getId();
 
-        when(eventRepository.findById(nonExistentEventId))
-                .thenReturn(Optional.empty());
+        when(eventDeletionService.completeEvent(nonExistentEventId, userId))
+                .thenThrow(new EventNotFoundException("Событие не найдено"));
 
         // When & Then
         EventNotFoundException exception = assertThrows(
@@ -628,8 +603,7 @@ class EventServiceTest {
                 "Должно быть выброшено EventNotFoundException"
         );
 
-        verify(eventRepository).findById(nonExistentEventId);
-        verify(eventRepository, never()).save(any(Event.class));
+        verify(eventDeletionService).completeEvent(nonExistentEventId, userId);
     }
 
     @Test
@@ -640,8 +614,8 @@ class EventServiceTest {
         Long userId = testUser.getId();
         testEvent.setStatus(Event.EventStatus.COMPLETED);
 
-        when(eventRepository.findById(eventId))
-                .thenReturn(Optional.of(testEvent));
+        when(eventDeletionService.completeEvent(eventId, userId))
+                .thenThrow(new IllegalStateException("Можно завершить только активное событие"));
 
         // When & Then
         IllegalStateException exception = assertThrows(
@@ -651,8 +625,7 @@ class EventServiceTest {
         );
 
         assertTrue(exception.getMessage().contains("Можно завершить только активное событие"));
-        verify(eventRepository).findById(eventId);
-        verify(eventRepository, never()).save(any(Event.class));
+        verify(eventDeletionService).completeEvent(eventId, userId);
     }
     
     // ========== Тесты для isToday и isTomorrow ==========
@@ -682,11 +655,15 @@ class EventServiceTest {
         User mockUser = createMockUser(1L, "Europe/Moscow");
         LocalDate today = mockUser.getCurrentDate();
         
+        when(eventQueryService.isToday(today, mockUser))
+                .thenReturn(true);
+        
         // When
         boolean result = eventService.isToday(today, mockUser);
         
         // Then
         assertTrue(result, "Сегодняшняя дата должна быть определена как 'сегодня'");
+        verify(eventQueryService).isToday(today, mockUser);
     }
     
     @Test
@@ -698,6 +675,11 @@ class EventServiceTest {
         LocalDate tomorrow = today.plusDays(1);
         LocalDate yesterday = today.minusDays(1);
         
+        when(eventQueryService.isToday(tomorrow, mockUser))
+                .thenReturn(false);
+        when(eventQueryService.isToday(yesterday, mockUser))
+                .thenReturn(false);
+        
         // When
         boolean resultTomorrow = eventService.isToday(tomorrow, mockUser);
         boolean resultYesterday = eventService.isToday(yesterday, mockUser);
@@ -705,6 +687,8 @@ class EventServiceTest {
         // Then
         assertFalse(resultTomorrow, "Завтрашняя дата не должна быть определена как 'сегодня'");
         assertFalse(resultYesterday, "Вчерашняя дата не должна быть определена как 'сегодня'");
+        verify(eventQueryService).isToday(tomorrow, mockUser);
+        verify(eventQueryService).isToday(yesterday, mockUser);
     }
     
     @Test
@@ -715,11 +699,15 @@ class EventServiceTest {
         LocalDate today = mockUser.getCurrentDate();
         LocalDate tomorrow = today.plusDays(1);
         
+        when(eventQueryService.isTomorrow(tomorrow, mockUser))
+                .thenReturn(true);
+        
         // When
         boolean result = eventService.isTomorrow(tomorrow, mockUser);
         
         // Then
         assertTrue(result, "Завтрашняя дата должна быть определена как 'завтра'");
+        verify(eventQueryService).isTomorrow(tomorrow, mockUser);
     }
     
     @Test
@@ -730,6 +718,11 @@ class EventServiceTest {
         LocalDate today = mockUser.getCurrentDate();
         LocalDate dayAfterTomorrow = today.plusDays(2);
         
+        when(eventQueryService.isTomorrow(today, mockUser))
+                .thenReturn(false);
+        when(eventQueryService.isTomorrow(dayAfterTomorrow, mockUser))
+                .thenReturn(false);
+        
         // When
         boolean resultToday = eventService.isTomorrow(today, mockUser);
         boolean resultDayAfterTomorrow = eventService.isTomorrow(dayAfterTomorrow, mockUser);
@@ -737,6 +730,8 @@ class EventServiceTest {
         // Then
         assertFalse(resultToday, "Сегодняшняя дата не должна быть определена как 'завтра'");
         assertFalse(resultDayAfterTomorrow, "Послезавтрашняя дата не должна быть определена как 'завтра'");
+        verify(eventQueryService).isTomorrow(today, mockUser);
+        verify(eventQueryService).isTomorrow(dayAfterTomorrow, mockUser);
     }
     
     @Test
@@ -750,6 +745,11 @@ class EventServiceTest {
         User userLA = createMockUser(2L, "America/Los_Angeles");
         LocalDate todayLA = userLA.getCurrentDate();
         
+        when(eventQueryService.isToday(todayVladivostok, userVladivostok))
+                .thenReturn(true);
+        when(eventQueryService.isToday(todayLA, userLA))
+                .thenReturn(true);
+        
         // When
         boolean resultVladivostok = eventService.isToday(todayVladivostok, userVladivostok);
         boolean resultLA = eventService.isToday(todayLA, userLA);
@@ -761,6 +761,11 @@ class EventServiceTest {
         // Проверяем, что даты могут отличаться из-за разницы во времени
         // (это нормально, так как в разных timezone может быть разная дата)
         if (!todayVladivostok.equals(todayLA)) {
+            when(eventQueryService.isToday(todayVladivostok, userLA))
+                    .thenReturn(false);
+            when(eventQueryService.isToday(todayLA, userVladivostok))
+                    .thenReturn(false);
+            
             // Если даты разные, проверяем что каждый метод использует свою timezone
             assertFalse(eventService.isToday(todayVladivostok, userLA), 
                     "Дата Владивостока не должна быть 'сегодня' для пользователя из Лос-Анджелеса");
@@ -780,6 +785,11 @@ class EventServiceTest {
         User userTokyo = createMockUser(2L, "Asia/Tokyo");
         LocalDate tomorrowTokyo = userTokyo.getCurrentDate().plusDays(1);
         
+        when(eventQueryService.isTomorrow(tomorrowMoscow, userMoscow))
+                .thenReturn(true);
+        when(eventQueryService.isTomorrow(tomorrowTokyo, userTokyo))
+                .thenReturn(true);
+        
         // When
         boolean resultMoscow = eventService.isTomorrow(tomorrowMoscow, userMoscow);
         boolean resultTokyo = eventService.isTomorrow(tomorrowTokyo, userTokyo);
@@ -787,6 +797,8 @@ class EventServiceTest {
         // Then
         assertTrue(resultMoscow, "Завтрашняя дата в Москве должна быть определена как 'завтра'");
         assertTrue(resultTokyo, "Завтрашняя дата в Токио должна быть определена как 'завтра'");
+        verify(eventQueryService).isTomorrow(tomorrowMoscow, userMoscow);
+        verify(eventQueryService).isTomorrow(tomorrowTokyo, userTokyo);
     }
     
     @Test
@@ -794,6 +806,9 @@ class EventServiceTest {
     void shouldThrowNullPointerExceptionWhenEventDateIsNullInIsToday() {
         // Given
         User mockUser = createMockUser(1L, "Europe/Moscow");
+        
+        when(eventQueryService.isToday(null, mockUser))
+                .thenThrow(new NullPointerException("eventDate не может быть null"));
         
         // When & Then
         assertThrows(NullPointerException.class, 
@@ -807,6 +822,9 @@ class EventServiceTest {
         // Given
         LocalDate today = LocalDate.now();
         
+        when(eventQueryService.isToday(today, null))
+                .thenThrow(new NullPointerException("user не может быть null"));
+        
         // When & Then
         assertThrows(NullPointerException.class, 
                 () -> eventService.isToday(today, null),
@@ -819,6 +837,9 @@ class EventServiceTest {
         // Given
         User mockUser = createMockUser(1L, "Europe/Moscow");
         
+        when(eventQueryService.isTomorrow(null, mockUser))
+                .thenThrow(new NullPointerException("eventDate не может быть null"));
+        
         // When & Then
         assertThrows(NullPointerException.class, 
                 () -> eventService.isTomorrow(null, mockUser),
@@ -830,6 +851,9 @@ class EventServiceTest {
     void shouldThrowNullPointerExceptionWhenUserIsNullInIsTomorrow() {
         // Given
         LocalDate tomorrow = LocalDate.now().plusDays(1);
+        
+        when(eventQueryService.isTomorrow(tomorrow, null))
+                .thenThrow(new NullPointerException("user не может быть null"));
         
         // When & Then
         assertThrows(NullPointerException.class, 

@@ -56,9 +56,9 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SPRING_FLYWAY_ENABLED: true
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: true
-    # Убираем проброс порта наружу - доступ только через nginx
-    expose:
-      - "8080"
+    ports:
+      # В dev режиме пробрасываем порт для ngrok, в prod доступ через nginx
+      - "${SERVER_PORT:-8080}:8080"
     networks:
       - family-calendar-network
     healthcheck:
@@ -68,11 +68,13 @@ services:
       retries: 3
       start_period: 40s
 
-  # Nginx reverse proxy для HTTPS
+  # Nginx reverse proxy для HTTPS (только для prod)
   nginx:
     image: nginx:1.27-alpine
     container_name: family-calendar-nginx
     restart: unless-stopped
+    profiles:
+      - prod
     depends_on:
       app:
         condition: service_healthy

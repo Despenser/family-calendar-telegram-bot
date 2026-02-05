@@ -419,7 +419,6 @@ class UpdateProcessorTest {
             when(update.hasCallbackQuery()).thenReturn(false);
             when(update.getMessage()).thenReturn(message);
             when(message.getText()).thenReturn(null);
-            when(message.getMessageId()).thenReturn(67890);
 
             // When
             updateProcessor.processUpdate(update);
@@ -440,7 +439,6 @@ class UpdateProcessorTest {
             when(update.hasCallbackQuery()).thenReturn(false);
             when(update.getMessage()).thenReturn(message);
             when(message.getText()).thenReturn("   ");
-            when(message.getMessageId()).thenReturn(67890);
 
             // When
             updateProcessor.processUpdate(update);

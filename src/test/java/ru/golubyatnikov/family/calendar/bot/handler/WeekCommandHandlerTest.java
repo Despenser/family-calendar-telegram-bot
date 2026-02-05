@@ -113,7 +113,7 @@ class WeekCommandHandlerTest {
         List<Event> events = createTestEventsForWeek(user);
         
         when(message.getChatId()).thenReturn(123456789L);
-        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("UTC"))).thenReturn(events);
+        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"))).thenReturn(events);
 
         // When
         String response = handler.handle(message, user);
@@ -126,7 +126,7 @@ class WeekCommandHandlerTest {
         assertTrue(response.contains("Поход в кино"), "Ответ должен содержать название второго события");
         assertTrue(response.contains("Всего событий: 2"), "Ответ должен содержать счетчик событий");
         
-        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("UTC"));
+        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"));
     }
 
     @Test
@@ -145,7 +145,7 @@ class WeekCommandHandlerTest {
         List<Event> events = Arrays.asList(todayEvent, tomorrowEvent);
         
         when(message.getChatId()).thenReturn(123456789L);
-        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("UTC"))).thenReturn(events);
+        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"))).thenReturn(events);
 
         // When
         String response = handler.handle(message, user);
@@ -166,7 +166,7 @@ class WeekCommandHandlerTest {
                                     response.contains("воскресенье");
         assertTrue(hasRussianDayName, "Ответ должен содержать русское название дня недели со строчной буквы");
         
-        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("UTC"));
+        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"));
     }
 
     @Test
@@ -184,7 +184,7 @@ class WeekCommandHandlerTest {
         List<Event> events = Arrays.asList(familyEvent, userPersonalEvent, otherUserPersonalEvent);
         
         when(message.getChatId()).thenReturn(123456789L);
-        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("UTC"))).thenReturn(events);
+        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"))).thenReturn(events);
 
         // When
         String response = handler.handle(message, user);
@@ -196,7 +196,7 @@ class WeekCommandHandlerTest {
         assertFalse(response.contains("Чужая встреча"), "Ответ НЕ должен содержать персональное событие другого пользователя");
         assertTrue(response.contains("Всего событий: 2"), "Должно быть отфильтровано 2 события");
         
-        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("UTC"));
+        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"));
     }
 
     @Test
@@ -207,7 +207,7 @@ class WeekCommandHandlerTest {
         ru.golubyatnikov.family.calendar.bot.model.User user = createUserWithFamily(familyId);
         
         when(message.getChatId()).thenReturn(123456789L);
-        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("UTC"))).thenReturn(Collections.emptyList());
+        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"))).thenReturn(Collections.emptyList());
 
         // When
         String response = handler.handle(message, user);
@@ -219,7 +219,7 @@ class WeekCommandHandlerTest {
         assertTrue(response.contains("На ближайшую неделю событий не запланировано"), 
                 "Ответ должен содержать сообщение об отсутствии событий");
         
-        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("UTC"));
+        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"));
     }
 
     @Test
@@ -230,7 +230,7 @@ class WeekCommandHandlerTest {
         ru.golubyatnikov.family.calendar.bot.model.User user = createUserWithFamily(familyId);
         
         when(message.getChatId()).thenReturn(123456789L);
-        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("UTC"))).thenThrow(new RuntimeException("Database error"));
+        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"))).thenThrow(new RuntimeException("Database error"));
 
         // When
         String response = handler.handle(message, user);
@@ -240,7 +240,7 @@ class WeekCommandHandlerTest {
         assertTrue(response.contains("❌") || response.contains("ошибка") || response.contains("Произошла ошибка"), 
                 "Ответ должен содержать сообщение об ошибке");
         
-        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("UTC"));
+        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"));
     }
 
     @Test
@@ -256,7 +256,7 @@ class WeekCommandHandlerTest {
         List<Event> events = Arrays.asList(familyEvent, personalEvent);
         
         when(message.getChatId()).thenReturn(123456789L);
-        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("UTC"))).thenReturn(events);
+        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"))).thenReturn(events);
 
         // When
         String response = handler.handle(message, user);
@@ -268,7 +268,7 @@ class WeekCommandHandlerTest {
         assertTrue(response.contains("👤"), 
                 "Ответ должен содержать иконку персонального события (изменено с 🔒 на 👤)");
         
-        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("UTC"));
+        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"));
     }
 
     @Test
@@ -282,7 +282,7 @@ class WeekCommandHandlerTest {
         List<Event> events = Collections.singletonList(event);
         
         when(message.getChatId()).thenReturn(123456789L);
-        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("UTC"))).thenReturn(events);
+        when(eventService.getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"))).thenReturn(events);
 
         // When
         String response = handler.handle(message, user);
@@ -291,7 +291,7 @@ class WeekCommandHandlerTest {
         assertNotNull(response);
         assertTrue(response.contains("14:30"), "Ответ должен содержать время события");
         
-        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("UTC"));
+        verify(eventService).getUpcomingEvents(familyId, 7, ZoneId.of("Europe/Moscow"));
     }
 
     /**
@@ -310,6 +310,7 @@ class WeekCommandHandlerTest {
                 .firstName("Иван")
                 .lastName("Иванов")
                 .family(family)
+                .timezone("Europe/Moscow")
                 .build();
     }
 

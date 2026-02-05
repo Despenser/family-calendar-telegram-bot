@@ -81,10 +81,12 @@ public class StatsCommandHandler implements CommandHandler {
             
             // Формирование сообщения со статистикой
             StringBuilder messageBuilder = new StringBuilder();
+            String monthName = currentMonth.atDay(1).format(MONTH_FORMATTER);
             messageBuilder.append(escape("📊 "))
                           .append(bold("Статистика событий"))
-                          .append(escape("\n"))
-                          .append(italic(currentMonth.atDay(1).format(MONTH_FORMATTER)))
+                          .append(escape(" ("))
+                          .append(escape(monthName))
+                          .append(escape(")"))
                           .append(escape("\n\n"));
             
             // Общая статистика

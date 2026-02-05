@@ -293,11 +293,11 @@ public class FileMessageHandler {
                     
                     messageBuilder.append(emoji).append(" ")
                                  .append(bold(att.getFileName())).append("\n")
-                                 .append("   Размер: ").append(escape(sizeStr)).append("\n")
-                                 .append("   Загружено: ").append(escape(dateStr)).append("\n");
+                                 .append("📊 Размер: ").append(escape(sizeStr)).append("\n")
+                                 .append("📅 Загружено: ").append(escape(dateStr));
                     
                     if (i < attachments.size() - 1) {
-                        messageBuilder.append("\n");
+                        messageBuilder.append("\n\n━━━━━━━━━━━━━━━━━━━━\n\n");
                     }
                 }
             }

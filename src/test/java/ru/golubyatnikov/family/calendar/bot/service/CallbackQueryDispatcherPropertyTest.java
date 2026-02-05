@@ -280,7 +280,7 @@ class CallbackQueryDispatcherPropertyTest {
             "attach_file_123",
             "checklist_add",
             "checklist_toggle_123",
-            "comment_add",
+            "comment_add_123",
             "add_completion_note_123",
             
             // Поиск

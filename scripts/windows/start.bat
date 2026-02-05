@@ -3,9 +3,15 @@ REM Переход в корневую директорию проекта
 cd /d "%~dp0\..\.."
 
 REM Скрипт для запуска Docker Compose в Windows
-REM Использование: start.bat
+REM Использование: 
+REM   start.bat          - запуск в dev режиме (без nginx)
+REM   start.bat prod     - запуск в prod режиме (с nginx)
 
-echo 🚀 Запуск Family Calendar Bot...
+REM Определение профиля
+set PROFILE=%1
+if "%PROFILE%"=="" set PROFILE=dev
+
+echo 🚀 Запуск Family Calendar Bot (профиль: %PROFILE%)...
 echo.
 
 REM Проверка наличия .env файла
@@ -38,14 +44,30 @@ if errorlevel 1 (
     )
 )
 
+REM Проверка SSL сертификатов для prod
+if "%PROFILE%"=="prod" (
+    if not exist nginx\ssl\server.crt (
+        echo ⚠️  SSL сертификаты не найдены!
+        echo 📝 Сгенерируйте сертификаты командой:
+        echo   ssl.bat ^<ВАШ_IP^>
+        echo.
+        exit /b 1
+    )
+)
+
 REM Сборка образов
 echo 🔨 Сборка Docker образов...
 docker-compose build
 
 REM Запуск контейнеров
 echo.
-echo ▶️  Запуск контейнеров...
-docker-compose up -d
+if "%PROFILE%"=="prod" (
+    echo ▶️  Запуск контейнеров (с nginx)...
+    docker-compose --profile prod up -d
+) else (
+    echo ▶️  Запуск контейнеров (без nginx, для ngrok)...
+    docker-compose up -d
+)
 
 REM Ожидание готовности PostgreSQL
 echo.
@@ -59,6 +81,18 @@ docker-compose ps
 
 echo.
 echo ✅ Family Calendar Bot успешно запущен!
+echo.
+
+if "%PROFILE%"=="prod" (
+    echo 🌐 Режим: Production (с nginx и SSL^)
+    echo    Webhook URL должен быть: https://^<ВАШ_IP^>/webhook
+) else (
+    echo 🔧 Режим: Development (с ngrok^)
+    echo    1. Запустите ngrok: ngrok http 8080
+    echo    2. Скопируйте HTTPS URL в .env (TELEGRAM_BOT_WEBHOOK_URL^)
+    echo    3. Перезапустите приложение если нужно
+)
+
 echo.
 echo 📝 Полезные команды:
 echo   - Просмотр логов: logs.bat

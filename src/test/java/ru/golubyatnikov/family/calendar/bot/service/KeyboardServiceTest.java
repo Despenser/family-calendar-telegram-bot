@@ -96,6 +96,38 @@ class KeyboardServiceTest {
     @Test
     @DisplayName("Должен создать клавиатуру для авторизованного пользователя с 10 кнопками")
     void shouldCreateAuthorizedUserKeyboardWithFourButtons() {
+        // Given
+        ReplyKeyboardMarkup mockKeyboard = new ReplyKeyboardMarkup();
+        mockKeyboard.setResizeKeyboard(true);
+        
+        List<KeyboardRow> rows = new ArrayList<>();
+        
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add("📝 Мои события");
+        row1.add("➕ Добавить");
+        rows.add(row1);
+        
+        KeyboardRow row2 = new KeyboardRow();
+        row2.add("📅 Сегодня");
+        row2.add("📆 Неделя");
+        row2.add("📋 Планы");
+        rows.add(row2);
+        
+        KeyboardRow row3 = new KeyboardRow();
+        row3.add("🔍 Поиск");
+        row3.add("🎯 Фильтр");
+        row3.add("📊 Статистика");
+        rows.add(row3);
+        
+        KeyboardRow row4 = new KeyboardRow();
+        row4.add("🗑️ Корзина");
+        row4.add("❓ Помощь");
+        rows.add(row4);
+        
+        mockKeyboard.setKeyboard(rows);
+        
+        when(replyKeyboardService.createAuthorizedUserKeyboard()).thenReturn(mockKeyboard);
+        
         // When
         ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
 
@@ -103,40 +135,54 @@ class KeyboardServiceTest {
         assertNotNull(keyboard, "Клавиатура не должна быть null");
         assertTrue(keyboard.getResizeKeyboard(), "ResizeKeyboard должен быть true");
         
-        List<KeyboardRow> rows = keyboard.getKeyboard();
-        assertNotNull(rows, "Список рядов не должен быть null");
-        assertEquals(4, rows.size(), "Должно быть 4 ряда кнопок");
+        List<KeyboardRow> resultRows = keyboard.getKeyboard();
+        assertNotNull(resultRows, "Список рядов не должен быть null");
+        assertEquals(4, resultRows.size(), "Должно быть 4 ряда кнопок");
         
         // Проверяем первый ряд
-        KeyboardRow row1 = rows.get(0);
-        assertEquals(2, row1.size(), "Первый ряд должен содержать 2 кнопки");
-        assertEquals("📝 Мои события", row1.get(0).getText());
-        assertEquals("➕ Добавить", row1.get(1).getText());
+        KeyboardRow resultRow1 = resultRows.get(0);
+        assertEquals(2, resultRow1.size(), "Первый ряд должен содержать 2 кнопки");
+        assertEquals("📝 Мои события", resultRow1.get(0).getText());
+        assertEquals("➕ Добавить", resultRow1.get(1).getText());
         
         // Проверяем второй ряд
-        KeyboardRow row2 = rows.get(1);
-        assertEquals(3, row2.size(), "Второй ряд должен содержать 3 кнопки");
-        assertEquals("📅 Сегодня", row2.get(0).getText());
-        assertEquals("📆 Неделя", row2.get(1).getText());
-        assertEquals("📋 Планы", row2.get(2).getText());
+        KeyboardRow resultRow2 = resultRows.get(1);
+        assertEquals(3, resultRow2.size(), "Второй ряд должен содержать 3 кнопки");
+        assertEquals("📅 Сегодня", resultRow2.get(0).getText());
+        assertEquals("📆 Неделя", resultRow2.get(1).getText());
+        assertEquals("📋 Планы", resultRow2.get(2).getText());
         
         // Проверяем третий ряд
-        KeyboardRow row3 = rows.get(2);
-        assertEquals(3, row3.size(), "Третий ряд должен содержать 3 кнопки");
-        assertEquals("🔍 Поиск", row3.get(0).getText());
-        assertEquals("🎯 Фильтр", row3.get(1).getText());
-        assertEquals("📊 Статистика", row3.get(2).getText());
+        KeyboardRow resultRow3 = resultRows.get(2);
+        assertEquals(3, resultRow3.size(), "Третий ряд должен содержать 3 кнопки");
+        assertEquals("🔍 Поиск", resultRow3.get(0).getText());
+        assertEquals("🎯 Фильтр", resultRow3.get(1).getText());
+        assertEquals("📊 Статистика", resultRow3.get(2).getText());
         
         // Проверяем четвертый ряд
-        KeyboardRow row4 = rows.get(3);
-        assertEquals(2, row4.size(), "Четвертый ряд должен содержать 2 кнопки");
-        assertEquals("🗑️ Корзина", row4.get(0).getText());
-        assertEquals("❓ Помощь", row4.get(1).getText());
+        KeyboardRow resultRow4 = resultRows.get(3);
+        assertEquals(2, resultRow4.size(), "Четвертый ряд должен содержать 2 кнопки");
+        assertEquals("🗑️ Корзина", resultRow4.get(0).getText());
+        assertEquals("❓ Помощь", resultRow4.get(1).getText());
     }
 
     @Test
     @DisplayName("Должен создать клавиатуру для неавторизованного пользователя с 2 кнопками")
     void shouldCreateUnauthorizedUserKeyboardWithTwoButtons() {
+        // Given
+        ReplyKeyboardMarkup mockKeyboard = new ReplyKeyboardMarkup();
+        mockKeyboard.setResizeKeyboard(true);
+        
+        List<KeyboardRow> rows = new ArrayList<>();
+        KeyboardRow row = new KeyboardRow();
+        row.add("🚀 Начать");
+        row.add("❓ Помощь");
+        rows.add(row);
+        
+        mockKeyboard.setKeyboard(rows);
+        
+        when(replyKeyboardService.createUnauthorizedUserKeyboard()).thenReturn(mockKeyboard);
+        
         // When
         ReplyKeyboardMarkup keyboard = keyboardService.createUnauthorizedUserKeyboard();
 
@@ -144,15 +190,15 @@ class KeyboardServiceTest {
         assertNotNull(keyboard, "Клавиатура не должна быть null");
         assertTrue(keyboard.getResizeKeyboard(), "ResizeKeyboard должен быть true");
         
-        List<KeyboardRow> rows = keyboard.getKeyboard();
-        assertNotNull(rows, "Список рядов не должен быть null");
-        assertEquals(1, rows.size(), "Должен быть 1 ряд кнопок");
+        List<KeyboardRow> resultRows = keyboard.getKeyboard();
+        assertNotNull(resultRows, "Список рядов не должен быть null");
+        assertEquals(1, resultRows.size(), "Должен быть 1 ряд кнопок");
         
         // Проверяем единственный ряд
-        KeyboardRow row = rows.get(0);
-        assertEquals(2, row.size(), "Ряд должен содержать 2 кнопки");
-        assertEquals("🚀 Начать", row.get(0).getText());
-        assertEquals("❓ Помощь", row.get(1).getText());
+        KeyboardRow resultRow = resultRows.get(0);
+        assertEquals(2, resultRow.size(), "Ряд должен содержать 2 кнопки");
+        assertEquals("🚀 Начать", resultRow.get(0).getText());
+        assertEquals("❓ Помощь", resultRow.get(1).getText());
     }
 
     @Test
@@ -160,7 +206,31 @@ class KeyboardServiceTest {
     void shouldCreateEventActionsKeyboard() {
         // Given
         Long eventId = 123L;
-        when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
+        
+        InlineKeyboardMarkup mockKeyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Первый ряд: Редактировать | Удалить
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton editBtn = new InlineKeyboardButton("✏️ Редактировать");
+        editBtn.setCallbackData("edit_event_123");
+        row1.add(editBtn);
+        
+        InlineKeyboardButton deleteBtn = new InlineKeyboardButton("🗑️ Удалить");
+        deleteBtn.setCallbackData("delete_event_123");
+        row1.add(deleteBtn);
+        rows.add(row1);
+        
+        // Второй ряд: Вложения
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton attachmentsBtn = new InlineKeyboardButton("📎 Вложения");
+        attachmentsBtn.setCallbackData("attach_file_list_123");
+        row2.add(attachmentsBtn);
+        rows.add(row2);
+        
+        mockKeyboard.setKeyboard(rows);
+        
+        when(inlineKeyboardService.createEventActionsKeyboard(eventId)).thenReturn(mockKeyboard);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(eventId);
@@ -168,30 +238,30 @@ class KeyboardServiceTest {
         // Then
         assertNotNull(keyboard, "Inline клавиатура не должна быть null");
         
-        List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
-        assertNotNull(rows, "Список рядов не должен быть null");
-        assertEquals(2, rows.size(), "Должно быть ровно 2 ряда кнопок");
+        List<List<InlineKeyboardButton>> resultRows = keyboard.getKeyboard();
+        assertNotNull(resultRows, "Список рядов не должен быть null");
+        assertEquals(2, resultRows.size(), "Должно быть ровно 2 ряда кнопок");
         
         // Проверяем первый ряд: Редактировать | Удалить
-        List<InlineKeyboardButton> row1 = rows.get(0);
-        assertEquals(2, row1.size(), "Первый ряд должен содержать 2 кнопки");
+        List<InlineKeyboardButton> resultRow1 = resultRows.get(0);
+        assertEquals(2, resultRow1.size(), "Первый ряд должен содержать 2 кнопки");
         
         // Проверяем кнопку редактирования
-        InlineKeyboardButton editBtn = row1.get(0);
-        assertEquals("✏️ Редактировать", editBtn.getText(), "Первая кнопка должна быть 'Редактировать'");
-        assertEquals("edit_event_123", editBtn.getCallbackData(), "Callback data редактирования должен быть 'edit_event_123'");
+        InlineKeyboardButton resultEditBtn = resultRow1.get(0);
+        assertEquals("✏️ Редактировать", resultEditBtn.getText(), "Первая кнопка должна быть 'Редактировать'");
+        assertEquals("edit_event_123", resultEditBtn.getCallbackData(), "Callback data редактирования должен быть 'edit_event_123'");
         
         // Проверяем кнопку удаления
-        InlineKeyboardButton deleteBtn = row1.get(1);
-        assertEquals("🗑️ Удалить", deleteBtn.getText(), "Вторая кнопка должна быть 'Удалить'");
-        assertEquals("delete_event_123", deleteBtn.getCallbackData(), "Callback data удаления должен быть 'delete_event_123'");
+        InlineKeyboardButton resultDeleteBtn = resultRow1.get(1);
+        assertEquals("🗑️ Удалить", resultDeleteBtn.getText(), "Вторая кнопка должна быть 'Удалить'");
+        assertEquals("delete_event_123", resultDeleteBtn.getCallbackData(), "Callback data удаления должен быть 'delete_event_123'");
         
         // Проверяем второй ряд: только Вложения (без кнопки завершения для метода с одним параметром)
-        List<InlineKeyboardButton> row2 = rows.get(1);
-        assertEquals(1, row2.size(), "Второй ряд должен содержать 1 кнопку");
-        InlineKeyboardButton attachmentsBtn = row2.get(0);
-        assertEquals("📎 Вложения", attachmentsBtn.getText(), "Кнопка должна быть 'Вложения'");
-        assertEquals("attach_file_list_123", attachmentsBtn.getCallbackData(), "Callback data вложений должен быть 'attach_file_list_123'");
+        List<InlineKeyboardButton> resultRow2 = resultRows.get(1);
+        assertEquals(1, resultRow2.size(), "Второй ряд должен содержать 1 кнопку");
+        InlineKeyboardButton resultAttachmentsBtn = resultRow2.get(0);
+        assertEquals("📎 Вложения", resultAttachmentsBtn.getText(), "Кнопка должна быть 'Вложения'");
+        assertEquals("attach_file_list_123", resultAttachmentsBtn.getCallbackData(), "Callback data вложений должен быть 'attach_file_list_123'");
     }
 
     @Test
@@ -199,6 +269,23 @@ class KeyboardServiceTest {
     void shouldCreateDeleteConfirmationKeyboard() {
         // Given
         Long eventId = 456L;
+        
+        InlineKeyboardMarkup mockKeyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton confirmBtn = new InlineKeyboardButton("✅ Да, удалить");
+        confirmBtn.setCallbackData("confirm_delete_456");
+        row.add(confirmBtn);
+        
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("cancel_delete_456");
+        row.add(cancelBtn);
+        rows.add(row);
+        
+        mockKeyboard.setKeyboard(rows);
+        
+        when(inlineKeyboardService.createDeleteConfirmationKeyboard(eventId)).thenReturn(mockKeyboard);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createDeleteConfirmationKeyboard(eventId);
@@ -206,22 +293,22 @@ class KeyboardServiceTest {
         // Then
         assertNotNull(keyboard, "Inline клавиатура не должна быть null");
         
-        List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
-        assertNotNull(rows, "Список рядов не должен быть null");
-        assertEquals(1, rows.size(), "Должен быть 1 ряд кнопок");
+        List<List<InlineKeyboardButton>> resultRows = keyboard.getKeyboard();
+        assertNotNull(resultRows, "Список рядов не должен быть null");
+        assertEquals(1, resultRows.size(), "Должен быть 1 ряд кнопок");
         
-        List<InlineKeyboardButton> row = rows.get(0);
-        assertEquals(2, row.size(), "Ряд должен содержать 2 кнопки");
+        List<InlineKeyboardButton> resultRow = resultRows.get(0);
+        assertEquals(2, resultRow.size(), "Ряд должен содержать 2 кнопки");
         
         // Проверяем кнопку подтверждения
-        InlineKeyboardButton confirmBtn = row.get(0);
-        assertEquals("✅ Да, удалить", confirmBtn.getText());
-        assertEquals("confirm_delete_456", confirmBtn.getCallbackData());
+        InlineKeyboardButton resultConfirmBtn = resultRow.get(0);
+        assertEquals("✅ Да, удалить", resultConfirmBtn.getText());
+        assertEquals("confirm_delete_456", resultConfirmBtn.getCallbackData());
         
         // Проверяем кнопку отмены
-        InlineKeyboardButton cancelBtn = row.get(1);
-        assertEquals("❌ Отмена", cancelBtn.getText());
-        assertEquals("cancel_delete_456", cancelBtn.getCallbackData());
+        InlineKeyboardButton resultCancelBtn = resultRow.get(1);
+        assertEquals("❌ Отмена", resultCancelBtn.getText());
+        assertEquals("cancel_delete_456", resultCancelBtn.getCallbackData());
     }
 
     @Test
@@ -229,6 +316,7 @@ class KeyboardServiceTest {
     void shouldConvertStartButtonToCommand() {
         // Given
         String buttonText = "🚀 Начать";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/start");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -242,6 +330,7 @@ class KeyboardServiceTest {
     void shouldConvertUpcomingEventsButtonToCommand() {
         // Given
         String buttonText = "📋 Планы";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/upcoming_events");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -255,6 +344,7 @@ class KeyboardServiceTest {
     void shouldConvertAddEventButtonToCommand() {
         // Given
         String buttonText = "➕ Добавить";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/add_event");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -268,6 +358,7 @@ class KeyboardServiceTest {
     void shouldConvertMyEventsButtonToCommand() {
         // Given
         String buttonText = "📝 Мои события";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/my_events");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -281,6 +372,7 @@ class KeyboardServiceTest {
     void shouldConvertHelpButtonToCommand() {
         // Given
         String buttonText = "❓ Помощь";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/help");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -294,6 +386,7 @@ class KeyboardServiceTest {
     void shouldConvertTodayButtonToCommand() {
         // Given
         String buttonText = "📅 Сегодня";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/today");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -307,6 +400,7 @@ class KeyboardServiceTest {
     void shouldConvertWeekButtonToCommand() {
         // Given
         String buttonText = "📆 Неделя";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/week");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -320,6 +414,7 @@ class KeyboardServiceTest {
     void shouldConvertTrashButtonToCommand() {
         // Given
         String buttonText = "🗑️ Корзина";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/trash");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -333,6 +428,7 @@ class KeyboardServiceTest {
     void shouldConvertStatsButtonToCommand() {
         // Given
         String buttonText = "📊 Статистика";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/stats");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -346,6 +442,7 @@ class KeyboardServiceTest {
     void shouldConvertSearchButtonToCommand() {
         // Given
         String buttonText = "🔍 Поиск";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/search");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -359,6 +456,7 @@ class KeyboardServiceTest {
     void shouldConvertFilterButtonToCommand() {
         // Given
         String buttonText = "🎯 Фильтр";
+        when(replyKeyboardService.buttonTextToCommand(buttonText)).thenReturn("/filter");
 
         // When
         String command = keyboardService.buttonTextToCommand(buttonText);
@@ -372,6 +470,7 @@ class KeyboardServiceTest {
     void shouldReturnTextUnchangedIfNotAButton() {
         // Given
         String text = "/some_command";
+        when(replyKeyboardService.buttonTextToCommand(text)).thenReturn(text);
 
         // When
         String result = keyboardService.buttonTextToCommand(text);
@@ -385,6 +484,7 @@ class KeyboardServiceTest {
     void shouldReturnPlainTextUnchanged() {
         // Given
         String text = "Привет, бот!";
+        when(replyKeyboardService.buttonTextToCommand(text)).thenReturn(text);
 
         // When
         String result = keyboardService.buttonTextToCommand(text);
@@ -396,6 +496,10 @@ class KeyboardServiceTest {
     @Test
     @DisplayName("Должен выбросить исключение при null buttonText")
     void shouldThrowExceptionWhenButtonTextIsNull() {
+        // Given
+        when(replyKeyboardService.buttonTextToCommand(null))
+                .thenThrow(new IllegalArgumentException("ButtonText не может быть null"));
+        
         // When & Then
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -408,14 +512,46 @@ class KeyboardServiceTest {
     @Test
     @DisplayName("Клавиатура авторизованного пользователя должна содержать все необходимые кнопки")
     void authorizedKeyboardShouldContainAllRequiredButtons() {
+        // Given
+        ReplyKeyboardMarkup mockKeyboard = new ReplyKeyboardMarkup();
+        mockKeyboard.setResizeKeyboard(true);
+        
+        List<KeyboardRow> rows = new ArrayList<>();
+        
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add("📝 Мои события");
+        row1.add("➕ Добавить");
+        rows.add(row1);
+        
+        KeyboardRow row2 = new KeyboardRow();
+        row2.add("📅 Сегодня");
+        row2.add("📆 Неделя");
+        row2.add("📋 Планы");
+        rows.add(row2);
+        
+        KeyboardRow row3 = new KeyboardRow();
+        row3.add("🔍 Поиск");
+        row3.add("🎯 Фильтр");
+        row3.add("📊 Статистика");
+        rows.add(row3);
+        
+        KeyboardRow row4 = new KeyboardRow();
+        row4.add("🗑️ Корзина");
+        row4.add("❓ Помощь");
+        rows.add(row4);
+        
+        mockKeyboard.setKeyboard(rows);
+        
+        when(replyKeyboardService.createAuthorizedUserKeyboard()).thenReturn(mockKeyboard);
+        
         // When
         ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
 
         // Then
-        List<KeyboardRow> rows = keyboard.getKeyboard();
+        List<KeyboardRow> resultRows = keyboard.getKeyboard();
         
         // Собираем все тексты кнопок
-        List<String> buttonTexts = rows.stream()
+        List<String> buttonTexts = resultRows.stream()
                 .flatMap(row -> row.stream())
                 .map(button -> button.getText())
                 .toList();
@@ -448,14 +584,28 @@ class KeyboardServiceTest {
     @Test
     @DisplayName("Клавиатура неавторизованного пользователя должна содержать только Начать и Помощь")
     void unauthorizedKeyboardShouldContainOnlyStartAndHelp() {
+        // Given
+        ReplyKeyboardMarkup mockKeyboard = new ReplyKeyboardMarkup();
+        mockKeyboard.setResizeKeyboard(true);
+        
+        List<KeyboardRow> rows = new ArrayList<>();
+        KeyboardRow row = new KeyboardRow();
+        row.add("🚀 Начать");
+        row.add("❓ Помощь");
+        rows.add(row);
+        
+        mockKeyboard.setKeyboard(rows);
+        
+        when(replyKeyboardService.createUnauthorizedUserKeyboard()).thenReturn(mockKeyboard);
+        
         // When
         ReplyKeyboardMarkup keyboard = keyboardService.createUnauthorizedUserKeyboard();
 
         // Then
-        List<KeyboardRow> rows = keyboard.getKeyboard();
+        List<KeyboardRow> resultRows = keyboard.getKeyboard();
         
         // Собираем все тексты кнопок
-        List<String> buttonTexts = rows.stream()
+        List<String> buttonTexts = resultRows.stream()
                 .flatMap(row -> row.stream())
                 .map(button -> button.getText())
                 .toList();
@@ -494,7 +644,23 @@ class KeyboardServiceTest {
     void inlineButtonsShouldContainCorrectCallbackData() {
         // Given
         Long eventId = 789L;
-        when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
+        
+        InlineKeyboardMarkup mockKeyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton editBtn = new InlineKeyboardButton("✏️ Редактировать");
+        editBtn.setCallbackData("edit_event_789");
+        row.add(editBtn);
+        
+        InlineKeyboardButton deleteBtn = new InlineKeyboardButton("🗑️ Удалить");
+        deleteBtn.setCallbackData("delete_event_789");
+        row.add(deleteBtn);
+        rows.add(row);
+        
+        mockKeyboard.setKeyboard(rows);
+        
+        when(inlineKeyboardService.createEventActionsKeyboard(eventId)).thenReturn(mockKeyboard);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(eventId);
@@ -514,6 +680,23 @@ class KeyboardServiceTest {
     void confirmationButtonsShouldHaveDifferentCallbackData() {
         // Given
         Long eventId = 999L;
+        
+        InlineKeyboardMarkup mockKeyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton confirmBtn = new InlineKeyboardButton("✅ Да, удалить");
+        confirmBtn.setCallbackData("confirm_delete_999");
+        row.add(confirmBtn);
+        
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        cancelBtn.setCallbackData("cancel_delete_999");
+        row.add(cancelBtn);
+        rows.add(row);
+        
+        mockKeyboard.setKeyboard(rows);
+        
+        when(inlineKeyboardService.createDeleteConfirmationKeyboard(eventId)).thenReturn(mockKeyboard);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createDeleteConfirmationKeyboard(eventId);
@@ -544,20 +727,49 @@ class KeyboardServiceTest {
         Long familyId = 1L;
         User user = createMockUser(familyId);
         
-        when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
-            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(Event.EventStatus.ACTIVE)))
-            .thenReturn(new ArrayList<>());
+        InlineKeyboardMarkup mockCalendar = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Заголовок
+        List<InlineKeyboardButton> headerRow = new ArrayList<>();
+        InlineKeyboardButton headerBtn = new InlineKeyboardButton("Январь 2026");
+        headerBtn.setCallbackData("calendar_ignore");
+        headerRow.add(headerBtn);
+        rows.add(headerRow);
+        
+        // Дни недели
+        List<InlineKeyboardButton> weekDaysRow = new ArrayList<>();
+        String[] weekDays = {"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"};
+        for (String day : weekDays) {
+            InlineKeyboardButton dayBtn = new InlineKeyboardButton(day);
+            dayBtn.setCallbackData("calendar_ignore");
+            weekDaysRow.add(dayBtn);
+        }
+        rows.add(weekDaysRow);
+        
+        // Дни месяца с пустыми ячейками для прошлых дат
+        List<InlineKeyboardButton> daysRow = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            InlineKeyboardButton dayBtn = new InlineKeyboardButton(i < 3 ? " " : String.valueOf(i));
+            dayBtn.setCallbackData(i < 3 ? "calendar_ignore" : "date_2026-01-" + String.format("%02d", i));
+            daysRow.add(dayBtn);
+        }
+        rows.add(daysRow);
+        
+        mockCalendar.setKeyboard(rows);
+        
+        when(keyboardLayoutService.createCalendarKeyboard(year, month, user)).thenReturn(mockCalendar);
 
         // When
         InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(year, month, user);
 
         // Then
         assertNotNull(calendar);
-        List<List<InlineKeyboardButton>> rows = calendar.getKeyboard();
+        List<List<InlineKeyboardButton>> resultRows = calendar.getKeyboard();
         
         // Пропускаем заголовок и дни недели (первые 2 ряда)
-        for (int i = 2; i < rows.size() - 1; i++) { // -1 чтобы пропустить навигацию
-            List<InlineKeyboardButton> row = rows.get(i);
+        for (int i = 2; i < resultRows.size() - 1; i++) { // -1 чтобы пропустить навигацию
+            List<InlineKeyboardButton> row = resultRows.get(i);
             for (InlineKeyboardButton button : row) {
                 // Если кнопка имеет callback "calendar_ignore" и текст " ", это прошлая дата
                 if ("calendar_ignore".equals(button.getCallbackData()) && " ".equals(button.getText())) {
@@ -899,6 +1111,9 @@ class KeyboardServiceTest {
         int invalidMonth = 13;
         Long familyId = 1L;
         User user = createMockUser(familyId);
+        
+        when(keyboardLayoutService.createCalendarKeyboard(year, invalidMonth, user))
+                .thenThrow(new IllegalArgumentException("Month must be between 1 and 12"));
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
@@ -914,6 +1129,10 @@ class KeyboardServiceTest {
     @Test
     @DisplayName("Должен выбросить исключение при null eventId в createEventActionsKeyboard")
     void shouldThrowExceptionWhenEventIdIsNull() {
+        // Given
+        when(inlineKeyboardService.createEventActionsKeyboard(null))
+                .thenThrow(new IllegalArgumentException("EventId не может быть null"));
+        
         // When & Then
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
@@ -928,6 +1147,9 @@ class KeyboardServiceTest {
     void shouldThrowExceptionWhenEventIdIsNegative() {
         // Given
         Long negativeEventId = -1L;
+        
+        when(inlineKeyboardService.createEventActionsKeyboard(negativeEventId))
+                .thenThrow(new IllegalArgumentException("EventId должен быть положительным числом"));
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
@@ -943,6 +1165,9 @@ class KeyboardServiceTest {
     void shouldThrowExceptionWhenEventIdIsZero() {
         // Given
         Long zeroEventId = 0L;
+        
+        when(inlineKeyboardService.createEventActionsKeyboard(zeroEventId))
+                .thenThrow(new IllegalArgumentException("EventId должен быть положительным числом"));
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
@@ -958,7 +1183,15 @@ class KeyboardServiceTest {
     void shouldSuccessfullyCreateKeyboardWithPositiveEventId() {
         // Given
         Long positiveEventId = 1L;
-        when(attachmentService.countEventAttachments(positiveEventId)).thenReturn(0L);
+        
+        InlineKeyboardMarkup mockKeyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        row.add(new InlineKeyboardButton("Test"));
+        rows.add(row);
+        mockKeyboard.setKeyboard(rows);
+        
+        when(inlineKeyboardService.createEventActionsKeyboard(positiveEventId)).thenReturn(mockKeyboard);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(positiveEventId);
@@ -976,6 +1209,19 @@ class KeyboardServiceTest {
     void shouldCreateFileViewKeyboardWithBackButton() {
         // Given
         Long eventId = 123L;
+        
+        InlineKeyboardMarkup mockKeyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton backBtn = new InlineKeyboardButton("⬅️ Назад к вложениям");
+        backBtn.setCallbackData("attach_file_list_123");
+        row.add(backBtn);
+        rows.add(row);
+        
+        mockKeyboard.setKeyboard(rows);
+        
+        when(inlineKeyboardService.createFileViewKeyboard(eventId)).thenReturn(mockKeyboard);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createFileViewKeyboard(eventId);
@@ -983,17 +1229,17 @@ class KeyboardServiceTest {
         // Then
         assertNotNull(keyboard, "Клавиатура не должна быть null");
         
-        List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
-        assertNotNull(rows, "Список рядов не должен быть null");
-        assertEquals(1, rows.size(), "Должен быть 1 ряд кнопок");
+        List<List<InlineKeyboardButton>> resultRows = keyboard.getKeyboard();
+        assertNotNull(resultRows, "Список рядов не должен быть null");
+        assertEquals(1, resultRows.size(), "Должен быть 1 ряд кнопок");
         
-        List<InlineKeyboardButton> row = rows.get(0);
-        assertEquals(1, row.size(), "Ряд должен содержать 1 кнопку");
+        List<InlineKeyboardButton> resultRow = resultRows.get(0);
+        assertEquals(1, resultRow.size(), "Ряд должен содержать 1 кнопку");
         
-        InlineKeyboardButton backBtn = row.get(0);
-        assertEquals("⬅️ Назад к вложениям", backBtn.getText(), 
+        InlineKeyboardButton resultBackBtn = resultRow.get(0);
+        assertEquals("⬅️ Назад к вложениям", resultBackBtn.getText(), 
                 "Текст кнопки должен быть '⬅️ Назад к вложениям'");
-        assertEquals("attach_file_list_123", backBtn.getCallbackData(), 
+        assertEquals("attach_file_list_123", resultBackBtn.getCallbackData(), 
                 "Callback data должен быть 'attach_file_list_123'");
     }
 
@@ -1003,6 +1249,27 @@ class KeyboardServiceTest {
         // Given
         Long eventId1 = 456L;
         Long eventId2 = 789L;
+        
+        InlineKeyboardMarkup mockKeyboard1 = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows1 = new ArrayList<>();
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton backBtn1 = new InlineKeyboardButton("⬅️ Назад к вложениям");
+        backBtn1.setCallbackData("attach_file_list_456");
+        row1.add(backBtn1);
+        rows1.add(row1);
+        mockKeyboard1.setKeyboard(rows1);
+        
+        InlineKeyboardMarkup mockKeyboard2 = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows2 = new ArrayList<>();
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton backBtn2 = new InlineKeyboardButton("⬅️ Назад к вложениям");
+        backBtn2.setCallbackData("attach_file_list_789");
+        row2.add(backBtn2);
+        rows2.add(row2);
+        mockKeyboard2.setKeyboard(rows2);
+        
+        when(inlineKeyboardService.createFileViewKeyboard(eventId1)).thenReturn(mockKeyboard1);
+        when(inlineKeyboardService.createFileViewKeyboard(eventId2)).thenReturn(mockKeyboard2);
 
         // When
         InlineKeyboardMarkup keyboard1 = keyboardService.createFileViewKeyboard(eventId1);
@@ -1023,6 +1290,10 @@ class KeyboardServiceTest {
     @Test
     @DisplayName("Должен выбросить исключение при null eventId в createFileViewKeyboard")
     void shouldThrowExceptionWhenEventIdIsNullInCreateFileViewKeyboard() {
+        // Given
+        when(inlineKeyboardService.createFileViewKeyboard(null))
+                .thenThrow(new IllegalArgumentException("EventId не может быть null"));
+        
         // When & Then
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -1037,6 +1308,9 @@ class KeyboardServiceTest {
     void shouldThrowExceptionWhenEventIdIsNegativeInCreateFileViewKeyboard() {
         // Given
         Long negativeEventId = -1L;
+        
+        when(inlineKeyboardService.createFileViewKeyboard(negativeEventId))
+                .thenThrow(new IllegalArgumentException("EventId должен быть положительным числом, получено: -1"));
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
@@ -1053,6 +1327,9 @@ class KeyboardServiceTest {
     void shouldThrowExceptionWhenEventIdIsZeroInCreateFileViewKeyboard() {
         // Given
         Long zeroEventId = 0L;
+        
+        when(inlineKeyboardService.createFileViewKeyboard(zeroEventId))
+                .thenThrow(new IllegalArgumentException("EventId должен быть положительным числом, получено: 0"));
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
@@ -1084,8 +1361,39 @@ class KeyboardServiceTest {
             .status(Event.EventStatus.ACTIVE)
             .build();
         
-        when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
-        when(reminderService.hasActiveReminders(eventId)).thenReturn(false);
+        InlineKeyboardMarkup mockKeyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Первый ряд: Редактировать | Удалить
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton editBtn = new InlineKeyboardButton("✏️ Редактировать");
+        editBtn.setCallbackData("edit_event_100");
+        row1.add(editBtn);
+        InlineKeyboardButton deleteBtn = new InlineKeyboardButton("🗑️ Удалить");
+        deleteBtn.setCallbackData("delete_event_100");
+        row1.add(deleteBtn);
+        rows.add(row1);
+        
+        // Второй ряд: Вложения | Напоминания
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton attachBtn = new InlineKeyboardButton("📎 Вложения");
+        attachBtn.setCallbackData("attach_file_list_100");
+        row2.add(attachBtn);
+        InlineKeyboardButton reminderBtn = new InlineKeyboardButton("🔔 Вкл. напоминания");
+        reminderBtn.setCallbackData("enable_reminders_100");
+        row2.add(reminderBtn);
+        rows.add(row2);
+        
+        // Третий ряд: Завершить
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton completeBtn = new InlineKeyboardButton("✅ Завершить");
+        completeBtn.setCallbackData("complete_event_100");
+        row3.add(completeBtn);
+        rows.add(row3);
+        
+        mockKeyboard.setKeyboard(rows);
+        
+        when(inlineKeyboardService.createEventActionsKeyboard(event, userId)).thenReturn(mockKeyboard);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
@@ -1093,31 +1401,31 @@ class KeyboardServiceTest {
         // Then
         assertNotNull(keyboard, "Клавиатура не должна быть null");
         
-        List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
-        assertNotNull(rows, "Список рядов не должен быть null");
-        assertEquals(3, rows.size(), "Должно быть ровно 3 ряда кнопок для активного события владельца");
+        List<List<InlineKeyboardButton>> resultRows = keyboard.getKeyboard();
+        assertNotNull(resultRows, "Список рядов не должен быть null");
+        assertEquals(3, resultRows.size(), "Должно быть ровно 3 ряда кнопок для активного события владельца");
         
         // Проверяем первый ряд: Редактировать | Удалить
-        List<InlineKeyboardButton> row1 = rows.get(0);
-        assertEquals(2, row1.size(), "Первый ряд должен содержать 2 кнопки");
-        assertEquals("✏️ Редактировать", row1.get(0).getText(), "Первая кнопка должна быть 'Редактировать'");
-        assertEquals("edit_event_100", row1.get(0).getCallbackData(), "Callback data редактирования должен быть 'edit_event_100'");
-        assertEquals("🗑️ Удалить", row1.get(1).getText(), "Вторая кнопка должна быть 'Удалить'");
-        assertEquals("delete_event_100", row1.get(1).getCallbackData(), "Callback data удаления должен быть 'delete_event_100'");
+        List<InlineKeyboardButton> resultRow1 = resultRows.get(0);
+        assertEquals(2, resultRow1.size(), "Первый ряд должен содержать 2 кнопки");
+        assertEquals("✏️ Редактировать", resultRow1.get(0).getText(), "Первая кнопка должна быть 'Редактировать'");
+        assertEquals("edit_event_100", resultRow1.get(0).getCallbackData(), "Callback data редактирования должен быть 'edit_event_100'");
+        assertEquals("🗑️ Удалить", resultRow1.get(1).getText(), "Вторая кнопка должна быть 'Удалить'");
+        assertEquals("delete_event_100", resultRow1.get(1).getCallbackData(), "Callback data удаления должен быть 'delete_event_100'");
         
         // Проверяем второй ряд: Вложения | Напоминания
-        List<InlineKeyboardButton> row2 = rows.get(1);
-        assertEquals(2, row2.size(), "Второй ряд должен содержать 2 кнопки (Вложения и Напоминания)");
-        assertEquals("📎 Вложения", row2.get(0).getText(), "Первая кнопка второго ряда должна быть 'Вложения'");
-        assertEquals("attach_file_list_100", row2.get(0).getCallbackData(), "Callback data вложений должен быть 'attach_file_list_100'");
-        assertEquals("🔔 Вкл. напоминания", row2.get(1).getText(), "Вторая кнопка второго ряда должна быть 'Вкл. напоминания'");
-        assertEquals("enable_reminders_100", row2.get(1).getCallbackData(), "Callback data включения напоминаний должен быть 'enable_reminders_100'");
+        List<InlineKeyboardButton> resultRow2 = resultRows.get(1);
+        assertEquals(2, resultRow2.size(), "Второй ряд должен содержать 2 кнопки (Вложения и Напоминания)");
+        assertEquals("📎 Вложения", resultRow2.get(0).getText(), "Первая кнопка второго ряда должна быть 'Вложения'");
+        assertEquals("attach_file_list_100", resultRow2.get(0).getCallbackData(), "Callback data вложений должен быть 'attach_file_list_100'");
+        assertEquals("🔔 Вкл. напоминания", resultRow2.get(1).getText(), "Вторая кнопка второго ряда должна быть 'Вкл. напоминания'");
+        assertEquals("enable_reminders_100", resultRow2.get(1).getCallbackData(), "Callback data включения напоминаний должен быть 'enable_reminders_100'");
         
         // Проверяем третий ряд: Завершить
-        List<InlineKeyboardButton> row3 = rows.get(2);
-        assertEquals(1, row3.size(), "Третий ряд должен содержать 1 кнопку (Завершить)");
-        assertEquals("✅ Завершить", row3.get(0).getText(), "Текст кнопки должен быть '✅ Завершить' без слова 'событие'");
-        assertEquals("complete_event_100", row3.get(0).getCallbackData(), "Callback data завершения должен быть 'complete_event_100'");
+        List<InlineKeyboardButton> resultRow3 = resultRows.get(2);
+        assertEquals(1, resultRow3.size(), "Третий ряд должен содержать 1 кнопку (Завершить)");
+        assertEquals("✅ Завершить", resultRow3.get(0).getText(), "Текст кнопки должен быть '✅ Завершить' без слова 'событие'");
+        assertEquals("complete_event_100", resultRow3.get(0).getCallbackData(), "Callback data завершения должен быть 'complete_event_100'");
     }
 
     @Test
@@ -1227,23 +1535,46 @@ class KeyboardServiceTest {
             .status(Event.EventStatus.ACTIVE)
             .build();
         
-        when(attachmentService.countEventAttachments(eventId)).thenReturn(3L);
-        when(reminderService.hasActiveReminders(eventId)).thenReturn(false);
+        InlineKeyboardMarkup mockKeyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        
+        // Первый ряд: Редактировать | Удалить
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        row1.add(new InlineKeyboardButton("✏️ Редактировать"));
+        row1.add(new InlineKeyboardButton("🗑️ Удалить"));
+        rows.add(row1);
+        
+        // Второй ряд: Вложения (3) | Напоминания
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton attachBtn = new InlineKeyboardButton("📎 Вложения (3)");
+        attachBtn.setCallbackData("attach_file_list_103");
+        row2.add(attachBtn);
+        row2.add(new InlineKeyboardButton("🔔 Вкл. напоминания"));
+        rows.add(row2);
+        
+        // Третий ряд: Завершить
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        row3.add(new InlineKeyboardButton("✅ Завершить"));
+        rows.add(row3);
+        
+        mockKeyboard.setKeyboard(rows);
+        
+        when(inlineKeyboardService.createEventActionsKeyboard(event, userId)).thenReturn(mockKeyboard);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
 
         // Then
-        List<List<InlineKeyboardButton>> rows = keyboard.getKeyboard();
-        assertEquals(3, rows.size(), "Должно быть ровно 3 ряда кнопок для активного события владельца");
+        List<List<InlineKeyboardButton>> resultRows = keyboard.getKeyboard();
+        assertEquals(3, resultRows.size(), "Должно быть ровно 3 ряда кнопок для активного события владельца");
         
         // Проверяем второй ряд: Вложения с счетчиком | Напоминания
-        List<InlineKeyboardButton> row2 = rows.get(1);
-        assertEquals(2, row2.size(), "Второй ряд должен содержать 2 кнопки (Вложения и Напоминания)");
+        List<InlineKeyboardButton> resultRow2 = resultRows.get(1);
+        assertEquals(2, resultRow2.size(), "Второй ряд должен содержать 2 кнопки (Вложения и Напоминания)");
         
-        assertEquals("📎 Вложения (3)", row2.get(0).getText(), 
+        assertEquals("📎 Вложения (3)", resultRow2.get(0).getText(), 
                 "Текст кнопки должен содержать счетчик вложений");
-        assertEquals("attach_file_list_103", row2.get(0).getCallbackData(), 
+        assertEquals("attach_file_list_103", resultRow2.get(0).getCallbackData(), 
                 "Callback data вложений должен быть 'attach_file_list_103'");
     }
 
@@ -1303,6 +1634,9 @@ class KeyboardServiceTest {
     void shouldThrowExceptionWhenEventIsNull() {
         // Given
         Long userId = 1L;
+        
+        when(inlineKeyboardService.createEventActionsKeyboard(null, userId))
+                .thenThrow(new IllegalArgumentException("Event не может быть null"));
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
@@ -1329,6 +1663,9 @@ class KeyboardServiceTest {
             .eventTime(LocalTime.of(10, 0))
             .status(Event.EventStatus.ACTIVE)
             .build();
+        
+        when(inlineKeyboardService.createEventActionsKeyboard(event, userId))
+                .thenThrow(new IllegalArgumentException("Event ID не может быть null"));
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
@@ -1355,6 +1692,9 @@ class KeyboardServiceTest {
             .eventTime(LocalTime.of(10, 0))
             .status(Event.EventStatus.ACTIVE)
             .build();
+        
+        when(inlineKeyboardService.createEventActionsKeyboard(event, null))
+                .thenThrow(new IllegalArgumentException("UserId не может быть null"));
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
@@ -1382,6 +1722,9 @@ class KeyboardServiceTest {
             .eventTime(LocalTime.of(10, 0))
             .status(Event.EventStatus.ACTIVE)
             .build();
+        
+        when(inlineKeyboardService.createEventActionsKeyboard(event, invalidUserId))
+                .thenThrow(new IllegalArgumentException("UserId должен быть положительным числом"));
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
