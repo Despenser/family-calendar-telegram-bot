@@ -89,16 +89,16 @@ Telegram бот для управления семейным календаре�
 2. **Сгенерируйте SSL сертификаты**
    ```bash
    # Unix (Linux/macOS)
-   chmod +x scripts/unix/generate-ssl-certs.sh
-   ./scripts/unix/generate-ssl-certs.sh <ВАШ_ПУБЛИЧНЫЙ_IP> [DAYS]
+   chmod +x scripts/unix/ssl.sh
+   ./scripts/unix/ssl.sh <ВАШ_ПУБЛИЧНЫЙ_IP> [DAYS]
    
    # Windows
-   scripts\windows\generate-ssl-certs.bat <ВАШ_ПУБЛИЧНЫЙ_IP> [DAYS]
+   scripts\windows\ssl.bat <ВАШ_ПУБЛИЧНЫЙ_IP> [DAYS]
    
    # Примеры:
-   ./scripts/unix/generate-ssl-certs.sh 176.108.254.68        # 10 лет (по умолчанию)
-   ./scripts/unix/generate-ssl-certs.sh 176.108.254.68 365    # 1 год
-   ./scripts/unix/generate-ssl-certs.sh 176.108.254.68 90     # 90 дней
+   ./scripts/unix/ssl.sh 176.108.254.68        # 10 лет (по умолчанию)
+   ./scripts/unix/ssl.sh 176.108.254.68 365    # 1 год
+   ./scripts/unix/ssl.sh 176.108.254.68 90     # 90 дней
    ```
 
 3. **Создайте файл .env из примера**
@@ -265,10 +265,10 @@ Telegram Bot API требует HTTPS для webhook. Проект включа�
 
 ```bash
 # 1. Генерация SSL сертификатов (по умолчанию на 10 лет)
-./scripts/unix/generate-ssl-certs.sh <ВАШ_ПУБЛИЧНЫЙ_IP>
+./scripts/unix/ssl.sh <ВАШ_ПУБЛИЧНЫЙ_IP>
 
 # Или с указанием срока действия
-./scripts/unix/generate-ssl-certs.sh <ВАШ_ПУБЛИЧНЫЙ_IP> 365  # 1 год
+./scripts/unix/ssl.sh <ВАШ_ПУБЛИЧНЫЙ_IP> 365  # 1 год
 
 # 2. Настройка .env
 TELEGRAM_BOT_WEBHOOK_URL=https://<ВАШ_ПУБЛИЧНЫЙ_IP>/webhook
