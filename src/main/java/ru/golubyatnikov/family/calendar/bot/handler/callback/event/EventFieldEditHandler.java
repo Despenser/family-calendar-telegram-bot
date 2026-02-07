@@ -110,8 +110,11 @@ public class EventFieldEditHandler implements CallbackHandler {
             log.info("Пользователь ID={} начал редактирование поля '{}' события ID={}", 
                     userId, field, eventId);
             
-            // Сохраняем messageId в контексте редактирования
-            conversationStateService.startEventEditing(userId, eventId, chatId, messageId);
+            // НЕ перезаписываем контекст редактирования, если он уже существует
+            // (он мог быть создан в handleEditEventFromCalendar с sourceDate)
+            if (!conversationStateService.isEditingEvent(userId)) {
+                conversationStateService.startEventEditing(userId, eventId, chatId, messageId);
+            }
             
             // Устанавливаем редактируемое поле
             ConversationStateService.EditField editField = mapToEditField(field);
@@ -129,12 +132,13 @@ public class EventFieldEditHandler implements CallbackHandler {
                 case "date" -> {
                     log.debug("Выбрано поле для редактирования: DATE, userId={}", userId);
                     message = "📅 Редактирование даты\n\nВыберите новую дату из календаря:";
-                    // Используем текущий месяц для начального отображения с учетом timezone пользователя
+                    // Используем текущий месяц для начального отображения с учетом timezone пользователя и eventId для кнопки "Назад"
                     LocalDate now = user.getCurrentDate();
                     keyboard = keyboardService.createCalendarKeyboard(
                         now.getYear(), 
                         now.getMonthValue(), 
-                        user
+                        user,
+                        eventId
                     );
                 }
                 case "time" -> {
@@ -145,20 +149,20 @@ public class EventFieldEditHandler implements CallbackHandler {
                     Event event = eventService.getEventById(eventId);
                     LocalDate eventDate = event.getEventDate();
                     
-                    // Показываем фильтрованный выбор часа с учетом даты события и timezone пользователя
-                    keyboard = keyboardService.createFilteredHourSelectionKeyboard(eventDate, user);
+                    // Показываем фильтрованный выбор часа с учетом даты события, timezone пользователя и eventId для кнопки "Назад"
+                    keyboard = keyboardService.createFilteredHourSelectionKeyboard(eventDate, user, eventId);
                 }
                 case "title" -> {
                     log.debug("Выбрано поле для редактирования: TITLE, userId={}", userId);
                     message = "📝 Редактирование названия\n\nОтправьте новое название события:";
-                    // Создаем клавиатуру только с кнопкой "Отменить"
-                    keyboard = createCancelOnlyKeyboard(eventId);
+                    // Создаем клавиатуру с кнопкой "Отмена" или "Назад"
+                    keyboard = createCancelOnlyKeyboard(eventId, userId);
                 }
                 case "description" -> {
                     log.debug("Выбрано поле для редактирования: DESCRIPTION, userId={}", userId);
                     message = "📄 Редактирование описания\n\nОтправьте новое описание события:";
-                    // Создаем клавиатуру только с кнопкой "Отменить"
-                    keyboard = createCancelOnlyKeyboard(eventId);
+                    // Создаем клавиатуру с кнопкой "Отмена" или "Назад"
+                    keyboard = createCancelOnlyKeyboard(eventId, userId);
                 }
                 default -> {
                     log.warn("Неизвестное поле для редактирования: field='{}', userId={}", field, userId);
@@ -178,19 +182,23 @@ public class EventFieldEditHandler implements CallbackHandler {
     }
     
     /**
-     * Создает клавиатуру только с кнопкой "Отмена".
+     * Создает клавиатуру только с кнопкой "Отмена" или "Назад".
      * 
      * @param eventId идентификатор события для callback data
-     * @return клавиатура с кнопкой "Отмена"
+     * @param userId идентификатор пользователя для проверки контекста
+     * @return клавиатура с кнопкой "Отмена" или "Назад"
      */
-    private InlineKeyboardMarkup createCancelOnlyKeyboard(Long eventId) {
+    private InlineKeyboardMarkup createCancelOnlyKeyboard(Long eventId, Long userId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
         
         List<InlineKeyboardButton> row = new ArrayList<>();
         InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-        cancelButton.setText("❌ Отмена");
-        cancelButton.setCallbackData(CallbackPrefix.EDIT_CANCEL.withPayload(eventId.toString()));
+        
+        // Всегда показываем "Назад" для возврата к меню выбора поля
+        cancelButton.setText("🔙 Назад");
+        cancelButton.setCallbackData(CallbackPrefix.EDIT_BACK.withPayload(eventId.toString()));
+        
         row.add(cancelButton);
         keyboard.add(row);
         

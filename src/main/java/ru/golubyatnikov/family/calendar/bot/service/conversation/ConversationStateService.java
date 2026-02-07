@@ -219,7 +219,7 @@ public class ConversationStateService {
      * @param chatId идентификатор чата
      */
     public void startEventEditing(Long userId, Long eventId, Long chatId) {
-        EditingContext context = new EditingContext(eventId, chatId, null, null);
+        EditingContext context = new EditingContext(eventId, chatId, null, null, null);
         usersEditingEvents.put(userId, context);
         log.info("Пользователь ID={} начал редактирование события ID={}", userId, eventId);
     }
@@ -233,10 +233,26 @@ public class ConversationStateService {
      * @param messageId идентификатор сообщения для редактирования
      */
     public void startEventEditing(Long userId, Long eventId, Long chatId, Integer messageId) {
-        EditingContext context = new EditingContext(eventId, chatId, null, messageId);
+        EditingContext context = new EditingContext(eventId, chatId, null, messageId, null);
         usersEditingEvents.put(userId, context);
         log.info("Пользователь ID={} начал редактирование события ID={} в сообщении ID={}", 
                 userId, eventId, messageId);
+    }
+    
+    /**
+     * Начинает процесс редактирования события для пользователя из календаря.
+     * 
+     * @param userId идентификатор пользователя
+     * @param eventId идентификатор редактируемого события
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для редактирования
+     * @param sourceDate дата, с которой началось редактирование (для возврата к списку событий)
+     */
+    public void startEventEditingFromCalendar(Long userId, Long eventId, Long chatId, Integer messageId, java.time.LocalDate sourceDate) {
+        EditingContext context = new EditingContext(eventId, chatId, null, messageId, sourceDate);
+        usersEditingEvents.put(userId, context);
+        log.info("Пользователь ID={} начал редактирование события ID={} из календаря (дата={}) в сообщении ID={}", 
+                userId, eventId, sourceDate, messageId);
     }
     
     /**
@@ -678,6 +694,12 @@ public class ConversationStateService {
          * Используется для обновления того же сообщения при изменениях.
          */
         private Integer messageId;
+        
+        /**
+         * Дата, с которой началось редактирование (для возврата к списку событий на эту дату).
+         * Если null, редактирование началось не из календаря.
+         */
+        private java.time.LocalDate sourceDate;
     }
     
     /**

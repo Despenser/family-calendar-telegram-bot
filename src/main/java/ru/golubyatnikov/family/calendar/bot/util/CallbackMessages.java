@@ -178,4 +178,10 @@ public final class CallbackMessages {
      * Используется как подсказка при выборе времени на следующий час.
      */
     public static final String SELECT_NEXT_HOUR = "Выберите следующий час";
+    
+    /**
+     * Для календаря - нет событий на выбранную дату.
+     * Используется когда пользователь выбирает дату без событий.
+     */
+    public static final String NO_EVENTS_ON_DATE = "На эту дату нет событий";
 }

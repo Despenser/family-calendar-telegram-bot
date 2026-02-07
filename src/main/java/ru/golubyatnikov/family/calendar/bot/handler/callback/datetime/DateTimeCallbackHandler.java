@@ -8,6 +8,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationService;
 import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
@@ -252,20 +253,23 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                 .orElseThrow(() -> new ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException(
                         "Пользователь не найден: " + userId));
         
-        // Получаем дату события (из черновика или редактируемого события)
+        // Получаем дату события и eventId (из черновика или редактируемого события)
         LocalDate eventDate;
+        Long editingEventId = null;
+        
         if (conversationStateService.isEditingEvent(userId)) {
             ConversationStateService.EditingContext context = conversationStateService.getEditingContext(userId);
             ru.golubyatnikov.family.calendar.bot.model.Event event = 
                 eventService.getEventById(context.getEventId());
             eventDate = event.getEventDate();
+            editingEventId = context.getEventId();
         } else {
             ru.golubyatnikov.family.calendar.bot.model.Event draft = conversationService.getActiveDraft(userId);
             eventDate = draft.getEventDate();
         }
         
-        // Показываем фильтрованный выбор минут
-        InlineKeyboardMarkup keyboard = keyboardService.createFilteredMinuteSelectionKeyboard(hour, eventDate, user);
+        // Показываем фильтрованный выбор минут с учетом контекста редактирования
+        InlineKeyboardMarkup keyboard = keyboardService.createFilteredMinuteSelectionKeyboard(hour, eventDate, user, editingEventId);
         
         // Проверяем, есть ли доступные минуты
         // Клавиатура содержит: заголовок (1 строка) + кнопки навигации (1 строка) + минуты (если есть)
@@ -276,7 +280,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
             try {
                 // Показываем сообщение и возвращаем к выбору часа
                 messageService.editMessageText(chatId, messageId, message, 
-                        keyboardService.createFilteredHourSelectionKeyboard(eventDate, user));
+                        keyboardService.createFilteredHourSelectionKeyboard(eventDate, user, editingEventId));
                 messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.SELECT_NEXT_HOUR);
                 log.warn("Попытка выбрать час, для которого все минуты прошли: userId={}, hour={}, eventDate={}", 
                         userId, hour, eventDate);
@@ -306,7 +310,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
     
     /**
      * Обрабатывает выбор времени (час и минуты).
-     * Обновляет черновик или существующее событие и запрашивает название события.
+     * Обновляет черновик или существующее событие и показывает выбор типа события.
      * 
      * <p><b>Требования:</b> 3.1, 3.3</p>
      * 
@@ -380,25 +384,50 @@ public class DateTimeCallbackHandler implements CallbackHandler {
             }
         } else {
             // Создание нового события (черновик)
-            conversationService.updateEventTime(userId, time);
+            Event draft = conversationService.updateEventTime(userId, time);
             
-            // Запрашиваем название события
-            String formattedTime = time.format(TIME_FORMATTER);
-            String message = messageBuilder.buildTimeSelectedMessage(formattedTime);
+            // Проверяем, является ли это повторением события (уже заполнены title, description, isPersonal)
+            boolean isRepeatEvent = draft.getTitle() != null && !draft.getTitle().isBlank() 
+                                 && draft.getIsPersonal() != null;
             
-            try {
-                // Обновляем сообщение создания через editMessageText
-                messageService.editMessageText(chatId, messageId, message, null);
-                log.debug("Сообщение создания обновлено после выбора времени: userId={}, messageId={}, time={}", 
-                         userId, messageId, time);
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.itemSelected("Время"));
-            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
-                log.error("Ошибка при выборе времени: userId={}, time={}, error={}", 
-                         userId, time, e.getMessage());
-                throw new RuntimeException("Ошибка при выборе времени", e);
+            if (isRepeatEvent) {
+                // Это повторение события - сразу завершаем создание
+                Event completedEvent = conversationService.completeEventCreation(userId, draft.getDescription());
+                
+                String eventMessage = messageBuilder.buildEventCreatedMessage(completedEvent);
+                InlineKeyboardMarkup eventKeyboard = keyboardService.createEventActionsKeyboard(completedEvent.getId());
+                
+                try {
+                    messageService.editMessageText(chatId, messageId, eventMessage, eventKeyboard);
+                    messageService.answerCallbackQuery(callbackQueryId, "✅ Событие создано");
+                    
+                    log.info("Событие повторено успешно: eventId={}, userId={}, originalTitle={}", 
+                            completedEvent.getId(), userId, completedEvent.getTitle());
+                } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                    log.error("Ошибка при завершении повторения события: userId={}, error={}", 
+                             userId, e.getMessage());
+                    throw new RuntimeException("Ошибка при завершении повторения события", e);
+                }
+            } else {
+                // Обычное создание события - показываем выбор типа события
+                String formattedTime = time.format(TIME_FORMATTER);
+                InlineKeyboardMarkup typeKeyboard = keyboardService.createEventTypeSelectionKeyboard();
+                String message = messageBuilder.buildTimeSelectedMessage(formattedTime);
+                
+                try {
+                    // Обновляем сообщение создания через editMessageText
+                    messageService.editMessageText(chatId, messageId, message, typeKeyboard);
+                    log.debug("Сообщение создания обновлено после выбора времени: userId={}, messageId={}, time={}", 
+                             userId, messageId, time);
+                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.itemSelected("Время"));
+                } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                    log.error("Ошибка при выборе времени: userId={}, time={}, error={}", 
+                             userId, time, e.getMessage());
+                    throw new RuntimeException("Ошибка при выборе времени", e);
+                }
+                
+                log.info("Время выбрано для пользователя {}: {}", userId, time);
             }
-            
-            log.info("Время выбрано для пользователя {}: {}", userId, time);
         }
     }
     
@@ -419,20 +448,23 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                 .orElseThrow(() -> new ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException(
                         "Пользователь не найден: " + userId));
         
-        // Получаем дату события (из черновика или редактируемого события)
+        // Получаем дату события и eventId (из черновика или редактируемого события)
         LocalDate eventDate;
+        Long editingEventId = null;
+        
         if (conversationStateService.isEditingEvent(userId)) {
             ConversationStateService.EditingContext context = conversationStateService.getEditingContext(userId);
             ru.golubyatnikov.family.calendar.bot.model.Event event = 
                 eventService.getEventById(context.getEventId());
             eventDate = event.getEventDate();
+            editingEventId = context.getEventId();
         } else {
             ru.golubyatnikov.family.calendar.bot.model.Event draft = conversationService.getActiveDraft(userId);
             eventDate = draft.getEventDate();
         }
         
-        // Пересчитываем доступные часы на основе текущего времени
-        InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(eventDate, user);
+        // Пересчитываем доступные часы на основе текущего времени с учетом контекста редактирования
+        InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(eventDate, user, editingEventId);
         String message = messageBuilder.buildSelectHourMessage();
         
         try {

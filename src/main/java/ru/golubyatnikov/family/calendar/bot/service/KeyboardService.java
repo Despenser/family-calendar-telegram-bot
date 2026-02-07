@@ -105,6 +105,16 @@ public class KeyboardService {
     public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId) {
         return inlineKeyboardService.createEditFieldSelectionKeyboard(eventId);
     }
+    
+    /**
+     * Создает inline клавиатуру для выбора поля редактирования.
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя (для проверки контекста редактирования)
+     */
+    public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId, Long userId) {
+        return inlineKeyboardService.createEditFieldSelectionKeyboard(eventId, userId);
+    }
 
     /**
      * Создает inline клавиатуру для завершения редактирования.
@@ -214,6 +224,25 @@ public class KeyboardService {
     }
 
     /**
+     * Создает календарь для выбора даты.
+     * 
+     * @param year год для отображения
+     * @param month месяц для отображения (1-12)
+     * @param user пользователь для определения timezone и семьи
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     */
+    public InlineKeyboardMarkup createCalendarKeyboard(int year, int month, User user, Long editingEventId) {
+        return keyboardLayoutService.createCalendarKeyboard(year, month, user, editingEventId);
+    }
+    
+    /**
+     * Создает календарь для просмотра событий с возможностью выбора прошлых дат.
+     */
+    public InlineKeyboardMarkup createViewCalendarKeyboard(int year, int month, User user) {
+        return keyboardLayoutService.createViewCalendarKeyboard(year, month, user);
+    }
+
+    /**
      * Создает клавиатуру для выбора часа.
      */
     public InlineKeyboardMarkup createHourSelectionKeyboard() {
@@ -235,9 +264,55 @@ public class KeyboardService {
     }
 
     /**
+     * Создает фильтрованную клавиатуру для выбора часа.
+     * 
+     * @param selectedDate выбранная дата события
+     * @param user пользователь (для определения timezone)
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     */
+    public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate, User user, Long editingEventId) {
+        return keyboardLayoutService.createFilteredHourSelectionKeyboard(selectedDate, user, editingEventId);
+    }
+
+    /**
      * Создает фильтрованную клавиатуру для выбора минут.
      */
     public InlineKeyboardMarkup createFilteredMinuteSelectionKeyboard(int selectedHour, LocalDate selectedDate, User user) {
         return keyboardLayoutService.createFilteredMinuteSelectionKeyboard(selectedHour, selectedDate, user);
+    }
+
+    /**
+     * Создает фильтрованную клавиатуру для выбора минут.
+     * 
+     * @param selectedHour выбранный час
+     * @param selectedDate выбранная дата события
+     * @param user пользователь (для определения timezone)
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     */
+    public InlineKeyboardMarkup createFilteredMinuteSelectionKeyboard(int selectedHour, LocalDate selectedDate, User user, Long editingEventId) {
+        return keyboardLayoutService.createFilteredMinuteSelectionKeyboard(selectedHour, selectedDate, user, editingEventId);
+    }
+    
+    // ==================== Методы для календаря просмотра ====================
+    
+    /**
+     * Создает клавиатуру со списком событий на дату (для прошлых дат).
+     */
+    public InlineKeyboardMarkup createDateEventsListKeyboard(LocalDate date, List<Event> events, User user) {
+        return inlineKeyboardService.createDateEventsListKeyboard(date, events, user);
+    }
+    
+    /**
+     * Создает клавиатуру для создания события на дату (для будущих дат без событий).
+     */
+    public InlineKeyboardMarkup createCreateEventOnDateKeyboard(LocalDate date) {
+        return inlineKeyboardService.createCreateEventOnDateKeyboard(date);
+    }
+    
+    /**
+     * Создает клавиатуру для управления событиями на дату (для будущих дат с событиями).
+     */
+    public InlineKeyboardMarkup createDateEventsManagementKeyboard(LocalDate date, List<Event> events, User user) {
+        return inlineKeyboardService.createDateEventsManagementKeyboard(date, events, user);
     }
 }

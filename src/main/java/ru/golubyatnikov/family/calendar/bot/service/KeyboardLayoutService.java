@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
@@ -65,6 +66,20 @@ public class KeyboardLayoutService {
         Map.entry('Ю', 'ᵁ'), Map.entry('ю', 'ᵁ'),
         Map.entry('Я', 'ᴬ'), Map.entry('я', 'ᴬ')
     );
+    
+    // Маппинг цифр на надстрочные Unicode символы
+    private static final Map<Character, Character> SUPERSCRIPT_DIGITS = Map.of(
+        '0', '⁰',
+        '1', '¹',
+        '2', '²',
+        '3', '³',
+        '4', '⁴',
+        '5', '⁵',
+        '6', '⁶',
+        '7', '⁷',
+        '8', '⁸',
+        '9', '⁹'
+    );
 
     /**
      * Создает inline-календарь для выбора даты события с учетом таймзоны пользователя.
@@ -76,6 +91,48 @@ public class KeyboardLayoutService {
      * @throws IllegalArgumentException если month не в диапазоне 1-12
      */
     public InlineKeyboardMarkup createCalendarKeyboard(int year, int month, User user) {
+        return createCalendarKeyboard(year, month, user, false, null);
+    }
+
+    /**
+     * Создает inline-календарь для выбора даты события с учетом таймзоны пользователя.
+     * 
+     * @param year год для отображения
+     * @param month месяц для отображения (1-12)
+     * @param user пользователь для определения timezone и семьи
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     * @return настроенная InlineKeyboardMarkup с календарем
+     * @throws IllegalArgumentException если month не в диапазоне 1-12
+     */
+    public InlineKeyboardMarkup createCalendarKeyboard(int year, int month, User user, Long editingEventId) {
+        return createCalendarKeyboard(year, month, user, false, editingEventId);
+    }
+
+    /**
+     * Создает inline-календарь для просмотра событий с возможностью навигации в прошлое.
+     * 
+     * @param year год для отображения
+     * @param month месяц для отображения (1-12)
+     * @param user пользователь для определения timezone и семьи
+     * @return настроенная InlineKeyboardMarkup с календарем
+     * @throws IllegalArgumentException если month не в диапазоне 1-12
+     */
+    public InlineKeyboardMarkup createViewCalendarKeyboard(int year, int month, User user) {
+        return createCalendarKeyboard(year, month, user, true, null);
+    }
+
+    /**
+     * Создает inline-календарь для выбора даты события с учетом таймзоны пользователя.
+     * 
+     * @param year год для отображения
+     * @param month месяц для отображения (1-12)
+     * @param user пользователь для определения timezone и семьи
+     * @param allowPastDates разрешить выбор прошлых дат и навигацию в прошлое
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     * @return настроенная InlineKeyboardMarkup с календарем
+     * @throws IllegalArgumentException если month не в диапазоне 1-12
+     */
+    private InlineKeyboardMarkup createCalendarKeyboard(int year, int month, User user, boolean allowPastDates, Long editingEventId) {
         if (month < 1 || month > 12) {
             throw new IllegalArgumentException("Month must be between 1 and 12");
         }
@@ -83,8 +140,8 @@ public class KeyboardLayoutService {
         Long familyId = user.getFamily() != null ? user.getFamily().getId() : null;
         ZoneId userZone = user.getZoneId();
         
-        log.debug("Создание inline-календаря для {}-{:02d}, userId={}, timezone={}, familyId={}", 
-                year, month, user.getId(), user.getTimezone(), familyId);
+        log.debug("Создание inline-календаря для {}-{:02d}, userId={}, timezone={}, familyId={}, allowPastDates={}, editingEventId={}", 
+                year, month, user.getId(), user.getTimezone(), familyId, allowPastDates, editingEventId);
         
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -98,9 +155,21 @@ public class KeyboardLayoutService {
         // Получаем события семьи за этот месяц
         LocalDate monthStart = yearMonth.atDay(1);
         LocalDate monthEnd = yearMonth.atEndOfMonth();
-        List<Event> monthEvents = eventRepository
-            .findByFamilyIdAndEventDateBetweenAndStatus(
-                familyId, monthStart, monthEnd, Event.EventStatus.ACTIVE);
+        
+        // Для календаря просмотра получаем активные и завершенные события, для создания - только активные
+        List<Event> monthEvents;
+        if (allowPastDates) {
+            // Календарь просмотра - включаем завершенные события
+            monthEvents = eventRepository
+                .findByFamilyIdAndEventDateBetween(familyId, monthStart, monthEnd).stream()
+                .filter(e -> e.getStatus() == Event.EventStatus.ACTIVE || e.getStatus() == Event.EventStatus.COMPLETED)
+                .collect(Collectors.toList());
+        } else {
+            // Календарь создания - только активные события
+            monthEvents = eventRepository
+                .findByFamilyIdAndEventDateBetweenAndStatus(
+                    familyId, monthStart, monthEnd, Event.EventStatus.ACTIVE);
+        }
         
         // Группируем события по датам
         Map<LocalDate, Event> firstEventByDate = monthEvents.stream()
@@ -155,17 +224,13 @@ public class KeyboardLayoutService {
             LocalDate date = LocalDate.of(year, month, day);
             InlineKeyboardButton dayBtn;
             
-            // Даты в прошлом отображаются как пустые ячейки
-            if (date.isBefore(today)) {
+            // Даты в прошлом отображаются как пустые ячейки (только если не разрешены прошлые даты)
+            if (!allowPastDates && date.isBefore(today)) {
                 dayBtn = new InlineKeyboardButton(" ");
                 dayBtn.setCallbackData("calendar_ignore");
             } else {
                 String dayText = String.valueOf(day);
-                
-                // Добавляем эмодзи для текущей даты
-                if (date.equals(today)) {
-                    dayText = "📍" + day;
-                }
+                boolean isCurrentDay = date.equals(today);
                 
                 // Если на этот день есть событие, добавляем инициал создателя
                 if (firstEventByDate.containsKey(date)) {
@@ -175,19 +240,31 @@ public class KeyboardLayoutService {
                     String superscriptInitial = toSuperscript(creatorInitial);
                     
                     long eventCount = eventCountByDate.getOrDefault(date, 0L);
-                    if (eventCount > 1) {
-                        dayText = day + superscriptInitial + "(" + eventCount + ")";
-                    } else {
-                        dayText = day + superscriptInitial;
+                    
+                    // Для текущего дня добавляем квадратные скобки вокруг даты
+                    if (isCurrentDay) {
+                        dayText = "[" + day + "]";
                     }
                     
-                    if (date.equals(today)) {
-                        dayText = "📍" + dayText;
+                    // Добавляем инициал после даты (или после скобки для текущего дня)
+                    if (eventCount > 1) {
+                        // Преобразуем число в надстрочный формат
+                        String superscriptCount = toSuperscriptNumber(String.valueOf(eventCount));
+                        dayText = dayText + superscriptInitial + superscriptCount;
+                    } else {
+                        dayText = dayText + superscriptInitial;
                     }
+                } else {
+                    // Для текущего дня без событий используем квадратные скобки
+                    if (isCurrentDay) {
+                        dayText = "[" + day + "]";
+                    }
+                    // Убираем точку - оставляем даты без дополнительных символов
                 }
                 
                 dayBtn = new InlineKeyboardButton(dayText);
-                dayBtn.setCallbackData(String.format("date_%d-%02d-%02d", year, month, day));
+                // Используем единый префикс calendar_ для всех типов календарей
+                dayBtn.setCallbackData(String.format("calendar_%d-%02d-%02d", year, month, day));
             }
             
             currentRow.add(dayBtn);
@@ -213,28 +290,51 @@ public class KeyboardLayoutService {
         List<InlineKeyboardButton> navigationRow = new ArrayList<>();
         
         YearMonth prevMonth = yearMonth.minusMonths(1);
-        if (prevMonth.isBefore(currentYearMonth)) {
+        // Для календаря просмотра разрешаем навигацию в прошлое
+        if (!allowPastDates && prevMonth.isBefore(currentYearMonth)) {
             InlineKeyboardButton disabledBtn = new InlineKeyboardButton("   ");
             disabledBtn.setCallbackData("calendar_ignore");
             navigationRow.add(disabledBtn);
         } else {
-            InlineKeyboardButton prevBtn = new InlineKeyboardButton("◀️ Пред");
+            InlineKeyboardButton prevBtn = new InlineKeyboardButton("⬅️");
+            // Используем единый префикс calendar_ для всех типов календарей
             prevBtn.setCallbackData(String.format("calendar_%d-%02d", 
                 prevMonth.getYear(), prevMonth.getMonthValue()));
             navigationRow.add(prevBtn);
         }
         
-        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
-        cancelBtn.setCallbackData("calendar_cancel");
-        navigationRow.add(cancelBtn);
+        InlineKeyboardButton todayBtn = new InlineKeyboardButton();
         
-        InlineKeyboardButton nextBtn = new InlineKeyboardButton("След ▶️");
+        if (editingEventId != null) {
+            // При редактировании - кнопка "Назад"
+            todayBtn.setText("🔙 Назад");
+            todayBtn.setCallbackData(CallbackPrefix.EDIT_BACK.withPayload(editingEventId.toString()));
+        } else {
+            // При создании или просмотре - кнопка "Сегодня"
+            todayBtn.setText("Сегодня");
+            todayBtn.setCallbackData(String.format("calendar_%d-%02d", 
+                currentYearMonth.getYear(), currentYearMonth.getMonthValue()));
+        }
+        
+        navigationRow.add(todayBtn);
+        
+        InlineKeyboardButton nextBtn = new InlineKeyboardButton("➡️");
         YearMonth nextMonth = yearMonth.plusMonths(1);
+        // Используем единый префикс calendar_ для всех типов календарей
         nextBtn.setCallbackData(String.format("calendar_%d-%02d", 
             nextMonth.getYear(), nextMonth.getMonthValue()));
         navigationRow.add(nextBtn);
         
         rows.add(navigationRow);
+        
+        // Добавляем кнопку "Отмена" в отдельный ряд только при создании нового события
+        if (editingEventId == null && !allowPastDates) {
+            List<InlineKeyboardButton> cancelRow = new ArrayList<>();
+            InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+            cancelBtn.setCallbackData("calendar_cancel");
+            cancelRow.add(cancelBtn);
+            rows.add(cancelRow);
+        }
         
         keyboard.setKeyboard(rows);
         
@@ -328,7 +428,7 @@ public class KeyboardLayoutService {
         // Кнопки навигации
         List<InlineKeyboardButton> navigationRow = new ArrayList<>();
         
-        InlineKeyboardButton backBtn = new InlineKeyboardButton("◀️ Назад");
+        InlineKeyboardButton backBtn = new InlineKeyboardButton("🔙 Назад");
         backBtn.setCallbackData("time_back");
         navigationRow.add(backBtn);
         
@@ -354,6 +454,19 @@ public class KeyboardLayoutService {
      * @throws IllegalArgumentException если параметры некорректны
      */
     public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate, User user) {
+        return createFilteredHourSelectionKeyboard(selectedDate, user, null);
+    }
+
+    /**
+     * Создает inline-клавиатуру для выбора часа с фильтрацией прошедших часов.
+     * 
+     * @param selectedDate выбранная дата события
+     * @param user пользователь (для определения timezone)
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если параметры некорректны
+     */
+    public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate, User user, Long editingEventId) {
         if (selectedDate == null) {
             log.error("Попытка создать фильтрованную клавиатуру часов с null selectedDate");
             throw new IllegalArgumentException("Selected date cannot be null");
@@ -363,8 +476,8 @@ public class KeyboardLayoutService {
             throw new IllegalArgumentException("User cannot be null");
         }
         
-        log.debug("Создание фильтрованной inline-клавиатуры для выбора часа: date={}, userId={}, timezone={}", 
-                selectedDate, user.getId(), user.getTimezone());
+        log.debug("Создание фильтрованной inline-клавиатуры для выбора часа: date={}, userId={}, timezone={}, editingEventId={}", 
+                selectedDate, user.getId(), user.getTimezone(), editingEventId);
         
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -398,10 +511,20 @@ public class KeyboardLayoutService {
             }
         }
         
-        // Кнопка отмены
+        // Кнопка отмены или возврата
         List<InlineKeyboardButton> cancelRow = new ArrayList<>();
-        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
-        cancelBtn.setCallbackData("time_cancel");
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton();
+        
+        if (editingEventId != null) {
+            // При редактировании - кнопка "Назад"
+            cancelBtn.setText("🔙 Назад");
+            cancelBtn.setCallbackData(CallbackPrefix.EDIT_BACK.withPayload(editingEventId.toString()));
+        } else {
+            // При создании - кнопка "Отмена"
+            cancelBtn.setText("❌ Отмена");
+            cancelBtn.setCallbackData("time_cancel");
+        }
+        
         cancelRow.add(cancelBtn);
         rows.add(cancelRow);
         
@@ -422,6 +545,20 @@ public class KeyboardLayoutService {
      * @throws IllegalArgumentException если параметры некорректны
      */
     public InlineKeyboardMarkup createFilteredMinuteSelectionKeyboard(int selectedHour, LocalDate selectedDate, User user) {
+        return createFilteredMinuteSelectionKeyboard(selectedHour, selectedDate, user, null);
+    }
+
+    /**
+     * Создает inline-клавиатуру для выбора минут с фильтрацией прошедших минут.
+     * 
+     * @param selectedHour выбранный час (0-23)
+     * @param selectedDate выбранная дата события
+     * @param user пользователь (для определения timezone)
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если параметры некорректны
+     */
+    public InlineKeyboardMarkup createFilteredMinuteSelectionKeyboard(int selectedHour, LocalDate selectedDate, User user, Long editingEventId) {
         if (selectedHour < 0 || selectedHour > 23) {
             log.error("Попытка создать фильтрованную клавиатуру минут с некорректным selectedHour: {}", selectedHour);
             throw new IllegalArgumentException("Selected hour must be between 0 and 23");
@@ -435,8 +572,8 @@ public class KeyboardLayoutService {
             throw new IllegalArgumentException("User cannot be null");
         }
         
-        log.debug("Создание фильтрованной inline-клавиатуры для выбора минут: hour={}, date={}, userId={}, timezone={}", 
-                selectedHour, selectedDate, user.getId(), user.getTimezone());
+        log.debug("Создание фильтрованной inline-клавиатуры для выбора минут: hour={}, date={}, userId={}, timezone={}, editingEventId={}", 
+                selectedHour, selectedDate, user.getId(), user.getTimezone(), editingEventId);
         
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -470,13 +607,16 @@ public class KeyboardLayoutService {
         // Кнопки навигации
         List<InlineKeyboardButton> navigationRow = new ArrayList<>();
         
-        InlineKeyboardButton backBtn = new InlineKeyboardButton("◀️ Назад");
+        InlineKeyboardButton backBtn = new InlineKeyboardButton("🔙 Назад");
         backBtn.setCallbackData("time_back");
         navigationRow.add(backBtn);
         
-        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
-        cancelBtn.setCallbackData("time_cancel");
-        navigationRow.add(cancelBtn);
+        if (editingEventId == null) {
+            // При создании - кнопка "Отмена"
+            InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+            cancelBtn.setCallbackData("time_cancel");
+            navigationRow.add(cancelBtn);
+        }
         
         rows.add(navigationRow);
         
@@ -612,6 +752,25 @@ public class KeyboardLayoutService {
         StringBuilder result = new StringBuilder();
         for (char c : text.toCharArray()) {
             result.append(SUPERSCRIPT_MAP.getOrDefault(c, c));
+        }
+        
+        return result.toString();
+    }
+    
+    /**
+     * Преобразует число в надстрочный формат используя Unicode символы.
+     * 
+     * @param number число в виде строки для преобразования
+     * @return число с надстрочными цифрами
+     */
+    private String toSuperscriptNumber(String number) {
+        if (number == null || number.isEmpty()) {
+            return number;
+        }
+        
+        StringBuilder result = new StringBuilder();
+        for (char c : number.toCharArray()) {
+            result.append(SUPERSCRIPT_DIGITS.getOrDefault(c, c));
         }
         
         return result.toString();

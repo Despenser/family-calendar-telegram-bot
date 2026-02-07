@@ -47,6 +47,9 @@ public enum CallbackPrefix {
     /** Редактирование события (формат: edit_event_{eventId}) */
     EDIT_EVENT("edit_event_"),
     
+    /** Возврат к меню выбора поля редактирования (формат: edit_back_{eventId}) */
+    EDIT_BACK("edit_back_"),
+    
     /** Отмена редактирования события (формат: edit_cancel_{eventId}) */
     EDIT_CANCEL("edit_cancel_"),
     
@@ -129,6 +132,9 @@ public enum CallbackPrefix {
     
     /** Пропуск добавления заметки к завершенному событию */
     SKIP_COMPLETION_NOTE("skip_completion_note"),
+    
+    /** Повторение события с новой датой и временем (формат: repeat_event_{eventId}) */
+    REPEAT_EVENT("repeat_event_"),
     
     // ===== Поиск =====
     

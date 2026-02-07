@@ -176,6 +176,39 @@ public class BotMessageBuilder {
     }
     
     /**
+     * Формирует сообщение для выбора даты при создании нового события.
+     * Включает шапку "📋 Создание нового события".
+     * 
+     * @return отформатированное сообщение с шапкой
+     */
+    public String buildSelectDateMessageWithHeader() {
+        return bold(EVENT_CREATION_HEADER) + "\n\nВыберите дату события:";
+    }
+    
+    /**
+     * Формирует сообщение для выбора даты при повторении события.
+     * Включает информацию о скопированных данных из исходного события.
+     * 
+     * @param originalEvent исходное событие, которое повторяется
+     * @return отформатированное сообщение с информацией о повторении
+     */
+    public String buildRepeatEventSelectDateMessage(Event originalEvent) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("🔄 ").append(bold("Повторение события")).append("\n\n");
+        sb.append("📝 ").append(bold("Название: ")).append(escape(originalEvent.getTitle())).append("\n");
+        
+        if (originalEvent.getDescription() != null && !originalEvent.getDescription().isBlank()) {
+            sb.append("📄 ").append(bold("Описание: ")).append(escape(originalEvent.getDescription())).append("\n");
+        }
+        
+        sb.append("👤 ").append(bold("Тип: "))
+          .append(originalEvent.getIsPersonal() ? "Персональное" : "Семейное").append("\n\n");
+        sb.append("Выберите новую дату для события:");
+        
+        return sb.toString();
+    }
+    
+    /**
      * Формирует сообщение о невозможности создания события на сегодня.
      * 
      * <p>Используется когда текущее время >= 23:46 и пользователь выбирает сегодняшнюю дату.
@@ -219,13 +252,11 @@ public class BotMessageBuilder {
         if (isPersonal) {
             return bold(EVENT_CREATION_HEADER) + "\n\n" +
                    "✅ " + escape("Выбрано: Персональное событие") + "\n\n" +
-                   italic("Только вы будете видеть это событие.") + "\n\n" +
-                   "📅 " + escape("Теперь выберите дату события:");
+                   italic("Только вы будете видеть это событие.");
         } else {
             return bold(EVENT_CREATION_HEADER) + "\n\n" +
                    "✅ " + escape("Выбрано: Семейное событие") + "\n\n" +
-                   italic("Все члены семьи будут видеть это событие.") + "\n\n" +
-                   "📅 " + escape("Теперь выберите дату события:");
+                   italic("Все члены семьи будут видеть это событие.");
         }
     }
     
@@ -599,5 +630,73 @@ public class BotMessageBuilder {
             return "";
         }
         return time.format(TIME_FORMATTER);
+    }
+    
+    // ===== Методы для календаря просмотра =====
+    
+    /**
+     * Формирует сообщение со списком событий на дату (для прошлых дат).
+     * 
+     * @param date дата
+     * @param events список событий
+     * @return отформатированное сообщение
+     */
+    public String buildDateEventsListMessage(LocalDate date, java.util.List<ru.golubyatnikov.family.calendar.bot.model.Event> events) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(escape("📅 События на ")).append(bold(date.format(DATE_FORMATTER))).append("\n\n");
+        sb.append(escape("Выберите событие для просмотра:"));
+        return sb.toString();
+    }
+    
+    /**
+     * Формирует сообщение для создания события на дату (для будущих дат без событий).
+     * 
+     * @param date дата
+     * @return отформатированное сообщение
+     */
+    public String buildCreateEventOnDateMessage(LocalDate date) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(escape("📅 ")).append(bold(date.format(DATE_FORMATTER))).append("\n\n");
+        sb.append(escape("На эту дату нет событий.")).append("\n\n");
+        sb.append(escape("Хотите создать событие?"));
+        return sb.toString();
+    }
+    
+    /**
+     * Формирует сообщение для управления событиями на дату (для будущих дат с событиями).
+     * 
+     * @param date дата
+     * @param events список событий
+     * @return отформатированное сообщение
+     */
+    public String buildDateEventsManagementMessage(LocalDate date, java.util.List<ru.golubyatnikov.family.calendar.bot.model.Event> events) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(escape("📅 События на ")).append(bold(date.format(DATE_FORMATTER))).append("\n\n");
+        sb.append(escape("Всего событий: ")).append(bold(String.valueOf(events.size()))).append("\n\n");
+        sb.append(escape("Выберите действие:"));
+        return sb.toString();
+    }
+    
+    /**
+     * Формирует сообщение для выбора времени события.
+     * 
+     * @param date выбранная дата
+     * @return отформатированное сообщение
+     */
+    public String buildSelectTimeMessage(LocalDate date) {
+        return escape("📋 Создание нового события") + "\n\n" +
+               escape("✅ Дата: ") + bold(date.format(DATE_FORMATTER)) + "\n\n" +
+               escape("Выберите время события:");
+    }
+    
+    /**
+     * Формирует сообщение для календаря просмотра событий.
+     * Включает шапку "📅 Календарь событий".
+     * 
+     * @return отформатированное сообщение с шапкой
+     */
+    public String buildCalendarViewMessage() {
+        return "📅 " + bold("Календарь событий") + "\n\n" +
+               escape("Выберите дату для просмотра, создания или редактирования событий:");
     }
 }

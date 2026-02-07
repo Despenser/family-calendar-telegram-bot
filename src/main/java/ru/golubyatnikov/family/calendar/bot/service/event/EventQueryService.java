@@ -247,4 +247,58 @@ public class EventQueryService {
         
         return result;
     }
+    
+    /**
+     * Получает активные события семьи на указанную дату.
+     * 
+     * @param familyId идентификатор семьи
+     * @param date дата для поиска событий
+     * @return список активных событий на указанную дату, отсортированный по времени
+     */
+    @Transactional(readOnly = true)
+    public List<Event> getEventsByDate(Long familyId, LocalDate date) {
+        log.debug("Получение активных событий для семьи ID={} на дату {}", familyId, date);
+        
+        if (familyId == null) {
+            throw new IllegalArgumentException("familyId не может быть null");
+        }
+        if (date == null) {
+            throw new IllegalArgumentException("date не может быть null");
+        }
+        
+        List<Event> events = eventRepository.findByFamilyIdAndEventDateAndStatusOrderByEventTimeAsc(
+            familyId, date, Event.EventStatus.ACTIVE);
+        
+        log.debug("Найдено {} активных событий для семьи ID={} на дату {}", 
+                 events.size(), familyId, date);
+        
+        return events;
+    }
+    
+    /**
+     * Получает активные и завершенные события семьи на указанную дату.
+     * Используется для просмотра событий в календаре, включая завершенные события в прошлом.
+     * 
+     * @param familyId идентификатор семьи
+     * @param date дата для поиска событий
+     * @return список активных и завершенных событий на указанную дату, отсортированный по времени
+     */
+    @Transactional(readOnly = true)
+    public List<Event> getEventsByDateIncludingCompleted(Long familyId, LocalDate date) {
+        log.debug("Получение активных и завершенных событий для семьи ID={} на дату {}", familyId, date);
+        
+        if (familyId == null) {
+            throw new IllegalArgumentException("familyId не может быть null");
+        }
+        if (date == null) {
+            throw new IllegalArgumentException("date не может быть null");
+        }
+        
+        List<Event> events = eventRepository.findByFamilyIdAndEventDateIncludingCompleted(familyId, date);
+        
+        log.debug("Найдено {} активных и завершенных событий для семьи ID={} на дату {}", 
+                 events.size(), familyId, date);
+        
+        return events;
+    }
 }

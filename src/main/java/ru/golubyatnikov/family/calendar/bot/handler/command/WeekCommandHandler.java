@@ -88,6 +88,8 @@ public class WeekCommandHandler implements CommandHandler {
             // Сортировка дат и вывод событий по дням
             LocalDate today = user.getCurrentDate();
             boolean firstDay = true;
+            int displayedEventsCount = 0; // Счетчик отображенных событий
+            
             for (int i = 0; i < 7; i++) {
                 LocalDate date = today.plusDays(i);
                 List<Event> dayEvents = eventsByDate.get(date);
@@ -105,12 +107,13 @@ public class WeekCommandHandler implements CommandHandler {
                     for (Event event : dayEvents) {
                         boolean hasReminders = reminderService.hasActiveReminders(event.getId());
                         messageBuilder.append(EventFormatter.formatEvent(event, user, hasReminders));
+                        displayedEventsCount++; // Увеличиваем счетчик отображенных событий
                     }
                 }
             }
             
-            // Добавляем счетчик без разделителя перед ним
-            messageBuilder.append(EventFormatter.formatEventCounter(filteredEvents.size()));
+            // Добавляем счетчик только отображенных событий
+            messageBuilder.append(EventFormatter.formatEventCounter(displayedEventsCount));
             
             String responseMessage = messageBuilder.toString();
             log.debug("Пользователю ID={} будет отправлен список из {} событий на неделю", 

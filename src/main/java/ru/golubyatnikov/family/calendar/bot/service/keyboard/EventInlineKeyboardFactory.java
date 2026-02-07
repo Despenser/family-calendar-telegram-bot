@@ -8,6 +8,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.service.attachment.AttachmentService;
+import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
 
 import java.time.LocalDate;
@@ -32,6 +33,7 @@ public class EventInlineKeyboardFactory {
 
     private final AttachmentService attachmentService;
     private final ReminderService reminderService;
+    private final ConversationStateService conversationStateService;
 
     /**
      * Создает inline клавиатуру для управления событием.
@@ -372,12 +374,24 @@ public class EventInlineKeyboardFactory {
      * @throws IllegalArgumentException если eventId некорректен
      */
     public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId) {
+        return createEditFieldSelectionKeyboard(eventId, null);
+    }
+    
+    /**
+     * Создает inline клавиатуру для выбора поля редактирования события.
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя (для проверки контекста редактирования)
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если eventId некорректен
+     */
+    public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId, Long userId) {
         if (eventId == null || eventId <= 0) {
             log.error("Попытка создать клавиатуру выбора поля с некорректным eventId: {}", eventId);
             throw new IllegalArgumentException("EventId должен быть положительным числом");
         }
         
-        log.debug("Создание inline клавиатуры выбора поля для редактирования события ID={}", eventId);
+        log.debug("Создание inline клавиатуры выбора поля для редактирования события ID={}, userId={}", eventId, userId);
         
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -404,9 +418,25 @@ public class EventInlineKeyboardFactory {
         row2.add(descBtn);
         rows.add(row2);
         
-        // Ряд 3: Отмена
+        // Ряд 3: Отмена или Назад (в зависимости от контекста)
         List<InlineKeyboardButton> row3 = new ArrayList<>();
-        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton();
+        
+        // Проверяем, редактируется ли событие из календаря
+        boolean isFromCalendar = false;
+        if (userId != null) {
+            ConversationStateService.EditingContext context = conversationStateService.getEditingContext(userId);
+            isFromCalendar = context != null && context.getSourceDate() != null;
+        }
+        
+        if (isFromCalendar) {
+            cancelBtn.setText("🔙 Назад");
+            log.debug("Создана кнопка 'Назад' для редактирования из календаря: eventId={}, userId={}", eventId, userId);
+        } else {
+            cancelBtn.setText("❌ Отмена");
+            log.debug("Создана кнопка 'Отмена' для обычного редактирования: eventId={}, userId={}", eventId, userId);
+        }
+        
         cancelBtn.setCallbackData("edit_cancel_" + eventId);
         row3.add(cancelBtn);
         rows.add(row3);

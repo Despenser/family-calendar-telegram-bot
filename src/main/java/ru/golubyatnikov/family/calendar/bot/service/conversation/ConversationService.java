@@ -24,6 +24,7 @@ import java.util.List;
  * <ol>
  *   <li>Выбор даты через inline-календарь</li>
  *   <li>Выбор времени через inline-кнопки</li>
+ *   <li>Выбор типа события (персональное или семейное)</li>
  *   <li>Ввод названия события</li>
  *   <li>Ввод описания события (опционально)</li>
  * </ol>
@@ -294,14 +295,14 @@ public class ConversationService {
      * @return текущий шаг диалога
      */
     public ConversationStep getCurrentStep(Event draft) {
-        if (draft.getIsPersonal() == null) {
-            return ConversationStep.WAITING_FOR_TYPE;
-        }
         if (draft.getEventDate() == null) {
             return ConversationStep.WAITING_FOR_DATE;
         }
         if (draft.getEventTime() == null) {
             return ConversationStep.WAITING_FOR_TIME;
+        }
+        if (draft.getIsPersonal() == null) {
+            return ConversationStep.WAITING_FOR_TYPE;
         }
         if (draft.getTitle() == null || draft.getTitle().isBlank()) {
             return ConversationStep.WAITING_FOR_TITLE;
@@ -349,14 +350,14 @@ public class ConversationService {
      * Определяют текущее состояние процесса создания события.
      */
     public enum ConversationStep {
-        /** Ожидание выбора типа события (персональное или семейное) */
-        WAITING_FOR_TYPE,
-        
         /** Ожидание выбора даты через inline-календарь */
         WAITING_FOR_DATE,
         
         /** Ожидание выбора времени через inline-кнопки */
         WAITING_FOR_TIME,
+        
+        /** Ожидание выбора типа события (персональное или семейное) */
+        WAITING_FOR_TYPE,
         
         /** Ожидание ввода названия события через текстовое сообщение */
         WAITING_FOR_TITLE,

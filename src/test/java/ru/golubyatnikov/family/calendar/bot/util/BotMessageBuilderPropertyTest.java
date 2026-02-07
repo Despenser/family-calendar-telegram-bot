@@ -200,6 +200,38 @@ class BotMessageBuilderPropertyTest {
     }
     
     /**
+     * Проверяет, что сообщение выбора даты с шапкой содержит заголовок создания события.
+     */
+    @Property(tries = 10)
+    void selectDateMessageWithHeaderContainsCreationHeader() {
+        String message = messageBuilder.buildSelectDateMessageWithHeader();
+        
+        assertThat(message)
+            .as("Сообщение должно содержать заголовок 'Создание нового события'")
+            .contains("Создание нового события");
+        
+        assertThat(message)
+            .as("Сообщение должно содержать текст 'Выберите дату события'")
+            .contains("Выберите дату события");
+    }
+    
+    /**
+     * Проверяет, что сообщение выбора даты без шапки не содержит заголовок создания.
+     */
+    @Property(tries = 10)
+    void selectDateMessageWithoutHeaderDoesNotContainCreationHeader() {
+        String message = messageBuilder.buildSelectDateMessage();
+        
+        assertThat(message)
+            .as("Сообщение не должно содержать заголовок 'Создание нового события'")
+            .doesNotContain("Создание нового события");
+        
+        assertThat(message)
+            .as("Сообщение должно содержать текст 'Выберите дату события'")
+            .contains("Выберите дату события");
+    }
+    
+    /**
      * Провайдер текста со специальными символами.
      */
     @Provide

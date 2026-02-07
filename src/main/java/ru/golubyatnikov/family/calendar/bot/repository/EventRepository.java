@@ -489,4 +489,45 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Query("SELECT e FROM Event e WHERE e.id = :id")
     @EntityGraph(attributePaths = {"reminders"})
     Optional<Event> findByIdWithReminders(@Param("id") Long id);
+    
+    /**
+     * Находит активные события семьи на указанную дату, отсортированные по времени.
+     * Используется для просмотра событий на конкретную дату в календаре.
+     * 
+     * @param familyId идентификатор семьи
+     * @param eventDate дата события
+     * @param status статус события (обычно ACTIVE)
+     *
+     * @return список активных событий на указанную дату, отсортированный по времени
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    @EntityGraph(attributePaths = {"user", "family"})
+    List<Event> findByFamilyIdAndEventDateAndStatusOrderByEventTimeAsc(
+        Long familyId,
+        LocalDate eventDate,
+        Event.EventStatus status
+    );
+    
+    /**
+     * Находит активные и завершенные события семьи на указанную дату, отсортированные по времени.
+     * Используется для просмотра событий на конкретную дату в календаре, включая завершенные события в прошлом.
+     * 
+     * @param familyId идентификатор семьи
+     * @param eventDate дата события
+     *
+     * @return список активных и завершенных событий на указанную дату, отсортированный по времени
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    @EntityGraph(attributePaths = {"user", "family"})
+    @Query("""
+                SELECT e FROM Event e
+                WHERE e.family.id = :familyId
+                AND e.eventDate = :eventDate
+                AND e.status IN ('ACTIVE', 'COMPLETED')
+                ORDER BY e.eventTime ASC
+    """)
+    List<Event> findByFamilyIdAndEventDateIncludingCompleted(
+        @Param("familyId") Long familyId,
+        @Param("eventDate") LocalDate eventDate
+    );
 }

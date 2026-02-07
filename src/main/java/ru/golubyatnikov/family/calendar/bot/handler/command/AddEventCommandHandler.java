@@ -20,6 +20,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * <ol>
  *   <li>Выбор даты через inline-календарь с навигацией по месяцам</li>
  *   <li>Выбор времени через inline-кнопки (час и минуты)</li>
+ *   <li>Выбор типа события (персональное или семейное)</li>
  *   <li>Ввод названия события через текстовое сообщение</li>
  *   <li>Ввод описания события (опционально)</li>
  *   <li>Создание события в базе данных</li>
@@ -43,6 +44,9 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * Бот: [Показывает выбор часа]
  * 
  * Пользователь: [Выбирает 18:00]
+ * Бот: [Показывает выбор типа события: Семейное/Персональное]
+ * 
+ * Пользователь: [Выбирает "Семейное"]
  * Бот: Теперь отправьте название события:
  * 
  * Пользователь: Новогодний ужин
@@ -124,19 +128,21 @@ public class AddEventCommandHandler implements CommandHandler {
             // Создаем черновик события
             conversationService.startEventCreation(user.getId());
             
-            // Показываем выбор типа события (персональное или семейное)
-            InlineKeyboardMarkup typeKeyboard = keyboardService.createEventTypeSelectionKeyboard();
+            // Показываем календарь для выбора даты
+            java.time.LocalDate now = user.getCurrentDate();
+            InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(
+                now.getYear(), now.getMonthValue(), user);
             
             // Отправляем сообщение и получаем объект Message с messageId
             org.telegram.telegrambots.meta.api.objects.Message sentMessage = 
                 messageService.sendMessageWithInlineKeyboardAndGet(chatId, 
-                    bold("📋 Создание нового события") + "\n\nВыберите тип события:", 
-                    typeKeyboard);
+                    bold("📋 Создание нового события") + "\n\nВыберите дату события:", 
+                    calendar);
             
             // Сохраняем messageId в черновике для последующих обновлений
             conversationService.setCreationMessageId(user.getId(), sentMessage.getMessageId().longValue());
             
-            log.debug("Клавиатура выбора типа события отправлена и messageId сохранен: userId={}, telegramId={}, messageId={}", 
+            log.debug("Календарь для выбора даты отправлен и messageId сохранен: userId={}, telegramId={}, messageId={}", 
                     user.getId(), telegramId, sentMessage.getMessageId());
             
             // Возвращаем null, так как ответ уже отправлен через TelegramMessageService

@@ -70,7 +70,7 @@ class WeekCommandHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new WeekCommandHandler(eventService, messageService, reminderService);
+        handler = new WeekCommandHandler(eventService, reminderService);
     }
 
     @Test

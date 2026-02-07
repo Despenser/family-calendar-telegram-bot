@@ -101,16 +101,13 @@ public class EventTypeCallbackHandler implements CallbackHandler {
         conversationService.updateEventType(user.getId(), isPersonal);
         log.info("Пользователь {} выбрал тип события: {}", user.getId(), eventType);
         
-        // Показываем календарь для выбора даты с учетом timezone пользователя
-        LocalDate now = user.getCurrentDate();
-        InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(
-            now.getYear(), now.getMonthValue(), user);
-        
-        String message = messageBuilder.buildEventTypeSelectedMessage(isPersonal);
+        // Показываем запрос на ввод названия события
+        String message = messageBuilder.buildEventTypeSelectedMessage(isPersonal) + 
+                        "\n\n" + bold("Теперь отправьте название события:");
         
         try {
-            // Обновляем сообщение создания через editMessageText
-            messageService.editMessageText(chatId, messageId, message, calendar);
+            // Обновляем сообщение создания через editMessageText (убираем клавиатуру)
+            messageService.editMessageText(chatId, messageId, message, null);
             log.debug("Сообщение создания обновлено после выбора типа: userId={}, messageId={}, type={}", 
                      user.getId(), messageId, eventType);
             messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.SELECTED);

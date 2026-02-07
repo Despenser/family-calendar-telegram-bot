@@ -43,6 +43,7 @@ public class ReplyKeyboardService {
     private static final String BTN_STATS = "📊 Статистика";
     private static final String BTN_SEARCH = "🔍 Поиск";
     private static final String BTN_FILTER = "🎯 Фильтр";
+    private static final String BTN_CALENDAR = "📅 Календарь";
 
     /**
      * Создает клавиатуру для авторизованного пользователя с полным набором команд.
@@ -77,25 +78,30 @@ public class ReplyKeyboardService {
         row1.add(new KeyboardButton(BTN_ADD));
         rows.add(row1);
         
-        // Ряд 2: Сегодня | Неделя | Месяц
+        // Ряд 2: Календарь
         KeyboardRow row2 = new KeyboardRow();
-        row2.add(new KeyboardButton(BTN_TODAY));
-        row2.add(new KeyboardButton(BTN_WEEK));
-        row2.add(new KeyboardButton(BTN_MONTH));
+        row2.add(new KeyboardButton(BTN_CALENDAR));
         rows.add(row2);
         
-        // Ряд 3: Поиск | Фильтр | Статистика
+        // Ряд 3: Сегодня | Неделя | Месяц
         KeyboardRow row3 = new KeyboardRow();
-        row3.add(new KeyboardButton(BTN_SEARCH));
-        row3.add(new KeyboardButton(BTN_FILTER));
-        row3.add(new KeyboardButton(BTN_STATS));
+        row3.add(new KeyboardButton(BTN_TODAY));
+        row3.add(new KeyboardButton(BTN_WEEK));
+        row3.add(new KeyboardButton(BTN_MONTH));
         rows.add(row3);
         
-        // Ряд 4: Корзина | Помощь
+        // Ряд 4: Поиск | Фильтр | Статистика
         KeyboardRow row4 = new KeyboardRow();
-        row4.add(new KeyboardButton(BTN_TRASH));
-        row4.add(new KeyboardButton(BTN_HELP));
+        row4.add(new KeyboardButton(BTN_SEARCH));
+        row4.add(new KeyboardButton(BTN_FILTER));
+        row4.add(new KeyboardButton(BTN_STATS));
         rows.add(row4);
+        
+        // Ряд 5: Корзина | Помощь
+        KeyboardRow row5 = new KeyboardRow();
+        row5.add(new KeyboardButton(BTN_TRASH));
+        row5.add(new KeyboardButton(BTN_HELP));
+        rows.add(row5);
         
         keyboard.setKeyboard(rows);
         
@@ -154,6 +160,7 @@ public class ReplyKeyboardService {
      *   <li>"📊 Статистика" → "/stats"</li>
      *   <li>"🔍 Поиск" → "/search"</li>
      *   <li>"🎯 Фильтр" → "/filter"</li>
+     *   <li>"📅 Календарь" → "/calendar"</li>
      * </ul>
      * 
      * @param buttonText текст кнопки для преобразования
@@ -180,6 +187,7 @@ public class ReplyKeyboardService {
             case BTN_STATS -> "/stats";
             case BTN_SEARCH -> "/search";
             case BTN_FILTER -> "/filter";
+            case BTN_CALENDAR -> "/calendar";
             default -> buttonText;
         };
         

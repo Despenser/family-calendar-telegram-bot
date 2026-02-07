@@ -181,6 +181,16 @@ public class EventService {
         return eventQueryService.isTomorrow(eventDate, user);
     }
     
+    @Transactional(readOnly = true)
+    public List<Event> getEventsByDate(Long familyId, LocalDate date) {
+        return eventQueryService.getEventsByDate(familyId, date);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<Event> getEventsByDateIncludingCompleted(Long familyId, LocalDate date) {
+        return eventQueryService.getEventsByDateIncludingCompleted(familyId, date);
+    }
+    
     // ===== Делегирование к EventDeletionService =====
     
     @Transactional
