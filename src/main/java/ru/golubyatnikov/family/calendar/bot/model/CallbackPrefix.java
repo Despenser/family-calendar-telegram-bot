@@ -33,7 +33,7 @@ public enum CallbackPrefix {
     /** Возврат к выбору часа */
     TIME_BACK("time_back"),
     
-    /** Отмена выбора времени */
+    /** Возврат к списку полей для редактирования */
     TIME_CANCEL("time_cancel"),
     
     // ===== События =====

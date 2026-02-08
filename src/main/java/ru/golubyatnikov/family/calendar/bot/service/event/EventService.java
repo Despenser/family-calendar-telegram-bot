@@ -267,24 +267,32 @@ public class EventService {
                     eventId, userId);
         }
         
-        // 4. Проверяем, является ли событие последним
+        // 4. Проверяем, является ли событие частью списка /my_events
+        // Событие является частью списка, если у него есть messageId и оно в списке активных
+        boolean isPartOfMyEventsList = (event.getMessageId() != null && eventPosition != -1);
+        log.debug("Событие ID={} является частью списка /my_events: {}", eventId, isPartOfMyEventsList);
+        
+        // 5. Проверяем, является ли событие последним
         boolean isLastEvent = (eventPosition == activeEventsBefore.size() - 1);
         log.debug("Событие ID={} находится на позиции {} из {}, является последним: {}", 
                  eventId, eventPosition, activeEventsBefore.size(), isLastEvent);
         
-        // 5. Завершаем событие БЕЗ обновления шапки
+        // 6. Завершаем событие БЕЗ обновления шапки
         Event completedEvent = completeEventWithoutHeaderUpdate(eventId, userId);
         log.info("Событие ID={} успешно завершено, статус изменён на COMPLETED", eventId);
         
-        // 6. Если событие не последнее и есть другие события - переупорядочиваем список
-        if (!isLastEvent && activeEventsBefore.size() > 1) {
-            log.info("Событие ID={} не является последним (позиция {} из {}), начинаем переупорядочивание", 
+        // 7. Если событие часть списка /my_events, не последнее и есть другие события - переупорядочиваем список
+        if (isPartOfMyEventsList && !isLastEvent && activeEventsBefore.size() > 1) {
+            log.info("Событие ID={} является частью списка /my_events и не последнее (позиция {} из {}), начинаем переупорядочивание", 
                     eventId, eventPosition, activeEventsBefore.size());
             reorderMyEventsList(userId, completedEvent, activeEventsBefore);
             log.info("Переупорядочивание списка завершено для пользователя ID={}", userId);
         } else {
-            if (isLastEvent) {
-                log.info("Событие ID={} является последним в списке, редактируем сообщение", 
+            if (!isPartOfMyEventsList) {
+                log.info("Событие ID={} не является частью списка /my_events (только что создано), редактируем сообщение создания", 
+                        eventId);
+            } else if (isLastEvent) {
+                log.info("Событие ID={} является последним в списке /my_events, редактируем сообщение", 
                         eventId);
             } else if (activeEventsBefore.size() <= 1) {
                 log.info("В списке только одно событие, редактируем сообщение");

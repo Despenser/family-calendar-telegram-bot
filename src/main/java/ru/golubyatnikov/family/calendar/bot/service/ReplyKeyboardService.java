@@ -72,15 +72,15 @@ public class ReplyKeyboardService {
         
         List<KeyboardRow> rows = new ArrayList<>();
         
-        // Ряд 1: Мои события | Добавить
+        // Ряд 1: Календарь
         KeyboardRow row1 = new KeyboardRow();
-        row1.add(new KeyboardButton(BTN_MY));
-        row1.add(new KeyboardButton(BTN_ADD));
+        row1.add(new KeyboardButton(BTN_CALENDAR));
         rows.add(row1);
         
-        // Ряд 2: Календарь
+        // Ряд 2: Мои события | Добавить
         KeyboardRow row2 = new KeyboardRow();
-        row2.add(new KeyboardButton(BTN_CALENDAR));
+        row2.add(new KeyboardButton(BTN_MY));
+        row2.add(new KeyboardButton(BTN_ADD));
         rows.add(row2);
         
         // Ряд 3: Сегодня | Неделя | Месяц

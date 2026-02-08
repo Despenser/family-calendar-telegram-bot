@@ -134,6 +134,18 @@ public class BotMessageBuilder {
     }
     
     /**
+     * Формирует сообщение о выборе часа при редактировании времени события.
+     * Включает шапку "🕐 Редактирование времени".
+     * 
+     * @param hour выбранный час
+     * @return отформатированное сообщение с шапкой
+     */
+    public String buildEditTimeHourSelectedMessage(int hour) {
+        return "🕐 Редактирование времени\n\n" +
+               formatMessage("✅ Час выбран: %02d:00\n\nТеперь выберите минуты:", hour);
+    }
+    
+    /**
      * Формирует сообщение о выборе времени.
      * 
      * @param time выбранное время
@@ -164,6 +176,16 @@ public class BotMessageBuilder {
      */
     public String buildSelectHourMessage() {
         return "🕐 Выберите час:";
+    }
+    
+    /**
+     * Формирует сообщение для выбора часа при редактировании времени события.
+     * Включает шапку "🕐 Редактирование времени".
+     * 
+     * @return отформатированное сообщение с шапкой
+     */
+    public String buildEditTimeSelectHourMessage() {
+        return "🕐 Редактирование времени\n\nВыберите новое время:";
     }
     
     /**

@@ -22,7 +22,7 @@ import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
  * <p>Обрабатывает следующие типы callback:</p>
  * <ul>
  *   <li>calendar_ - навигация по месяцам календаря (calendar_YYYY-MM)</li>
- *   <li>calendar_cancel - отмена выбора даты</li>
+ *   <li>calendar_cancel - возврат к списку полей для редактирования</li>
  *   <li>date_actions_ - действия с выбранной датой</li>
  * </ul>
  * 
@@ -70,7 +70,8 @@ public class NavigationCallbackHandler implements CallbackHandler {
                callbackData.startsWith("edit_my_events_on_date_") ||
                callbackData.startsWith("edit_event_from_calendar_") ||
                callbackData.startsWith("delete_my_events_on_date_") ||
-               callbackData.startsWith("repeat_event_");
+               callbackData.startsWith("repeat_event_") ||
+               callbackData.startsWith("back_to_calendar_");
     }
     
     @Override
@@ -91,7 +92,9 @@ public class NavigationCallbackHandler implements CallbackHandler {
             return;
         }
         
-        if (callbackData.startsWith("view_event_")) {
+        if (callbackData.startsWith("back_to_calendar_")) {
+            handleBackToCalendar(callbackData, user, chatId, messageId, callbackQueryId);
+        } else if (callbackData.startsWith("view_event_")) {
             handleViewEvent(callbackData, user, chatId, messageId, callbackQueryId);
         } else if (callbackData.startsWith("repeat_event_")) {
             handleRepeatEvent(callbackData, user, chatId, messageId, callbackQueryId);
@@ -109,6 +112,41 @@ public class NavigationCallbackHandler implements CallbackHandler {
             handleCalendarNavigation(callbackData, user, chatId, messageId, callbackQueryId);
         } else if (CallbackPrefix.DATE_ACTIONS.matches(callbackData)) {
             handleDateActions(callbackData, user, chatId, messageId, callbackQueryId);
+        }
+    }
+    
+    /**
+     * Обрабатывает возврат к календарю месяца.
+     * 
+     * @param callbackData данные callback (формат: back_to_calendar_YYYY-MM)
+     * @param user пользователь
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения
+     * @param callbackQueryId идентификатор callback query
+     */
+    private void handleBackToCalendar(String callbackData, User user, Long chatId, 
+                                      Integer messageId, String callbackQueryId) {
+        try {
+            String yearMonthStr = callbackData.substring("back_to_calendar_".length());
+            String[] parts = yearMonthStr.split("-");
+            int year = Integer.parseInt(parts[0]);
+            int month = Integer.parseInt(parts[1]);
+            
+            log.info("Пользователь {} возвращается к календарю месяца: год={}, месяц={}", 
+                    user.getId(), year, month);
+            
+            // Показываем календарь для выбранного месяца
+            InlineKeyboardMarkup keyboard = keyboardService.createViewCalendarKeyboard(year, month, user);
+            String message = messageBuilder.buildCalendarViewMessage();
+            
+            messageService.editMessageText(chatId, messageId, message, keyboard);
+            messageService.answerCallbackQuery(callbackQueryId, "");
+            
+            log.debug("Возврат к календарю месяца: год={}, месяц={}, userId={}", year, month, user.getId());
+        } catch (Exception e) {
+            log.error("Ошибка при возврате к календарю: userId={}, error={}", 
+                     user.getId(), e.getMessage());
+            throw new RuntimeException("Ошибка при возврате к календарю", e);
         }
     }
     
@@ -185,14 +223,8 @@ public class NavigationCallbackHandler implements CallbackHandler {
                         log.warn("Некорректный контекст редактирования при отмене: userId={}", user.getId());
                     }
                 } else {
-                    // Создание нового события - отменяем создание
-                    conversationService.cancelEventCreation(user.getId());
-                    
-                    String message = messageBuilder.buildEventCancelledMessage();
-                    messageService.editMessageText(chatId, messageId, message, null);
-                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.actionCancelled("Создание"));
-                    
-                    log.info("Создание события отменено пользователем {}", user.getId());
+                    // Создание нового события - возвращаем к календарю или экрану управления событиями
+                    handleBackFromEventCreation(user, chatId, messageId, callbackQueryId);
                 }
                 return;
             }
@@ -311,10 +343,12 @@ public class NavigationCallbackHandler implements CallbackHandler {
         try {
             log.info("Пользователь {} выбрал дату {} в календаре просмотра", user.getId(), selectedDate);
             
+            boolean isToday = selectedDate.equals(today);
             boolean isPastDate = selectedDate.isBefore(today);
+            boolean isFutureDate = selectedDate.isAfter(today);
             
-            // Для прошлых дат получаем события включая завершенные, для будущих - только активные
-            java.util.List<ru.golubyatnikov.family.calendar.bot.model.Event> events = isPastDate
+            // Для прошлых дат и сегодня получаем события включая завершенные, для будущих - только активные
+            java.util.List<ru.golubyatnikov.family.calendar.bot.model.Event> events = (isPastDate || isToday)
                 ? eventService.getEventsByDateIncludingCompleted(user.getFamily().getId(), selectedDate)
                 : eventService.getEventsByDate(user.getFamily().getId(), selectedDate);
             
@@ -325,7 +359,8 @@ public class NavigationCallbackHandler implements CallbackHandler {
             
             boolean hasEvents = !events.isEmpty();
             
-            log.debug("Дата {}: прошлая={}, события={}", selectedDate, isPastDate, hasEvents);
+            log.debug("Дата {}: сегодня={}, прошлая={}, будущая={}, события={}", 
+                     selectedDate, isToday, isPastDate, isFutureDate, hasEvents);
             
             if (isPastDate && !hasEvents) {
                 // Прошлая дата без событий - всплывающее сообщение
@@ -351,7 +386,42 @@ public class NavigationCallbackHandler implements CallbackHandler {
                         throw e;
                     }
                 }
-            } else if (!isPastDate && !hasEvents) {
+            } else if (isToday && !hasEvents) {
+                // Сегодняшняя дата без событий - предложение создать событие
+                String message = messageBuilder.buildCreateEventOnDateMessage(selectedDate);
+                InlineKeyboardMarkup keyboard = keyboardService.createCreateEventOnDateKeyboard(selectedDate);
+                
+                try {
+                    messageService.editMessageText(chatId, messageId, message, keyboard);
+                    messageService.answerCallbackQuery(callbackQueryId, "");
+                    log.info("Сегодняшняя дата {} без событий, предложено создание", selectedDate);
+                } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                    if (e.getMessage() != null && e.getMessage().contains("message is not modified")) {
+                        messageService.answerCallbackQuery(callbackQueryId, "");
+                        log.debug("Повторный клик на дату {}, сообщение не изменилось", selectedDate);
+                    } else {
+                        throw e;
+                    }
+                }
+            } else if (isToday && hasEvents) {
+                // Сегодняшняя дата с событиями - управление событиями (включая завершенные)
+                String message = messageBuilder.buildDateEventsManagementMessage(selectedDate, events);
+                InlineKeyboardMarkup keyboard = keyboardService.createDateEventsManagementKeyboard(
+                    selectedDate, events, user);
+                
+                try {
+                    messageService.editMessageText(chatId, messageId, message, keyboard);
+                    messageService.answerCallbackQuery(callbackQueryId, "");
+                    log.info("Сегодняшняя дата {} с {} событиями (включая завершенные), показано управление", selectedDate, events.size());
+                } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                    if (e.getMessage() != null && e.getMessage().contains("message is not modified")) {
+                        messageService.answerCallbackQuery(callbackQueryId, "");
+                        log.debug("Повторный клик на дату {}, сообщение не изменилось", selectedDate);
+                    } else {
+                        throw e;
+                    }
+                }
+            } else if (isFutureDate && !hasEvents) {
                 // Будущая дата без событий - предложение создать событие
                 String message = messageBuilder.buildCreateEventOnDateMessage(selectedDate);
                 InlineKeyboardMarkup keyboard = keyboardService.createCreateEventOnDateKeyboard(selectedDate);
@@ -505,10 +575,11 @@ public class NavigationCallbackHandler implements CallbackHandler {
             String dateStr = callbackData.substring("view_events_on_date_".length());
             java.time.LocalDate selectedDate = java.time.LocalDate.parse(dateStr);
             java.time.LocalDate today = user.getCurrentDate();
+            boolean isToday = selectedDate.equals(today);
             boolean isPastDate = selectedDate.isBefore(today);
             
-            // Для прошлых дат получаем события включая завершенные, для будущих - только активные
-            java.util.List<ru.golubyatnikov.family.calendar.bot.model.Event> events = isPastDate
+            // Для прошлых дат и сегодня получаем события включая завершенные, для будущих - только активные
+            java.util.List<ru.golubyatnikov.family.calendar.bot.model.Event> events = (isPastDate || isToday)
                 ? eventService.getEventsByDateIncludingCompleted(user.getFamily().getId(), selectedDate)
                 : eventService.getEventsByDate(user.getFamily().getId(), selectedDate);
             
@@ -766,6 +837,125 @@ public class NavigationCallbackHandler implements CallbackHandler {
         } catch (Exception e) {
             log.error("Ошибка при повторении события: userId={}, error={}", user.getId(), e.getMessage());
             throw new RuntimeException("Ошибка при повторении события", e);
+        }
+    }
+    
+    /**
+     * Обрабатывает возврат из создания события.
+     * Возвращает пользователя к календарю или экрану управления событиями в зависимости от наличия событий на дату.
+     * 
+     * @param user пользователь
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения
+     * @param callbackQueryId идентификатор callback query
+     */
+    private void handleBackFromEventCreation(User user, Long chatId, Integer messageId, String callbackQueryId) {
+        try {
+            // Получаем черновик события для определения даты
+            ru.golubyatnikov.family.calendar.bot.model.Event draft = conversationService.getActiveDraft(user.getId());
+            
+            if (draft == null || draft.getEventDate() == null) {
+                // Если черновика нет или дата не выбрана - возвращаем к текущему месяцу календаря
+                log.info("Возврат из создания события без выбранной даты: userId={}", user.getId());
+                
+                java.time.LocalDate currentDate = user.getCurrentDate();
+                int year = currentDate.getYear();
+                int month = currentDate.getMonthValue();
+                
+                InlineKeyboardMarkup keyboard = keyboardService.createViewCalendarKeyboard(year, month, user);
+                String message = messageBuilder.buildCalendarViewMessage();
+                
+                // Отменяем создание события
+                conversationService.cancelEventCreation(user.getId());
+                
+                messageService.editMessageText(chatId, messageId, message, keyboard);
+                messageService.answerCallbackQuery(callbackQueryId, "");
+                
+                log.debug("Возврат к календарю текущего месяца: userId={}, год={}, месяц={}", 
+                         user.getId(), year, month);
+                return;
+            }
+            
+            // Получаем выбранную дату из черновика
+            java.time.LocalDate selectedDate = draft.getEventDate();
+            java.time.LocalDate today = user.getCurrentDate();
+            boolean isToday = selectedDate.equals(today);
+            boolean isPastDate = selectedDate.isBefore(today);
+            boolean isFutureDate = selectedDate.isAfter(today);
+            
+            log.info("Возврат из создания события с выбранной датой: userId={}, дата={}", 
+                    user.getId(), selectedDate);
+            
+            // Получаем события на выбранную дату
+            // Для прошлых дат и сегодня получаем события включая завершенные, для будущих - только активные
+            java.util.List<ru.golubyatnikov.family.calendar.bot.model.Event> events = (isPastDate || isToday)
+                ? eventService.getEventsByDateIncludingCompleted(user.getFamily().getId(), selectedDate)
+                : eventService.getEventsByDate(user.getFamily().getId(), selectedDate);
+            
+            // Фильтруем персональные события других пользователей
+            events = events.stream()
+                .filter(event -> !event.getIsPersonal() || event.belongsToUser(user.getId()))
+                .collect(java.util.stream.Collectors.toList());
+            
+            boolean hasEvents = !events.isEmpty();
+            
+            // Отменяем создание события
+            conversationService.cancelEventCreation(user.getId());
+            
+            if (isPastDate && !hasEvents) {
+                // Прошлая дата без событий - возвращаем к календарю месяца
+                int year = selectedDate.getYear();
+                int month = selectedDate.getMonthValue();
+                
+                InlineKeyboardMarkup keyboard = keyboardService.createViewCalendarKeyboard(year, month, user);
+                String message = messageBuilder.buildCalendarViewMessage();
+                
+                messageService.editMessageText(chatId, messageId, message, keyboard);
+                messageService.answerCallbackQuery(callbackQueryId, "");
+                
+                log.info("Возврат к календарю (прошлая дата без событий): userId={}, дата={}", 
+                        user.getId(), selectedDate);
+            } else if (isPastDate && hasEvents) {
+                // Прошлая дата с событиями - показываем список событий
+                String message = messageBuilder.buildDateEventsListMessage(selectedDate, events);
+                InlineKeyboardMarkup keyboard = keyboardService.createDateEventsListKeyboard(
+                    selectedDate, events, user);
+                
+                messageService.editMessageText(chatId, messageId, message, keyboard);
+                messageService.answerCallbackQuery(callbackQueryId, "");
+                
+                log.info("Возврат к списку событий (прошлая дата): userId={}, дата={}, событий={}", 
+                        user.getId(), selectedDate, events.size());
+            } else if ((isToday || isFutureDate) && !hasEvents) {
+                // Сегодняшняя или будущая дата без событий - возвращаем к календарю месяца
+                int year = selectedDate.getYear();
+                int month = selectedDate.getMonthValue();
+                
+                InlineKeyboardMarkup keyboard = keyboardService.createViewCalendarKeyboard(year, month, user);
+                String message = messageBuilder.buildCalendarViewMessage();
+                
+                messageService.editMessageText(chatId, messageId, message, keyboard);
+                messageService.answerCallbackQuery(callbackQueryId, "");
+                
+                log.info("Возврат к календарю (сегодня или будущая дата без событий): userId={}, дата={}", 
+                        user.getId(), selectedDate);
+            } else {
+                // Сегодняшняя или будущая дата с событиями - показываем экран управления событиями
+                String message = messageBuilder.buildDateEventsManagementMessage(selectedDate, events);
+                InlineKeyboardMarkup keyboard = keyboardService.createDateEventsManagementKeyboard(
+                    selectedDate, events, user);
+                
+                messageService.editMessageText(chatId, messageId, message, keyboard);
+                messageService.answerCallbackQuery(callbackQueryId, "");
+                
+                log.info("Возврат к экрану управления событиями (сегодня или будущая дата): userId={}, дата={}, событий={}", 
+                        user.getId(), selectedDate, events.size());
+            }
+            
+        } catch (Exception e) {
+            log.error("Ошибка при возврате из создания события: userId={}, error={}", 
+                     user.getId(), e.getMessage());
+            throw new RuntimeException("Ошибка при возврате из создания события", e);
         }
     }
 }

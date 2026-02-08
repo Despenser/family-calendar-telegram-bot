@@ -327,10 +327,10 @@ public class KeyboardLayoutService {
         
         rows.add(navigationRow);
         
-        // Добавляем кнопку "Отмена" в отдельный ряд только при создании нового события
+        // Добавляем кнопку "Назад" в отдельный ряд только при создании нового события
         if (editingEventId == null && !allowPastDates) {
             List<InlineKeyboardButton> cancelRow = new ArrayList<>();
-            InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+            InlineKeyboardButton cancelBtn = new InlineKeyboardButton("🔙 Назад");
             cancelBtn.setCallbackData("calendar_cancel");
             cancelRow.add(cancelBtn);
             rows.add(cancelRow);
@@ -375,9 +375,9 @@ public class KeyboardLayoutService {
             }
         }
         
-        // Кнопка отмены
+        // Кнопка назад
         List<InlineKeyboardButton> cancelRow = new ArrayList<>();
-        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("🔙 Назад");
         cancelBtn.setCallbackData("time_cancel");
         cancelRow.add(cancelBtn);
         rows.add(cancelRow);
@@ -432,7 +432,7 @@ public class KeyboardLayoutService {
         backBtn.setCallbackData("time_back");
         navigationRow.add(backBtn);
         
-        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+        InlineKeyboardButton cancelBtn = new InlineKeyboardButton("🔙 Назад");
         cancelBtn.setCallbackData("time_cancel");
         navigationRow.add(cancelBtn);
         
@@ -511,7 +511,7 @@ public class KeyboardLayoutService {
             }
         }
         
-        // Кнопка отмены или возврата
+        // Кнопка возврата
         List<InlineKeyboardButton> cancelRow = new ArrayList<>();
         InlineKeyboardButton cancelBtn = new InlineKeyboardButton();
         
@@ -520,8 +520,8 @@ public class KeyboardLayoutService {
             cancelBtn.setText("🔙 Назад");
             cancelBtn.setCallbackData(CallbackPrefix.EDIT_BACK.withPayload(editingEventId.toString()));
         } else {
-            // При создании - кнопка "Отмена"
-            cancelBtn.setText("❌ Отмена");
+            // При создании - кнопка "Назад"
+            cancelBtn.setText("🔙 Назад");
             cancelBtn.setCallbackData("time_cancel");
         }
         
@@ -612,8 +612,8 @@ public class KeyboardLayoutService {
         navigationRow.add(backBtn);
         
         if (editingEventId == null) {
-            // При создании - кнопка "Отмена"
-            InlineKeyboardButton cancelBtn = new InlineKeyboardButton("❌ Отмена");
+            // При создании - кнопка "Назад"
+            InlineKeyboardButton cancelBtn = new InlineKeyboardButton("🔙 Назад");
             cancelBtn.setCallbackData("time_cancel");
             navigationRow.add(cancelBtn);
         }

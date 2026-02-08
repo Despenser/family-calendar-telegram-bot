@@ -303,12 +303,12 @@ public class InlineKeyboardService {
             rows.add(row);
         }
         
-        // Кнопка "Назад к календарю"
+        // Кнопка "Назад" - возвращаемся к экрану выбора действий с датой
         java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton> backRow = new java.util.ArrayList<>();
         org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton backButton = 
-            new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton("🔙 Назад к календарю");
-        // Возвращаемся к календарю месяца, а не к выбору даты
-        backButton.setCallbackData(String.format("calendar_%d-%02d", date.getYear(), date.getMonthValue()));
+            new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton("🔙 Назад");
+        // Возвращаемся к экрану выбора действий (повторный клик на дату покажет экран управления)
+        backButton.setCallbackData("calendar_" + date.toString());
         backRow.add(backButton);
         rows.add(backRow);
         
@@ -390,11 +390,12 @@ public class InlineKeyboardService {
             rows.add(secondRow);
         }
         
-        // Третий ряд: Назад к календарю
+        // Третий ряд: Назад - возвращаемся к календарю месяца
         java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton> backRow = new java.util.ArrayList<>();
         org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton backButton = 
-            new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton("🔙 Назад к календарю");
-        backButton.setCallbackData(String.format("calendar_%d-%02d", date.getYear(), date.getMonthValue()));
+            new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton("🔙 Назад");
+        // Возвращаемся к календарю месяца
+        backButton.setCallbackData(String.format("back_to_calendar_%d-%02d", date.getYear(), date.getMonthValue()));
         backRow.add(backButton);
         rows.add(backRow);
         

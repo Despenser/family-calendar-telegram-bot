@@ -97,7 +97,9 @@ public class EventDeleteHandler implements CallbackHandler {
                 .collect(java.util.stream.Collectors.toList());
             
             LocalDate today = LocalDate.now(user.getZoneId());
+            boolean isToday = eventDate.equals(today);
             boolean isPastDate = eventDate.isBefore(today);
+            boolean isFutureDate = eventDate.isAfter(today);
             
             if (allRemainingEvents.isEmpty()) {
                 // Событий вообще не осталось
@@ -110,7 +112,7 @@ public class EventDeleteHandler implements CallbackHandler {
                     // Удаляем сообщение и пользователь вернется к календарю
                     messageService.deleteMessageSilently(chatId, messageId);
                 } else {
-                    // Будущая дата без событий - показываем экран создания
+                    // Сегодняшняя или будущая дата без событий - показываем экран создания
                     log.info("На дату {} не осталось событий, показываем экран создания", eventDate);
                     
                     String message = messageBuilder.buildCreateEventOnDateMessage(eventDate);
