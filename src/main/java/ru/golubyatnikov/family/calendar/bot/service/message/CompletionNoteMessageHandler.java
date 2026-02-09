@@ -65,6 +65,13 @@ public class CompletionNoteMessageHandler {
             Long eventId = context.getEventId();
             Integer messageId = context.getMessageId();
             
+            // Получаем событие ДО добавления заметки, чтобы проверить было ли оно частью списка
+            ru.golubyatnikov.family.calendar.bot.model.Event eventBefore = 
+                eventService.getEventById(eventId);
+            boolean wasPartOfMyEventsList = (eventBefore.getMessageId() != null);
+            
+            log.debug("Событие ID={} было частью списка /my_events: {}", eventId, wasPartOfMyEventsList);
+            
             messageService.deleteMessageSilently(chatId, userMessageId);
             log.debug("Сообщение пользователя с заметкой удалено: chatId={}, messageId={}, userId={}", 
                     chatId, userMessageId, userId);
@@ -80,8 +87,14 @@ public class CompletionNoteMessageHandler {
             conversationStateService.clearAwaitingCompletionNote(userId);
             log.debug("Контекст добавления заметки очищен: userId={}", userId);
             
-            eventNotificationService.updateMyEventsHeaderAfterRemoval(userId);
-            log.info("Шапка /my_events обновлена после добавления заметки: userId={}", userId);
+            // Обновляем шапку /my_events только если событие было частью списка
+            if (wasPartOfMyEventsList) {
+                eventNotificationService.updateMyEventsHeaderAfterRemoval(userId);
+                log.info("Шапка /my_events обновлена после добавления заметки: userId={}", userId);
+            } else {
+                log.info("Событие ID={} не было частью списка /my_events (только что создано), шапка не обновляется: userId={}", 
+                        eventId, userId);
+            }
             
         } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
             handleEventNotFoundError(user, message.getChatId(), e);

@@ -268,9 +268,29 @@ public class EventService {
         }
         
         // 4. Проверяем, является ли событие частью списка /my_events
-        // Событие является частью списка, если у него есть messageId и оно в списке активных
-        boolean isPartOfMyEventsList = (event.getMessageId() != null && eventPosition != -1);
-        log.debug("Событие ID={} является частью списка /my_events: {}", eventId, isPartOfMyEventsList);
+        // Событие является частью списка /my_events, если:
+        // 1. У него есть messageId (было отправлено в Telegram как часть списка)
+        // 2. Оно в списке активных событий
+        // 3. Оно первое в списке (isMyEventsHeader=true)
+        //    ИЛИ в списке есть событие с isMyEventsHeader=true И текущее не на первой позиции
+        // Только что созданные события НЕ имеют messageId (он устанавливается только при добавлении в список)
+        boolean hasMessageId = (event.getMessageId() != null);
+        boolean isInActiveList = (eventPosition != -1);
+        boolean isFirstInMyEventsList = Boolean.TRUE.equals(event.getIsMyEventsHeader());
+        
+        // Проверяем, есть ли в списке событие с isMyEventsHeader=true (список существует)
+        boolean listHasFirstEvent = activeEventsBefore.stream()
+            .anyMatch(e -> Boolean.TRUE.equals(e.getIsMyEventsHeader()));
+        
+        // Событие часть списка /my_events если:
+        // - У него есть messageId (только события из списка имеют messageId)
+        // - И оно либо первое (isMyEventsHeader=true)
+        // - Либо список существует И текущее не на первой позиции
+        boolean isPartOfMyEventsList = hasMessageId && isInActiveList && 
+                                       (isFirstInMyEventsList || (listHasFirstEvent && eventPosition > 0));
+        
+        log.debug("Событие ID={} проверка принадлежности к списку /my_events: hasMessageId={}, isInActiveList={}, eventPosition={}, isMyEventsHeader={}, listHasFirstEvent={}, isPartOfMyEventsList={}", 
+                 eventId, hasMessageId, isInActiveList, eventPosition, event.getIsMyEventsHeader(), listHasFirstEvent, isPartOfMyEventsList);
         
         // 5. Проверяем, является ли событие последним
         boolean isLastEvent = (eventPosition == activeEventsBefore.size() - 1);

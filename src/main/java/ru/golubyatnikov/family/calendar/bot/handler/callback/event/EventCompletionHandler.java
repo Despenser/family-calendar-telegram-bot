@@ -90,8 +90,8 @@ public class EventCompletionHandler implements CallbackHandler {
                                      Integer messageId, String callbackQueryId) {
         Long eventId = extractEventId(callbackData, CallbackPrefix.COMPLETE_EVENT);
         
-        log.debug("Начало обработки завершения события с переупорядочиванием: eventId={}, userId={}", 
-                 eventId, userId);
+        log.debug("Начало обработки завершения события с переупорядочиванием: eventId={}, userId={}, messageId={}", 
+                 eventId, userId, messageId);
         
         try {
             // Завершаем событие с переупорядочиванием списка
@@ -100,10 +100,12 @@ public class EventCompletionHandler implements CallbackHandler {
             log.info("Событие ID={} успешно завершено с переупорядочиванием пользователем ID={}", 
                     eventId, userId);
             
-            // Сохраняем контекст для добавления заметки
+            // Определяем messageId для сохранения в контексте:
+            // - Если у события есть messageId (из списка /my_events), используем его
+            // - Иначе используем messageId из callback query (сообщение создания события)
             Integer updatedMessageId = completedEvent.getMessageId() != null 
                 ? completedEvent.getMessageId().intValue() 
-                : null;
+                : messageId;
             
             conversationStateService.setAwaitingCompletionNote(
                 userId, 
@@ -234,6 +236,12 @@ public class EventCompletionHandler implements CallbackHandler {
             // Получаем событие
             Event event = eventService.getEventById(eventId);
             
+            // Проверяем, было ли событие частью списка /my_events
+            // Если у события был messageId до завершения, значит оно было в списке
+            boolean wasPartOfMyEventsList = (event.getMessageId() != null);
+            
+            log.debug("Событие ID={} было частью списка /my_events: {}", eventId, wasPartOfMyEventsList);
+            
             // Формируем финальное сообщение с карточкой события
             String eventMessage = botMessageBuilder.buildCompletedEventMessage(event);
             
@@ -267,11 +275,16 @@ public class EventCompletionHandler implements CallbackHandler {
             
             log.info("Контекст очищен после пропуска заметки: userId={}, eventId={}", userId, eventId);
             
-            // Обновляем шапку /my_events после отображения карточки события
-            eventNotificationService.updateMyEventsHeaderAfterRemoval(userId);
-            
-            log.info("Шапка /my_events обновлена после пропуска заметки к событию ID={}: userId={}", 
-                    eventId, userId);
+            // Обновляем шапку /my_events только если событие было частью списка
+            if (wasPartOfMyEventsList) {
+                eventNotificationService.updateMyEventsHeaderAfterRemoval(userId);
+                
+                log.info("Шапка /my_events обновлена после пропуска заметки к событию ID={}: userId={}", 
+                        eventId, userId);
+            } else {
+                log.info("Событие ID={} не было частью списка /my_events (только что создано), шапка не обновляется: userId={}", 
+                        eventId, userId);
+            }
             
             // Отвечаем на callback query
             messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);

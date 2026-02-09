@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
@@ -48,6 +49,7 @@ public class TextEventCallbackHandler implements CallbackHandler {
     private final TelegramMessageService messageService;
     private final BotMessageBuilder messageBuilder;
     private final ru.golubyatnikov.family.calendar.bot.service.event.EventService eventService;
+    private final ru.golubyatnikov.family.calendar.bot.service.KeyboardService keyboardService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -198,10 +200,13 @@ public class TextEventCallbackHandler implements CallbackHandler {
                                       Long chatId, Integer messageId, String callbackQueryId) {
         try {
             if (createdEvent != null) {
-                // Успешное создание - отправляем сообщение о событии и сохраняем messageId
+                // Успешное создание - отправляем сообщение о событии БЕЗ сохранения messageId
+                // messageId будет установлен только при добавлении в список /my_events
                 try {
-                    eventService.sendOrUpdateEventMessage(createdEvent, chatId);
-                    log.debug("Сообщение о созданном событии отправлено и messageId сохранён: eventId={}", 
+                    String eventMessage = messageBuilder.buildEventCreatedMessage(createdEvent);
+                    InlineKeyboardMarkup eventKeyboard = keyboardService.createEventActionsKeyboard(createdEvent.getId());
+                    messageService.editMessageText(chatId, messageId, eventMessage, eventKeyboard);
+                    log.debug("Сообщение о созданном событии отправлено БЕЗ сохранения messageId: eventId={}", 
                             createdEvent.getId());
                     messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.CREATED);
                 } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
