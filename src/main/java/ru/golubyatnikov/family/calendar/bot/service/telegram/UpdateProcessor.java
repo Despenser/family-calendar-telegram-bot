@@ -129,7 +129,17 @@ public class UpdateProcessor {
         }
         
         // Проверяем авторизацию
+        // Если пользователь не авторизован, проверяем требует ли команда авторизации
         if (userOpt.isEmpty()) {
+            // Проверяем, является ли это командой, которая не требует авторизации
+            if (commandText != null && commandText.startsWith("/") && commandDispatcher.hasHandler(commandText)) {
+                // Команда существует - проверяем, требует ли она авторизации
+                // Если команда не требует авторизации (например, /start или /help), обрабатываем её
+                handleCommand(message);
+                return;
+            }
+            
+            // Для всех остальных случаев отправляем сообщение о необходимости авторизации
             handleUnauthorizedMessage(message, commandText);
             return;
         }

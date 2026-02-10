@@ -6,10 +6,8 @@ import org.springframework.lang.NonNull;
 
 /**
  * Enum для типизации callback data prefixes.
- * Устраняет магические строки и обеспечивает type-safety.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
  */
 @Getter
@@ -105,14 +103,6 @@ public enum CallbackPrefix {
     /** Возврат к минималистичному виду напоминания (формат: back_to_reminder_{eventId}_{reminderId}) */
     BACK_TO_REMINDER("back_to_reminder_"),
     
-    // ===== Повторения =====
-    
-    /** Настройка повторений (формат: recurrence_{action}_{eventId}) */
-    RECURRENCE("recurrence_"),
-    
-    /** Действия с серией повторяющихся событий (формат: series_action_{action}_{eventId}) */
-    SERIES_ACTION("series_action_"),
-    
     // ===== Дополнительные функции =====
     
     /** Действия с датой (формат: date_actions_{action}_{date}) */
@@ -120,9 +110,6 @@ public enum CallbackPrefix {
     
     /** Прикрепление файлов (формат: attach_file_{action}_{eventId}) */
     ATTACH_FILE("attach_file_"),
-    
-    /** Работа с чек-листами (формат: checklist_{action}_{eventId}) */
-    CHECKLIST("checklist_"),
     
     /** Работа с комментариями (формат: comment_{action}_{eventId}) */
     COMMENT("comment_"),
@@ -240,7 +227,7 @@ public enum CallbackPrefix {
                 return prefix;
             }
         }
-        
+
         return null;
     }
     

@@ -13,24 +13,15 @@ import java.util.List;
 
 /**
  * Конфигурация автоматических напоминаний по умолчанию.
- * Загружает настройки из application.yml (секция reminder.defaults).
- * 
- * <p>Позволяет настроить:
- * <ul>
- *   <li>Глобальное включение/отключение автоматических напоминаний</li>
- *   <li>Список типов напоминаний, создаваемых автоматически</li>
- * </ul>
- * 
+ *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-27
- * @see ReminderType
  */
-@Configuration
-@ConfigurationProperties(prefix = "reminder.defaults")
 @Getter
 @Setter
 @Slf4j
+@Configuration
+@ConfigurationProperties(prefix = "reminder.defaults")
 public class DefaultReminderConfig {
     
     /**
@@ -52,11 +43,6 @@ public class DefaultReminderConfig {
     /**
      * Инициализация конфигурации после загрузки свойств.
      * Логирует состояние автоматических напоминаний при старте приложения.
-     * 
-     * <p>Если автоматические напоминания отключены глобально (enabled = false),
-     * логирует предупреждение с уровнем WARN.</p>
-     * 
-     * <p><b>Требование:</b> 10.5</p>
      */
     @PostConstruct
     public void init() {

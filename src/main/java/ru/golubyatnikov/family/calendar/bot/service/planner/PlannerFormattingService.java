@@ -293,7 +293,6 @@ public class PlannerFormattingService {
             case MORNING_OF_DAY -> "Утром в день события";
             case EVENING_BEFORE -> "Вечером накануне";
             case ONE_HOUR_BEFORE -> "За 1 час до события";
-            case TEN_MINUTES_BEFORE -> "За 10 минут до события";
             case FIFTEEN_MINUTES_BEFORE -> "За 15 минут до события";
             case CUSTOM -> "За " + reminder.getCustomMinutes() + " минут до события";
         };

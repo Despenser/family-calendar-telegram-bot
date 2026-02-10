@@ -4,7 +4,6 @@ package ru.golubyatnikov.family.calendar.bot.model;
  * Категории сообщений для неавторизованных пользователей.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
  */
 public enum MessageCategory {

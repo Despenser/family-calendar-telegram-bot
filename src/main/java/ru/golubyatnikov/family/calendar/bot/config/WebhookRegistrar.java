@@ -10,12 +10,9 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-
 import ru.golubyatnikov.family.calendar.bot.service.authorization.WebhookSecurityService;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -48,27 +45,19 @@ public class WebhookRegistrar {
         log.debug("Webhook URL: {}", botConfig.getWebhookUrl());
 
         try {
-            // Формируем URL для Telegram Bot API
             String apiUrl = String.format("https://api.telegram.org/bot%s/setWebhook", botConfig.getToken());
-
-            // Генерируем secret token для безопасной валидации webhook запросов
             String secretToken = webhookSecurityService.generateSecretToken();
-            
-            // Подготавливаем тело запроса
-            // Используем secret_token вместо токена в URL для безопасности
+
             Map<String, String> requestBody = new HashMap<>();
             requestBody.put("url", botConfig.getWebhookUrl());
             requestBody.put("secret_token", secretToken);
 
-            // Настраиваем заголовки
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
-            // Создаем HTTP запрос
             HttpEntity<Map<String, String>> request = new HttpEntity<>(requestBody, headers);
 
-            // Выполняем запрос к Telegram API
-            ResponseEntity<Map> response = restTemplate.exchange(
+            var response = restTemplate.exchange(
                     apiUrl,
                     HttpMethod.POST,
                     request,
@@ -76,11 +65,12 @@ public class WebhookRegistrar {
             );
 
             // Проверяем результат
-            Map<String, Object> responseBody = response.getBody();
+            var responseBody = response.getBody();
             if (responseBody != null && Boolean.TRUE.equals(responseBody.get("ok"))) {
                 log.info("✓ Webhook успешно зарегистрирован для бота: {}", botConfig.getUsername());
                 log.info("✓ URL: {}", botConfig.getWebhookUrl());
                 log.debug("✓ Ответ от Telegram API: {}", responseBody);
+
             } else {
                 String errorDescription = responseBody != null ? 
                         String.valueOf(responseBody.get("description")) : "Неизвестная ошибка";
@@ -91,13 +81,6 @@ public class WebhookRegistrar {
         } catch (Exception e) {
             log.error("✗ Ошибка при регистрации webhook для бота: {}", botConfig.getUsername(), e);
             log.error("✗ Детали ошибки: {}", e.getMessage());
-            log.error("✗ Проверьте:");
-            log.error("  - Корректность токена бота (TELEGRAM_BOT_TOKEN)");
-            log.error("  - Доступность webhook URL (TELEGRAM_BOT_WEBHOOK_URL)");
-            log.error("  - Использование HTTPS протокола");
-            log.error("  - Использование поддерживаемого порта (443, 80, 88, 8443)");
-            log.error("  - Доступность Telegram API (https://api.telegram.org)");
-            
             shutdownApplication("Ошибка регистрации webhook: " + e.getMessage());
         }
     }
@@ -114,11 +97,11 @@ public class WebhookRegistrar {
         log.error("Причина: {}", reason);
         log.error("═══════════════════════════════════════════════════════════");
         
-        // Выполняем graceful shutdown в отдельном потоке
+        // Выполняем graceful shutdown в отдельном потоке,
         // чтобы позволить текущему методу завершиться корректно
         new Thread(() -> {
             try {
-                Thread.sleep(1000); // Даем время на завершение логирования
+                Thread.sleep(1000);
                 SpringApplication.exit(applicationContext, () -> 1);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

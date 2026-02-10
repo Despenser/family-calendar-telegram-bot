@@ -186,12 +186,6 @@ public class ConversationService {
      * @param messageId идентификатор сообщения Telegram, которое будет обновляться
      * @throws IllegalStateException если активный черновик не найден для пользователя
      * @throws IllegalArgumentException если userId или messageId равны null
-     * 
-     * @see Event#getMessageId()
-     * @see Event#setMessageId(Long)
-     * @see ru.golubyatnikov.family.calendar.bot.handler.AddEventCommandHandler#handle
-     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#sendMessageWithInlineKeyboardAndGet
-     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#editMessageText
      */
     @Transactional
 

@@ -11,9 +11,7 @@ import java.util.List;
  * Предоставляет методы для CRUD операций и поиска записей истории.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
- * @see EventHistory
  */
 @Repository
 public interface EventHistoryRepository extends JpaRepository<EventHistory, Long> {

@@ -11,9 +11,7 @@ import java.util.List;
  * Предоставляет методы для CRUD операций и поиска вложений.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
- * @see Attachment
  */
 @Repository
 public interface AttachmentRepository extends JpaRepository<Attachment, Long> {

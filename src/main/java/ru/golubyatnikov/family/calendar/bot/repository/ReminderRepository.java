@@ -17,9 +17,7 @@ import java.util.Optional;
  * Предоставляет методы для CRUD операций и поиска напоминаний.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
- * @see Reminder
  */
 @Repository
 public interface ReminderRepository extends JpaRepository<Reminder, Long> {
@@ -37,17 +35,6 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
     
     /**
      * Находит все неотправленные напоминания, время которых наступило.
-     * Использует <= вместо BETWEEN для предотвращения пропусков.
-     * 
-     * <p>Этот метод используется новой логикой отправки напоминаний с UTC.
-     * Он находит все напоминания, где:</p>
-     * <ul>
-     *   <li>sent = false</li>
-     *   <li>reminder_time <= nowUTC (время наступило)</li>
-     *   <li>reminder_time >= oneHourAgo (не старше 1 часа)</li>
-     * </ul>
-     * 
-     * <p><b>Требования:</b> 3.3, 3.4</p>
      * 
      * @param nowUTC текущее время в UTC
      * @param oneHourAgo время час назад в UTC (для фильтрации старых напоминаний)
@@ -62,11 +49,6 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
     /**
      * Находит напоминание по ID с пессимистической блокировкой.
      * Предотвращает одновременную обработку одного напоминания несколькими процессами.
-     * 
-     * <p>Использует PESSIMISTIC_WRITE блокировку для обеспечения атомарности
-     * операций проверки и обновления флага sent.</p>
-     * 
-     * <p><b>Требования:</b> 2.3, 3.1, 3.3</p>
      * 
      * @param id идентификатор напоминания
      * @return напоминание с блокировкой или empty если не найдено
@@ -94,11 +76,7 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
     List<Reminder> findByEventIdAndSentFalse(Long eventId);
     
     /**
-     * Находит напоминание по ID с eager загрузкой связанного события.
-     * Использует EntityGraph для предотвращения LazyInitializationException.
-     * 
-     * <p>Загружает напоминание вместе со связанным событием в одном запросе,
-     * что позволяет использовать event вне транзакции.</p>
+     * Находит напоминание по ID с загрузкой связанного события.
      * 
      * @param id идентификатор напоминания
      * @return напоминание с загруженным событием или empty если не найдено
@@ -107,22 +85,7 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
     Optional<Reminder> findWithEventById(Long id);
     
     /**
-     * Находит напоминание по ID с eager загрузкой события и пользователя.
-     * 
-     * <p>Использует @EntityGraph для загрузки связанных сущностей в одном запросе.
-     * Это предотвращает LazyInitializationException при доступе к event.user
-     * вне транзакции.</p>
-     * 
-     * <p>Загружаемые связи:</p>
-     * <ul>
-     *   <li>event - событие напоминания</li>
-     *   <li>event.user - пользователь-создатель события</li>
-     * </ul>
-     * 
-     * <p>Метод используется в сценариях, где необходим доступ к timezone
-     * пользователя-создателя события для корректного форматирования времени.</p>
-     * 
-     * <p><b>Требования:</b> 1.1, 2.1</p>
+     * Находит напоминание по ID с загрузкой события и пользователя.
      * 
      * @param id идентификатор напоминания
      * @return напоминание с загруженным событием и пользователем или empty если не найдено

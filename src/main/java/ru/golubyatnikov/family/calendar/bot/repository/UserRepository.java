@@ -10,7 +10,6 @@ import java.util.Optional;
  * Spring Data JPA репозиторий для работы с сущностью {@link User}.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
  */
 @Repository

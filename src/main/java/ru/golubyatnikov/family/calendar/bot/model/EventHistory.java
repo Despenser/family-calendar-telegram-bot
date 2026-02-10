@@ -12,10 +12,7 @@ import java.time.LocalDateTime;
  * Отслеживает все действия пользователей с событиями для аудита и отображения истории.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
- * @see Event
- * @see User
  */
 @Entity
 @Table(name = "event_history")

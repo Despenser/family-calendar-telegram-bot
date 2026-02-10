@@ -9,7 +9,6 @@ import java.lang.annotation.Target;
  * Аннотация для маркировки методов, в которых нужна централизованная обработка ошибок.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
  */
 @Target(ElementType.METHOD)

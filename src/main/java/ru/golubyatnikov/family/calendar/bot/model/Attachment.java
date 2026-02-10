@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
  * Хранит информацию о файлах, прикрепленных к событиям (билеты, документы, изображения).
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
  * @see Event
  */

@@ -359,20 +359,9 @@ class CallbackQueryDispatcherPropertyTest {
             CallbackPrefix.REMINDER.matches(callbackData)
         ));
         
-        // RecurrenceCallbackHandler
-        handlers.add(createMockHandler(CallbackPrefix.RECURRENCE, callbackData ->
-            CallbackPrefix.RECURRENCE.matches(callbackData) ||
-            CallbackPrefix.SERIES_ACTION.matches(callbackData)
-        ));
-        
         // AttachmentCallbackHandler
         handlers.add(createMockHandler(CallbackPrefix.ATTACH_FILE, callbackData ->
             CallbackPrefix.ATTACH_FILE.matches(callbackData)
-        ));
-        
-        // ChecklistCallbackHandler
-        handlers.add(createMockHandler(CallbackPrefix.CHECKLIST, callbackData ->
-            CallbackPrefix.CHECKLIST.matches(callbackData)
         ));
         
         // DateActionsCallbackHandler (через NavigationCallbackHandler)

@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul 2>&1
 REM Скрипт для генерации самоподписанных SSL сертификатов для Telegram Webhook
 REM Использование: generate-ssl-certs.bat <PUBLIC_IP> [DAYS]
 REM Пример: generate-ssl-certs.bat 176.108.254.68
@@ -8,7 +9,7 @@ setlocal enabledelayedexpansion
 
 REM Проверка аргументов
 if "%~1"=="" (
-    echo Ошибка: Не указан публичный IP адрес
+    echo [ОШИБКА] Не указан публичный IP адрес
     echo Использование: %~nx0 ^<PUBLIC_IP^> [DAYS]
     echo Пример: %~nx0 176.108.254.68
     echo Пример: %~nx0 176.108.254.68 365
@@ -31,16 +32,16 @@ if not exist "%SSL_DIR%" mkdir "%SSL_DIR%"
 
 REM Проверяем, существуют ли уже сертификаты
 if exist "%CERT_FILE%" if exist "%KEY_FILE%" (
-    echo Внимание: Сертификаты уже существуют
+    echo [ПРЕДУПРЕЖДЕНИЕ] Сертификаты уже существуют
     set /p REPLY="Перезаписать существующие сертификаты? (y/N): "
     if /i not "!REPLY!"=="y" (
-        echo Генерация отменена
+        echo [ОТМЕНА] Генерация отменена
         exit /b 0
     )
 )
 
 REM Генерируем сертификаты
-echo Генерация сертификатов...
+echo [ГЕНЕРАЦИЯ] Генерация сертификатов...
 openssl req -newkey rsa:2048 -sha256 -nodes ^
     -keyout "%KEY_FILE%" ^
     -x509 -days %CERT_DAYS% ^
@@ -48,12 +49,12 @@ openssl req -newkey rsa:2048 -sha256 -nodes ^
     -subj "/C=RU/ST=Moscow/L=Moscow/O=Bot/CN=%PUBLIC_IP%"
 
 if %ERRORLEVEL% equ 0 (
-    echo [OK] Сертификаты успешно созданы
+    echo [УСПЕХ] Сертификаты успешно созданы
     echo   Сертификат: %CERT_FILE%
     echo   Ключ: %KEY_FILE%
     
     echo.
-    echo Информация о сертификате:
+    echo [ИНФО] Информация о сертификате:
     openssl x509 -in "%CERT_FILE%" -noout -subject -dates
     
     echo.

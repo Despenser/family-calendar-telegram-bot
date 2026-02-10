@@ -10,16 +10,9 @@ import java.time.LocalDateTime;
 
 /**
  * Entity класс для хранения состояния диалога пользователя с ботом.
- * 
- * <p>Используется для сохранения контекста между операциями, в частности
- * для хранения информации о сообщениях с вложениями, которые нужно редактировать
- * вместо создания новых сообщений.</p>
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
- * @see User
- * @see Event
  */
 @Entity
 @Table(name = "conversation_states", indexes = {

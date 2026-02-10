@@ -22,7 +22,6 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.italic
  * Глобальный обработчик исключений для всего приложения.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
  */
 @RestControllerAdvice

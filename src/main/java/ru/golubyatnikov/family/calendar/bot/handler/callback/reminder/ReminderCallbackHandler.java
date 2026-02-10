@@ -638,8 +638,6 @@ public class ReminderCallbackHandler {
                 return "Вечером накануне";
             case ONE_HOUR_BEFORE:
                 return "За 1 час";
-            case TEN_MINUTES_BEFORE:
-                return "За 10 минут";
             case FIFTEEN_MINUTES_BEFORE:
                 return "За 15 минут";
             case CUSTOM:

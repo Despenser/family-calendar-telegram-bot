@@ -10,13 +10,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * Главный класс приложения Family Calendar Bot.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
  */
-@SpringBootApplication
-@EnableScheduling
 @EnableAsync
 @EnableRetry
+@EnableScheduling
+@SpringBootApplication
 public class Application {
 
     /**

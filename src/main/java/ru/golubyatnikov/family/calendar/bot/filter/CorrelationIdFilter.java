@@ -42,10 +42,9 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
      * @throws IOException если возникает ошибка ввода-вывода
      */
     @Override
-    protected void doFilterInternal(
-            @NonNull HttpServletRequest request,
-            @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain filterChain) throws ServletException, IOException {
         try {
             String correlationId = extractOrGenerateCorrelationId(request);
             MDC.put(CORRELATION_ID_MDC_KEY, correlationId);

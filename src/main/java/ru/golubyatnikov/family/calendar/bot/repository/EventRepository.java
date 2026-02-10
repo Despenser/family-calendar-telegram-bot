@@ -1,8 +1,10 @@
 package ru.golubyatnikov.family.calendar.bot.repository;
 
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
@@ -16,7 +18,6 @@ import java.util.Optional;
  * Spring Data JPA репозиторий для работы с сущностью {@link Event}.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2025-12-30
  */
 @Repository
@@ -81,12 +82,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
-    @org.springframework.data.jpa.repository.QueryHints(
-        @jakarta.persistence.QueryHint(
-            name = org.hibernate.annotations.QueryHints.CACHEABLE, 
-            value = "false"
-        )
-    )
+    @QueryHints(@QueryHint(name = org.hibernate.annotations.QueryHints.CACHEABLE, value = "false"))
     List<Event> findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(Long userId, Event.EventStatus status);
     
     /**
@@ -302,18 +298,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findBySeriesIdAndStatus(String seriesId, Event.EventStatus status);
     
     /**
-     * Подсчитывает количество событий семьи в диапазоне дат.
-     * 
-     * @param familyId идентификатор семьи
-     * @param startDate начальная дата
-     * @param endDate конечная дата
-     *
-     * @return количество событий
-     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
-     */
-    int countByFamilyIdAndEventDateBetween(Long familyId, LocalDate startDate, LocalDate endDate);
-    
-    /**
      * Подсчитывает количество событий семьи в диапазоне дат с определенным статусом.
      * 
      * @param familyId идентификатор семьи
@@ -329,24 +313,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         LocalDate startDate,
         LocalDate endDate,
         Event.EventStatus status
-    );
-    
-    /**
-     * Подсчитывает количество персональных событий пользователя в диапазоне дат.
-     * 
-     * @param userId идентификатор пользователя
-     * @param startDate начальная дата
-     * @param endDate конечная дата
-     * @param isPersonal флаг персонального события
-     *
-     * @return количество персональных событий
-     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
-     */
-    int countByUserIdAndEventDateBetweenAndIsPersonal(
-        Long userId,
-        LocalDate startDate,
-        LocalDate endDate,
-        Boolean isPersonal
     );
     
     /**
@@ -423,24 +389,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     );
     
     /**
-     * Подсчитывает количество активных событий пользователя (исключая удаленные).
-     * Используется для отображения количества событий в шапке списка "Мои события".
-     * 
-     * @param userId идентификатор пользователя
-     * @param status статус события для исключения (обычно DELETED)
-     *
-     * @return количество активных событий пользователя
-     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
-     */
-    int countByUserIdAndStatusNot(Long userId, Event.EventStatus status);
-    
-    /**
      * Подсчитывает количество событий пользователя с определенным статусом.
-     * Используется для точного подсчета событий со статусом ACTIVE для отображения
-     * корректного количества в шапке списка "Мои события".
-     * 
-     * <p>Метод использует Spring Data JPA naming convention для автоматической
-     * генерации запроса вида: {@code SELECT COUNT(e) FROM Event e WHERE e.user.id = :userId AND e.status = :status}</p>
      * 
      * @param userId идентификатор пользователя
      * @param status статус события (обычно ACTIVE)
@@ -451,35 +400,19 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     int countByUserIdAndStatus(Long userId, Event.EventStatus status);
     
     /**
-     * Находит событие по ID с eager загрузкой пользователя.
-     * 
-     * <p>Используется в случаях, когда необходим доступ к полям User вне транзакции,
-     * например, при обработке callback-запросов для включения напоминаний.
-     * Eager загрузка User предотвращает LazyInitializationException при попытке
-     * доступа к свойствам пользователя после закрытия сессии Hibernate.</p>
-     * 
-     * <p>Аннотация {@code @EntityGraph} указывает Hibernate загрузить связанную
-     * сущность User в том же запросе, используя JOIN вместо отдельного запроса.</p>
+     * Находит событие по ID с загрузкой пользователя.
      * 
      * @param id идентификатор события
      *
      * @return Optional с событием и инициализированным User, или empty если событие не найдено
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
-    @Query("SELECT e FROM Event e WHERE e.id = :id")
     @EntityGraph(attributePaths = {"user"})
+    @Query("SELECT e FROM Event e WHERE e.id = :id")
     Optional<Event> findByIdWithUser(@Param("id") Long id);
     
     /**
-     * Находит событие по ID с eager загрузкой напоминаний.
-     * 
-     * <p>Используется в случаях, когда необходим доступ к коллекции reminders вне транзакции,
-     * например, при просмотре деталей события для определения наличия активных напоминаний.
-     * Eager загрузка reminders предотвращает LazyInitializationException при попытке
-     * доступа к коллекции после закрытия сессии Hibernate.</p>
-     * 
-     * <p>Аннотация {@code @EntityGraph} указывает Hibernate загрузить связанную
-     * коллекцию reminders в том же запросе, используя JOIN вместо отдельного запроса.</p>
+     * Находит событие по ID с загрузкой напоминаний.
      * 
      * @param id идентификатор события
      *

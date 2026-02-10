@@ -10,11 +10,12 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 
+import java.util.Arrays;
+
 /**
  * AOP-аспект для централизованной обработки ошибок в callback handlers.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
  */
 @Aspect
@@ -55,13 +56,10 @@ public class CallbackErrorHandlingAspect {
         if (args == null) {
             return null;
         }
-        
-        for (Object arg : args) {
-            if (arg instanceof CallbackQuery) {
-                return (CallbackQuery) arg;
-            }
-        }
-        return null;
+
+        return (CallbackQuery) Arrays.stream(args).filter(arg -> arg instanceof CallbackQuery)
+                .findFirst()
+                .orElse(null);
     }
     
     /**

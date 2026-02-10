@@ -13,10 +13,7 @@ import java.time.ZoneId;
  * Entity класс для представления пользователя Telegram бота.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
- * @see Family
- * @see Event
  */
 @Entity
 @Table(name = "users", indexes = {

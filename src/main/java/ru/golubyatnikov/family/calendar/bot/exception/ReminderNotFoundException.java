@@ -4,7 +4,6 @@ package ru.golubyatnikov.family.calendar.bot.exception;
  * Исключение, выбрасываемое, когда напоминание не найдено в базе данных.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-28
  */
 public class ReminderNotFoundException extends RuntimeException {

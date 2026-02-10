@@ -15,7 +15,6 @@ import org.springframework.web.client.RestTemplate;
  * Загружает параметры бота из application.yml с префиксом "telegram.bot".
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
  */
 @Configuration

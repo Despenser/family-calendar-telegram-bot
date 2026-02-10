@@ -16,11 +16,7 @@ import java.util.List;
  * Entity класс для представления события в семейном календаре.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
- * @see User
- * @see Family
- * @see EventStatus
  */
 @Entity
 @Table(name = "events", indexes = {
@@ -179,57 +175,12 @@ public class Event {
 
     /**
      * Идентификатор сообщения Telegram, связанного с этим событием.
-     * 
-     * <p><b>Для активных событий (ACTIVE, COMPLETED, DELETED):</b></p>
-     * <p>Используется для обновления существующего сообщения при редактировании события
-     * вместо отправки нового сообщения, что предотвращает засорение чата.</p>
-     * 
-     * <p><b>Для черновиков (DRAFT):</b></p>
-     * <p>Хранит messageId сообщения создания события, которое обновляется на каждом шаге
-     * многошагового диалога создания события. Это позволяет весь процесс создания
-     * отображать в одном сообщении бота, обновляя его по мере ввода данных пользователем.</p>
-     * 
-     * <p><b>Примеры использования:</b></p>
-     * <ul>
-     *   <li>При создании события через /add_event - сохраняется messageId первого сообщения,
-     *       которое затем обновляется при выборе даты, времени, вводе названия и описания</li>
-     *   <li>При редактировании активного события - используется для обновления карточки события
-     *       вместо отправки нового сообщения</li>
-     *   <li>При отображении списка событий - позволяет обновлять конкретное сообщение
-     *       при изменении данных события</li>
-     * </ul>
-     * 
-     * <p><b>Значение NULL возможно в следующих случаях:</b></p>
-     * <ul>
-     *   <li>Событие создано до внедрения функции редактирования сообщений</li>
-     *   <li>Сообщение о событии было удалено пользователем</li>
-     *   <li>Черновик только что создан и сообщение еще не отправлено</li>
-     * </ul>
-     * 
-     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#sendMessageWithInlineKeyboardAndGet
-     * @see ru.golubyatnikov.family.calendar.bot.service.TelegramMessageService#editMessageText
-     * @see ru.golubyatnikov.family.calendar.bot.service.ConversationService#setCreationMessageId
-     * @see ru.golubyatnikov.family.calendar.bot.handler.AddEventCommandHandler#handle
      */
     @Column(name = "message_id")
     private Long messageId;
 
     /**
-     * Флаг, указывающий, что сообщение этого события содержит шапку списка "Мои события".
-     * 
-     * <p>Используется для корректного обновления первого события в списке "Мои события",
-     * чтобы при редактировании сохранялась шапка с заголовком "📋 Мои события" и 
-     * информацией о количестве событий пользователя.</p>
-     * 
-     * <p>Значение true устанавливается для события с самой ранней датой и временем
-     * при отображении списка через команду /my_events. При удалении первого события
-     * флаг автоматически передается следующему событию по дате.</p>
-     * 
-     * <p>По умолчанию false - событие не является первым в списке и не должно
-     * содержать шапку при обновлении.</p>
-     * 
-     * @see ru.golubyatnikov.family.calendar.bot.handler.command.PlannerCommandHandler
-     * @see ru.golubyatnikov.family.calendar.bot.service.event.EventService#sendOrUpdateEventMessage
+     * Флаг, указывающий, что сообщение этого события содержит шапку списка "Мои события"
      */
     @Column(name = "is_my_events_header")
     @Builder.Default
@@ -237,20 +188,7 @@ public class Event {
 
     /**
      * Флаг, указывающий, что сообщение этого события содержит шапку корзины.
-     * 
-     * <p>Используется для корректного обновления первого события в корзине,
-     * чтобы при редактировании сохранялась шапка с заголовком "🗑️ Корзина" и 
-     * информацией о количестве событий в корзине.</p>
-     * 
-     * <p>Значение true устанавливается для первого события в корзине
-     * при отображении списка через команду /trash. При удалении или восстановлении
-     * первого события флаг автоматически передается следующему событию.</p>
-     * 
-     * <p>По умолчанию false - событие не является первым в корзине и не должно
-     * содержать шапку при обновлении.</p>
-     * 
-     * @see ru.golubyatnikov.family.calendar.bot.handler.TrashCommandHandler
-     * @see ru.golubyatnikov.family.calendar.bot.service.TrashService
+     *
      */
     @Column(name = "is_trash_header")
     @Builder.Default
@@ -388,31 +326,5 @@ public class Event {
      */
     public boolean isRecurring() {
         return seriesId != null && !seriesId.isEmpty();
-    }
-
-    /**
-     * Проверяет, имеет ли событие временной интервал (время окончания).
-     * 
-     * @return true, если указано время окончания, иначе false
-     */
-    public boolean hasTimeInterval() {
-        return endTime != null;
-    }
-
-    /**
-     * Возвращает форматированный временной интервал события.
-     * 
-     * @return строка в формате "HH:mm - HH:mm", или только время начала если интервал не указан
-     */
-    public String getFormattedTimeInterval() {
-        if (eventTime == null) {
-            return null;
-        }
-        if (endTime == null) {
-            return getFormattedTime();
-        }
-        return String.format("%s - %s", 
-            eventTime.format(DateTimeFormatter.ofPattern("HH:mm")),
-            endTime.format(DateTimeFormatter.ofPattern("HH:mm")));
     }
 }

@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul 2>&1
 REM Переход в корневую директорию проекта
 cd /d "%~dp0\..\.."
 
@@ -13,7 +14,7 @@ docker-compose --version >nul 2>&1
 if errorlevel 1 (
     docker compose version >nul 2>&1
     if errorlevel 1 (
-        echo ❌ Docker Compose не установлен!
+        echo [ОШИБКА] Docker Compose не установлен!
         exit /b 1
     )
 )
@@ -21,12 +22,12 @@ if errorlevel 1 (
 set SERVICE=%1
 
 if "%SERVICE%"=="" (
-    echo 📋 Просмотр логов всех сервисов...
+    echo [ЛОГИ] Просмотр логов всех сервисов...
     echo    (Нажмите Ctrl+C для выхода^)
     echo.
     docker-compose logs -f
 ) else (
-    echo 📋 Просмотр логов сервиса: %SERVICE%
+    echo [ЛОГИ] Просмотр логов сервиса: %SERVICE%
     echo    (Нажмите Ctrl+C для выхода^)
     echo.
     docker-compose logs -f %SERVICE%

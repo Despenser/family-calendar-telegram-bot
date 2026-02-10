@@ -13,10 +13,7 @@ import java.util.List;
  * Entity класс для представления семьи в системе.
  *
  * @author Golubyatnikov Aleksey
- * @version 1.0.0
  * @since 2026-01-16
- * @see User
- * @see Event
  */
 @Entity
 @Table(name = "families")
