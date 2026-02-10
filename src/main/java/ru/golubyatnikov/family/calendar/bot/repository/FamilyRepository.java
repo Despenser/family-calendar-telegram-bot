@@ -5,7 +5,7 @@ import org.springframework.stereotype.Repository;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 
 /**
- * Spring Data JPA репозиторий для работы с сущностью {@link Family}.
+ * Repository интерфейс для работы с семьей
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-01-16

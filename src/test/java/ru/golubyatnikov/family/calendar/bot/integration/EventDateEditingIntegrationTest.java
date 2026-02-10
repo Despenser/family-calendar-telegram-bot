@@ -16,6 +16,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.FamilyRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
@@ -130,7 +131,7 @@ class EventDateEditingIntegrationTest {
                 .description("Описание тестового события")
                 .eventDate(originalDate)
                 .eventTime(eventTime)
-                .status(Event.EventStatus.ACTIVE)
+                .status(EventStatus.ACTIVE)
                 .isPersonal(false)
                 .notified(false)
                 .messageId((long) originalMessageId)
@@ -192,7 +193,7 @@ class EventDateEditingIntegrationTest {
                 .title("Событие без messageId")
                 .eventDate(originalDate)
                 .eventTime(eventTime)
-                .status(Event.EventStatus.ACTIVE)
+                .status(EventStatus.ACTIVE)
                 .isPersonal(false)
                 .notified(false)
                 .messageId(null)  // Нет messageId
@@ -238,7 +239,7 @@ class EventDateEditingIntegrationTest {
                 .title("Событие для множественных редактирований")
                 .eventDate(originalDate)
                 .eventTime(LocalTime.of(15, 0))
-                .status(Event.EventStatus.ACTIVE)
+                .status(EventStatus.ACTIVE)
                 .messageId((long) messageId)
                 .build();
 

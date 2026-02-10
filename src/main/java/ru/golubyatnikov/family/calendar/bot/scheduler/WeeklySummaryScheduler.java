@@ -9,6 +9,7 @@ import ru.golubyatnikov.family.calendar.bot.model.Event;
 
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.FamilyRepository;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
@@ -133,7 +134,7 @@ public class WeeklySummaryScheduler {
             family.getId(),
             startDate,
             endDate,
-            Event.EventStatus.ACTIVE
+            EventStatus.ACTIVE
         );
         
         // Формируем сообщение

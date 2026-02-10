@@ -80,29 +80,4 @@ public class EventHistory {
     protected void onCreate() {
         changedAt = LocalDateTime.now();
     }
-    
-    /**
-     * ENUM для типов действий с событиями
-     */
-    public enum ActionType {
-        /**
-         * Событие создано
-         */
-        CREATED,
-        
-        /**
-         * Событие обновлено
-         */
-        UPDATED,
-        
-        /**
-         * Событие удалено
-         */
-        DELETED,
-        
-        /**
-         * Событие восстановлено из корзины
-         */
-        RESTORED
-    }
 }

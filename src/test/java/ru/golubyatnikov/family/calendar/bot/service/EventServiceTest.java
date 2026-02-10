@@ -16,6 +16,7 @@ import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventHistoryService;
@@ -338,14 +339,14 @@ class EventServiceTest {
                 .id(1L)
                 .title("User Event 1")
                 .eventDate(LocalDate.now().plusDays(1))
-                .status(Event.EventStatus.ACTIVE)
+                .status(EventStatus.ACTIVE)
                 .build();
 
         Event event2 = Event.builder()
                 .id(2L)
                 .title("User Event 2")
                 .eventDate(LocalDate.now().plusDays(5))
-                .status(Event.EventStatus.ACTIVE)
+                .status(EventStatus.ACTIVE)
                 .build();
 
         List<Event> expectedEvents = Arrays.asList(event1, event2);
@@ -550,7 +551,7 @@ class EventServiceTest {
         // Given
         Long eventId = testEvent.getId();
         Long userId = testUser.getId();
-        testEvent.setStatus(Event.EventStatus.ACTIVE);
+        testEvent.setStatus(EventStatus.ACTIVE);
 
         when(eventDeletionService.completeEvent(eventId, userId))
                 .thenReturn(testEvent);
@@ -569,7 +570,7 @@ class EventServiceTest {
         // Given
         Long eventId = testEvent.getId();
         Long unauthorizedUserId = anotherUser.getId();
-        testEvent.setStatus(Event.EventStatus.ACTIVE);
+        testEvent.setStatus(EventStatus.ACTIVE);
 
         when(eventDeletionService.completeEvent(eventId, unauthorizedUserId))
                 .thenThrow(new UnauthorizedAccessException("Только создатель события может его завершить"));
@@ -612,7 +613,7 @@ class EventServiceTest {
         // Given
         Long eventId = testEvent.getId();
         Long userId = testUser.getId();
-        testEvent.setStatus(Event.EventStatus.COMPLETED);
+        testEvent.setStatus(EventStatus.COMPLETED);
 
         when(eventDeletionService.completeEvent(eventId, userId))
                 .thenThrow(new IllegalStateException("Можно завершить только активное событие"));

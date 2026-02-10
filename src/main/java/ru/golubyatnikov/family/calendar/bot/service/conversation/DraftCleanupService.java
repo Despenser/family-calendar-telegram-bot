@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 
 import java.time.Duration;
@@ -75,7 +76,7 @@ public class DraftCleanupService {
             return false;
         }
         
-        boolean isOrphaned = event.getStatus() == Event.EventStatus.DRAFT
+        boolean isOrphaned = event.getStatus() == EventStatus.DRAFT
             && event.getTitle() == null
             && event.getEventDate() == null
             && event.getEventTime() == null;
@@ -118,7 +119,7 @@ public class DraftCleanupService {
         
         // Находим все черновики
         List<Event> allDrafts = eventRepository.findAll().stream()
-            .filter(event -> event.getStatus() == Event.EventStatus.DRAFT)
+            .filter(event -> event.getStatus() == EventStatus.DRAFT)
             .toList();
         
         log.debug("Найдено {} черновиков для проверки", allDrafts.size());

@@ -2,6 +2,7 @@ package ru.golubyatnikov.family.calendar.bot.scheduler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,6 +10,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
+import ru.golubyatnikov.family.calendar.bot.model.ActionType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventHistoryService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
@@ -65,21 +68,19 @@ public class EventCompletionScheduler {
             int completedCount = 0;
             for (Event event : expiredEvents) {
                 try {
-                    // Изменяем статус на COMPLETED
-                    Event.EventStatus oldStatus = event.getStatus();
-                    event.setStatus(Event.EventStatus.COMPLETED);
+                    EventStatus oldStatus = event.getStatus();
+                    event.setStatus(EventStatus.COMPLETED);
                     event.setCompletedAt(now);
                     
                     eventRepository.save(event);
-                    
-                    // Записываем в историю
+
                     eventHistoryService.recordChange(
                         event.getId(),
                         event.getUser().getId(),
-                        EventHistory.ActionType.UPDATED,
+                        ActionType.UPDATED,
                         "status",
                         oldStatus.name(),
-                        Event.EventStatus.COMPLETED.name()
+                        EventStatus.COMPLETED.name()
                     );
                     
                     // Отправляем уведомление создателю
@@ -156,7 +157,7 @@ public class EventCompletionScheduler {
      * @param eventId идентификатор события
      * @return объект InlineKeyboardMarkup с кнопкой
      */
-    private InlineKeyboardMarkup createCompletionKeyboard(Long eventId) {
+    private @NonNull InlineKeyboardMarkup createCompletionKeyboard(Long eventId) {
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
         
         List<InlineKeyboardButton> row = new ArrayList<>();

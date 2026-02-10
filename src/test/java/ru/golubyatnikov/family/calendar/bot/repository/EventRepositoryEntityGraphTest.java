@@ -12,6 +12,7 @@ import org.springframework.test.context.TestPropertySource;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -89,7 +90,7 @@ class EventRepositoryEntityGraphTest {
                 .description("Описание события " + i)
                 .eventDate(LocalDate.now().plusDays(i))
                 .eventTime(LocalTime.of(10 + i, 0))
-                .status(Event.EventStatus.ACTIVE)
+                .status(EventStatus.ACTIVE)
                 .isPersonal(false)
                 .notified(false)
                 .build();
@@ -126,7 +127,7 @@ class EventRepositoryEntityGraphTest {
     void findAllByUserIdAndStatus_shouldLoadUserAndFamilyEagerly() {
         // When: Получаем события по статусу
         List<Event> events = eventRepository.findAllByUserIdAndStatus(
-            testUser.getId(), Event.EventStatus.ACTIVE);
+            testUser.getId(), EventStatus.ACTIVE);
 
         // Then: Проверяем, что события загружены
         assertThat(events).hasSize(5);
@@ -184,7 +185,7 @@ class EventRepositoryEntityGraphTest {
             .title("Удаленное событие")
             .eventDate(LocalDate.now())
             .eventTime(LocalTime.of(12, 0))
-            .status(Event.EventStatus.DELETED)
+            .status(EventStatus.DELETED)
             .isPersonal(false)
             .notified(false)
             .build();
@@ -194,7 +195,7 @@ class EventRepositoryEntityGraphTest {
 
         // When: Получаем удаленные события
         List<Event> events = eventRepository.findByUserIdAndStatusOrderByDeletedAtDesc(
-            testUser.getId(), Event.EventStatus.DELETED);
+            testUser.getId(), EventStatus.DELETED);
 
         // Then: Проверяем, что событие найдено
         assertThat(events).hasSize(1);
@@ -217,7 +218,7 @@ class EventRepositoryEntityGraphTest {
                 .title("Событие серии " + i)
                 .eventDate(LocalDate.now().plusWeeks(i))
                 .eventTime(LocalTime.of(14, 0))
-                .status(Event.EventStatus.ACTIVE)
+                .status(EventStatus.ACTIVE)
                 .seriesId(seriesId)
                 .isPersonal(false)
                 .notified(false)
@@ -229,7 +230,7 @@ class EventRepositoryEntityGraphTest {
 
         // When: Получаем события серии
         List<Event> events = eventRepository.findBySeriesIdAndStatus(
-            seriesId, Event.EventStatus.ACTIVE);
+            seriesId, EventStatus.ACTIVE);
 
         // Then: Проверяем, что события найдены
         assertThat(events).hasSize(3);

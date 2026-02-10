@@ -8,7 +8,6 @@ import java.util.List;
 
 /**
  * Repository интерфейс для работы с вложениями событий.
- * Предоставляет методы для CRUD операций и поиска вложений.
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-01-16

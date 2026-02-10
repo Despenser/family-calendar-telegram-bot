@@ -18,6 +18,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.ActionType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
@@ -133,7 +134,7 @@ public class EventCommandService {
         eventHistoryService.recordChange(
             savedEvent.getId(),
             userId,
-            EventHistory.ActionType.CREATED,
+            ActionType.CREATED,
             null,
             null,
             String.format("Событие '%s' создано", title)
@@ -235,23 +236,23 @@ public class EventCommandService {
         log.info("Событие ID={} успешно обновлено пользователем ID={}", eventId, userId);
         
         if (!oldTitle.equals(title)) {
-            eventHistoryService.recordChange(eventId, userId, EventHistory.ActionType.UPDATED, 
+            eventHistoryService.recordChange(eventId, userId, ActionType.UPDATED, 
                 "title", oldTitle, title);
         }
         if ((oldDescription == null && description != null) || 
             (oldDescription != null && !oldDescription.equals(description))) {
-            eventHistoryService.recordChange(eventId, userId, EventHistory.ActionType.UPDATED, 
+            eventHistoryService.recordChange(eventId, userId, ActionType.UPDATED, 
                 "description", oldDescription, description);
         }
         if (!oldDate.equals(eventDateTime.toLocalDate()) || !oldTime.equals(eventDateTime.toLocalTime())) {
-            eventHistoryService.recordChange(eventId, userId, EventHistory.ActionType.UPDATED, 
+            eventHistoryService.recordChange(eventId, userId, ActionType.UPDATED, 
                 "datetime", 
                 String.format("%s %s", oldDate, oldTime),
                 String.format("%s %s", eventDateTime.toLocalDate(), eventDateTime.toLocalTime()));
         }
         if ((oldEndTime == null && endTime != null) || 
             (oldEndTime != null && !oldEndTime.equals(endTime))) {
-            eventHistoryService.recordChange(eventId, userId, EventHistory.ActionType.UPDATED, 
+            eventHistoryService.recordChange(eventId, userId, ActionType.UPDATED, 
                 "end_time", 
                 oldEndTime != null ? oldEndTime.toString() : null, 
                 endTime != null ? endTime.toString() : null);
@@ -294,7 +295,7 @@ public class EventCommandService {
         eventHistoryService.recordChange(
             eventId,
             userId,
-            EventHistory.ActionType.UPDATED,
+            ActionType.UPDATED,
             "title",
             oldTitle,
             newTitle
@@ -338,7 +339,7 @@ public class EventCommandService {
         eventHistoryService.recordChange(
             eventId,
             userId,
-            EventHistory.ActionType.UPDATED,
+            ActionType.UPDATED,
             "event_date",
             oldDate.toString(),
             newDate.toString()
@@ -380,7 +381,7 @@ public class EventCommandService {
         eventHistoryService.recordChange(
             eventId,
             userId,
-            EventHistory.ActionType.UPDATED,
+            ActionType.UPDATED,
             "event_time",
             oldTime != null ? oldTime.toString() : null,
             newTime.toString()
@@ -421,7 +422,7 @@ public class EventCommandService {
         eventHistoryService.recordChange(
             eventId,
             userId,
-            EventHistory.ActionType.UPDATED,
+            ActionType.UPDATED,
             "description",
             oldDescription,
             newDescription

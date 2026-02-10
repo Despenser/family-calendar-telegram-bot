@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.ReminderType;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -30,13 +31,12 @@ public class ReminderConfigurationService {
      * 
      * @param event событие
      * @param type тип напоминания
-     * @param customMinutes количество минут для CUSTOM типа (может быть null для других типов)
      * @return рассчитанное время отправки напоминания
      */
-    public LocalDateTime calculateReminderTime(Event event, Reminder.ReminderType type, Integer customMinutes) {
+    public LocalDateTime calculateReminderTime(Event event, ReminderType type) {
         // Используем timezone создателя события для расчета
         ZoneId userTimezone = getUserTimezone(event.getUser());
-        return calculateReminderTimeWithTimezone(event, type, userTimezone, customMinutes);
+        return calculateReminderTimeWithTimezone(event, type, userTimezone);
     }
     
     /**
@@ -45,13 +45,12 @@ public class ReminderConfigurationService {
      * @param event событие
      * @param type тип напоминания
      * @param userTimezone часовой пояс пользователя
-     * @param customMinutes количество минут для CUSTOM типа (может быть null для других типов)
      * @return рассчитанное время отправки напоминания в UTC
      */
-    public LocalDateTime calculateReminderTimeWithTimezone(Event event, Reminder.ReminderType type, 
-                                                          ZoneId userTimezone, Integer customMinutes) {
-        log.debug("Начало расчета времени напоминания: eventId={}, type={}, userTimezone={}, customMinutes={}", 
-                 event.getId(), type, userTimezone, customMinutes);
+    public LocalDateTime calculateReminderTimeWithTimezone(Event event, ReminderType type, 
+                                                          ZoneId userTimezone) {
+        log.debug("Начало расчета времени напоминания: eventId={}, type={}, userTimezone={}", 
+                 event.getId(), type, userTimezone);
         
         try {
             // Шаг 1: Создаем ZonedDateTime для времени события в timezone пользователя
@@ -126,9 +125,9 @@ public class ReminderConfigurationService {
             
         } catch (java.time.DateTimeException e) {
             log.error("Ошибка DateTimeException при расчете времени напоминания: eventId={}, type={}, " +
-                     "timezone={}, eventDate={}, eventTime={}, customMinutes={}, error={}", 
+                     "timezone={}, eventDate={}, eventTime={}, error={}", 
                      event.getId(), type, userTimezone, event.getEventDate(), event.getEventTime(), 
-                     customMinutes, e.getMessage(), e);
+                     e.getMessage(), e);
             
             // Если уже используем UTC, пробрасываем исключение дальше
             if (userTimezone.equals(ZoneId.of("UTC"))) {
@@ -143,19 +142,19 @@ public class ReminderConfigurationService {
                     event.getId(), type, userTimezone);
             
             // Повторяем расчет с UTC
-            return calculateReminderTimeWithTimezone(event, type, ZoneId.of("UTC"), customMinutes);
+            return calculateReminderTimeWithTimezone(event, type, ZoneId.of("UTC"));
             
         } catch (IllegalArgumentException e) {
             log.error("Ошибка IllegalArgumentException при расчете времени напоминания: eventId={}, type={}, " +
-                     "timezone={}, customMinutes={}, error={}", 
-                     event.getId(), type, userTimezone, customMinutes, e.getMessage(), e);
+                     "timezone={}, error={}", 
+                     event.getId(), type, userTimezone, e.getMessage(), e);
             throw e;
             
         } catch (Exception e) {
             log.error("Непредвиденная ошибка {} при расчете времени напоминания: eventId={}, type={}, " +
-                     "timezone={}, eventDate={}, eventTime={}, customMinutes={}, error={}", 
+                     "timezone={}, eventDate={}, eventTime={}, error={}", 
                      e.getClass().getSimpleName(), event.getId(), type, userTimezone, 
-                     event.getEventDate(), event.getEventTime(), customMinutes, e.getMessage(), e);
+                     event.getEventDate(), event.getEventTime(), e.getMessage(), e);
             
             // Если уже используем UTC, пробрасываем исключение дальше
             if (userTimezone.equals(ZoneId.of("UTC"))) {
@@ -169,7 +168,7 @@ public class ReminderConfigurationService {
                     event.getId(), type, userTimezone, e.getClass().getSimpleName());
             
             // Повторяем расчет с UTC
-            return calculateReminderTimeWithTimezone(event, type, ZoneId.of("UTC"), customMinutes);
+            return calculateReminderTimeWithTimezone(event, type, ZoneId.of("UTC"));
         }
     }
     

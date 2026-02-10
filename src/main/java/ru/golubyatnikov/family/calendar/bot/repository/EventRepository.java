@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,7 +16,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Spring Data JPA репозиторий для работы с сущностью {@link Event}.
+ * Repository интерфейс для работы с событиями
  *
  * @author Golubyatnikov Aleksey
  * @since 2025-12-30
@@ -56,7 +57,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         Long familyId, 
         LocalDate startDate, 
         LocalDate endDate,
-        Event.EventStatus status
+        EventStatus status
     );
     
     /**
@@ -73,8 +74,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     /**
      * Находит все события пользователя с определенным статусом, отсортированные по дате и времени в порядке возрастания.
      * 
-     * <p>Кэширование отключено для обеспечения получения актуальных данных из базы данных.</p>
-     * 
      * @param userId идентификатор пользователя
      * @param status статус события (ACTIVE, DELETED, COMPLETED, DRAFT)
      *
@@ -83,34 +82,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      */
     @EntityGraph(attributePaths = {"user", "family"})
     @QueryHints(@QueryHint(name = org.hibernate.annotations.QueryHints.CACHEABLE, value = "false"))
-    List<Event> findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(Long userId, Event.EventStatus status);
-    
-    /**
-     * Находит события, для которых нужно отправить уведомления.
-     * Ищет только активные события (не черновики), для которых уведомление еще не отправлено.
-     * 
-     * @param startDateTime начало временного диапазона для поиска событий
-     * @param endDateTime конец временного диапазона для поиска событий
-     *
-     * @return список событий, требующих отправки уведомлений
-     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
-     */
-    @EntityGraph(attributePaths = {"user", "family", "family.members"})
-    @Query("""
-                SELECT e FROM Event e
-                WHERE e.notified = false
-                AND e.status = 'ACTIVE'
-                AND e.eventDate IS NOT NULL
-                AND e.eventTime IS NOT NULL
-                AND CAST(CONCAT(CAST(e.eventDate AS string), ' ', CAST(e.eventTime AS string)) AS timestamp) 
-                    BETWEEN :startDateTime AND :endDateTime
-                ORDER BY e.eventDate ASC, e.eventTime ASC
-    """)
-    List<Event> findEventsForNotification(
-        @Param("startDateTime") LocalDateTime startDateTime,
-        @Param("endDateTime") LocalDateTime endDateTime
-    );
-    
+    List<Event> findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(Long userId, EventStatus status);
+
     /**
      * Находит черновик события пользователя по статусу.
      * Используется для получения активного черновика в процессе создания события.
@@ -122,7 +95,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
-    Optional<Event> findByUserIdAndStatus(Long userId, Event.EventStatus status);
+    Optional<Event> findByUserIdAndStatus(Long userId, EventStatus status);
     
     /**
      * Находит все черновики пользователя по статусу.
@@ -135,7 +108,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findAllByUserIdAndStatus(Long userId, Event.EventStatus status);
+    List<Event> findAllByUserIdAndStatus(Long userId, EventStatus status);
     
     /**
      * Находит удаленные события пользователя (корзина), отсортированные по дате удаления.
@@ -148,7 +121,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findByUserIdAndStatusOrderByDeletedAtDesc(Long userId, Event.EventStatus status);
+    List<Event> findByUserIdAndStatusOrderByDeletedAtDesc(Long userId, EventStatus status);
     
     /**
      * Находит удаленные события старше указанной даты для автоматической очистки корзины.
@@ -161,7 +134,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findByStatusAndDeletedAtBefore(Event.EventStatus status, LocalDateTime deletedBefore);
+    List<Event> findByStatusAndDeletedAtBefore(EventStatus status, LocalDateTime deletedBefore);
     
     /**
      * Находит активные события, время окончания которых уже прошло.
@@ -229,7 +202,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findByFamilyIdAndIsPersonalFalseAndStatus(Long familyId, Event.EventStatus status);
+    List<Event> findByFamilyIdAndIsPersonalFalseAndStatus(Long familyId, EventStatus status);
     
     /**
      * Находит персональные события пользователя с определенным статусом.
@@ -241,7 +214,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findByUserIdAndIsPersonalTrueAndStatus(Long userId, Event.EventStatus status);
+    List<Event> findByUserIdAndIsPersonalTrueAndStatus(Long userId, EventStatus status);
     
     /**
      * Находит все события семьи с определенным статусом.
@@ -253,7 +226,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findByFamilyIdAndStatus(Long familyId, Event.EventStatus status);
+    List<Event> findByFamilyIdAndStatus(Long familyId, EventStatus status);
     
     /**
      * Находит предстоящие события семьи и пользователя.
@@ -295,7 +268,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findBySeriesIdAndStatus(String seriesId, Event.EventStatus status);
+    List<Event> findBySeriesIdAndStatus(String seriesId, EventStatus status);
     
     /**
      * Подсчитывает количество событий семьи в диапазоне дат с определенным статусом.
@@ -312,7 +285,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         Long familyId,
         LocalDate startDate,
         LocalDate endDate,
-        Event.EventStatus status
+        EventStatus status
     );
     
     /**
@@ -333,7 +306,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         LocalDate startDate,
         LocalDate endDate,
         Boolean isPersonal,
-        Event.EventStatus status
+        EventStatus status
     );
     
     /**
@@ -349,7 +322,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @EntityGraph(attributePaths = {"user", "family"})
     List<Event> findByFamilyIdAndStatusOrderByEventDateAscEventTimeAsc(
         Long familyId, 
-        Event.EventStatus status
+        EventStatus status
     );
     
     /**
@@ -367,7 +340,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByFamilyIdAndIsPersonalAndStatusOrderByEventDateAscEventTimeAsc(
         Long familyId, 
         Boolean isPersonal, 
-        Event.EventStatus status
+        EventStatus status
     );
     
     /**
@@ -385,7 +358,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByUserIdAndIsPersonalAndStatusOrderByEventDateAscEventTimeAsc(
         Long userId, 
         Boolean isPersonal, 
-        Event.EventStatus status
+        EventStatus status
     );
     
     /**
@@ -397,7 +370,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @return количество событий пользователя с указанным статусом
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
-    int countByUserIdAndStatus(Long userId, Event.EventStatus status);
+    int countByUserIdAndStatus(Long userId, EventStatus status);
     
     /**
      * Находит событие по ID с загрузкой пользователя.
@@ -438,7 +411,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByFamilyIdAndEventDateAndStatusOrderByEventTimeAsc(
         Long familyId,
         LocalDate eventDate,
-        Event.EventStatus status
+        EventStatus status
     );
     
     /**

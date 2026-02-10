@@ -13,6 +13,7 @@ import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.ReminderRepository;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 
@@ -105,7 +106,7 @@ public class ReminderNotificationService {
                 Event event = lockedReminder.getEvent();
                 
                 // Фильтр 1: Пропускаем напоминания для удаленных событий
-                if (event.getStatus() == Event.EventStatus.DELETED) {
+                if (event.getStatus() == EventStatus.DELETED) {
                     log.debug("Пропуск напоминания ID={}: событие удалено", lockedReminder.getId());
                     skippedCount++;
                     continue;
@@ -205,7 +206,7 @@ public class ReminderNotificationService {
                  reminder.getId(), event.getId(), reminder.getReminderType(), reminder.getReminderTime());
         
         // Фильтр 1: Событие не удалено
-        if (event.getStatus() == Event.EventStatus.DELETED) {
+        if (event.getStatus() == EventStatus.DELETED) {
             log.debug("Пропуск напоминания ID {}: событие ID {} удалено (status=DELETED)", 
                      reminder.getId(), event.getId());
             return false;

@@ -14,7 +14,6 @@ import java.util.Optional;
 
 /**
  * Repository интерфейс для работы с напоминаниями о событиях.
- * Предоставляет методы для CRUD операций и поиска напоминаний.
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-01-16
@@ -22,17 +21,7 @@ import java.util.Optional;
 @Repository
 public interface ReminderRepository extends JpaRepository<Reminder, Long> {
     
-    /**
-     * Находит все неотправленные напоминания в указанном временном диапазоне.
-     * Используется планировщиком для отправки напоминаний.
-     * 
-     * @param startTime начало временного диапазона
-     * @param endTime конец временного диапазона
-     * @return список неотправленных напоминаний в указанном диапазоне
-     */
-    @EntityGraph(attributePaths = {"event", "event.user"})
-    List<Reminder> findBySentFalseAndReminderTimeBetween(LocalDateTime startTime, LocalDateTime endTime);
-    
+
     /**
      * Находит все неотправленные напоминания, время которых наступило.
      * 

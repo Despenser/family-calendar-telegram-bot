@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
@@ -19,7 +20,7 @@ import java.util.List;
  * Сервис для управления состоянием многошагового диалога создания события.
  * 
  * <p>Использует черновики событий в базе данных для хранения промежуточного состояния.
- * Черновики имеют статус {@link Event.EventStatus#DRAFT} и постепенно заполняются
+ * Черновики имеют статус {@link EventStatus#DRAFT} и постепенно заполняются
  * по мере прохождения пользователем шагов диалога:</p>
  * <ol>
  *   <li>Выбор даты через inline-календарь</li>
@@ -30,7 +31,7 @@ import java.util.List;
  * </ol>
  * 
  * <p>После завершения всех шагов черновик переводится в статус 
- * {@link Event.EventStatus#ACTIVE} и становится полноценным событием.</p>
+ * {@link EventStatus#ACTIVE} и становится полноценным событием.</p>
  * 
  * <p><b>Требования:</b> 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7</p>
  * 
@@ -71,7 +72,7 @@ public class ConversationService {
         Event draft = Event.builder()
             .user(user)
             .family(user.getFamily())
-            .status(Event.EventStatus.DRAFT)
+            .status(EventStatus.DRAFT)
             .notified(false)
             .build();
         
@@ -211,7 +212,7 @@ public class ConversationService {
     public Event completeEventCreation(Long userId, String description) {
         Event draft = getActiveDraft(userId);
         draft.setDescription(description);
-        draft.setStatus(Event.EventStatus.ACTIVE);
+        draft.setStatus(EventStatus.ACTIVE);
         
         Event completed = eventRepository.save(draft);
         log.info("Completed event creation: {}", completed.getId());
@@ -264,7 +265,7 @@ public class ConversationService {
      * @throws IllegalStateException если активный черновик не найден
      */
     public Event getActiveDraft(Long userId) {
-        return eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT)
+        return eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT)
             .orElseThrow(() -> new IllegalStateException(
                 "No active draft found for user " + userId));
     }
@@ -278,7 +279,7 @@ public class ConversationService {
     @Transactional(readOnly = true)
 
     public boolean hasActiveDraft(Long userId) {
-        return eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT)
+        return eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT)
             .isPresent();
     }
     
@@ -313,7 +314,7 @@ public class ConversationService {
      */
     private int cancelPendingDrafts(Long userId) {
         List<Event> drafts = eventRepository.findAllByUserIdAndStatus(
-            userId, Event.EventStatus.DRAFT);
+            userId, EventStatus.DRAFT);
         
         if (!drafts.isEmpty()) {
             log.debug("Found {} pending draft(s) for user {}", drafts.size(), userId);

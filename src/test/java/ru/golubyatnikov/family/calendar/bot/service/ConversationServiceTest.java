@@ -12,6 +12,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationService;
@@ -87,7 +88,7 @@ class ConversationServiceTest {
                 .id(1L)
                 .user(testUser)
                 .family(testFamily)
-                .status(Event.EventStatus.DRAFT)
+                .status(EventStatus.DRAFT)
                 .notified(false)
                 .build();
     }
@@ -100,7 +101,7 @@ class ConversationServiceTest {
         // Given
         Long userId = testUser.getId();
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
-        when(eventRepository.findAllByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findAllByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Collections.emptyList());
         when(eventRepository.save(any(Event.class))).thenReturn(testDraft);
 
@@ -109,13 +110,13 @@ class ConversationServiceTest {
 
         // Then
         assertNotNull(result);
-        assertEquals(Event.EventStatus.DRAFT, result.getStatus());
+        assertEquals(EventStatus.DRAFT, result.getStatus());
         assertEquals(testUser, result.getUser());
         assertEquals(testFamily, result.getFamily());
         assertFalse(result.getNotified());
 
         verify(userRepository).findById(userId);
-        verify(eventRepository).findAllByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findAllByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository).save(any(Event.class));
     }
 
@@ -124,12 +125,12 @@ class ConversationServiceTest {
     void shouldDeleteOldDraftsBeforeCreatingNew() {
         // Given
         Long userId = testUser.getId();
-        Event oldDraft1 = Event.builder().id(10L).status(Event.EventStatus.DRAFT).build();
-        Event oldDraft2 = Event.builder().id(11L).status(Event.EventStatus.DRAFT).build();
+        Event oldDraft1 = Event.builder().id(10L).status(EventStatus.DRAFT).build();
+        Event oldDraft2 = Event.builder().id(11L).status(EventStatus.DRAFT).build();
         List<Event> oldDrafts = List.of(oldDraft1, oldDraft2);
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
-        when(eventRepository.findAllByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findAllByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(oldDrafts);
         when(eventRepository.save(any(Event.class))).thenReturn(testDraft);
 
@@ -166,7 +167,7 @@ class ConversationServiceTest {
         Long userId = testUser.getId();
         LocalDate date = LocalDate.of(2026, 12, 31);
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.of(testDraft));
         when(eventRepository.save(testDraft)).thenReturn(testDraft);
 
@@ -176,7 +177,7 @@ class ConversationServiceTest {
         // Then
         assertNotNull(result);
         assertEquals(date, testDraft.getEventDate());
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository).save(testDraft);
     }
 
@@ -187,14 +188,14 @@ class ConversationServiceTest {
         Long userId = testUser.getId();
         LocalDate date = LocalDate.of(2026, 12, 31);
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.empty());
 
         // When & Then
         assertThrows(IllegalStateException.class, () -> 
                 conversationService.updateEventDate(userId, date));
 
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository, never()).save(any(Event.class));
     }
 
@@ -207,7 +208,7 @@ class ConversationServiceTest {
         Long userId = testUser.getId();
         LocalTime time = LocalTime.of(18, 30);
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.of(testDraft));
         when(eventRepository.save(testDraft)).thenReturn(testDraft);
 
@@ -217,7 +218,7 @@ class ConversationServiceTest {
         // Then
         assertNotNull(result);
         assertEquals(time, testDraft.getEventTime());
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository).save(testDraft);
     }
 
@@ -228,14 +229,14 @@ class ConversationServiceTest {
         Long userId = testUser.getId();
         LocalTime time = LocalTime.of(18, 30);
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.empty());
 
         // When & Then
         assertThrows(IllegalStateException.class, () -> 
                 conversationService.updateEventTime(userId, time));
 
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository, never()).save(any(Event.class));
     }
 
@@ -248,7 +249,7 @@ class ConversationServiceTest {
         Long userId = testUser.getId();
         String title = "Новогодний ужин";
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.of(testDraft));
         when(eventRepository.save(testDraft)).thenReturn(testDraft);
 
@@ -258,7 +259,7 @@ class ConversationServiceTest {
         // Then
         assertNotNull(result);
         assertEquals(title, testDraft.getTitle());
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository).save(testDraft);
     }
 
@@ -269,14 +270,14 @@ class ConversationServiceTest {
         Long userId = testUser.getId();
         String title = "Новогодний ужин";
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.empty());
 
         // When & Then
         assertThrows(IllegalStateException.class, () -> 
                 conversationService.updateEventTitle(userId, title));
 
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository, never()).save(any(Event.class));
     }
 
@@ -289,7 +290,7 @@ class ConversationServiceTest {
         Long userId = testUser.getId();
         String description = "Семейный ужин в честь Нового года";
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.of(testDraft));
         when(eventRepository.save(testDraft)).thenReturn(testDraft);
         doNothing().when(eventService).handleEventCreated(any(Event.class), any(User.class));
@@ -300,8 +301,8 @@ class ConversationServiceTest {
         // Then
         assertNotNull(result);
         assertEquals(description, testDraft.getDescription());
-        assertEquals(Event.EventStatus.ACTIVE, testDraft.getStatus());
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        assertEquals(EventStatus.ACTIVE, testDraft.getStatus());
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository).save(testDraft);
     }
 
@@ -311,7 +312,7 @@ class ConversationServiceTest {
         // Given
         Long userId = testUser.getId();
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.of(testDraft));
         when(eventRepository.save(testDraft)).thenReturn(testDraft);
         doNothing().when(eventService).handleEventCreated(any(Event.class), any(User.class));
@@ -322,8 +323,8 @@ class ConversationServiceTest {
         // Then
         assertNotNull(result);
         assertNull(testDraft.getDescription());
-        assertEquals(Event.EventStatus.ACTIVE, testDraft.getStatus());
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        assertEquals(EventStatus.ACTIVE, testDraft.getStatus());
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository).save(testDraft);
     }
 
@@ -334,14 +335,14 @@ class ConversationServiceTest {
         Long userId = testUser.getId();
         String description = "Описание";
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.empty());
 
         // When & Then
         assertThrows(IllegalStateException.class, () -> 
                 conversationService.completeEventCreation(userId, description));
 
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository, never()).save(any(Event.class));
     }
 
@@ -354,14 +355,14 @@ class ConversationServiceTest {
         Long userId = testUser.getId();
         List<Event> drafts = List.of(testDraft);
         
-        when(eventRepository.findAllByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findAllByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(drafts);
 
         // When
         conversationService.cancelEventCreation(userId);
 
         // Then
-        verify(eventRepository).findAllByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findAllByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository).deleteAll(drafts);
     }
 
@@ -371,14 +372,14 @@ class ConversationServiceTest {
         // Given
         Long userId = testUser.getId();
         
-        when(eventRepository.findAllByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findAllByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Collections.emptyList());
 
         // When
         conversationService.cancelEventCreation(userId);
 
         // Then
-        verify(eventRepository).findAllByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findAllByUserIdAndStatus(userId, EventStatus.DRAFT);
         verify(eventRepository, never()).deleteAll(any());
     }
 
@@ -390,7 +391,7 @@ class ConversationServiceTest {
         // Given
         Long userId = testUser.getId();
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.of(testDraft));
 
         // When
@@ -399,7 +400,7 @@ class ConversationServiceTest {
         // Then
         assertNotNull(result);
         assertEquals(testDraft, result);
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
     }
 
     @Test
@@ -408,14 +409,14 @@ class ConversationServiceTest {
         // Given
         Long userId = testUser.getId();
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.empty());
 
         // When & Then
         assertThrows(IllegalStateException.class, () -> 
                 conversationService.getActiveDraft(userId));
 
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
     }
 
     // ========== Тесты для hasActiveDraft ==========
@@ -426,7 +427,7 @@ class ConversationServiceTest {
         // Given
         Long userId = testUser.getId();
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.of(testDraft));
 
         // When
@@ -434,7 +435,7 @@ class ConversationServiceTest {
 
         // Then
         assertTrue(result);
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
     }
 
     @Test
@@ -443,7 +444,7 @@ class ConversationServiceTest {
         // Given
         Long userId = testUser.getId();
         
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.empty());
 
         // When
@@ -451,7 +452,7 @@ class ConversationServiceTest {
 
         // Then
         assertFalse(result);
-        verify(eventRepository).findByUserIdAndStatus(userId, Event.EventStatus.DRAFT);
+        verify(eventRepository).findByUserIdAndStatus(userId, EventStatus.DRAFT);
     }
 
     // ========== Тесты для getCurrentStep ==========
@@ -554,17 +555,17 @@ class ConversationServiceTest {
         String description = "Семейный ужин";
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
-        when(eventRepository.findAllByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findAllByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Collections.emptyList());
         when(eventRepository.save(any(Event.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(eventRepository.findByUserIdAndStatus(userId, Event.EventStatus.DRAFT))
+        when(eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT))
                 .thenReturn(Optional.of(testDraft));
         doNothing().when(eventService).handleEventCreated(any(Event.class), any(User.class));
 
         // When - создаем черновик
         Event draft = conversationService.startEventCreation(userId);
         assertNotNull(draft);
-        assertEquals(Event.EventStatus.DRAFT, draft.getStatus());
+        assertEquals(EventStatus.DRAFT, draft.getStatus());
 
         // When - обновляем дату
         conversationService.updateEventDate(userId, date);
@@ -583,7 +584,7 @@ class ConversationServiceTest {
 
         // Then
         assertNotNull(completed);
-        assertEquals(Event.EventStatus.ACTIVE, testDraft.getStatus());
+        assertEquals(EventStatus.ACTIVE, testDraft.getStatus());
         assertEquals(date, testDraft.getEventDate());
         assertEquals(time, testDraft.getEventTime());
         assertEquals(title, testDraft.getTitle());

@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Reminder;
+import ru.golubyatnikov.family.calendar.bot.model.ReminderType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.ReminderRepository;
 
@@ -40,8 +41,7 @@ public class ReminderSchedulingService {
     @Data
     @AllArgsConstructor
     private static class ReminderInfo {
-        private Reminder.ReminderType reminderType;
-        private Integer customMinutes;
+        private ReminderType reminderType;
     }
     
     /**
@@ -173,8 +173,7 @@ public class ReminderSchedulingService {
         
         // Логируем типы удаляемых напоминаний
         String reminderTypes = reminders.stream()
-            .map(r -> r.getReminderType().toString() + 
-                     (r.getCustomMinutes() != null ? "(" + r.getCustomMinutes() + "min)" : ""))
+            .map(r -> r.getReminderType().toString())
             .toList()
             .toString();
         
@@ -192,7 +191,7 @@ public class ReminderSchedulingService {
      * Извлекает информацию о напоминаниях для последующего пересоздания.
      * 
      * @param reminders список напоминаний для извлечения информации
-     * @return список ReminderInfo с типами и параметрами напоминаний
+     * @return список ReminderInfo с типами напоминаний
      */
     private List<ReminderInfo> extractReminderInfo(List<Reminder> reminders) {
         log.debug("Извлечение информации из {} напоминаний", reminders.size());
@@ -200,21 +199,17 @@ public class ReminderSchedulingService {
         List<ReminderInfo> reminderInfos = new ArrayList<>();
         
         for (Reminder reminder : reminders) {
-            ReminderInfo info = new ReminderInfo(
-                reminder.getReminderType(),
-                reminder.getCustomMinutes()
-            );
+            ReminderInfo info = new ReminderInfo(reminder.getReminderType());
             reminderInfos.add(info);
             
-            log.debug("Извлечена информация о напоминании ID {}: type={}, customMinutes={}", 
-                     reminder.getId(), info.getReminderType(), info.getCustomMinutes());
+            log.debug("Извлечена информация о напоминании ID {}: type={}", 
+                     reminder.getId(), info.getReminderType());
         }
         
         log.info("Извлечена информация из {} напоминаний: типы={}", 
                 reminderInfos.size(),
                 reminderInfos.stream()
-                    .map(info -> info.getReminderType().toString() + 
-                         (info.getCustomMinutes() != null ? "(" + info.getCustomMinutes() + "min)" : ""))
+                    .map(info -> info.getReminderType().toString())
                     .toList());
         
         return reminderInfos;
@@ -241,8 +236,7 @@ public class ReminderSchedulingService {
                 // Рассчитываем новое время напоминания
                 LocalDateTime reminderTimeUTC = reminderConfigurationService.calculateReminderTime(
                     event,
-                    info.getReminderType(),
-                    info.getCustomMinutes()
+                    info.getReminderType()
                 );
                 
                 // Пропускаем напоминания, время которых в прошлом
@@ -258,7 +252,6 @@ public class ReminderSchedulingService {
                 Reminder reminder = Reminder.builder()
                     .event(event)
                     .reminderType(info.getReminderType())
-                    .customMinutes(info.getCustomMinutes())
                     .reminderTime(reminderTimeUTC)
                     .sent(false)
                     .build();
@@ -280,8 +273,7 @@ public class ReminderSchedulingService {
             List<Reminder> saved = reminderRepository.saveAll(newReminders);
             
             String createdTypes = saved.stream()
-                .map(r -> r.getReminderType().toString() +
-                         (r.getCustomMinutes() != null ? "(" + r.getCustomMinutes() + "min)" : ""))
+                .map(r -> r.getReminderType().toString())
                 .toList()
                 .toString();
             

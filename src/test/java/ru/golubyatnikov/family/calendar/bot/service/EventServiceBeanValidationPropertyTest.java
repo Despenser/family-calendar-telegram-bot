@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.FamilyRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
@@ -91,7 +92,7 @@ class EventServiceBeanValidationPropertyTest {
             .description("Описание")
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(10, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .isPersonal(false)
             .notified(false)
             .build();

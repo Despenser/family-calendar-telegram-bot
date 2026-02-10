@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 
 import java.time.LocalDate;
@@ -71,12 +72,12 @@ public class StatisticsService {
         
         // Подсчет активных событий за месяц (исключая COMPLETED, DELETED, DRAFT)
         long activeEvents = eventRepository.countByFamilyIdAndEventDateBetweenAndStatus(
-            familyId, startDate, endDate, Event.EventStatus.ACTIVE
+            familyId, startDate, endDate, EventStatus.ACTIVE
         );
         
         // Подсчет завершенных событий
         long completedEvents = eventRepository.countByFamilyIdAndEventDateBetweenAndStatus(
-            familyId, startDate, endDate, Event.EventStatus.COMPLETED
+            familyId, startDate, endDate, EventStatus.COMPLETED
         );
         
         // Общее количество событий = активные + завершенные
@@ -84,12 +85,12 @@ public class StatisticsService {
         
         // Подсчет семейных активных событий
         long familyEvents = eventRepository.countByUserIdAndEventDateBetweenAndIsPersonalAndStatus(
-            userId, startDate, endDate, false, Event.EventStatus.ACTIVE
+            userId, startDate, endDate, false, EventStatus.ACTIVE
         );
         
         // Подсчет персональных активных событий
         long personalEvents = eventRepository.countByUserIdAndEventDateBetweenAndIsPersonalAndStatus(
-            userId, startDate, endDate, true, Event.EventStatus.ACTIVE
+            userId, startDate, endDate, true, EventStatus.ACTIVE
         );
         
         // Подсчет повторяющихся событий (имеют series_id)

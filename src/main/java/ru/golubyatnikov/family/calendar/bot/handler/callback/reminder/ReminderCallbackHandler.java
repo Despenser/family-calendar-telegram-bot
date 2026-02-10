@@ -9,6 +9,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.ReminderType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
@@ -78,11 +79,9 @@ public class ReminderCallbackHandler {
             StringBuilder message = new StringBuilder();
             message.append("🔔 ").append(bold("Настройка напоминаний")).append("\n\n");
             message.append("Выберите один или несколько типов напоминаний:\n\n");
-            message.append("• Утром в день события (9:00)\n");
             message.append("• Вечером накануне (20:00)\n");
             message.append("• За 1 час до события\n");
-            message.append("• За 15 минут до события\n");
-            message.append("• Свое время\n\n");
+            message.append("• За 15 минут до события\n\n");
             message.append(italic("Нажмите на тип, чтобы выбрать или отменить выбор"));
             
             InlineKeyboardMarkup keyboard = createReminderTypesKeyboard(eventId);
@@ -112,7 +111,7 @@ public class ReminderCallbackHandler {
      * @param messageId идентификатор сообщения для редактирования
      * @param callbackQueryId идентификатор callback query для ответа
      */
-    public void handleReminderTypeSelection(Long eventId, Reminder.ReminderType type, 
+    public void handleReminderTypeSelection(Long eventId, ReminderType type, 
                                            Long chatId, Integer messageId, String callbackQueryId) {
         log.debug("Выбор типа напоминания {} для события ID={}", type, eventId);
         
@@ -126,18 +125,6 @@ public class ReminderCallbackHandler {
             } else {
                 selectedReminders.add(key);
                 log.debug("Выбран тип {} для события ID={}", type, eventId);
-            }
-            
-            // Если выбран CUSTOM, запрашиваем ввод минут
-            if (type == Reminder.ReminderType.CUSTOM && selectedReminders.contains(key)) {
-                StringBuilder message = new StringBuilder();
-                message.append("⏱️ ").append(bold("Свое время напоминания")).append("\n\n");
-                message.append("Введите количество минут до события, за которое нужно отправить напоминание.\n\n");
-                message.append("Например: 30 (за 30 минут), 120 (за 2 часа), 1440 (за 1 день)");
-                
-                messageService.editMessageText(chatId, messageId, message.toString(), null);
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ENTER_MINUTES);
-                return;
             }
             
             // Обновляем клавиатуру с отметками выбранных типов
@@ -156,66 +143,6 @@ public class ReminderCallbackHandler {
             } catch (Exception ex) {
                 log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}, stackTrace={}", 
                         callbackQueryId, ex.getMessage(), getStackTraceString(ex), ex);
-            }
-        }
-    }
-    
-    /**
-     * Обрабатывает ввод пользовательского количества минут для custom напоминания.
-     * 
-     * @param eventId идентификатор события
-     * @param input введенный текст
-     * @param chatId идентификатор чата
-     */
-    public void handleCustomReminderInput(Long eventId, String input, Long chatId) {
-        log.debug("Обработка custom напоминания для события ID={}: input={}", eventId, input);
-        
-        try {
-            int minutes = Integer.parseInt(input.trim());
-            
-            if (minutes < 1) {
-                messageService.sendMessage(chatId, 
-                    "❌ Количество минут должно быть больше 0. Попробуйте еще раз.");
-                return;
-            }
-            
-            if (minutes > 43200) { // 30 дней
-                messageService.sendMessage(chatId, 
-                    "❌ Максимальное количество минут: 43200 (30 дней). Попробуйте еще раз.");
-                return;
-            }
-            
-            // Создаем custom напоминание
-            Reminder reminder = reminderService.createCustomReminder(eventId, minutes);
-            
-            StringBuilder message = new StringBuilder();
-            message.append("✅ ").append(bold("Напоминание создано")).append("\n\n");
-            message.append(formatMessage("Тип: Свое время\n"));
-            message.append(formatMessage("За %d минут до события\n", minutes));
-            message.append(formatMessage("Время отправки: %s", 
-                reminder.getReminderTime().format(TIME_FORMATTER)));
-            
-            messageService.sendMessage(chatId, message.toString());
-            log.debug("Custom напоминание создано для события ID={}: {} минут", eventId, minutes);
-            
-        } catch (NumberFormatException e) {
-            log.warn("Некорректный ввод для custom напоминания: input='{}', chatId={}", input, chatId);
-            try {
-                messageService.sendMessage(chatId, 
-                    "❌ Некорректный формат. Введите число (количество минут).");
-            } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: chatId={}, error={}, stackTrace={}", 
-                        chatId, ex.getMessage(), getStackTraceString(ex), ex);
-            }
-        } catch (Exception e) {
-            log.error("Ошибка при создании custom напоминания: eventId={}, chatId={}, error={}, stackTrace={}", 
-                     eventId, chatId, e.getMessage(), getStackTraceString(e), e);
-            try {
-                messageService.sendMessage(chatId, 
-                    "❌ Ошибка при создании напоминания: " + e.getMessage());
-            } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: chatId={}, error={}, stackTrace={}", 
-                        chatId, ex.getMessage(), getStackTraceString(ex), ex);
             }
         }
     }
@@ -479,15 +406,13 @@ public class ReminderCallbackHandler {
         
         try {
             // Собираем выбранные типы
-            List<Reminder.ReminderType> selectedTypes = new ArrayList<>();
+            List<ReminderType> selectedTypes = new ArrayList<>();
             for (String key : selectedReminders) {
                 if (key.startsWith(eventId + "_")) {
                     String typeName = key.substring((eventId + "_").length());
                     try {
-                        Reminder.ReminderType type = Reminder.ReminderType.valueOf(typeName);
-                        if (type != Reminder.ReminderType.CUSTOM) { // CUSTOM обрабатывается отдельно
-                            selectedTypes.add(type);
-                        }
+                        ReminderType type = ReminderType.valueOf(typeName);
+                        selectedTypes.add(type);
                     } catch (IllegalArgumentException e) {
                         log.warn("Неизвестный тип напоминания: {}", typeName);
                     }
@@ -542,11 +467,9 @@ public class ReminderCallbackHandler {
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
         
         // Кнопки типов напоминаний
-        addReminderTypeButton(keyboard, eventId, Reminder.ReminderType.MORNING_OF_DAY, "☀️ Утром в день события");
-        addReminderTypeButton(keyboard, eventId, Reminder.ReminderType.EVENING_BEFORE, "🌙 Вечером накануне");
-        addReminderTypeButton(keyboard, eventId, Reminder.ReminderType.ONE_HOUR_BEFORE, "⏰ За 1 час");
-        addReminderTypeButton(keyboard, eventId, Reminder.ReminderType.FIFTEEN_MINUTES_BEFORE, "⏱️ За 15 минут");
-        addReminderTypeButton(keyboard, eventId, Reminder.ReminderType.CUSTOM, "🕐 Свое время");
+        addReminderTypeButton(keyboard, eventId, ReminderType.EVENING_BEFORE, "🌙 Вечером накануне");
+        addReminderTypeButton(keyboard, eventId, ReminderType.ONE_HOUR_BEFORE, "⏰ За 1 час");
+        addReminderTypeButton(keyboard, eventId, ReminderType.FIFTEEN_MINUTES_BEFORE, "⏱️ За 15 минут");
         
         // Кнопка подтверждения
         List<InlineKeyboardButton> confirmRow = new ArrayList<>();
@@ -570,7 +493,7 @@ public class ReminderCallbackHandler {
      * @param text текст кнопки
      */
     private void addReminderTypeButton(List<List<InlineKeyboardButton>> keyboard, Long eventId, 
-                                      Reminder.ReminderType type, String text) {
+                                      ReminderType type, String text) {
         List<InlineKeyboardButton> row = new ArrayList<>();
         InlineKeyboardButton button = new InlineKeyboardButton();
         
@@ -616,11 +539,6 @@ public class ReminderCallbackHandler {
         String typeText = getReminderTypeText(reminder.getReminderType());
         String timeText = reminder.getReminderTime().format(TIME_FORMATTER);
         
-        if (reminder.getReminderType() == Reminder.ReminderType.CUSTOM) {
-            return String.format("• %s (за %d мин)\n  Время: %s", 
-                typeText, reminder.getCustomMinutes(), timeText);
-        }
-        
         return String.format("• %s\n  Время: %s", typeText, timeText);
     }
     
@@ -630,18 +548,14 @@ public class ReminderCallbackHandler {
      * @param type тип напоминания
      * @return текстовое описание
      */
-    private String getReminderTypeText(Reminder.ReminderType type) {
+    private String getReminderTypeText(ReminderType type) {
         switch (type) {
-            case MORNING_OF_DAY:
-                return "Утром в день события";
             case EVENING_BEFORE:
                 return "Вечером накануне";
             case ONE_HOUR_BEFORE:
                 return "За 1 час";
             case FIFTEEN_MINUTES_BEFORE:
                 return "За 15 минут";
-            case CUSTOM:
-                return "Свое время";
             default:
                 return type.name();
         }

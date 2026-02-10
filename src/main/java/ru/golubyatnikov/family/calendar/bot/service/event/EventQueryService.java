@@ -11,6 +11,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventFilter;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 
 import java.time.LocalDate;
@@ -58,7 +59,7 @@ public class EventQueryService {
         LocalDate endDate = startDate.plusDays(days);
         
         List<Event> events = eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
-            familyId, startDate, endDate, Event.EventStatus.ACTIVE);
+            familyId, startDate, endDate, EventStatus.ACTIVE);
         
         log.debug("Найдено {} активных предстоящих событий для семьи ID={}", events.size(), familyId);
         return events;
@@ -79,7 +80,7 @@ public class EventQueryService {
         
         List<Event> events = eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(
             userId, 
-            Event.EventStatus.ACTIVE
+            EventStatus.ACTIVE
         );
         
         log.info("Найдено {} активных событий для пользователя ID={}", events.size(), userId);
@@ -170,7 +171,7 @@ public class EventQueryService {
         switch (filter) {
             case ALL:
                 events = eventRepository.findByFamilyIdAndStatusOrderByEventDateAscEventTimeAsc(
-                    familyId, Event.EventStatus.ACTIVE);
+                    familyId, EventStatus.ACTIVE);
                 
                 events = events.stream()
                     .filter(event -> !event.getIsPersonal() || event.belongsToUser(userId))
@@ -181,14 +182,14 @@ public class EventQueryService {
                 
             case FAMILY:
                 events = eventRepository.findByFamilyIdAndIsPersonalAndStatusOrderByEventDateAscEventTimeAsc(
-                    familyId, false, Event.EventStatus.ACTIVE);
+                    familyId, false, EventStatus.ACTIVE);
                 
                 log.debug("Найдено {} семейных событий для пользователя ID={}", events.size(), userId);
                 break;
                 
             case PERSONAL:
                 events = eventRepository.findByUserIdAndIsPersonalAndStatusOrderByEventDateAscEventTimeAsc(
-                    userId, true, Event.EventStatus.ACTIVE);
+                    userId, true, EventStatus.ACTIVE);
                 
                 log.debug("Найдено {} личных событий для пользователя ID={}", events.size(), userId);
                 break;
@@ -209,7 +210,7 @@ public class EventQueryService {
      */
     @Transactional(readOnly = true)
     public int getActiveEventsCount(Long userId) {
-        int count = eventRepository.countByUserIdAndStatus(userId, Event.EventStatus.ACTIVE);
+        int count = eventRepository.countByUserIdAndStatus(userId, EventStatus.ACTIVE);
         log.debug("Подсчитано активных событий для пользователя ID={}: {}", userId, count);
         return count;
     }
@@ -267,7 +268,7 @@ public class EventQueryService {
         }
         
         List<Event> events = eventRepository.findByFamilyIdAndEventDateAndStatusOrderByEventTimeAsc(
-            familyId, date, Event.EventStatus.ACTIVE);
+            familyId, date, EventStatus.ACTIVE);
         
         log.debug("Найдено {} активных событий для семьи ID={} на дату {}", 
                  events.size(), familyId, date);

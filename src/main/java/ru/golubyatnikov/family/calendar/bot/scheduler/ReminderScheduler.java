@@ -36,17 +36,7 @@ public class ReminderScheduler {
     
     /**
      * Проверяет и отправляет напоминания по расписанию.
-     * 
-     * <p>Выполняется каждую минуту (fixedRate = 60000 мс).
-     * Делегирует всю логику отправки в ReminderService.</p>
-     * 
-     * <p>Процесс:</p>
-     * <ol>
-     *   <li>Логирует начало проверки напоминаний</li>
-     *   <li>Вызывает ReminderService.sendReminders()</li>
-     *   <li>Обрабатывает исключения с логированием</li>
-     *   <li>Логирует завершение проверки</li>
-     * </ol>
+
      */
     @Scheduled(fixedRate = 60000) // Каждую минуту
     public void checkAndSendReminders() {

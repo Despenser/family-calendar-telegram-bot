@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.ActionType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventHistoryRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 
@@ -55,7 +56,7 @@ public class EventHistoryService {
      * @return созданная запись истории
      * @throws UserNotFoundException если пользователь не найден
      */
-    public EventHistory recordChange(Long eventId, Long userId, EventHistory.ActionType actionType,
+    public EventHistory recordChange(Long eventId, Long userId, ActionType actionType,
                                     String fieldName, String oldValue, String newValue) {
         log.debug("Запись изменения события ID {}: actionType={}, userId={}, field={}", 
                   eventId, actionType, userId, fieldName);
@@ -91,7 +92,7 @@ public class EventHistoryService {
      * @throws UserNotFoundException если пользователь не найден
      */
     public EventHistory recordCreation(Long eventId, Long userId) {
-        return recordChange(eventId, userId, EventHistory.ActionType.CREATED, null, null, null);
+        return recordChange(eventId, userId, ActionType.CREATED, null, null, null);
     }
     
     /**
@@ -109,7 +110,7 @@ public class EventHistoryService {
      */
     public EventHistory recordUpdate(Long eventId, Long userId, String fieldName, 
                                     String oldValue, String newValue) {
-        return recordChange(eventId, userId, EventHistory.ActionType.UPDATED, 
+        return recordChange(eventId, userId, ActionType.UPDATED, 
                           fieldName, oldValue, newValue);
     }
     
@@ -124,7 +125,7 @@ public class EventHistoryService {
      * @throws UserNotFoundException если пользователь не найден
      */
     public EventHistory recordDeletion(Long eventId, Long userId) {
-        return recordChange(eventId, userId, EventHistory.ActionType.DELETED, null, null, null);
+        return recordChange(eventId, userId, ActionType.DELETED, null, null, null);
     }
     
     /**
@@ -138,7 +139,7 @@ public class EventHistoryService {
      * @throws UserNotFoundException если пользователь не найден
      */
     public EventHistory recordRestoration(Long eventId, Long userId) {
-        return recordChange(eventId, userId, EventHistory.ActionType.RESTORED, null, null, null);
+        return recordChange(eventId, userId, ActionType.RESTORED, null, null, null);
     }
     
     /**

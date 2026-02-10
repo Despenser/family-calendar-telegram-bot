@@ -8,6 +8,7 @@ import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.ReminderType;
 
 /**
  * Обработчик callback queries для управления напоминаниями.
@@ -105,8 +106,8 @@ public class ReminderCallbackHandlerImpl implements CallbackHandler {
             }
             
             Long eventId = Long.parseLong(parts[0]);
-            ru.golubyatnikov.family.calendar.bot.model.Reminder.ReminderType type = 
-                ru.golubyatnikov.family.calendar.bot.model.Reminder.ReminderType.valueOf(parts[1]);
+            ru.golubyatnikov.family.calendar.bot.model.ReminderType type = 
+                ru.golubyatnikov.family.calendar.bot.model.ReminderType.valueOf(parts[1]);
             
             log.debug("Переключение типа напоминания: eventId={}, type={}, userId={}", 
                      eventId, type, user.getId());

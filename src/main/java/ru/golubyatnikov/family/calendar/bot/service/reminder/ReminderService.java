@@ -8,6 +8,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.ReminderType;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -50,7 +51,7 @@ public class ReminderService {
      */
     @Deprecated
     @Transactional
-    public List<Reminder> createReminders(Long eventId, List<Reminder.ReminderType> reminderTypes) {
+    public List<Reminder> createReminders(Long eventId, List<ReminderType> reminderTypes) {
         log.debug("Делегирование createReminders в ReminderCreationService: eventId={}", eventId);
         return reminderCreationService.createReminders(eventId, reminderTypes);
     }
@@ -65,17 +66,6 @@ public class ReminderService {
     public List<Reminder> createDefaultReminders(Event event, User user) {
         log.debug("Делегирование createDefaultReminders в ReminderCreationService: eventId={}", event.getId());
         return reminderCreationService.createDefaultReminders(event, user);
-    }
-    
-    /**
-     * Создает кастомное напоминание с произвольным временем.
-     * 
-     * @deprecated Используйте {@link ReminderCreationService#createCustomReminder(Long, int)}
-     */
-    @Deprecated
-    public Reminder createCustomReminder(Long eventId, int minutesBefore) {
-        log.debug("Делегирование createCustomReminder в ReminderCreationService: eventId={}", eventId);
-        return reminderCreationService.createCustomReminder(eventId, minutesBefore);
     }
     
     /**
@@ -243,26 +233,26 @@ public class ReminderService {
     /**
      * Рассчитывает время отправки напоминания на основе типа.
      * 
-     * @deprecated Используйте {@link ReminderConfigurationService#calculateReminderTime(Event, Reminder.ReminderType, Integer)}
+     * @deprecated Используйте {@link ReminderConfigurationService#calculateReminderTime(Event, ReminderType, Integer)}
      */
     @Deprecated
-    public LocalDateTime calculateReminderTime(Event event, Reminder.ReminderType type, Integer customMinutes) {
+    public LocalDateTime calculateReminderTime(Event event, ReminderType type, Integer customMinutes) {
         log.debug("Делегирование calculateReminderTime в ReminderConfigurationService: eventId={}, type={}", 
                  event.getId(), type);
-        return reminderConfigurationService.calculateReminderTime(event, type, customMinutes);
+        return reminderConfigurationService.calculateReminderTime(event, type);
     }
     
     /**
      * Рассчитывает время отправки напоминания с учетом часового пояса пользователя.
      * 
-     * @deprecated Используйте {@link ReminderConfigurationService#calculateReminderTimeWithTimezone(Event, Reminder.ReminderType, ZoneId, Integer)}
+     * @deprecated Используйте {@link ReminderConfigurationService#calculateReminderTimeWithTimezone(Event, ReminderType, ZoneId)}
      */
     @Deprecated
-    public LocalDateTime calculateReminderTimeWithTimezone(Event event, Reminder.ReminderType type, 
-                                                          ZoneId userTimezone, Integer customMinutes) {
+    public LocalDateTime calculateReminderTimeWithTimezone(Event event, ReminderType type, 
+                                                          ZoneId userTimezone) {
         log.debug("Делегирование calculateReminderTimeWithTimezone в ReminderConfigurationService: eventId={}, type={}", 
                  event.getId(), type);
-        return reminderConfigurationService.calculateReminderTimeWithTimezone(event, type, userTimezone, customMinutes);
+        return reminderConfigurationService.calculateReminderTimeWithTimezone(event, type, userTimezone);
     }
     
     /**

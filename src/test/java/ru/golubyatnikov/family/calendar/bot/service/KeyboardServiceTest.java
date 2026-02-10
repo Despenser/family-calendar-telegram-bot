@@ -14,6 +14,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.service.attachment.AttachmentService;
 
@@ -791,7 +792,7 @@ class KeyboardServiceTest {
         User user = createMockUser(familyId);
         
         when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
-            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(Event.EventStatus.ACTIVE)))
+            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(EventStatus.ACTIVE)))
             .thenReturn(new ArrayList<>());
 
         // When
@@ -830,11 +831,11 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(eventDate)
             .eventTime(LocalTime.of(10, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
-            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(Event.EventStatus.ACTIVE)))
+            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(EventStatus.ACTIVE)))
             .thenReturn(List.of(event));
 
         // When
@@ -882,11 +883,11 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(eventDate)
             .eventTime(LocalTime.of(14, 30))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
-            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(Event.EventStatus.ACTIVE)))
+            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(EventStatus.ACTIVE)))
             .thenReturn(List.of(event));
 
         // When
@@ -932,7 +933,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(eventDate)
             .eventTime(LocalTime.of(15, 0)) // Позже
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         Event event2 = Event.builder()
@@ -941,11 +942,11 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(eventDate)
             .eventTime(LocalTime.of(10, 0)) // Раньше
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
-            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(Event.EventStatus.ACTIVE)))
+            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(EventStatus.ACTIVE)))
             .thenReturn(List.of(event1, event2));
 
         // When
@@ -991,7 +992,7 @@ class KeyboardServiceTest {
         LocalDate monthEnd = yearMonth.atEndOfMonth();
         
         when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
-            eq(familyId), eq(monthStart), eq(monthEnd), eq(Event.EventStatus.ACTIVE)))
+            eq(familyId), eq(monthStart), eq(monthEnd), eq(EventStatus.ACTIVE)))
             .thenReturn(new ArrayList<>());
 
         // When
@@ -1000,7 +1001,7 @@ class KeyboardServiceTest {
         // Then
         // Проверяем, что метод репозитория был вызван с правильными параметрами
         org.mockito.Mockito.verify(eventRepository).findByFamilyIdAndEventDateBetweenAndStatus(
-            eq(familyId), eq(monthStart), eq(monthEnd), eq(Event.EventStatus.ACTIVE));
+            eq(familyId), eq(monthStart), eq(monthEnd), eq(EventStatus.ACTIVE));
     }
 
     @Test
@@ -1014,7 +1015,7 @@ class KeyboardServiceTest {
         User user = createMockUser(familyId);
         
         when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
-            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(Event.EventStatus.ACTIVE)))
+            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(EventStatus.ACTIVE)))
             .thenReturn(new ArrayList<>());
 
         // When
@@ -1064,7 +1065,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(date1)
             .eventTime(LocalTime.of(12, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         Event event2 = Event.builder()
@@ -1073,11 +1074,11 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(date2)
             .eventTime(LocalTime.of(16, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         when(eventRepository.findByFamilyIdAndEventDateBetweenAndStatus(
-            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(Event.EventStatus.ACTIVE)))
+            eq(familyId), any(LocalDate.class), any(LocalDate.class), eq(EventStatus.ACTIVE)))
             .thenReturn(List.of(event1, event2));
 
         // When
@@ -1358,7 +1359,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(10, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         InlineKeyboardMarkup mockKeyboard = new InlineKeyboardMarkup();
@@ -1443,7 +1444,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(14, 0))
-            .status(Event.EventStatus.COMPLETED) // Неактивное событие
+            .status(EventStatus.COMPLETED) // Неактивное событие
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
@@ -1488,7 +1489,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(16, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
@@ -1532,7 +1533,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(12, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         InlineKeyboardMarkup mockKeyboard = new InlineKeyboardMarkup();
@@ -1593,7 +1594,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(18, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
@@ -1661,7 +1662,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(10, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         when(inlineKeyboardService.createEventActionsKeyboard(event, userId))
@@ -1690,7 +1691,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(10, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         when(inlineKeyboardService.createEventActionsKeyboard(event, null))
@@ -1720,7 +1721,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(10, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         when(inlineKeyboardService.createEventActionsKeyboard(event, invalidUserId))
@@ -1750,7 +1751,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(15, 0))
-            .status(Event.EventStatus.COMPLETED) // Неактивное событие
+            .status(EventStatus.COMPLETED) // Неактивное событие
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(5L);
@@ -1786,7 +1787,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(10, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
@@ -1823,7 +1824,7 @@ class KeyboardServiceTest {
             .family(family)
             .eventDate(LocalDate.now().plusDays(1))
             .eventTime(LocalTime.of(14, 0))
-            .status(Event.EventStatus.ACTIVE)
+            .status(EventStatus.ACTIVE)
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);

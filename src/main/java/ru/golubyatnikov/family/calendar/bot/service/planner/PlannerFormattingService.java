@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
+import ru.golubyatnikov.family.calendar.bot.model.ReminderType;
 import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
@@ -142,9 +144,9 @@ public class PlannerFormattingService {
         }
         
         // Статус
-        if (event.getStatus() == Event.EventStatus.COMPLETED) {
+        if (event.getStatus() == EventStatus.COMPLETED) {
             details.append(escape("✅ Статус: Завершено\n"));
-        } else if (event.getStatus() == Event.EventStatus.DELETED) {
+        } else if (event.getStatus() == EventStatus.DELETED) {
             details.append(escape("🗑️ Статус: Удалено\n"));
         }
         
@@ -290,11 +292,9 @@ public class PlannerFormattingService {
      */
     private String getReminderDisplayText(ru.golubyatnikov.family.calendar.bot.model.Reminder reminder) {
         return switch (reminder.getReminderType()) {
-            case MORNING_OF_DAY -> "Утром в день события";
             case EVENING_BEFORE -> "Вечером накануне";
             case ONE_HOUR_BEFORE -> "За 1 час до события";
             case FIFTEEN_MINUTES_BEFORE -> "За 15 минут до события";
-            case CUSTOM -> "За " + reminder.getCustomMinutes() + " минут до события";
         };
     }
 
@@ -304,9 +304,9 @@ public class PlannerFormattingService {
      * @param type тип напоминания
      * @return true если тип автоматический
      */
-    private boolean isAutomaticReminderType(ru.golubyatnikov.family.calendar.bot.model.Reminder.ReminderType type) {
-        return type == ru.golubyatnikov.family.calendar.bot.model.Reminder.ReminderType.EVENING_BEFORE ||
-               type == ru.golubyatnikov.family.calendar.bot.model.Reminder.ReminderType.ONE_HOUR_BEFORE ||
-               type == ru.golubyatnikov.family.calendar.bot.model.Reminder.ReminderType.FIFTEEN_MINUTES_BEFORE;
+    private boolean isAutomaticReminderType(ru.golubyatnikov.family.calendar.bot.model.ReminderType type) {
+        return type == ru.golubyatnikov.family.calendar.bot.model.ReminderType.EVENING_BEFORE ||
+               type == ru.golubyatnikov.family.calendar.bot.model.ReminderType.ONE_HOUR_BEFORE ||
+               type == ru.golubyatnikov.family.calendar.bot.model.ReminderType.FIFTEEN_MINUTES_BEFORE;
     }
 }

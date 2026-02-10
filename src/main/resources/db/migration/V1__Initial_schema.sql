@@ -210,7 +210,6 @@ CREATE TABLE reminders (
     id BIGSERIAL PRIMARY KEY,
     event_id BIGINT NOT NULL,
     reminder_type VARCHAR(50) NOT NULL,
-    custom_minutes INTEGER,
     reminder_time TIMESTAMP NOT NULL,
     sent BOOLEAN NOT NULL DEFAULT FALSE,
     sent_at TIMESTAMP,
@@ -219,14 +218,7 @@ CREATE TABLE reminders (
     CONSTRAINT reminders_event_fk FOREIGN KEY (event_id) 
         REFERENCES events(id) ON DELETE CASCADE,
     CONSTRAINT reminders_type_valid CHECK (
-        reminder_type IN ('EVENING_BEFORE', 'ONE_HOUR_BEFORE', 'FIFTEEN_MINUTES_BEFORE', 'CUSTOM')
-    ),
-    CONSTRAINT reminders_custom_minutes_positive CHECK (
-        custom_minutes IS NULL OR custom_minutes > 0
-    ),
-    CONSTRAINT reminders_custom_logic CHECK (
-        (reminder_type = 'CUSTOM' AND custom_minutes IS NOT NULL) OR
-        (reminder_type != 'CUSTOM' AND custom_minutes IS NULL)
+        reminder_type IN ('EVENING_BEFORE', 'ONE_HOUR_BEFORE', 'FIFTEEN_MINUTES_BEFORE')
     ),
     CONSTRAINT reminders_sent_logic CHECK (
         (sent = FALSE AND sent_at IS NULL) OR
@@ -241,8 +233,7 @@ CREATE TABLE reminders (
 COMMENT ON TABLE reminders IS 'Напоминания о событиях с гибкими настройками времени отправки';
 COMMENT ON COLUMN reminders.id IS 'Уникальный идентификатор напоминания';
 COMMENT ON COLUMN reminders.event_id IS 'Ссылка на событие, для которого настроено напоминание';
-COMMENT ON COLUMN reminders.reminder_type IS 'Тип напоминания: MORNING_OF_DAY, EVENING_BEFORE, ONE_HOUR_BEFORE, TEN_MINUTES_BEFORE, CUSTOM';
-COMMENT ON COLUMN reminders.custom_minutes IS 'Количество минут до события для CUSTOM типа (обязательно для CUSTOM, NULL для остальных)';
+COMMENT ON COLUMN reminders.reminder_type IS 'Тип напоминания: EVENING_BEFORE, ONE_HOUR_BEFORE, FIFTEEN_MINUTES_BEFORE';
 COMMENT ON COLUMN reminders.reminder_time IS 'Рассчитанное время отправки напоминания';
 COMMENT ON COLUMN reminders.sent IS 'Флаг отправки напоминания: true - отправлено, false - ожидает отправки';
 COMMENT ON COLUMN reminders.sent_at IS 'Дата и время фактической отправки напоминания';
@@ -505,12 +496,6 @@ COMMENT ON CONSTRAINT reminders_event_fk ON reminders IS
 
 COMMENT ON CONSTRAINT reminders_type_valid ON reminders IS 
     'Бизнес-правило: тип напоминания должен быть одним из предопределенных значений';
-
-COMMENT ON CONSTRAINT reminders_custom_minutes_positive ON reminders IS 
-    'Бизнес-правило: количество минут для пользовательского напоминания должно быть положительным';
-
-COMMENT ON CONSTRAINT reminders_custom_logic ON reminders IS 
-    'Бизнес-правило: для типа CUSTOM обязательно указание custom_minutes, для остальных типов - запрещено';
 
 COMMENT ON CONSTRAINT reminders_sent_logic ON reminders IS 
     'Бизнес-правило: если напоминание отправлено (sent=true), то должна быть указана дата отправки';

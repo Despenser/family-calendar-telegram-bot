@@ -7,6 +7,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.service.attachment.AttachmentService;
 import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
@@ -125,7 +126,7 @@ public class EventInlineKeyboardFactory {
         
         rows.add(row1);
         
-        boolean isActive = event.getStatus() == Event.EventStatus.ACTIVE;
+        boolean isActive = event.getStatus() == EventStatus.ACTIVE;
         boolean isOwner = event.belongsToUser(userId);
         
         // Второй ряд: кнопка вложений и кнопка управления напоминаниями

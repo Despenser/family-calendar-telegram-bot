@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 
 import java.util.List;
@@ -92,7 +93,7 @@ public class SearchService {
         switch (filter) {
             case ALL:
                 // Все активные события семьи (семейные + персональные пользователя)
-                results = eventRepository.findByFamilyIdAndStatus(familyId, Event.EventStatus.ACTIVE)
+                results = eventRepository.findByFamilyIdAndStatus(familyId, EventStatus.ACTIVE)
                     .stream()
                     .filter(event -> !event.getIsPersonal() || event.belongsToUser(userId))
                     .collect(Collectors.toList());
@@ -101,20 +102,20 @@ public class SearchService {
             case FAMILY_ONLY:
                 // Только семейные события (is_personal = false)
                 results = eventRepository.findByFamilyIdAndIsPersonalFalseAndStatus(
-                    familyId, Event.EventStatus.ACTIVE
+                    familyId, EventStatus.ACTIVE
                 );
                 break;
                 
             case PERSONAL_ONLY:
                 // Только персональные события пользователя (is_personal = true)
                 results = eventRepository.findByUserIdAndIsPersonalTrueAndStatus(
-                    userId, Event.EventStatus.ACTIVE
+                    userId, EventStatus.ACTIVE
                 );
                 break;
                 
             case COMPLETED:
                 // Завершенные события семьи (семейные + персональные пользователя)
-                results = eventRepository.findByFamilyIdAndStatus(familyId, Event.EventStatus.COMPLETED)
+                results = eventRepository.findByFamilyIdAndStatus(familyId, EventStatus.COMPLETED)
                     .stream()
                     .filter(event -> !event.getIsPersonal() || event.belongsToUser(userId))
                     .collect(Collectors.toList());
@@ -122,7 +123,7 @@ public class SearchService {
                 
             case RECURRING:
                 // Повторяющиеся события (имеют series_id)
-                results = eventRepository.findByFamilyIdAndStatus(familyId, Event.EventStatus.ACTIVE)
+                results = eventRepository.findByFamilyIdAndStatus(familyId, EventStatus.ACTIVE)
                     .stream()
                     .filter(event -> !event.getIsPersonal() || event.belongsToUser(userId))
                     .filter(Event::isRecurring)

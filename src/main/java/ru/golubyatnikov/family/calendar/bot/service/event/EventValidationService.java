@@ -8,6 +8,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.InvalidDateException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -139,7 +140,7 @@ public class EventValidationService {
      * @throws IllegalStateException если событие не активно
      */
     public void checkEventIsActive(Event event) {
-        if (event.getStatus() != Event.EventStatus.ACTIVE) {
+        if (event.getStatus() != EventStatus.ACTIVE) {
             log.warn("Попытка выполнить операцию с неактивным событием ID={} (статус: {})", 
                      event.getId(), event.getStatus());
             throw new IllegalStateException(

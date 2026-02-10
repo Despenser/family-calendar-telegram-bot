@@ -10,6 +10,8 @@ import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
+import ru.golubyatnikov.family.calendar.bot.model.ActionType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventHistoryService;
@@ -100,7 +102,7 @@ public class TrashService {
         
         List<Event> trashedEvents = eventRepository.findByUserIdAndStatusOrderByDeletedAtDesc(
             userId, 
-            Event.EventStatus.DELETED
+            EventStatus.DELETED
         );
         
         log.info("Получено {} удаленных событий для пользователя ID={}", 
@@ -147,7 +149,7 @@ public class TrashService {
         }
         
         // Проверка, что событие находится в корзине
-        if (event.getStatus() != Event.EventStatus.DELETED) {
+        if (event.getStatus() != EventStatus.DELETED) {
             log.error("Попытка восстановить событие ID={} со статусом {}", 
                      eventId, event.getStatus());
             throw new IllegalStateException(
@@ -164,7 +166,7 @@ public class TrashService {
         }
         
         // Восстановление события
-        event.setStatus(Event.EventStatus.ACTIVE);
+        event.setStatus(EventStatus.ACTIVE);
         event.setDeletedAt(null);
         // Сбрасываем messageId, чтобы при восстановлении создалось новое сообщение
         event.setMessageId(null);
@@ -191,10 +193,10 @@ public class TrashService {
         eventHistoryService.recordChange(
             eventId,
             userId,
-            EventHistory.ActionType.RESTORED,
+            ActionType.RESTORED,
             "status",
-            Event.EventStatus.DELETED.name(),
-            Event.EventStatus.ACTIVE.name()
+            EventStatus.DELETED.name(),
+            EventStatus.ACTIVE.name()
         );
         
         log.info("Событие ID={} успешно восстановлено пользователем ID={}", eventId, userId);
@@ -247,7 +249,7 @@ public class TrashService {
         }
         
         // Проверка, что событие находится в корзине
-        if (event.getStatus() != Event.EventStatus.DELETED) {
+        if (event.getStatus() != EventStatus.DELETED) {
             log.error("Попытка окончательно удалить событие ID={} со статусом {}", 
                      eventId, event.getStatus());
             throw new IllegalStateException(
@@ -466,7 +468,7 @@ public class TrashService {
         log.debug("Поиск событий в корзине старше {}", cutoffDate);
         
         List<Event> oldEvents = eventRepository.findByStatusAndDeletedAtBefore(
-            Event.EventStatus.DELETED,
+            EventStatus.DELETED,
             cutoffDate
         );
         

@@ -8,6 +8,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 
 import java.time.LocalDate;
@@ -162,13 +163,13 @@ public class KeyboardLayoutService {
             // Календарь просмотра - включаем завершенные события
             monthEvents = eventRepository
                 .findByFamilyIdAndEventDateBetween(familyId, monthStart, monthEnd).stream()
-                .filter(e -> e.getStatus() == Event.EventStatus.ACTIVE || e.getStatus() == Event.EventStatus.COMPLETED)
+                .filter(e -> e.getStatus() == EventStatus.ACTIVE || e.getStatus() == EventStatus.COMPLETED)
                 .collect(Collectors.toList());
         } else {
             // Календарь создания - только активные события
             monthEvents = eventRepository
                 .findByFamilyIdAndEventDateBetweenAndStatus(
-                    familyId, monthStart, monthEnd, Event.EventStatus.ACTIVE);
+                    familyId, monthStart, monthEnd, EventStatus.ACTIVE);
         }
         
         // Группируем события по датам

@@ -13,6 +13,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.handler.command.AddEventCommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationService;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
@@ -73,7 +74,7 @@ class AddEventCommandHandlerTest {
                 .id(1L)
                 .user(testUser)
                 .family(testFamily)
-                .status(Event.EventStatus.DRAFT)
+                .status(EventStatus.DRAFT)
                 .notified(false)
                 .build();
     }

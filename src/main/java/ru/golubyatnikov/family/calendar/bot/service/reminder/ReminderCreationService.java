@@ -8,6 +8,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.ReminderType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.ReminderRepository;
 
@@ -43,7 +44,7 @@ public class ReminderCreationService {
      * @throws IllegalArgumentException если список типов пустой или событие не имеет даты/времени
      */
     @Transactional
-    public List<Reminder> createReminders(Long eventId, List<Reminder.ReminderType> reminderTypes) {
+    public List<Reminder> createReminders(Long eventId, List<ReminderType> reminderTypes) {
         log.debug("Создание напоминаний для события ID {}: типы={}", eventId, reminderTypes);
         
         if (reminderTypes == null || reminderTypes.isEmpty()) {
@@ -61,8 +62,8 @@ public class ReminderCreationService {
         
         List<Reminder> reminders = new ArrayList<>();
         
-        for (Reminder.ReminderType type : reminderTypes) {
-            LocalDateTime reminderTime = reminderConfigurationService.calculateReminderTime(event, type, null);
+        for (ReminderType type : reminderTypes) {
+            LocalDateTime reminderTime = reminderConfigurationService.calculateReminderTime(event, type);
             
             // Не создавать напоминания для прошедшего времени
             if (reminderTime.isBefore(LocalDateTime.now())) {
@@ -119,7 +120,7 @@ public class ReminderCreationService {
         }
         
         // Получение списка типов из конфигурации
-        List<Reminder.ReminderType> types = defaultReminderConfig.getTypes();
+        List<ReminderType> types = defaultReminderConfig.getTypes();
         if (types == null || types.isEmpty()) {
             log.warn("Конфигурация автоматических напоминаний пуста, пропуск создания для события ID {}", 
                     event.getId());
@@ -135,11 +136,11 @@ public class ReminderCreationService {
         List<Reminder> reminders = new ArrayList<>();
         
         // Создание напоминаний для каждого типа
-        for (Reminder.ReminderType type : types) {
+        for (ReminderType type : types) {
             try {
                 // Расчет времени напоминания с учетом timezone (возвращает время в UTC)
                 LocalDateTime reminderTimeUTC = reminderConfigurationService.calculateReminderTimeWithTimezone(
-                    event, type, userTimezone, null);
+                    event, type, userTimezone);
                 
                 // Получаем текущее время в UTC для корректного сравнения
                 LocalDateTime nowUTC = LocalDateTime.now(ZoneId.of("UTC"));
@@ -185,26 +186,6 @@ public class ReminderCreationService {
                 saved.stream().map(r -> r.getReminderType().toString()).toList());
         
         return saved;
-    }
-    
-    /**
-     * Создает кастомное напоминание с произвольным временем.
-     * 
-     * @param eventId идентификатор события
-     * @param minutesBefore количество минут до события
-     * @return созданное напоминание
-     * @throws UnsupportedOperationException всегда, так как функционал кастомных напоминаний удален
-     * @deprecated Кастомные напоминания больше не поддерживаются.
-     *             Используйте фиксированные типы: EVENING_BEFORE, ONE_HOUR_BEFORE, FIFTEEN_MINUTES_BEFORE
-     */
-    @Deprecated
-    public Reminder createCustomReminder(Long eventId, int minutesBefore) {
-        log.error("Попытка создать кастомное напоминание для события ID {}: " +
-                 "функционал удален (minutesBefore={})", eventId, minutesBefore);
-        throw new UnsupportedOperationException(
-            "Кастомные напоминания больше не поддерживаются. " +
-            "Используйте фиксированные типы: EVENING_BEFORE, ONE_HOUR_BEFORE, FIFTEEN_MINUTES_BEFORE"
-        );
     }
     
     /**

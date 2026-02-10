@@ -16,6 +16,7 @@ import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Family;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationService;
 import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
@@ -348,7 +349,7 @@ class DateTimeCallbackHandlerTest {
                 .family(user.getFamily())
                 .eventDate(eventDate)
                 .eventTime(eventTime)
-                .status(Event.EventStatus.ACTIVE)
+                .status(EventStatus.ACTIVE)
                 .build();
     }
     

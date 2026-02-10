@@ -12,6 +12,8 @@ import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
+import ru.golubyatnikov.family.calendar.bot.model.ActionType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
@@ -81,7 +83,7 @@ public class EventDeletionService {
             }
         }
         
-        event.setStatus(Event.EventStatus.DELETED);
+        event.setStatus(EventStatus.DELETED);
         event.setDeletedAt(LocalDateTime.now());
         event.setMessageId(null);
         event.setIsMyEventsHeader(false);
@@ -125,7 +127,7 @@ public class EventDeletionService {
                 "Только создатель события может его завершить");
         }
         
-        if (event.getStatus() != Event.EventStatus.ACTIVE) {
+        if (event.getStatus() != EventStatus.ACTIVE) {
             log.warn("Попытка завершить неактивное событие ID={} (статус: {})", 
                      eventId, event.getStatus());
             throw new IllegalStateException(
@@ -149,7 +151,7 @@ public class EventDeletionService {
             }
         }
         
-        event.setStatus(Event.EventStatus.COMPLETED);
+        event.setStatus(EventStatus.COMPLETED);
         event.setCompletedAt(LocalDateTime.now());
         event.setMessageId(null);
         event.setIsMyEventsHeader(false);
@@ -160,7 +162,7 @@ public class EventDeletionService {
         eventHistoryService.recordChange(
             eventId,
             userId,
-            EventHistory.ActionType.UPDATED,
+            ActionType.UPDATED,
             "status",
             "ACTIVE",
             "COMPLETED"
@@ -201,7 +203,7 @@ public class EventDeletionService {
                 "Только создатель события может его завершить");
         }
         
-        if (event.getStatus() != Event.EventStatus.ACTIVE) {
+        if (event.getStatus() != EventStatus.ACTIVE) {
             log.warn("Попытка завершить неактивное событие ID={} (статус: {})", 
                      eventId, event.getStatus());
             throw new IllegalStateException(
@@ -209,7 +211,7 @@ public class EventDeletionService {
                              event.getStatus()));
         }
         
-        event.setStatus(Event.EventStatus.COMPLETED);
+        event.setStatus(EventStatus.COMPLETED);
         event.setCompletedAt(LocalDateTime.now());
         event.setIsMyEventsHeader(false);
         
@@ -220,7 +222,7 @@ public class EventDeletionService {
         eventHistoryService.recordChange(
             eventId,
             userId,
-            EventHistory.ActionType.UPDATED,
+            ActionType.UPDATED,
             "status",
             "ACTIVE",
             "COMPLETED"
@@ -261,7 +263,7 @@ public class EventDeletionService {
                 "Только создатель события может его завершить");
         }
         
-        if (event.getStatus() != Event.EventStatus.ACTIVE) {
+        if (event.getStatus() != EventStatus.ACTIVE) {
             log.warn("Попытка завершить неактивное событие ID={} (статус: {})", 
                      eventId, event.getStatus());
             throw new IllegalStateException(
@@ -269,7 +271,7 @@ public class EventDeletionService {
                              event.getStatus()));
         }
         
-        event.setStatus(Event.EventStatus.COMPLETED);
+        event.setStatus(EventStatus.COMPLETED);
         event.setCompletedAt(LocalDateTime.now());
         event.setIsMyEventsHeader(false);
         
@@ -280,7 +282,7 @@ public class EventDeletionService {
         eventHistoryService.recordChange(
             eventId,
             userId,
-            EventHistory.ActionType.UPDATED,
+            ActionType.UPDATED,
             "status",
             "ACTIVE",
             "COMPLETED"
@@ -335,7 +337,7 @@ public class EventDeletionService {
         eventHistoryService.recordChange(
             eventId,
             userId,
-            EventHistory.ActionType.UPDATED,
+            ActionType.UPDATED,
             "completion_note",
             oldNote,
             note

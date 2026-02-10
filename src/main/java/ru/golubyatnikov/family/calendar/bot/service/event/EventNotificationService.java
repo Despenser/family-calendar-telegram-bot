@@ -15,6 +15,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
@@ -102,7 +103,7 @@ public class EventNotificationService {
                 event.getId(), messageText.length());
         
         if (Boolean.TRUE.equals(event.getIsMyEventsHeader())) {
-            int eventCount = eventRepository.countByUserIdAndStatus(event.getUser().getId(), Event.EventStatus.ACTIVE);
+            int eventCount = eventRepository.countByUserIdAndStatus(event.getUser().getId(), EventStatus.ACTIVE);
             String header = botMessageBuilder.buildMyEventsHeader(eventCount);
             messageText = header + "\n" + messageText;
             log.debug("Добавлена шапка 'Мои события' к сообщению: eventId={}, eventCount={}", 
@@ -110,7 +111,7 @@ public class EventNotificationService {
         }
         
         InlineKeyboardMarkup keyboard;
-        if (event.getStatus() == Event.EventStatus.DRAFT) {
+        if (event.getStatus() == EventStatus.DRAFT) {
             keyboard = keyboardService.createEditFieldSelectionKeyboard(event.getId());
             log.debug("Клавиатура для черновика создана для события ID={}", event.getId());
         } else {
@@ -193,7 +194,7 @@ public class EventNotificationService {
         log.debug("Обновление шапки /my_events после удаления события для пользователя ID={}", userId);
         
         List<Event> activeEvents = eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(
-            userId, Event.EventStatus.ACTIVE);
+            userId, EventStatus.ACTIVE);
         
         User user = userRepository.findById(userId)
             .orElseThrow(() -> {
