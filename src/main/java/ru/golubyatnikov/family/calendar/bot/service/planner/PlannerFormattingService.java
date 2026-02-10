@@ -7,7 +7,7 @@ import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.model.ReminderType;
 import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 
 import java.util.List;
@@ -29,7 +29,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 public class PlannerFormattingService {
 
     private final BotMessageBuilder botMessageBuilder;
-    private final ReminderService reminderService;
+    private final ReminderSchedulingService reminderSchedulingService;
 
     /**
      * Формирует заголовок списка событий.
@@ -109,7 +109,7 @@ public class PlannerFormattingService {
         details.append("📌 ").append(bold(event.getTitle()));
         
         // Добавляем эмодзи 🔔 если есть напоминания
-        boolean hasReminders = reminderService.hasActiveReminders(event.getId());
+        boolean hasReminders = reminderSchedulingService.hasActiveReminders(event.getId());
         if (hasReminders) {
             details.append(escape(" 🔔"));
         }
@@ -156,7 +156,7 @@ public class PlannerFormattingService {
         
         if (hasReminders) {
             List<ru.golubyatnikov.family.calendar.bot.model.Reminder> reminders = 
-                reminderService.getEventReminders(event.getId());
+                reminderSchedulingService.getEventReminders(event.getId());
             
             List<ru.golubyatnikov.family.calendar.bot.model.Reminder> activeReminders = 
                 reminders.stream()

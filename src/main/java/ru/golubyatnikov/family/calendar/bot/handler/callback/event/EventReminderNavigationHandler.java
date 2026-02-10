@@ -16,7 +16,8 @@ import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderNotificationService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.user.UserService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
@@ -44,7 +45,8 @@ public class EventReminderNavigationHandler implements CallbackHandler {
     
     private final TelegramMessageService messageService;
     private final EventService eventService;
-    private final ReminderService reminderService;
+    private final ReminderSchedulingService reminderSchedulingService;
+    private final ReminderNotificationService reminderNotificationService;
     private final UserService userService;
     
     @Override
@@ -134,7 +136,7 @@ public class EventReminderNavigationHandler implements CallbackHandler {
                      eventId, reminderId, userId);
             
             // Загружаем напоминание из базы данных с eager загрузкой события И пользователя
-            Reminder reminder = reminderService.getReminderWithEventAndUser(reminderId);
+            Reminder reminder = reminderSchedulingService.getReminderWithEventAndUser(reminderId);
             
             log.debug("Напоминание загружено с событием и пользователем: reminderId={}, eventId={}, userId={}", 
                      reminderId, eventId, userId);
@@ -150,7 +152,7 @@ public class EventReminderNavigationHandler implements CallbackHandler {
                 : ZoneId.of("UTC");
             
             // Формируем текст сообщения с ПОЛНОЙ информацией о напоминании
-            String eventMessage = reminderService.formatReminderMessageByType(reminder, userTimezone);
+            String eventMessage = reminderNotificationService.formatReminderMessageByType(reminder, userTimezone);
             
             // Создаем упрощенную клавиатуру с кнопкой "Назад к напоминанию"
             InlineKeyboardMarkup keyboard = createDetailsKeyboard(eventId, reminderId);
@@ -256,7 +258,7 @@ public class EventReminderNavigationHandler implements CallbackHandler {
             }
             
             // Загружаем напоминание с eager загрузкой события и пользователя
-            Reminder reminder = reminderService.getReminderWithEventAndUser(reminderId);
+            Reminder reminder = reminderSchedulingService.getReminderWithEventAndUser(reminderId);
             
             log.debug("Напоминание загружено с событием и пользователем: reminderId={}, eventId={}, userId={}", 
                      reminderId, reminder.getEvent().getId(), userId);
@@ -273,13 +275,13 @@ public class EventReminderNavigationHandler implements CallbackHandler {
                      event.getId(), creatorTimezone, userId);
             
             // Восстанавливаем КОРОТКИЙ текст напоминания
-            String reminderMessage = reminderService.formatShortReminderMessage(reminder, creatorTimezone);
+            String reminderMessage = reminderNotificationService.formatShortReminderMessage(reminder, creatorTimezone);
             
             log.debug("Текст напоминания восстановлен: eventId={}, reminderId={}, userId={}", 
                      eventId, reminderId, userId);
             
             // Создаем упрощенную клавиатуру
-            InlineKeyboardMarkup keyboard = reminderService.createSimplifiedReminderKeyboard(event, reminderId);
+            InlineKeyboardMarkup keyboard = reminderNotificationService.createSimplifiedReminderKeyboard(event, reminderId);
             
             log.debug("Упрощенная клавиатура создана: eventId={}, reminderId={}, userId={}", 
                      eventId, reminderId, userId);

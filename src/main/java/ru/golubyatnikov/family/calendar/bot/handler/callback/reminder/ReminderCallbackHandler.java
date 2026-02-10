@@ -11,7 +11,8 @@ import ru.golubyatnikov.family.calendar.bot.model.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.model.ReminderType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderCreationService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 
 import java.time.format.DateTimeFormatter;
@@ -50,7 +51,8 @@ import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 @Slf4j
 public class ReminderCallbackHandler {
     
-    private final ReminderService reminderService;
+    private final ReminderCreationService reminderCreationService;
+    private final ReminderSchedulingService reminderSchedulingService;
     private final TelegramMessageService messageService;
     private final EventRepository eventRepository;
     private final ru.golubyatnikov.family.calendar.bot.service.event.EventService eventService;
@@ -158,7 +160,7 @@ public class ReminderCallbackHandler {
         log.debug("Просмотр напоминаний для события ID={}", eventId);
         
         try {
-            List<Reminder> reminders = reminderService.getEventReminders(eventId);
+            List<Reminder> reminders = reminderSchedulingService.getEventReminders(eventId);
             
             if (reminders.isEmpty()) {
                 StringBuilder message = new StringBuilder();
@@ -205,7 +207,7 @@ public class ReminderCallbackHandler {
         log.debug("Удаление напоминания ID={}", reminderId);
         
         try {
-            reminderService.deleteReminder(reminderId);
+            reminderCreationService.deleteReminder(reminderId);
             
             messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.DELETED);
             
@@ -250,7 +252,7 @@ public class ReminderCallbackHandler {
         
         try {
             // Отключаем все напоминания для события
-            reminderService.disableRemindersForEvent(eventId);
+            reminderCreationService.disableRemindersForEvent(eventId);
             
             // Отвечаем на callback query
             messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.SUCCESS);
@@ -330,7 +332,7 @@ public class ReminderCallbackHandler {
             }
             
             // Создаем автоматические напоминания
-            List<Reminder> createdReminders = reminderService.createDefaultReminders(event, user);
+            List<Reminder> createdReminders = reminderCreationService.createDefaultReminders(event, user);
             
             // Формируем сообщение в зависимости от результата
             String responseMessage;
@@ -426,7 +428,7 @@ public class ReminderCallbackHandler {
             }
             
             // Создаем напоминания
-            List<Reminder> createdReminders = reminderService.createReminders(eventId, selectedTypes);
+            List<Reminder> createdReminders = reminderCreationService.createReminders(eventId, selectedTypes);
             
             // Очищаем выбранные типы для этого события
             selectedReminders.removeIf(key -> key.startsWith(eventId + "_"));

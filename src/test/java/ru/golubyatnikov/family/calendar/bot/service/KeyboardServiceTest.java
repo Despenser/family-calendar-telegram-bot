@@ -57,7 +57,7 @@ class KeyboardServiceTest {
     private ru.golubyatnikov.family.calendar.bot.service.attachment.AttachmentService attachmentService;
     
     @Mock
-    private ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService reminderService;
+    private ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService reminderSchedulingService;
 
     private KeyboardService keyboardService;
 
@@ -1598,7 +1598,7 @@ class KeyboardServiceTest {
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
-        when(reminderService.hasActiveReminders(eventId)).thenReturn(false);
+        when(reminderSchedulingService.hasActiveReminders(eventId)).thenReturn(false);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
@@ -1791,7 +1791,7 @@ class KeyboardServiceTest {
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
-        when(reminderService.hasActiveReminders(eventId)).thenReturn(false);
+        when(reminderSchedulingService.hasActiveReminders(eventId)).thenReturn(false);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
@@ -1828,7 +1828,7 @@ class KeyboardServiceTest {
             .build();
         
         when(attachmentService.countEventAttachments(eventId)).thenReturn(0L);
-        when(reminderService.hasActiveReminders(eventId)).thenReturn(true);
+        when(reminderSchedulingService.hasActiveReminders(eventId)).thenReturn(true);
 
         // When
         InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);

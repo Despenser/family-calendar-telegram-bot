@@ -15,7 +15,7 @@ import ru.golubyatnikov.family.calendar.bot.model.EventHistory;
 import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.model.ActionType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 
 import java.time.LocalDateTime;
@@ -39,7 +39,7 @@ public class EventDeletionService {
     private final EventRepository eventRepository;
     private final EventHistoryService eventHistoryService;
     private final TelegramMessageService telegramMessageService;
-    private final ReminderService reminderService;
+    private final ReminderSchedulingService reminderSchedulingService;
     private final EventNotificationService eventNotificationService;
     
     /**
@@ -356,7 +356,7 @@ public class EventDeletionService {
         log.info("Обработка завершения события ID={}", eventId);
         
         try {
-            reminderService.markRemindersAsSent(eventId);
+            reminderSchedulingService.markRemindersAsSent(eventId);
             log.info("Напоминания отмечены как отправленные для события ID={}", eventId);
         } catch (Exception e) {
             log.error("Ошибка при отметке напоминаний для события ID={}: {}", 

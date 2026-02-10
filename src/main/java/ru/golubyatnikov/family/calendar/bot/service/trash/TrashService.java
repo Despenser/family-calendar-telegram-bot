@@ -51,7 +51,7 @@ public class TrashService {
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
     private final EventHistoryService eventHistoryService;
-    private final ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService reminderService;
+    private final ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService reminderSchedulingService;
     private final TelegramMessageService messageService;
     private final ru.golubyatnikov.family.calendar.bot.handler.command.PlannerCommandHandler plannerCommandHandler;
     private final ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder botMessageBuilder;
@@ -180,7 +180,7 @@ public class TrashService {
         // Пересчет напоминаний при восстановлении из корзины (Требование 9.4)
         if (event.getEventDate() != null && event.getEventTime() != null) {
             try {
-                reminderService.recalculateReminders(eventId);
+                reminderSchedulingService.recalculateReminders(eventId);
                 log.debug("Напоминания пересчитаны для восстановленного события ID={}", eventId);
             } catch (Exception e) {
                 log.warn("Не удалось пересчитать напоминания для восстановленного события ID={}: {}", 

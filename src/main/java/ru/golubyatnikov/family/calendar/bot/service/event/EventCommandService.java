@@ -21,7 +21,7 @@ import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.model.ActionType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -45,7 +45,7 @@ public class EventCommandService {
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
     private final EventHistoryService eventHistoryService;
-    private final ReminderService reminderService;
+    private final ReminderSchedulingService reminderSchedulingService;
     private final ApplicationEventPublisher eventPublisher;
     
     /**
@@ -515,7 +515,7 @@ public class EventCommandService {
         log.info("Обработка изменения даты/времени события ID={}", eventId);
         
         try {
-            reminderService.recalculateReminders(eventId);
+            reminderSchedulingService.recalculateReminders(eventId);
             log.info("Напоминания пересчитаны для события ID={}", eventId);
         } catch (Exception e) {
             log.error("Ошибка при пересчете напоминаний для события ID={}: {}", 

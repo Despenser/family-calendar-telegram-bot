@@ -54,7 +54,7 @@ class MonthCommandHandlerTest {
     private EventService eventService;
     
     @Mock
-    private ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService reminderService;
+    private ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService reminderSchedulingService;
 
     @Mock
     private Message message;
@@ -66,7 +66,7 @@ class MonthCommandHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new MonthCommandHandler(eventService, reminderService);
+        handler = new MonthCommandHandler(eventService, reminderSchedulingService);
     }
 
     @Test

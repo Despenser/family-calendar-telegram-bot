@@ -7,7 +7,7 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.User;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.EventFormatter;
 import java.time.LocalDate;
@@ -24,7 +24,6 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * @author Golubyatnikov Aleksey
  * @since 2026-01-08
  */
-//TODO Исправить проблему с deprecated сервисом
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -34,7 +33,7 @@ public class WeekCommandHandler implements CommandHandler {
     private static final int WEEK_DAYS = 7;
     
     private final EventService eventService;
-    private final ReminderService reminderService;
+    private final ReminderSchedulingService reminderSchedulingService;
 
     /**
      * Обрабатывает команду /week.
@@ -105,7 +104,7 @@ public class WeekCommandHandler implements CommandHandler {
                     messageBuilder.append(EventFormatter.formatDayHeader(date, today));
                     
                     for (Event event : dayEvents) {
-                        boolean hasReminders = reminderService.hasActiveReminders(event.getId());
+                        boolean hasReminders = reminderSchedulingService.hasActiveReminders(event.getId());
                         messageBuilder.append(EventFormatter.formatEvent(event, user, hasReminders));
                         displayedEventsCount++; // Увеличиваем счетчик отображенных событий
                     }

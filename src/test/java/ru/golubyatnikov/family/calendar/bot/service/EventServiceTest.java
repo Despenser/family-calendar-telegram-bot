@@ -21,7 +21,7 @@ import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventHistoryService;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
 
@@ -71,7 +71,7 @@ class EventServiceTest {
     private EventHistoryService eventHistoryService;
 
     @Mock
-    private ReminderService reminderService;
+    private ReminderSchedulingService reminderSchedulingService;
     
     @Mock
     private TelegramMessageService telegramMessageService;

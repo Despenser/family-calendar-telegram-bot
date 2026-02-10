@@ -19,7 +19,7 @@ import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderCreationService;
 import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.event.EventCommandService.EventCreatedEvent;
 import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
@@ -47,7 +47,7 @@ public class EventNotificationService {
     private final TelegramMessageService telegramMessageService;
     private final KeyboardService keyboardService;
     private final BotMessageBuilder botMessageBuilder;
-    private final ReminderService reminderService;
+    private final ReminderCreationService reminderCreationService;
     
     /**
      * Обрабатывает создание события и автоматически создает напоминания по умолчанию.
@@ -59,7 +59,7 @@ public class EventNotificationService {
     public void handleEventCreated(Event event, User user) {
         log.debug("Обработка создания события ID={} пользователем ID={}", event.getId(), user.getId());
         
-        List<Reminder> createdReminders = reminderService.createDefaultReminders(event, user);
+        List<Reminder> createdReminders = reminderCreationService.createDefaultReminders(event, user);
         
         if (event.getEventTime() == null) {
             log.debug("Событие ID={} без времени, напоминания не созданы", event.getId());

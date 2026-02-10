@@ -10,7 +10,7 @@ import ru.golubyatnikov.family.calendar.bot.model.Event;
 import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.service.attachment.AttachmentService;
 import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -33,7 +33,7 @@ import java.util.List;
 public class EventInlineKeyboardFactory {
 
     private final AttachmentService attachmentService;
-    private final ReminderService reminderService;
+    private final ReminderSchedulingService reminderSchedulingService;
     private final ConversationStateService conversationStateService;
 
     /**
@@ -142,7 +142,7 @@ public class EventInlineKeyboardFactory {
         row2.add(attachmentsBtn);
         
         if (isActive && isOwner) {
-            boolean hasReminders = reminderService.hasActiveReminders(eventId);
+            boolean hasReminders = reminderSchedulingService.hasActiveReminders(eventId);
             
             InlineKeyboardButton remindersBtn;
             if (hasReminders) {

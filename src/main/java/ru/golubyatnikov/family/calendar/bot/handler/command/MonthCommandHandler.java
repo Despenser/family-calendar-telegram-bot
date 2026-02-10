@@ -76,18 +76,18 @@ public class MonthCommandHandler implements CommandHandler {
     private static final DateTimeFormatter DATE_RANGE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     
     private final EventService eventService;
-    private final ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService reminderService;
+    private final ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService reminderSchedulingService;
 
     /**
      * Конструктор для внедрения зависимостей.
      * 
      * @param eventService сервис для работы с событиями
-     * @param reminderService сервис для работы с напоминаниями
+     * @param reminderSchedulingService сервис для работы с напоминаниями
      */
     public MonthCommandHandler(EventService eventService, 
-                                       ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService reminderService) {
+                                       ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService reminderSchedulingService) {
         this.eventService = eventService;
-        this.reminderService = reminderService;
+        this.reminderSchedulingService = reminderSchedulingService;
     }
 
     /**
@@ -290,7 +290,7 @@ public class MonthCommandHandler implements CommandHandler {
                 
                 // Добавляем события дня
                 for (Event event : dayEvents) {
-                    boolean hasReminders = reminderService.hasActiveReminders(event.getId());
+                    boolean hasReminders = reminderSchedulingService.hasActiveReminders(event.getId());
                     messageBuilder.append(EventFormatter.formatEvent(event, user, hasReminders));
                 }
             }

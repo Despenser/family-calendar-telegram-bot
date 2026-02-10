@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderService;
+import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderNotificationService;
 import ru.golubyatnikov.family.calendar.bot.util.CorrelationIdUtil;
 
 /**
@@ -32,7 +32,7 @@ import ru.golubyatnikov.family.calendar.bot.util.CorrelationIdUtil;
 @Slf4j
 public class ReminderScheduler {
     
-    private final ReminderService reminderService;
+    private final ReminderNotificationService reminderNotificationService;
     
     /**
      * Проверяет и отправляет напоминания по расписанию.
@@ -44,7 +44,7 @@ public class ReminderScheduler {
             log.debug("Запуск планировщика напоминаний");
             
             try {
-                reminderService.sendReminders();
+                reminderNotificationService.sendReminders();
                 log.debug("Планировщик напоминаний завершил работу");
                 
             } catch (Exception e) {
