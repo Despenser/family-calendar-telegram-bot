@@ -2,39 +2,33 @@ package ru.golubyatnikov.family.calendar.bot.handler.callback.eventtype;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
-import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
-import ru.golubyatnikov.family.calendar.bot.model.Event;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationService;
-import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.service.user.UserService;
-import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import ru.golubyatnikov.family.calendar.bot.model.context.CallbackQueryContext;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationService;
+import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.CallbackQueryService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
-import java.time.LocalDate;
-
-import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
 
 /**
  * Обработчик callback queries для выбора типа события.
- * 
- * <p>Обрабатывает следующие типы callback:</p>
- * <ul>
- *   <li>event_type_ - выбор типа события (семейное/персональное)</li>
- *   <li>skip_description - пропуск описания события</li>
- * </ul>
- * 
- * <p><b>Требования:</b> 1.3, 2.5</p>
- * 
- * @author Family Calendar Bot Team
- * @version 1.0.0
+ *
+ * @author Golubyatnikov Aleksey
  * @since 2026-01-16
  */
 @Component
@@ -45,9 +39,10 @@ public class EventTypeCallbackHandler implements CallbackHandler {
     private final ConversationService conversationService;
     private final TelegramMessageService messageService;
     private final KeyboardService keyboardService;
-    private final UserService userService;
-    private final BotMessageBuilder messageBuilder;
-    private final ru.golubyatnikov.family.calendar.bot.service.event.EventService eventService;
+    private final BotMessageFormattingService botMessageFormattingService;
+    private final EventService eventService;
+    private final CallbackDataExtractionService callbackDataExtractionService;
+    private final CallbackQueryService callbackQueryService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -66,100 +61,106 @@ public class EventTypeCallbackHandler implements CallbackHandler {
     
     @Override
     @HandleCallbackErrors
-    public void handle(CallbackQuery callbackQuery, User user) throws Exception {
-        String callbackData = callbackQuery.getData();
-        Long chatId = callbackQuery.getMessage().getChatId();
-        Integer messageId = callbackQuery.getMessage().getMessageId();
-        String callbackQueryId = callbackQuery.getId();
+    public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
+        CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
         log.debug("Обработка callback типа события: data='{}', userId={}", 
-                callbackData, user.getId());
+                context.callbackData(), user.getId());
         
-        if (CallbackPrefix.EVENT_TYPE.matches(callbackData)) {
-            handleEventTypeSelection(callbackData, user, chatId, messageId, callbackQueryId);
-        } else if (CallbackPrefix.SKIP_DESCRIPTION.matches(callbackData)) {
-            handleSkipDescription(user.getId(), chatId, callbackQueryId);
+        if (CallbackPrefix.EVENT_TYPE.matches(context.callbackData())) {
+            handleEventTypeSelection(context);
+
+        } else if (CallbackPrefix.SKIP_DESCRIPTION.matches(context.callbackData())) {
+            handleSkipDescription(context);
         }
     }
     
     /**
      * Обрабатывает выбор типа события (семейное/персональное).
      * 
-     * @param callbackData данные callback (формат: event_type_{type})
-     * @param user пользователь
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения
-     * @param callbackQueryId идентификатор callback query
+     * @param context контекст callback query
      */
-    private void handleEventTypeSelection(String callbackData, User user, Long chatId, 
-                                          Integer messageId, String callbackQueryId) {
+    private void handleEventTypeSelection(@NonNull CallbackQueryContext context) {
         // Извлекаем тип события (family или personal)
-        String eventType = CallbackPrefix.EVENT_TYPE.extractPayload(callbackData);
+        String eventType = CallbackPrefix.EVENT_TYPE.extractPayload(context.callbackData());
         boolean isPersonal = eventType.equals("personal");
-        
-        // Сохраняем выбор типа события в черновике
-        conversationService.updateEventType(user.getId(), isPersonal);
-        log.info("Пользователь {} выбрал тип события: {}", user.getId(), eventType);
+
+        conversationService.updateEventType(context.getUserId(), isPersonal);
+        log.info("Пользователь {} выбрал тип события: {}", context.getUserId(), eventType);
         
         // Показываем запрос на ввод названия события
-        String message = messageBuilder.buildEventTypeSelectedMessage(isPersonal) + 
+        String message = botMessageFormattingService.buildEventTypeSelectedMessage(isPersonal) + 
                         "\n\n" + bold("Теперь отправьте название события:");
         
-        try {
-            // Обновляем сообщение создания через editMessageText (убираем клавиатуру)
-            messageService.editMessageText(chatId, messageId, message, null);
-            log.debug("Сообщение создания обновлено после выбора типа: userId={}, messageId={}, type={}", 
-                     user.getId(), messageId, eventType);
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.SELECTED);
-        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
-            log.error("Ошибка при выборе типа события: userId={}, type={}, error={}", 
-                     user.getId(), eventType, e.getMessage());
-            throw new RuntimeException("Ошибка при выборе типа события", e);
-        }
+        callbackQueryService.editMessageAndAnswer(context, message, null, CallbackMessages.SELECTED);
+        
+        log.debug("Сообщение создания обновлено после выбора типа: userId={}, messageId={}, type={}", 
+                 context.getUserId(), context.messageId(), eventType);
     }
     
     /**
      * Обрабатывает пропуск описания события.
      * Завершает создание события без описания.
      * 
-     * @param userId идентификатор пользователя
-     * @param chatId идентификатор чата
-     * @param callbackQueryId идентификатор callback query
+     * @param context контекст callback query
      */
-    private void handleSkipDescription(Long userId, Long chatId, String callbackQueryId) {
-        Event completedEvent = conversationService.completeEventCreation(userId, null);
+    private void handleSkipDescription(@NonNull CallbackQueryContext context) {
+        Event completedEvent = conversationService.completeEventCreation(context.getUserId(), null);
         
-        try {
-            // Отправляем сообщение о созданном событии и сохраняем messageId
-            try {
-                eventService.sendOrUpdateEventMessage(completedEvent, chatId);
-                log.debug("Сообщение о созданном событии отправлено и messageId сохранён: eventId={}", 
-                        completedEvent.getId());
-            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
-                log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
-                        completedEvent.getId(), e.getMessage());
-                // Отправляем простое подтверждающее сообщение как fallback
-                String response = formatMessage(
-                    "✅ *Событие успешно создано!*\n\n" +
-                    "📅 Дата: %s\n" +
-                    "🕐 Время: %s\n" +
-                    "📝 Название: %s",
-                    completedEvent.getFormattedDate(),
-                    completedEvent.getFormattedTime(),
-                    completedEvent.getTitle()
-                );
-                ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
-                messageService.sendMessage(chatId, response, keyboard);
-            }
-            
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.CREATED);
-        } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
-            log.error("Ошибка при создании события: userId={}, eventId={}, error={}", 
-                     userId, completedEvent.getId(), e.getMessage());
-            throw new RuntimeException("Ошибка при создании события", e);
-        }
+        sendEventCreatedNotification(completedEvent, context.chatId());
+        callbackQueryService.answerCallback(context.callbackQueryId(), CallbackMessages.CREATED);
         
         log.info("Событие успешно создано без описания: eventId={}, userId={}", 
-            completedEvent.getId(), userId);
+            completedEvent.getId(), context.getUserId());
+    }
+    
+    /**
+     * Отправляет уведомление о созданном событии.
+     * В случае ошибки отправляет упрощённое сообщение.
+     * 
+     * @param event созданное событие
+     * @param chatId идентификатор чата
+     */
+    private void sendEventCreatedNotification(Event event, Long chatId) {
+        try {
+            eventService.sendOrUpdateEventMessage(event, chatId);
+            log.debug("Сообщение о созданном событии отправлено и messageId сохранён: eventId={}", event.getId());
+
+        } catch (TelegramApiException e) {
+            log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
+                    event.getId(), e.getMessage());
+
+            sendFallbackEventMessage(event, chatId);
+        }
+    }
+    
+    /**
+     * Отправляет упрощённое сообщение о созданном событии в случае ошибки основного метода.
+     * 
+     * @param event созданное событие
+     * @param chatId идентификатор чата
+     */
+    private void sendFallbackEventMessage(@NonNull Event event, Long chatId) {
+        try {
+            String response = formatMessage(
+                    """
+                            ✅ *Событие успешно создано!*
+                            
+                            📅 Дата: %s
+                            🕐 Время: %s
+                            📝 Название: %s""",
+                event.getFormattedDate(),
+                event.getFormattedTime(),
+                event.getTitle()
+            );
+
+            ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+            messageService.sendMessage(chatId, response, keyboard);
+            log.debug("Отправлено fallback сообщение о созданном событии: eventId={}", event.getId());
+
+        } catch (TelegramApiException e) {
+            log.error("Критическая ошибка при отправке fallback сообщения: eventId={}, error={}", 
+                    event.getId(), e.getMessage());
+        }
     }
 }

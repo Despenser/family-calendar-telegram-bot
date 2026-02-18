@@ -1,15 +1,12 @@
 package ru.golubyatnikov.family.calendar.bot.repository;
 
-import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import ru.golubyatnikov.family.calendar.bot.model.Event;
-import ru.golubyatnikov.family.calendar.bot.model.EventStatus;
-
+import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -81,7 +78,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
      */
     @EntityGraph(attributePaths = {"user", "family"})
-    @QueryHints(@QueryHint(name = org.hibernate.annotations.QueryHints.CACHEABLE, value = "false"))
     List<Event> findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(Long userId, EventStatus status);
 
     /**
@@ -191,43 +187,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         @Param("userId") Long userId,
         @Param("query") String query
     );
-    
-    /**
-     * Находит семейные события (не персональные) с определенным статусом.
-     * 
-     * @param familyId идентификатор семьи
-     * @param status статус события
-     *
-     * @return список семейных событий с указанным статусом
-     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
-     */
-    @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findByFamilyIdAndIsPersonalFalseAndStatus(Long familyId, EventStatus status);
-    
-    /**
-     * Находит персональные события пользователя с определенным статусом.
-     * 
-     * @param userId идентификатор пользователя
-     * @param status статус события
-     *
-     * @return список персональных событий пользователя с указанным статусом
-     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
-     */
-    @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findByUserIdAndIsPersonalTrueAndStatus(Long userId, EventStatus status);
-    
-    /**
-     * Находит все события семьи с определенным статусом.
-     * 
-     * @param familyId идентификатор семьи
-     * @param status статус события
-     *
-     * @return список событий семьи с указанным статусом
-     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
-     */
-    @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findByFamilyIdAndStatus(Long familyId, EventStatus status);
-    
+
     /**
      * Находит предстоящие события семьи и пользователя.
      * Включает семейные события и персональные события пользователя.

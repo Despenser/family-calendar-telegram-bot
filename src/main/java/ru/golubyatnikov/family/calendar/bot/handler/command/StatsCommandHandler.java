@@ -4,15 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.meta.api.objects.Message;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.statistics.StatisticsService;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
-
-import java.time.LocalDate;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
+import ru.golubyatnikov.family.calendar.bot.model.context.EventStatistics;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.domain.statistics.StatisticsService;
 import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
-import java.util.Locale;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
@@ -20,7 +17,6 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
  * Обработчик команды /stats для отображения статистики событий.
  *
  * @author Golubyatnikov Aleksey
- * @version 2.1.0
  * @since 2026-01-08
  */
 @Component
@@ -29,15 +25,14 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 public class StatsCommandHandler implements CommandHandler {
     
     private final StatisticsService statisticsService;
-    
-    private static final DateTimeFormatter MONTH_FORMATTER = 
-        DateTimeFormatter.ofPattern("LLLL yyyy", Locale.of("ru"));
+    private final DateTimeFormattingService dateTimeFormattingService;
     
     /**
      * Обрабатывает команду /stats.
      * 
      * @param message сообщение от пользователя с командой
      * @param user пользователь, отправивший команду
+     *
      * @return сообщение для отправки пользователю
      */
     @Override
@@ -48,7 +43,7 @@ public class StatsCommandHandler implements CommandHandler {
         try {
             // Получение статистики за текущий месяц в таймзоне пользователя
             YearMonth currentMonth = YearMonth.now(user.getZoneId());
-            StatisticsService.EventStatistics stats = statisticsService.getMonthlyStatistics(
+            EventStatistics stats = statisticsService.getMonthlyStatistics(
                 user.getFamily().getId(),
                 user.getId(),
                 currentMonth.getYear(),
@@ -56,7 +51,7 @@ public class StatsCommandHandler implements CommandHandler {
             );
             
             // Формирование сообщения со статистикой
-            String monthName = currentMonth.atDay(1).format(MONTH_FORMATTER);
+            String monthName = dateTimeFormattingService.formatMonth(currentMonth.atDay(1));
             StringBuilder messageBuilder = new StringBuilder();
             messageBuilder.append(escape("📊 "))
                           .append(bold("Статистика событий"))
@@ -84,19 +79,31 @@ public class StatsCommandHandler implements CommandHandler {
                           .append(bold("По типам событий:"))
                           .append(escape("\n"));
             messageBuilder.append(escape("• Семейные: "))
-                          .append(bold(String.valueOf(stats.getFamilyEvents())))
-                          .append(escape("\n"));
+                          .append(bold(String.valueOf(stats.getFamilyEvents())));
+            
+            if (stats.getTotalEvents() > 0) {
+                messageBuilder.append(escape(" ("))
+                              .append(escape(String.format("%.1f%%", stats.getFamilyEventsRate())))
+                              .append(escape(")"));
+            }
+            messageBuilder.append(escape("\n"));
+            
             messageBuilder.append(escape("• Персональные: "))
-                          .append(bold(String.valueOf(stats.getPersonalEvents())))
-                          .append(escape("\n\n"));
+                          .append(bold(String.valueOf(stats.getPersonalEvents())));
+            
+            if (stats.getTotalEvents() > 0) {
+                messageBuilder.append(escape(" ("))
+                              .append(escape(String.format("%.1f%%", stats.getPersonalEventsRate())))
+                              .append(escape(")"));
+            }
+            messageBuilder.append(escape("\n\n"));
             
             // Процент завершенных событий
             if (stats.getTotalEvents() > 0) {
-                double completionRate = (stats.getCompletedEvents() * 100.0) / stats.getTotalEvents();
                 messageBuilder.append(escape("✅ "))
                               .append("Процент завершения:")
                               .append(escape(" "))
-                              .append(bold(String.format("%.1f%%", completionRate)))
+                              .append(bold(String.format("%.1f%%", stats.getCompletionRate())))
                               .append(escape("\n"));
             }
             

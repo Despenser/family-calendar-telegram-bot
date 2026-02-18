@@ -2,29 +2,25 @@ package ru.golubyatnikov.family.calendar.bot.handler.callback.attachment;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
-import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.model.context.CallbackQueryContext;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.CallbackQueryService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 /**
  * Роутер для обработки callback queries вложений к событиям.
+ * Маршрутизирует запросы к соответствующим обработчикам.
  * 
- * <p>Маршрутизирует запросы к специализированным обработчикам:</p>
- * <ul>
- *   <li>AttachmentListHandler - просмотр списка вложений</li>
- *   <li>AttachmentUploadHandler - добавление файлов</li>
- *   <li>AttachmentViewHandler - просмотр файлов</li>
- *   <li>AttachmentDeleteHandler - удаление файлов</li>
- *   <li>AttachmentNavigationHandler - навигация между экранами</li>
- * </ul>
- * 
- * @author Family Calendar Bot Team
+ * @author Golubyatnikov Aleksey
  * @since 2026-02-03
  */
 @Component
@@ -32,8 +28,8 @@ import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 @Slf4j
 public class AttachmentCallbackRouter implements CallbackHandler {
     
-    private final TelegramMessageService messageService;
-    private final AttachmentListHandler listHandler;
+    private final CallbackQueryService callbackQueryService;
+    private final CallbackDataExtractionService callbackDataExtractionService;
     private final AttachmentUploadHandler uploadHandler;
     private final AttachmentViewHandler viewHandler;
     private final AttachmentDeleteHandler deleteHandler;
@@ -46,173 +42,186 @@ public class AttachmentCallbackRouter implements CallbackHandler {
     
     @Override
     @HandleCallbackErrors
-    public void handle(CallbackQuery callbackQuery, User user) throws Exception {
-        String callbackData = callbackQuery.getData();
-        Long chatId = callbackQuery.getMessage().getChatId();
-        Integer messageId = callbackQuery.getMessage().getMessageId();
-        String callbackQueryId = callbackQuery.getId();
+    public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
+        CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        log.debug("Маршрутизация callback вложения: data='{}', userId={}", 
-                callbackData, user.getId());
+        log.debug("Маршрутизация callback вложения: userId={}, data='{}'", user.getId(), context.callbackData());
         
-        // Проверка на null или пустые callback-данные
-        if (callbackData == null || callbackData.isEmpty()) {
-            log.error("Получены null или пустые callback-данные: userId={}", user.getId());
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректные данные"));
-            return;
-        }
-        
-        // Формат: attach_file_{action}_{eventId}[_{attachmentId}]
-        String payload = CallbackPrefix.ATTACH_FILE.extractPayload(callbackData);
-        
-        // Проверка на null или пустой payload после извлечения префикса
-        if (payload == null || payload.isEmpty()) {
-            log.error("Получен null или пустой payload после извлечения префикса: callbackData='{}', userId={}", 
-                    callbackData, user.getId());
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат данных"));
+        String payload = extractAndValidatePayload(context);
+        if (payload == null) {
             return;
         }
         
         String[] parts = payload.split("_");
-        
-        log.debug("Payload разобран: parts={}, length={}", java.util.Arrays.toString(parts), parts.length);
-        
         if (parts.length < 2) {
-            log.warn("Некорректный формат callback data (недостаточно частей): callbackData='{}', parts={}, userId={}", 
-                    callbackData, java.util.Arrays.toString(parts), user.getId());
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат данных"));
+            sendValidationError(context, "некорректный формат данных");
             return;
         }
         
-        String action = parts[0];
-        log.debug("Определено действие: action={}", action);
-        
         try {
-            switch (action) {
-                case "list" -> {
-                    // Формат: list_{eventId}
-                    if (parts.length < 2) {
-                        log.warn("Недостаточно частей для действия 'list': callbackData='{}', parts={}, userId={}", 
-                                callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("не указан ID события"));
-                        return;
-                    }
-                    Long eventId = Long.parseLong(parts[1]);
-                    log.debug("Маршрутизация к AttachmentListHandler: eventId={}", eventId);
-                    navigationHandler.handleBackToAttachments(eventId, user, chatId, messageId, callbackQueryId, callbackQuery);
-                }
-                case "add" -> {
-                    // Формат: add_{eventId}
-                    if (parts.length < 2) {
-                        log.warn("Недостаточно частей для действия 'add': callbackData='{}', parts={}, userId={}", 
-                                callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("не указан ID события"));
-                        return;
-                    }
-                    Long eventId = Long.parseLong(parts[1]);
-                    log.debug("Маршрутизация к AttachmentUploadHandler: eventId={}", eventId);
-                    uploadHandler.handleAddFile(eventId, user, chatId, messageId, callbackQueryId);
-                }
-                case "view" -> {
-                    // Формат: view_{eventId}_{attachmentId}
-                    if (parts.length < 3) {
-                        log.warn("Недостаточно частей для действия 'view': callbackData='{}', parts={}, userId={}", 
-                                callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("не указан ID вложения"));
-                        return;
-                    }
-                    Long eventId = Long.parseLong(parts[1]);
-                    Long attachmentId = Long.parseLong(parts[2]);
-                    log.debug("Маршрутизация к AttachmentViewHandler: eventId={}, attachmentId={}", eventId, attachmentId);
-                    viewHandler.handleViewFile(attachmentId, eventId, user, chatId, messageId, callbackQueryId);
-                }
-                case "delete" -> {
-                    // Формат: delete_{eventId}_{attachmentId}
-                    if (parts.length < 3) {
-                        log.warn("Недостаточно частей для действия 'delete': callbackData='{}', parts={}, userId={}", 
-                                callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("не указан ID вложения"));
-                        return;
-                    }
-                    Long eventId = Long.parseLong(parts[1]);
-                    Long attachmentId = Long.parseLong(parts[2]);
-                    log.debug("Маршрутизация к AttachmentDeleteHandler: eventId={}, attachmentId={}", eventId, attachmentId);
-                    deleteHandler.handleDeleteFile(attachmentId, eventId, user, chatId, messageId, callbackQueryId);
-                }
-                case "confirm" -> {
-                    // Составное действие: confirm_delete_{eventId}_{attachmentId}
-                    if (parts.length < 4) {
-                        log.warn("Недостаточно частей для действия 'confirm': callbackData='{}', parts={}, userId={}", 
-                                callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат данных"));
-                        return;
-                    }
-                    if (!parts[1].equals("delete")) {
-                        log.warn("Некорректный subAction для 'confirm': ожидается 'delete', получено '{}', callbackData='{}', userId={}", 
-                                parts[1], callbackData, user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("неподдерживаемое действие"));
-                        return;
-                    }
-                    Long eventId = Long.parseLong(parts[2]);
-                    Long attachmentId = Long.parseLong(parts[3]);
-                    log.debug("Маршрутизация к AttachmentDeleteHandler (confirm): eventId={}, attachmentId={}", eventId, attachmentId);
-                    deleteHandler.handleConfirmDelete(attachmentId, eventId, user, chatId, messageId, callbackQueryId);
-                }
-                case "cancel" -> {
-                    // Составное действие: cancel_delete_{eventId} или cancel_add_{eventId}
-                    if (parts.length < 3) {
-                        log.warn("Недостаточно частей для действия 'cancel': callbackData='{}', parts={}, userId={}", 
-                                callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат данных"));
-                        return;
-                    }
-                    
-                    String subAction = parts[1];
-                    Long eventId = Long.parseLong(parts[2]);
-                    
-                    if (subAction.equals("delete")) {
-                        log.debug("Маршрутизация к AttachmentDeleteHandler (cancel): eventId={}", eventId);
-                        deleteHandler.handleCancelDelete(eventId, user, chatId, messageId, callbackQueryId);
-                    } else if (subAction.equals("add")) {
-                        log.debug("Маршрутизация к AttachmentUploadHandler (cancel): eventId={}", eventId);
-                        uploadHandler.handleCancelAddFile(eventId, user, chatId, messageId, callbackQueryId);
-                    } else {
-                        log.warn("Некорректный subAction для 'cancel': ожидается 'delete' или 'add', получено '{}', callbackData='{}', userId={}", 
-                                subAction, callbackData, user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("неподдерживаемое действие"));
-                    }
-                }
-                case "back" -> {
-                    // Формат: back_{eventId}
-                    if (parts.length < 2) {
-                        log.warn("Недостаточно частей для действия 'back': callbackData='{}', parts={}, userId={}", 
-                                callbackData, java.util.Arrays.toString(parts), user.getId());
-                        messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("не указан ID события"));
-                        return;
-                    }
-                    Long eventId = Long.parseLong(parts[1]);
-                    log.debug("Маршрутизация к AttachmentNavigationHandler (back): eventId={}", eventId);
-                    navigationHandler.handleBackToEvent(eventId, user, chatId, messageId, callbackQueryId);
-                }
-                default -> {
-                    log.warn("Неизвестное действие: action='{}', callbackData='{}', userId={}", 
-                            action, callbackData, user.getId());
-                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.UNKNOWN_ACTION);
-                }
-            }
+            routeAction(parts, callbackQuery, context);
+
         } catch (NumberFormatException e) {
-            log.error("Ошибка парсинга числа в callback data: callbackData='{}', parts={}, userId={}, error={}", 
-                    callbackData, java.util.Arrays.toString(parts), user.getId(), e.getMessage());
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат ID"));
-        } catch (ArrayIndexOutOfBoundsException e) {
-            log.error("Ошибка доступа к элементу массива в callback data: callbackData='{}', parts={}, userId={}, error={}", 
-                    callbackData, java.util.Arrays.toString(parts), user.getId(), e.getMessage());
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.validationError("некорректный формат данных"));
+            log.error("Ошибка парсинга ID: userId={}", user.getId());
+            callbackQueryService.answerCallback(context, 
+                    CallbackMessageFormatter.validationError("некорректный формат ID"));
+        }
+    }
+    
+    /**
+     * Извлекает и валидирует payload из callback data.
+     * 
+     * @param context контекст callback query
+     * @return извлеченный payload или null при ошибке валидации
+     */
+    private @Nullable String extractAndValidatePayload(@NonNull CallbackQueryContext context) {
+        if (context.callbackData().isEmpty()) {
+            sendValidationError(context, "некорректные данные");
+            return null;
+        }
+        
+        String payload = CallbackPrefix.ATTACH_FILE.extractPayload(context.callbackData());
+        if (payload.isEmpty()) {
+            sendValidationError(context, "некорректный формат данных");
+            return null;
+        }
+        
+        return payload;
+    }
+    
+    /**
+     * Маршрутизирует действие к соответствующему обработчику.
+     * 
+     * @param parts массив частей callback data
+     * @param callbackQuery объект callback query
+     * @param context контекст callback query
+     *
+     * @throws Exception если произошла ошибка при обработке действия
+     */
+    private void routeAction(@NonNull String[] parts,
+                             CallbackQuery callbackQuery,
+                             CallbackQueryContext context) throws Exception {
+        
+        String action = parts[0];
+        
+        switch (action) {
+            case "list" -> handleList(parts, callbackQuery, context);
+            case "add" -> handleAdd(parts, context);
+            case "view" -> handleView(parts, context);
+            case "delete" -> handleDelete(parts, context);
+            case "confirm" -> handleConfirm(parts, context);
+            case "cancel" -> handleCancel(parts, context);
+            case "back" -> handleBack(parts, context);
+            default -> {
+                log.warn("Неизвестное действие: action={}, userId={}", action, context.getUserId());
+                callbackQueryService.answerCallback(context, CallbackMessages.UNKNOWN_ACTION);
+            }
+        }
+    }
+    
+    private void handleList(String[] parts,
+                            CallbackQuery callbackQuery,
+                            CallbackQueryContext context) throws Exception {
+
+        validatePartsLength(parts, 2, context, "не указан ID события");
+        Long eventId = Long.parseLong(parts[1]);
+
+        navigationHandler.handleBackToAttachments(eventId, context, callbackQuery);
+    }
+    
+    private void handleAdd(String[] parts, CallbackQueryContext context) throws Exception {
+        validatePartsLength(parts, 2, context, "не указан ID события");
+        Long eventId = Long.parseLong(parts[1]);
+
+        uploadHandler.handleAddFile(eventId, context);
+    }
+    
+    private void handleView(String[] parts, CallbackQueryContext context) throws Exception {
+        validatePartsLength(parts, 3, context, "не указан ID вложения");
+        Long eventId = Long.parseLong(parts[1]);
+        Long attachmentId = Long.parseLong(parts[2]);
+
+        viewHandler.handleViewFile(attachmentId, eventId, context);
+    }
+    
+    private void handleDelete(String[] parts, CallbackQueryContext context) throws Exception {
+        validatePartsLength(parts, 3, context, "не указан ID вложения");
+        Long eventId = Long.parseLong(parts[1]);
+        Long attachmentId = Long.parseLong(parts[2]);
+
+        deleteHandler.handleDeleteFile(attachmentId, eventId, context);
+    }
+    
+    private void handleConfirm(String[] parts, CallbackQueryContext context) throws Exception {
+        validatePartsLength(parts, 4, context, "некорректный формат данных");
+        
+        if (!"delete".equals(parts[1])) {
+            sendValidationError(context, "неподдерживаемое действие");
+            return;
+        }
+        
+        Long eventId = Long.parseLong(parts[2]);
+        Long attachmentId = Long.parseLong(parts[3]);
+        deleteHandler.handleConfirmDelete(attachmentId, eventId, context);
+    }
+    
+    private void handleCancel(String[] parts, CallbackQueryContext context) throws Exception {
+        validatePartsLength(parts, 3, context, "некорректный формат данных");
+        
+        String subAction = parts[1];
+        Long eventId = Long.parseLong(parts[2]);
+        
+        if ("delete".equals(subAction)) {
+            deleteHandler.handleCancelDelete(eventId, context);
+
+        } else if ("add".equals(subAction)) {
+            uploadHandler.handleCancelAddFile(eventId, context);
+
+        } else {
+            sendValidationError(context, "неподдерживаемое действие");
+        }
+    }
+    
+    private void handleBack(String[] parts, CallbackQueryContext context) throws Exception {
+        validatePartsLength(parts, 2, context, "не указан ID события");
+        Long eventId = Long.parseLong(parts[1]);
+        navigationHandler.handleBackToEvent(eventId, context);
+    }
+    
+    /**
+     * Валидирует длину массива частей callback data.
+     * 
+     * @param parts массив частей для валидации
+     * @param requiredLength требуемая минимальная длина
+     * @param context контекст callback query
+     * @param errorMessage сообщение об ошибке
+     *
+     * @throws IllegalArgumentException если длина массива меньше требуемой
+     */
+    private void validatePartsLength(@NonNull String[] parts,
+                                     int requiredLength,
+                                     CallbackQueryContext context,
+                                     String errorMessage) {
+
+        if (parts.length < requiredLength) {
+            sendValidationError(context, errorMessage);
+            throw new IllegalArgumentException(errorMessage);
+        }
+    }
+    
+    /**
+     * Отправляет ошибку валидации пользователю.
+     * 
+     * @param context контекст callback query
+     * @param message текст сообщения об ошибке
+     */
+    private void sendValidationError(CallbackQueryContext context, String message) {
+        try {
+            callbackQueryService.answerCallback(context, 
+                    CallbackMessageFormatter.validationError(message));
+
         } catch (Exception e) {
-            log.error("Неожиданная ошибка при маршрутизации callback вложения: callbackData='{}', userId={}, error={}", 
-                    callbackData, user.getId(), e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
-            throw e;
+            log.error("Ошибка при отправке callback ответа: {}", e.getMessage());
         }
     }
 }

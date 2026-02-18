@@ -26,6 +26,7 @@ bin/
 
 # IDE - VS Code
 .vscode/
+.kiro/
 
 # Environment variables и секреты
 .env

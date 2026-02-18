@@ -1,7 +1,5 @@
 package ru.golubyatnikov.family.calendar.bot.exception;
 
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -13,7 +11,6 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.italic;
@@ -34,6 +31,7 @@ public class GlobalExceptionHandler {
      * @param status HTTP статус
      * @param error краткое описание ошибки
      * @param message детальное сообщение для пользователя
+     *
      * @return Map с информацией об ошибке
      */
     private @NonNull Map<String, Object> createErrorResponse(@NonNull HttpStatus status,

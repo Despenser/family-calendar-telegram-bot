@@ -2,31 +2,39 @@ package ru.golubyatnikov.family.calendar.bot.handler.callback.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
-import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
-import ru.golubyatnikov.family.calendar.bot.model.Event;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
-import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import ru.golubyatnikov.family.calendar.bot.model.context.CallbackQueryContext;
+import ru.golubyatnikov.family.calendar.bot.model.context.EditingContext;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.CallbackQueryService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.EventEditKeyboardFactory;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 
 /**
  * Обработчик редактирования события.
- * 
- * <p>Обрабатывает начало редактирования события и отмену редактирования.</p>
- * 
- * @author Family Calendar Bot Team
+ *
+ * @author Golubyatnikov Aleksey
  * @since 2026-02-03
  */
 @Component
@@ -38,7 +46,10 @@ public class EventEditHandler implements CallbackHandler {
     private final ConversationStateService conversationStateService;
     private final KeyboardService keyboardService;
     private final EventService eventService;
-    private final BotMessageBuilder botMessageBuilder;
+    private final BotMessageFormattingService botMessageFormattingService;
+    private final EventEditKeyboardFactory keyboardFactory;
+    private final CallbackDataExtractionService callbackDataExtractionService;
+    private final CallbackQueryService callbackQueryService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -57,257 +68,183 @@ public class EventEditHandler implements CallbackHandler {
     
     @Override
     @Transactional
-    public void handle(CallbackQuery callbackQuery, User user) throws Exception {
-        String callbackData = callbackQuery.getData();
-        Long chatId = callbackQuery.getMessage().getChatId();
-        Integer messageId = callbackQuery.getMessage().getMessageId();
-        String callbackQueryId = callbackQuery.getId();
+    public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
+        CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        if (CallbackPrefix.EDIT_EVENT.matches(callbackData)) {
-            handleEditEvent(callbackData, user, chatId, messageId, callbackQueryId);
-        } else if (CallbackPrefix.EDIT_BACK.matches(callbackData)) {
-            handleEditBack(callbackData, user.getId(), chatId, messageId, callbackQueryId);
-        } else if (CallbackPrefix.EDIT_CANCEL.matches(callbackData)) {
-            handleEditCancel(callbackData, user.getId(), chatId, callbackQueryId);
+        if (CallbackPrefix.EDIT_EVENT.matches(context.callbackData())) {
+            handleEditEvent(context);
+        } else if (CallbackPrefix.EDIT_BACK.matches(context.callbackData())) {
+            handleEditBack(context);
+        } else if (CallbackPrefix.EDIT_CANCEL.matches(context.callbackData())) {
+            handleEditCancel(context);
         }
     }
     
     /**
      * Обрабатывает редактирование события.
-     * 
-     * <p>Обновляет текущее сообщение, показывая меню выбора поля для редактирования.</p>
-     * 
-     * @param callbackData данные callback (формат: edit_event_{eventId})
-     * @param user объект пользователя
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения
-     * @param callbackQueryId идентификатор callback query
      */
-    private void handleEditEvent(String callbackData, User user, Long chatId, 
-                                 Integer messageId, String callbackQueryId) {
-        Long userId = user.getId();
-        Long eventId = extractEventId(callbackData, CallbackPrefix.EDIT_EVENT);
+    private void handleEditEvent(CallbackQueryContext context) {
+        Long eventId = extractEventId(context.callbackData());
         
-        log.info("Редактирование события ID={} пользователем ID={}", eventId, userId);
+        log.info("Редактирование события ID={} пользователем ID={}", eventId, context.getUserId());
         
         try {
-            // Получаем событие и проверяем права доступа
             Event event = eventService.getEventById(eventId);
             
-            // Проверяем права доступа
-            if (!event.getUser().getId().equals(userId)) {
-                log.warn("Пользователь ID={} не имеет прав для редактирования события ID={}", 
-                        userId, eventId);
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.NO_ACCESS);
+            if (!event.getUser().getId().equals(context.getUserId())) {
+                log.warn("Пользователь ID={} не имеет прав для редактирования события ID={}", context.getUserId(), eventId);
+                callbackQueryService.answerCallback(context, CallbackMessages.NO_ACCESS);
                 return;
             }
             
-            // Сохраняем messageId в контексте редактирования
-            conversationStateService.startEventEditing(userId, eventId, chatId, messageId);
+            conversationStateService.startEventEditing(context.getUserId(), eventId, context.chatId(), context.messageId());
             
-            // Формируем сообщение с текущими данными события и клавиатурой выбора поля
             String message = buildEditFieldSelectionMessage(event);
-            InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId, userId);
+            InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId, context.getUserId());
             
-            // Обновляем текущее сообщение вместо отправки нового
-            messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
+            messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
+            callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
             log.debug("Начато редактирование события ID={} в сообщении ID={} пользователем ID={}", 
-                     eventId, messageId, userId);
+                     eventId, context.messageId(), context.getUserId());
             
         } catch (TelegramApiException e) {
             log.error("Ошибка при редактировании события: eventId={}, userId={}, error={}", 
-                     eventId, userId, e.getMessage(), e);
+                     eventId, context.getUserId(), e.getMessage(), e);
             throw new RuntimeException("Ошибка при редактировании события", e);
         }
     }
     
     /**
      * Обрабатывает возврат к меню выбора поля редактирования.
-     * 
-     * <p>Метод возвращает пользователя к меню выбора поля (Название, Дата, Время, Описание)
-     * из экрана редактирования конкретного поля.</p>
-     * 
-     * @param callbackData данные callback (формат: edit_back_{eventId})
-     * @param userId идентификатор пользователя
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения
-     * @param callbackQueryId идентификатор callback query
      */
-    private void handleEditBack(String callbackData, Long userId, Long chatId, 
-                                Integer messageId, String callbackQueryId) {
-        String eventIdStr = CallbackPrefix.EDIT_BACK.extractPayload(callbackData);
+    private void handleEditBack(CallbackQueryContext context) {
+        String eventIdStr = CallbackPrefix.EDIT_BACK.extractPayload(context.callbackData());
         Long eventId = Long.parseLong(eventIdStr);
         
-        log.info("Возврат к меню выбора поля редактирования события ID={} пользователем ID={}", eventId, userId);
+        log.info("Возврат к меню выбора поля редактирования события ID={} пользователем ID={}", eventId, context.getUserId());
         
         try {
-            // Получаем событие для отображения
             Event event = eventService.getEventById(eventId);
             
-            // Формируем сообщение с текущими данными события и клавиатурой выбора поля
             String message = buildEditFieldSelectionMessage(event);
-            InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId, userId);
+            InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId, context.getUserId());
             
-            // Обновляем текущее сообщение
-            messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
+            messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
+            callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
             log.debug("Возврат к меню выбора поля: eventId={}, messageId={}, userId={}", 
-                     eventId, messageId, userId);
+                     eventId, context.messageId(), context.getUserId());
             
         } catch (TelegramApiException e) {
             log.error("Ошибка Telegram API при возврате к меню выбора поля: eventId={}, userId={}, error={}", 
-                     eventId, userId, e.getMessage(), e);
+                     eventId, context.getUserId(), e.getMessage(), e);
             throw new RuntimeException("Ошибка при возврате к меню выбора поля", e);
         }
     }
     
     /**
      * Обрабатывает отмену редактирования события.
-     * 
-     * <p>Метод выполняет следующие действия:</p>
-     * <ol>
-     *   <li>Получает messageId и sourceDate из EditingContext</li>
-     *   <li>Очищает состояние редактирования</li>
-     *   <li>Если редактирование началось из календаря - возвращает к списку событий на дату</li>
-     *   <li>Иначе - возвращает к карточке события</li>
-     *   <li>Если messageId не найден, использует fallback на sendOrUpdateEventMessage</li>
-     * </ol>
-     * 
-     * @param callbackData данные callback (формат: edit_cancel_{eventId})
-     * @param userId идентификатор пользователя
-     * @param chatId идентификатор чата
-     * @param callbackQueryId идентификатор callback query
      */
-    private void handleEditCancel(String callbackData, Long userId, Long chatId, String callbackQueryId) {
-        String eventIdStr = CallbackPrefix.EDIT_CANCEL.extractPayload(callbackData);
+    private void handleEditCancel(CallbackQueryContext context) {
+        String eventIdStr = CallbackPrefix.EDIT_CANCEL.extractPayload(context.callbackData());
         Long eventId = Long.parseLong(eventIdStr);
         
-        log.info("Отмена редактирования события ID={} пользователем ID={}", eventId, userId);
+        log.info("Отмена редактирования события ID={} пользователем ID={}", eventId, context.getUserId());
         
         try {
-            // Получаем контекст редактирования
-            ConversationStateService.EditingContext context = conversationStateService.getEditingContext(userId);
-            Integer messageId = context != null ? context.getMessageId() : null;
-            java.time.LocalDate sourceDate = context != null ? context.getSourceDate() : null;
+            EditingContext editingContext = conversationStateService.getEditingContext(context.getUserId());
+            Integer messageId = editingContext != null ? editingContext.getMessageId() : null;
+            LocalDate sourceDate = editingContext != null ? editingContext.getSourceDate() : null;
             
             log.info("Контекст редактирования: userId={}, eventId={}, messageId={}, sourceDate={}, contextExists={}", 
-                    userId, eventId, messageId, sourceDate, context != null);
+                    context.getUserId(), eventId, messageId, sourceDate, editingContext != null);
             
-            // Очищаем состояние редактирования
-            conversationStateService.clearEventEditing(userId);
+            conversationStateService.clearEventEditing(context.getUserId());
             
-            // Получаем событие для отображения
             Event event = eventService.getEventById(eventId);
             
             if (sourceDate != null) {
-                // Редактирование началось из календаря - возвращаем к списку событий на дату
-                log.info("Возврат к списку событий на дату {} после отмены редактирования события ID={}", 
-                        sourceDate, eventId);
-                
-                if (messageId != null) {
-                    // Получаем события на дату
-                    java.util.List<Event> allEvents = eventService.getEventsByDate(
-                            event.getUser().getFamily().getId(), sourceDate);
-                    java.util.List<Event> myEvents = allEvents.stream()
-                            .filter(e -> e.getUser().getId().equals(userId))
-                            .collect(java.util.stream.Collectors.toList());
-                    
-                    // Формируем сообщение со списком событий
-                    String message = "✏️ Выберите событие для редактирования:";
-                    
-                    java.util.List<java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton>> rows = new java.util.ArrayList<>();
-                    
-                    for (Event e : myEvents) {
-                        java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton> row = new java.util.ArrayList<>();
-                        String buttonText = String.format("%s - %s", 
-                            e.getEventTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
-                            e.getTitle());
-                        org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton button = 
-                            new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton(buttonText);
-                        button.setCallbackData("edit_event_from_calendar_" + e.getId() + "_" + sourceDate.toString());
-                        row.add(button);
-                        rows.add(row);
-                    }
-                    
-                    java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton> backRow = new java.util.ArrayList<>();
-                    org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton backButton = 
-                        new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton("🔙 Назад");
-                    backButton.setCallbackData("calendar_" + sourceDate.toString());
-                    backRow.add(backButton);
-                    rows.add(backRow);
-                    
-                    org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup keyboard = 
-                        new org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup();
-                    keyboard.setKeyboard(rows);
-                    
-                    messageService.editMessageText(chatId, messageId, message, keyboard);
-                    
-                    log.debug("Сообщение обновлено при отмене редактирования из календаря: eventId={}, messageId={}, sourceDate={}", 
-                             eventId, messageId, sourceDate);
-                } else {
-                    log.warn("MessageId не найден в контексте редактирования из календаря: eventId={}, userId={}", 
-                            eventId, userId);
-                }
-                
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.actionCancelled("Редактирование"));
-                
+                handleCancelFromCalendar(event, context, messageId, sourceDate);
             } else {
-                // Редактирование началось не из календаря - возвращаем к карточке события
-                if (messageId != null) {
-                    // Обновляем то же сообщение, возвращая его к отображению события
-                    int eventCount = eventService.getActiveEventsCount(event.getUser().getId());
-                    String eventMessage = botMessageBuilder.buildEventMessageWithHeader(event, eventCount);
-                    InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
-                    messageService.editMessageText(chatId, messageId, eventMessage, keyboard);
-                    
-                    log.debug("Сообщение обновлено при отмене редактирования: eventId={}, messageId={}", 
-                             eventId, messageId);
-                } else {
-                    // Fallback: если messageId не найден, отправляем новое сообщение
-                    log.warn("MessageId не найден в контексте редактирования, используем sendOrUpdateEventMessage: eventId={}, userId={}", 
-                            eventId, userId);
-                    eventService.sendOrUpdateEventMessage(event, chatId);
-                }
-                
-                // Отвечаем на callback query
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.actionCancelled("Редактирование"));
+                handleCancelFromEvent(event, context, messageId);
             }
-            
-            log.info("Редактирование события ID={} успешно отменено пользователем ID={}", eventId, userId);
             
         } catch (TelegramApiException e) {
             log.error("Ошибка Telegram API при отмене редактирования: eventId={}, userId={}, error={}", 
-                     eventId, userId, e.getMessage(), e);
+                     eventId, context.getUserId(), e.getMessage(), e);
             throw new RuntimeException("Ошибка при отмене редактирования события", e);
         }
     }
     
     /**
-     * Формирует сообщение с текущими данными события для выбора поля редактирования.
-     * 
-     * @param event событие для редактирования
-     * @return отформатированное сообщение
+     * Обрабатывает отмену редактирования из календаря.
      */
-    private String buildEditFieldSelectionMessage(Event event) {
-        StringBuilder message = new StringBuilder();
-        message.append("📝 ").append(bold("Редактирование события")).append("\n\n");
-        message.append(botMessageBuilder.buildEventMessage(event));
-        message.append("\n\n").append("Выберите поле для редактирования:");
-        return message.toString();
+    private void handleCancelFromCalendar(@NonNull Event event,
+                                          CallbackQueryContext context,
+                                          Integer messageId,
+                                          LocalDate sourceDate) throws TelegramApiException {
+        log.info("Возврат к списку событий на дату {} после отмены редактирования события ID={}", 
+                sourceDate, event.getId());
+        
+        if (messageId != null) {
+            List<Event> allEvents = eventService.getEventsByDate(event.getUser().getFamily().getId(), sourceDate);
+            List<Event> myEvents = allEvents.stream()
+                    .filter(e -> e.getUser().getId().equals(context.getUserId()))
+                    .collect(Collectors.toList());
+            
+            String message = "✏️ Выберите событие для редактирования:";
+            InlineKeyboardMarkup keyboard = keyboardFactory.createEventListKeyboard(myEvents, sourceDate);
+            
+            messageService.editMessageText(context.chatId(), messageId, message, keyboard);
+            
+            log.debug("Сообщение обновлено при отмене редактирования из календаря: eventId={}, messageId={}, sourceDate={}", 
+                     event.getId(), messageId, sourceDate);
+        } else {
+            log.warn("MessageId не найден в контексте редактирования из календаря: eventId={}, userId={}", 
+                    event.getId(), context.getUserId());
+        }
+        
+        callbackQueryService.answerCallback(context, CallbackMessageFormatter.actionCancelled("Редактирование"));
+    }
+    
+    /**
+     * Обрабатывает отмену редактирования из карточки события.
+     */
+    private void handleCancelFromEvent(Event event,
+                                       CallbackQueryContext context,
+                                       Integer messageId) throws TelegramApiException {
+        if (messageId != null) {
+            int eventCount = eventService.getActiveEventsCount(event.getUser().getId());
+            String eventMessage = botMessageFormattingService.buildEventMessageWithHeader(event, eventCount);
+            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, context.getUserId());
+            messageService.editMessageText(context.chatId(), messageId, eventMessage, keyboard);
+            
+            log.debug("Сообщение обновлено при отмене редактирования: eventId={}, messageId={}", 
+                     event.getId(), messageId);
+        } else {
+            log.warn("MessageId не найден в контексте редактирования, используем sendOrUpdateEventMessage: eventId={}, userId={}", 
+                    event.getId(), context.getUserId());
+            eventService.sendOrUpdateEventMessage(event, context.chatId());
+        }
+        
+        callbackQueryService.answerCallback(context, CallbackMessageFormatter.actionCancelled("Редактирование"));
+    }
+    
+    /**
+     * Формирует сообщение с текущими данными события для выбора поля редактирования.
+     */
+    private @NonNull String buildEditFieldSelectionMessage(@NonNull Event event) {
+        return "📝 " + bold("Редактирование события") + "\n\n" +
+                botMessageFormattingService.buildEventMessage(event) +
+                "\n\n" + "Выберите поле для редактирования:";
     }
     
     /**
      * Извлекает ID события из callback data.
-     * 
-     * @param callbackData строка callback data
-     * @param prefix префикс для извлечения payload
-     * @return ID события
      */
-    private Long extractEventId(String callbackData, CallbackPrefix prefix) {
-        String payload = prefix.extractPayload(callbackData);
+    private @NonNull Long extractEventId(String callbackData) {
+        String payload = CallbackPrefix.EDIT_EVENT.extractPayload(callbackData);
         return Long.parseLong(payload);
     }
 }

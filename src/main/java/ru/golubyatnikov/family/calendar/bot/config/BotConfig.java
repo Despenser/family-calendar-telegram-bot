@@ -9,6 +9,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.client.RestTemplate;
+import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
+import org.telegram.telegrambots.meta.generics.TelegramClient;
 
 /**
  * Конфигурация Telegram бота.
@@ -55,4 +57,17 @@ public class BotConfig {
     public RestTemplate restTemplate(@NonNull RestTemplateBuilder builder) {
         return builder.build();
     }
+
+
+    /**
+     * Создает и настраивает TelegramClient для взаимодействия с Telegram Bot API.
+     * Используется всеми сервисами для отправки запросов к API.
+     *
+     * @return настроенный экземпляр TelegramClient
+     */
+    @Bean
+    public TelegramClient telegramClient() {
+        return new OkHttpTelegramClient(token);
+    }
+
 }

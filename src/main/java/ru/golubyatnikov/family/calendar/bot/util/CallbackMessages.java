@@ -2,21 +2,19 @@ package ru.golubyatnikov.family.calendar.bot.util;
 
 /**
  * Централизованное хранилище всплывающих сообщений для callback queries.
- * Все сообщения категоризированы для удобства использования и поддержки.
- * <p>
- * Категории сообщений:
- * <ul>
- *   <li>Успешные операции - начинаются с ✅</li>
- *   <li>Ошибки - начинаются с ❌</li>
- *   <li>Отмены - начинаются с 🚫</li>
- *   <li>Информационные - начинаются с ℹ️</li>
- *   <li>Подтверждения - начинаются с ✅</li>
- * </ul>
+ *
+ * @author Golubyatnikov Aleksey
+ * @since 2026-02-04
  */
 public final class CallbackMessages {
 
+    /**
+     * Приватный конструктор для предотвращения создания экземпляров.
+     *
+     * @throws UnsupportedOperationException всегда, так как это утилитный класс
+     */
     private CallbackMessages() {
-        // Utility class - предотвращаем создание экземпляров
+        throw new UnsupportedOperationException("Это утилитный класс и не может быть инстанцирован");
     }
 
     // ============ УСПЕШНЫЕ ОПЕРАЦИИ ============
@@ -55,27 +53,23 @@ public final class CallbackMessages {
 
     /**
      * Общая ошибка.
-     * Используется когда произошла непредвиденная ошибка.
+     * Используется, когда произошла непредвиденная ошибка.
      */
     public static final String ERROR = "❌ Произошла ошибка";
 
     /**
      * Ошибка доступа.
-     * Используется когда у пользователя нет прав для выполнения операции.
+     * Используется, когда у пользователя нет прав для выполнения операции.
      */
     public static final String NO_ACCESS = "❌ Нет прав доступа";
 
     /**
      * Сущность не найдена.
-     * Шаблон для форматирования: используется с {@link CallbackMessageFormatter#notFound(String)}.
-     * Пример: "❌ Событие не найдено"
      */
     public static final String NOT_FOUND = "❌ %s не найдено";
 
     /**
      * Ошибка валидации.
-     * Шаблон для форматирования: используется с {@link CallbackMessageFormatter#validationError(String)}.
-     * Пример: "❌ Ошибка: некорректные данные"
      */
     public static final String VALIDATION_ERROR = "❌ Ошибка: %s";
 
@@ -101,31 +95,19 @@ public final class CallbackMessages {
 
     /**
      * Отмена конкретного действия.
-     * Шаблон для форматирования: используется с {@link CallbackMessageFormatter#actionCancelled(String)}.
-     * Пример: "🚫 Создание отменено"
      */
     public static final String ACTION_CANCELLED = "🚫 %s отменено";
 
     // ============ ИНФОРМАЦИОННЫЕ ============
 
     /**
-     * Подсказка.
-     * Шаблон для форматирования: используется с {@link CallbackMessageFormatter#hint(String)}.
-     * Пример: "ℹ️ Добавьте время события"
-     */
-    public static final String HINT = "ℹ️ %s";
-
-    /**
      * Запрос выбора.
-     * Шаблон для форматирования: используется с {@link CallbackMessageFormatter#selectPrompt(String)}.
-     * Пример: "Выберите тип события"
      */
     public static final String SELECT_PROMPT = "Выберите %s";
 
     /**
      * Требование валидации.
      * Шаблон для форматирования с указанием минимального требования.
-     * Пример: "Выберите хотя бы один тип"
      */
     public static final String VALIDATION_REQUIRED = "Выберите хотя бы %s";
 
@@ -133,8 +115,6 @@ public final class CallbackMessages {
 
     /**
      * Подтверждение выбора элемента.
-     * Шаблон для форматирования: используется с {@link CallbackMessageFormatter#itemSelected(String)}.
-     * Пример: "✅ Дата выбрано"
      */
     public static final String ITEM_SELECTED = "✅ %s выбрано";
 
@@ -142,7 +122,6 @@ public final class CallbackMessages {
 
     /**
      * Пустой ответ.
-     * Используется когда обновление UI достаточно и дополнительное сообщение не требуется.
      */
     public static final String EMPTY = "";
 
@@ -155,23 +134,10 @@ public final class CallbackMessages {
     public static final String TOO_LATE_TODAY = "Слишком поздно для сегодня";
 
     /**
-     * Для напоминаний - требуется время события.
-     * Используется когда пользователь пытается настроить автоматические напоминания
-     * для события без указанного времени.
-     */
-    public static final String REMINDER_NEEDS_TIME = "ℹ️ Добавьте время события для автоматических напоминаний";
-
-    /**
      * Для напоминаний - событие слишком близко.
      * Используется когда событие происходит слишком скоро для создания напоминаний.
      */
     public static final String REMINDER_TOO_SOON = "ℹ️ Событие уже скоро, напоминания не созданы";
-
-    /**
-     * Для ввода минут.
-     * Используется как подсказка для ввода пользовательского времени напоминания.
-     */
-    public static final String ENTER_MINUTES = "Введите количество минут";
 
     /**
      * Для выбора следующего часа.

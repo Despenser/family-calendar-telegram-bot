@@ -2,19 +2,17 @@ package ru.golubyatnikov.family.calendar.bot.handler.command;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.meta.api.objects.Message;
-import ru.golubyatnikov.family.calendar.bot.model.Event;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.util.EventFormatter;
-
+import org.telegram.telegrambots.meta.api.objects.message.Message;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.domain.reminder.ReminderSchedulingService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.EventFormattingService;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
-import java.util.stream.Collectors;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
 
@@ -30,28 +28,20 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape
 public class TodayCommandHandler implements CommandHandler {
     
     private final EventService eventService;
-    private final TelegramMessageService messageService;
-    private final ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService reminderSchedulingService;
-    
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy - EEEE", Locale.forLanguageTag("ru"));
+    private final ReminderSchedulingService reminderSchedulingService;
+    private final EventFormattingService eventFormattingService;
+    private final DateTimeFormattingService dateTimeFormattingService;
     
     /**
      * Обрабатывает команду /today.
-     * 
-     * <p>Получает все события семьи на текущий день и отправляет
-     * отформатированный список пользователю с использованием единообразного
-     * форматирования через {@link EventFormatter}.</p>
-     * 
-     * <p>Применяется фильтрация персональных событий: семейные события видны всем,
-     * персональные события видны только создателю.</p>
-     * 
+
      * @param message сообщение от пользователя с командой
      * @param user пользователь, отправивший команду
+     *
      * @return сообщение для отправки пользователю
      */
     @Override
-    public String handle(Message message, User user) {
-        Long chatId = message.getChatId();
+    public String handle(Message message, @NonNull User user) {
         log.debug("Обработка команды /today для пользователя ID={}, семья ID={}", 
                   user.getId(), user.getFamily().getId());
         
@@ -67,31 +57,17 @@ public class TodayCommandHandler implements CommandHandler {
             LocalDate today = user.getCurrentDate();
             List<Event> todayOnlyEvents = todayEvents.stream()
                 .filter(event -> event.getEventDate().equals(today))
-                .collect(Collectors.toList());
-            
-            // ========== ФИЛЬТРАЦИЯ ПЕРСОНАЛЬНЫХ СОБЫТИЙ ==========
-            // Применяется единая логика фильтрации для обеспечения корректного отображения событий:
-            //
-            // Правила видимости:
-            // 1. Семейные события (isPersonal = false) - видны ВСЕМ членам семьи
-            // 2. Персональные события (isPersonal = true) - видны ТОЛЬКО создателю
-            //
-            // Логика фильтра: !event.getIsPersonal() || event.belongsToUser(user.getId())
-            // - Если событие НЕ персональное (!event.getIsPersonal()) -> показываем
-            // - ИЛИ если событие принадлежит текущему пользователю (event.belongsToUser(user.getId())) -> показываем
-            // - В остальных случаях (персональное событие другого пользователя) -> скрываем
-            //
-            // Требования: 1.4, 4.1, 4.2, 5.4
-            // =====================================================
+                .toList();
+
             List<Event> filteredEvents = todayOnlyEvents.stream()
                 .filter(event -> !event.getIsPersonal() || event.belongsToUser(user.getId()))
-                .collect(Collectors.toList());
+                .toList();
             
             log.debug("После фильтрации осталось {} событий на сегодня для пользователя ID={}", 
                     filteredEvents.size(), user.getId());
             
             if (filteredEvents.isEmpty()) {
-                String responseMessage = EventFormatter.formatNoEventsMessage(
+                String responseMessage = eventFormattingService.formatNoEventsMessage(
                     "📅",
                     "События на сегодня",
                     "На сегодня событий не запланировано."
@@ -102,31 +78,31 @@ public class TodayCommandHandler implements CommandHandler {
             
             // Формирование сообщения с событиями
             StringBuilder messageBuilder = new StringBuilder();
-            messageBuilder.append(EventFormatter.formatCommandHeader(
+            messageBuilder.append(eventFormattingService.formatCommandHeader(
                 "📅",
                 "События на сегодня",
-                today.format(DATE_FORMATTER)
+                dateTimeFormattingService.formatDateWithDayOfWeek(today)
             ));
             messageBuilder.append(escape("\n\n"));
             
             // Для команды /today не добавляем заголовок дня, так как дата уже указана в основном заголовке
-            
-            for (Event event : filteredEvents) {
+
+            filteredEvents.forEach(event -> {
                 boolean hasReminders = reminderSchedulingService.hasActiveReminders(event.getId());
-                messageBuilder.append(EventFormatter.formatEvent(event, user, hasReminders));
-            }
+                messageBuilder.append(eventFormattingService.formatEvent(event, user, hasReminders));
+            });
             
-            messageBuilder.append(EventFormatter.formatEventCounter(filteredEvents.size()));
+            messageBuilder.append(eventFormattingService.formatEventCounter(filteredEvents.size()));
             
             String responseMessage = messageBuilder.toString();
             log.debug("Пользователю ID={} будет отправлен список из {} событий на сегодня", 
                      user.getId(), filteredEvents.size());
+
             return responseMessage;
             
         } catch (Exception e) {
             log.error("Ошибка при обработке команды /today для пользователя ID={}", user.getId(), e);
-            String errorMessage = escape("❌ Произошла ошибка при получении событий на сегодня. Попробуйте позже.");
-            return errorMessage;
+            return escape("❌ Произошла ошибка при получении событий на сегодня. Попробуйте позже.");
         }
     }
     
@@ -138,10 +114,5 @@ public class TodayCommandHandler implements CommandHandler {
     @Override
     public String getDescription() {
         return "Показать события на сегодня";
-    }
-    
-    @Override
-    public boolean requiresAuth() {
-        return true;
     }
 }

@@ -3,11 +3,11 @@ package ru.golubyatnikov.family.calendar.bot.repository;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-import ru.golubyatnikov.family.calendar.bot.model.User;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import java.util.Optional;
 
 /**
- * Spring Data JPA репозиторий для работы с сущностью {@link User}.
+ * Repository интерфейс для работы с пользователем
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-01-16

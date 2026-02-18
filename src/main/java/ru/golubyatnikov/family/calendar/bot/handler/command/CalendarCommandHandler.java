@@ -2,18 +2,22 @@ package ru.golubyatnikov.family.calendar.bot.handler.command;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
 
 import java.time.LocalDate;
 
 /**
  * Обработчик команды /calendar для просмотра календаря событий.
+ *
+ * @author Golubyatnikov Aleksey
+ * @since 2025-12-30
  */
 @Component
 @RequiredArgsConstructor
@@ -22,7 +26,7 @@ public class CalendarCommandHandler implements CommandHandler {
 
     private final TelegramMessageService messageService;
     private final KeyboardService keyboardService;
-    private final BotMessageBuilder messageBuilder;
+    private final BotMessageFormattingService botMessageFormattingService;
 
     @Override
     public String getCommand() {
@@ -35,7 +39,7 @@ public class CalendarCommandHandler implements CommandHandler {
     }
 
     @Override
-    public String handle(Message message, User user) {
+    public String handle(@NonNull Message message, @NonNull User user) {
         Long chatId = message.getChatId();
         
         log.info("Пользователь {} вызвал команду /calendar", user.getId());
@@ -49,13 +53,14 @@ public class CalendarCommandHandler implements CommandHandler {
             // Создаем календарь просмотра с возможностью выбора прошлых дат
             InlineKeyboardMarkup keyboard = keyboardService.createViewCalendarKeyboard(year, month, user);
             
-            String messageText = messageBuilder.buildCalendarViewMessage();
+            String messageText = botMessageFormattingService.buildCalendarViewMessage();
             
             messageService.sendMessageWithInlineKeyboard(chatId, messageText, keyboard);
             
             log.debug("Календарь просмотра отправлен пользователю {}", user.getId());
             
-            return ""; // Возвращаем пустую строку, так как сообщение уже отправлено
+            return "";
+
         } catch (Exception e) {
             log.error("Ошибка при отправке календаря пользователю {}: {}", user.getId(), e.getMessage(), e);
             return "Произошла ошибка при загрузке календаря. Попробуйте позже.";

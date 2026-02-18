@@ -1,156 +1,35 @@
 package ru.golubyatnikov.family.calendar.bot.handler.command;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.meta.api.objects.Message;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.user.UserService;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.domain.user.UserService;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
  * Обработчик команды /start для Telegram бота семейного календаря.
- * 
- * <p>Команда /start является точкой входа для пользователей бота.
- * Она выполняет следующие функции:</p>
- * <ul>
- *   <li>Проверяет, зарегистрирован ли пользователь в системе</li>
- *   <li>Объясняет назначение бота и его возможности</li>
- *   <li>Отправляет приветственное сообщение зарегистрированным пользователям</li>
- *   <li>Информирует незарегистрированных пользователей о необходимости регистрации</li>
- *   <li>Предоставляет подробные инструкции по получению доступа</li>
- *   <li>Предоставляет список доступных команд в кликабельном формате</li>
- *   <li>Отображает команды из всех категорий функционала (минимум 8 команд)</li>
- * </ul>
- * 
- * <p>Команда /start не требует авторизации и доступна всем пользователям,
- * включая тех, кто еще не зарегистрирован в системе.</p>
- * 
- * <p><b>Форматирование команд:</b> Все команды в приветственном сообщении
- * отображаются в формате /command без моноширинного форматирования,
- * что делает их кликабельными в Telegram-клиенте. Пользователи могут
- * нажать на команду для её автоматического выполнения.</p>
- * 
- * <p><b>Список команд для зарегистрированных пользователей:</b></p>
- * <ul>
- *   <li>/add_event - Добавить новое событие (всегда первая команда)</li>
- *   <li>/today - Показать события на сегодня</li>
- *   <li>/week - Показать события на неделю</li>
- *   <li>/month - Показать события на месяц</li>
- *   <li>/my_events - Управление моими событиями</li>
- *   <li>/search - Поиск событий по тексту</li>
- *   <li>/filter - Фильтрация событий по типу</li>
- *   <li>/stats - Статистика событий за месяц</li>
- *   <li>/trash - Корзина удаленных событий</li>
- * </ul>
- * 
- * <p><b>Категории команд:</b> Команды представляют все основные категории функционала:</p>
- * <ul>
- *   <li>📅 Просмотр событий: /today, /week, /month</li>
- *   <li>➕ Управление событиями: /add_event, /my_events</li>
- *   <li>🔍 Поиск и фильтрация: /search, /filter</li>
- *   <li>📊 Статистика и корзина: /stats, /trash</li>
- * </ul>
- * 
- * <p><b>Требования:</b> 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 5.1</p>
- * 
- * <p><b>Пример использования:</b></p>
- * <pre>
- * Пользователь отправляет: /start
- * 
- * Если пользователь зарегистрирован:
- * Бот отвечает: "Добро пожаловать! 👋
- *                
- *                Семейный Календарь Бот - это ваш персональный помощник для управления семейными событиями и планами.
- *                
- *                Вы уже зарегистрированы в системе и можете пользоваться всеми возможностями бота:
- *                
- *                🎯 Основные возможности:
- *                📅 Создание и управление событиями
- *                🔔 Получение напоминаний о важных датах
- *                👥 Совместное планирование с семьей
- *                📊 Просмотр статистики и аналитики
- *                🔍 Поиск и фильтрация событий
- *                
- *                Основные команды:
- *                /add_event - Добавить новое событие
- *                /today - Показать события на сегодня
- *                /week - Показать события на неделю
- *                /month - Показать планы на 30 дней
- *                /my_events - Управление моими событиями
- *                /search - Поиск событий по тексту
- *                /filter - Фильтрация событий по типу
- *                /stats - Статистика событий за месяц
- *                /trash - Корзина удаленных событий
- *                
- *                Используйте /help для получения подробной информации о каждой команде."
- * 
- * Если пользователь не зарегистрирован:
- * Бот отвечает: "Добро пожаловать! 👋
- *                
- *                Семейный Календарь Бот - это ваш персональный помощник для управления семейными событиями и планами.
- *                
- *                С помощью этого бота вы сможете:
- *                📅 Создавать и управлять событиями
- *                📆 Просматривать события на сегодня, неделю и месяц
- *                🔔 Получать напоминания о важных датах
- *                👥 Совместно планировать с семьей
- *                🔍 Искать и фильтровать события по типу
- *                📊 Просматривать статистику и аналитику
- *                🗑️ Управлять корзиной удаленных событий
- *                
- *                🔒 Для доступа к функционалу требуется регистрация
- *                
- *                К сожалению, вы еще не зарегистрированы в системе.
- *                Для получения доступа к боту обратитесь к администратору вашей семьи.
- *                
- *                Как получить доступ:
- *                1️⃣ Свяжитесь с администратором вашей семьи
- *                2️⃣ Сообщите ему ваш Telegram ID или username
- *                3️⃣ Дождитесь подтверждения регистрации
- *                4️⃣ После регистрации отправьте /start снова
- *                
- *                После регистрации вам станут доступны все возможности бота для управления семейным календарем!"
- * </pre>
- * 
- * @see CommandHandler
- * @see UserService
- * @see User
- * @see HelpCommandHandler
- * @author Family Calendar Bot Team
- * @version 2.0.0
+ *
+ * @author Golubyatnikov Aleksey
  * @since 2025-12-30
  */
 @Component
+@RequiredArgsConstructor
 @Slf4j
 public class StartCommandHandler implements CommandHandler {
 
     private final UserService userService;
 
     /**
-     * Конструктор для внедрения зависимостей.
-     * 
-     * @param userService сервис для работы с пользователями
-     */
-    public StartCommandHandler(UserService userService) {
-        this.userService = userService;
-    }
-
-    /**
      * Обрабатывает команду /start от пользователя.
-     * 
-     * <p>Метод проверяет наличие пользователя в базе данных по Telegram ID
-     * и возвращает соответствующее приветственное сообщение.</p>
-     * 
-     * <p>Для зарегистрированных пользователей отправляется приветствие
-     * со списком доступных команд.</p>
-     * 
-     * <p>Для незарегистрированных пользователей отправляется сообщение
-     * о необходимости регистрации через администратора.</p>
-     * 
+     *
      * @param message входящее сообщение от Telegram, содержащее команду /start
-     * @param user пользователь из базы данных (может быть null, так как команда
-     *             не требует авторизации)
+     * @param user пользователь из базы данных (может быть null, так как команда не требует авторизации)
+     *
      * @return текст приветственного сообщения с инструкциями
      * @throws IllegalArgumentException если message равен null
      */
@@ -162,7 +41,6 @@ public class StartCommandHandler implements CommandHandler {
         }
 
         Long telegramId = message.getFrom().getId();
-        String username = message.getFrom().getUserName();
         String firstName = message.getFrom().getFirstName();
         
         // Извлекаем timezone из сообщения (для будущей автоматической регистрации)
@@ -178,87 +56,29 @@ public class StartCommandHandler implements CommandHandler {
             return buildWelcomeMessageForRegisteredUser(firstName);
         } else {
             log.debug("Пользователь не зарегистрирован: telegramId={}", telegramId);
-            
-            // TODO: В будущем здесь можно добавить автоматическую регистрацию:
-            // Family family = familyService.createFamily(firstName);
-            // user = userService.createUser(telegramId, username, firstName, family, timezone);
-            // log.info("Новый пользователь зарегистрирован: userId={}, timezone={}", user.getId(), user.getTimezone());
-            
             return buildWelcomeMessageForUnregisteredUser(firstName);
         }
     }
 
     /**
      * Пытается извлечь timezone из Telegram Message.
-     * 
-     * <p>Telegram Bot API не предоставляет прямой доступ к часовому поясу пользователя.
-     * Доступные данные ограничены:</p>
-     * <ul>
-     *   <li>language_code - код языка (например, "ru", "en")</li>
-     *   <li>Геолокация - только если пользователь явно отправляет</li>
-     * </ul>
-     * 
-     * <p>Маппинг language_code на timezone ненадежен, так как пользователь
-     * с кодом "ru" может находиться в любом часовом поясе.</p>
-     * 
-     * <p><b>Возможные улучшения в будущем:</b></p>
-     * <ul>
-     *   <li>Добавить команду для ручной настройки timezone (/settings)</li>
-     *   <li>Использовать геолокацию для определения timezone</li>
-     *   <li>Запрашивать timezone при первой регистрации</li>
-     * </ul>
-     * 
-     * <p><b>Требования:</b> 1.2</p>
-     * 
+     *
      * @param message Telegram сообщение от пользователя
      * @return timezone или null если недоступна (будет использован default timezone)
      */
-    private String extractTimezoneFromMessage(Message message) {
-        // Telegram API не предоставляет прямой доступ к timezone
-        // Можно использовать language_code как подсказку, но это ненадежно
+    private @Nullable String extractTimezoneFromMessage(@NonNull Message message) {
         String languageCode = message.getFrom().getLanguageCode();
         log.debug("Language code from Telegram: {}", languageCode);
-        
-        // Можно добавить маппинг language_code -> timezone, но это неточно
-        // Например: "ru" -> "Europe/Moscow", "en" -> "Europe/London"
-        // Но пользователь с "ru" может быть в любой timezone
-        
-        // Возвращаем null, чтобы использовался default timezone (Europe/Moscow)
         return null;
     }
 
     /**
      * Формирует приветственное сообщение для зарегистрированного пользователя.
-     * 
-     * <p>Сообщение включает:</p>
-     * <ul>
-     *   <li>Персонализированное приветствие</li>
-     *   <li>Объяснение назначения бота</li>
-     *   <li>Краткое описание возможностей</li>
-     *   <li>Список основных доступных команд в кликабельном формате (минимум 8 команд)</li>
-     * </ul>
-     * 
-     * <p><b>Важно:</b> Все команды отображаются без моноширинного форматирования
-     * (без использования метода code()), что делает их кликабельными в Telegram.
-     * Используется метод formatMessage() для корректного экранирования специальных
-     * символов MarkdownV2.</p>
-     * 
-     * <p><b>Порядок команд:</b> Команда /add_event всегда отображается первой,
-     * так как создание событий является основной функцией бота. Остальные команды
-     * представляют все категории функционала:</p>
-     * <ul>
-     *   <li>Управление событиями: /add_event (первая), /my_events</li>
-     *   <li>Просмотр событий: /today, /week, /month</li>
-     *   <li>Поиск и фильтрация: /search, /filter</li>
-     *   <li>Статистика и корзина: /stats, /trash</li>
-     * </ul>
-     * 
-     * <p><b>Требования:</b> 3.1, 3.2, 3.3, 3.5, 5.1, 6.1, 6.2, 6.3, 6.4, 6.5</p>
-     * 
+     *
      * @param firstName имя пользователя для персонализации
      * @return отформатированное приветственное сообщение с кликабельными командами
      */
-    private String buildWelcomeMessageForRegisteredUser(String firstName) {
+    private @NonNull String buildWelcomeMessageForRegisteredUser(String firstName) {
         // Формируем приветствие с экранированием
         String greetingText = firstName != null && !firstName.isBlank() 
                 ? escape("Добро пожаловать, " + firstName + "! 👋")
@@ -280,33 +100,10 @@ public class StartCommandHandler implements CommandHandler {
     /**
      * Формирует приветственное сообщение для незарегистрированного пользователя.
      * 
-     * <p>Сообщение включает:</p>
-     * <ul>
-     *   <li>Персонализированное приветствие</li>
-     *   <li>Объяснение назначения бота</li>
-     *   <li>Информацию о необходимости регистрации</li>
-     *   <li>Подробные инструкции по получению доступа</li>
-     *   <li>Список возможностей после регистрации, включая новые функции</li>
-     * </ul>
-     * 
-     * <p><b>Возможности после регистрации:</b> Сообщение информирует о всех
-     * основных возможностях бота, включая:</p>
-     * <ul>
-     *   <li>Создание и управление событиями</li>
-     *   <li>Просмотр событий на сегодня, неделю и месяц</li>
-     *   <li>Получение напоминаний о важных датах</li>
-     *   <li>Совместное планирование с семьей</li>
-     *   <li>Поиск и фильтрация событий по типу</li>
-     *   <li>Просмотр статистики и аналитики</li>
-     *   <li>Управление корзиной удаленных событий</li>
-     * </ul>
-     * 
-     * <p><b>Требования:</b> 3.4, 6.1, 6.2, 6.3, 6.4, 6.5</p>
-     * 
      * @param firstName имя пользователя для персонализации
      * @return отформатированное сообщение о необходимости регистрации
      */
-    private String buildWelcomeMessageForUnregisteredUser(String firstName) {
+    private @NonNull String buildWelcomeMessageForUnregisteredUser(String firstName) {
         // Формируем приветствие с экранированием
         String greetingText = firstName != null && !firstName.isBlank() 
                 ? escape("Добро пожаловать, " + firstName + "! 👋")
@@ -354,10 +151,7 @@ public class StartCommandHandler implements CommandHandler {
 
     /**
      * Определяет, требуется ли авторизация для выполнения этой команды.
-     * 
-     * <p>Команда /start не требует авторизации, так как она используется
-     * для первого контакта с ботом и проверки статуса регистрации.</p>
-     * 
+     *
      * @return false, так как команда доступна всем пользователям
      */
     @Override

@@ -2,52 +2,53 @@ package ru.golubyatnikov.family.calendar.bot.handler.callback.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.ReminderNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
-import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
-import ru.golubyatnikov.family.calendar.bot.model.Event;
-import ru.golubyatnikov.family.calendar.bot.model.Reminder;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderNotificationService;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.service.user.UserService;
+import ru.golubyatnikov.family.calendar.bot.model.context.CallbackQueryContext;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Reminder;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.domain.reminder.ReminderNotificationService;
+import ru.golubyatnikov.family.calendar.bot.service.domain.reminder.ReminderSchedulingService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.CallbackQueryService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
+import ru.golubyatnikov.family.calendar.bot.service.domain.user.UserService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardFactory;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
-
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Обработчик навигации между событием и напоминанием.
- * 
- * <p>Обрабатывает переходы между полным представлением события
- * и минималистичным представлением напоминания.</p>
- * 
- * <p><b>Требования:</b> 2.1, 2.3, 3.1, 3.2, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.4, 9.2, 9.3, 9.4, 9.5, 10.1, 10.2</p>
- * 
- * @author Family Calendar Bot Team
+ *
+ * @author Golubyatnikov Aleksey
  * @since 2026-02-03
  */
-@Component
 @RequiredArgsConstructor
+@Component
 @Slf4j
 public class EventReminderNavigationHandler implements CallbackHandler {
     
     private final TelegramMessageService messageService;
-    private final EventService eventService;
+    private final CallbackQueryService callbackQueryService;
+    private final CallbackDataExtractionService callbackDataExtractionService;
     private final ReminderSchedulingService reminderSchedulingService;
     private final ReminderNotificationService reminderNotificationService;
     private final UserService userService;
+    private final KeyboardFactory keyboardFactory;
+
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -64,290 +65,177 @@ public class EventReminderNavigationHandler implements CallbackHandler {
     }
     
     @Override
-    public void handle(CallbackQuery callbackQuery, User user) throws Exception {
-        String callbackData = callbackQuery.getData();
-        Long chatId = callbackQuery.getMessage().getChatId();
-        Integer messageId = callbackQuery.getMessage().getMessageId();
-        String callbackQueryId = callbackQuery.getId();
-        Long userId = user.getId();
+    public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
+        CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        if (CallbackPrefix.VIEW_EVENT_FROM_REMINDER.matches(callbackData)) {
-            handleViewEventFromReminder(callbackData, userId, chatId, messageId, callbackQueryId);
-        } else if (CallbackPrefix.BACK_TO_REMINDER.matches(callbackData)) {
-            handleBackToReminder(callbackData, userId, chatId, messageId, callbackQueryId);
+        if (CallbackPrefix.VIEW_EVENT_FROM_REMINDER.matches(context.callbackData())) {
+            handleViewEventFromReminder(context);
+
+        } else if (CallbackPrefix.BACK_TO_REMINDER.matches(context.callbackData())) {
+            handleBackToReminder(context);
         }
     }
+
+    /**
+     * Record для хранения ID события и напоминания.
+     */
+    private record ReminderEventIds(Long eventId, Long reminderId) {}
     
     /**
      * Обрабатывает просмотр деталей события из уведомления о напоминании.
-     * 
-     * @param callbackData данные callback (формат: view_event_from_reminder_{eventId}_{reminderId})
-     * @param userId идентификатор пользователя
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения для обновления
-     * @param callbackQueryId идентификатор callback query
      */
-    private void handleViewEventFromReminder(String callbackData, Long userId, Long chatId, 
-                                            Integer messageId, String callbackQueryId) {
+    private void handleViewEventFromReminder(@NonNull CallbackQueryContext context) {
         log.debug("Просмотр деталей события из напоминания: callbackData='{}', userId={}, messageId={}", 
-                 callbackData, userId, messageId);
+                 context.callbackData(), context.getUserId(), context.messageId());
         
         try {
-            // Извлекаем payload из callback data
-            String payload = CallbackPrefix.VIEW_EVENT_FROM_REMINDER.extractPayload(callbackData);
-            
-            // Разделяем payload на eventId и reminderId
-            String[] parts = payload.split("_", 2);
-            
-            // Валидация формата
-            if (parts.length != 2) {
-                log.error("Некорректный формат callback data для view_event_from_reminder: " +
-                         "ожидается 2 части, получено {}. CallbackData='{}', userId={}", 
-                         parts.length, callbackData, userId);
-                
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.INVALID_REQUEST);
+            ReminderEventIds ids = extractReminderEventIds(context);
+            if (ids == null) {
                 return;
             }
+
+            Reminder reminder = reminderSchedulingService.getReminderWithEventAndUser(ids.reminderId());
             
-            Long eventId;
-            Long reminderId;
+            log.debug("Событие и напоминание загружены: eventId={}, reminderId={}, userId={}", 
+                     ids.eventId(), ids.reminderId(), context.getUserId());
             
-            // Парсинг eventId и reminderId с обработкой NumberFormatException
-            try {
-                eventId = Long.parseLong(parts[0]);
-                reminderId = Long.parseLong(parts[1]);
-                
-                log.debug("Успешно извлечены данные: eventId={}, reminderId={}, userId={}", 
-                         eventId, reminderId, userId);
-            } catch (NumberFormatException e) {
-                log.error("Некорректный eventId или reminderId в callback data: " +
-                         "eventId='{}', reminderId='{}', callbackData='{}', userId={}, error={}", 
-                         parts[0], parts[1], callbackData, userId, e.getMessage());
-                
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.INVALID_REQUEST);
-                return;
-            }
+            User recipient = userService.findById(context.getUserId())
+                .orElseThrow(() -> new UserNotFoundException("Пользователь не найден: userId=" + context.getUserId()));
             
-            // Получаем событие
-            Event event = eventService.getEventById(eventId);
+            ZoneId userTimezone = getTimezone(recipient);
             
-            log.debug("Событие загружено: eventId={}, userId={}", eventId, userId);
-            log.debug("Определен контекст: Reminder_Context, eventId={}, reminderId={}, userId={}", 
-                     eventId, reminderId, userId);
-            
-            // Загружаем напоминание из базы данных с eager загрузкой события И пользователя
-            Reminder reminder = reminderSchedulingService.getReminderWithEventAndUser(reminderId);
-            
-            log.debug("Напоминание загружено с событием и пользователем: reminderId={}, eventId={}, userId={}", 
-                     reminderId, eventId, userId);
-            
-            // Загружаем пользователя-получателя для получения timezone
-            User recipient = userService.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(
-                    "Пользователь не найден: userId=" + userId));
-            
-            // Получаем timezone получателя для форматирования
-            ZoneId userTimezone = recipient.getTimezone() != null 
-                ? ZoneId.of(recipient.getTimezone()) 
-                : ZoneId.of("UTC");
-            
-            // Формируем текст сообщения с ПОЛНОЙ информацией о напоминании
             String eventMessage = reminderNotificationService.formatReminderMessageByType(reminder, userTimezone);
+            InlineKeyboardMarkup keyboard = createDetailsKeyboard(ids.eventId(), ids.reminderId());
             
-            // Создаем упрощенную клавиатуру с кнопкой "Назад к напоминанию"
-            InlineKeyboardMarkup keyboard = createDetailsKeyboard(eventId, reminderId);
-            
-            log.debug("Создана упрощенная клавиатура для напоминания: eventId={}, reminderId={}, userId={}", 
-                     eventId, reminderId, userId);
-            
-            // Обновляем сообщение
-            messageService.editMessageText(chatId, messageId, eventMessage, keyboard);
+            messageService.editMessageText(context.chatId(), context.messageId(), eventMessage, keyboard);
+            callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
             log.info("Детали события отображены из напоминания: eventId={}, reminderId={}, " +
-                    "messageId={}, userId={}", eventId, reminderId, messageId, userId);
-            
-            // Отвечаем на callback query
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
+                    "messageId={}, userId={}", ids.eventId(), ids.reminderId(), context.messageId(), context.getUserId());
             
         } catch (EventNotFoundException e) {
-            log.warn("Событие не найдено при просмотре деталей из напоминания: userId={}", userId, e);
-            try {
-                messageService.answerCallbackQuery(callbackQueryId, 
-                    CallbackMessageFormatter.notFound("Событие"));
-            } catch (TelegramApiException ex) {
-                log.error("Ошибка при отправке callback answer: {}", ex.getMessage());
-            }
-                
+            log.warn("Событие не найдено при просмотре деталей из напоминания: userId={}", context.getUserId(), e);
+            answerCallbackQuerySafely(context, CallbackMessageFormatter.notFound("Событие"));
+
         } catch (TelegramApiException e) {
             log.warn("Ошибка Telegram API при просмотре деталей из напоминания: " +
-                    "messageId={}, userId={}, error={}", messageId, userId, e.getMessage());
-            try {
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
-            } catch (TelegramApiException ex) {
-                log.error("Ошибка при отправке callback answer: {}", ex.getMessage());
-            }
-            
+                    "messageId={}, userId={}, error={}", context.messageId(), context.getUserId(), e.getMessage());
+            answerCallbackQuerySafely(context, CallbackMessages.ERROR);
+
         } catch (Exception e) {
             log.error("Неожиданная ошибка при просмотре деталей из напоминания: " +
-                     "userId={}, error={}", userId, e.getMessage(), e);
-            try {
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
-            } catch (TelegramApiException ex) {
-                log.error("Ошибка при отправке callback answer: {}", ex.getMessage());
-            }
+                     "userId={}, error={}", context.getUserId(), e.getMessage(), e);
+            answerCallbackQuerySafely(context, CallbackMessages.ERROR);
         }
     }
     
     /**
      * Обрабатывает возврат к минималистичному виду напоминания.
-     * 
-     * @param callbackData данные callback (формат: back_to_reminder_{eventId}_{reminderId})
-     * @param userId идентификатор пользователя
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения для обновления
-     * @param callbackQueryId идентификатор callback query
      */
-    private void handleBackToReminder(String callbackData, Long userId, Long chatId, 
-                                      Integer messageId, String callbackQueryId) {
+    private void handleBackToReminder(@NonNull CallbackQueryContext context) {
         log.debug("Возврат к напоминанию: callbackData='{}', userId={}, messageId={}", 
-                 callbackData, userId, messageId);
+                 context.callbackData(), context.getUserId(), context.messageId());
         
         try {
-            // Извлекаем payload из callback data
-            String payload = CallbackPrefix.BACK_TO_REMINDER.extractPayload(callbackData);
-            
-            // Разделяем payload на eventId и reminderId
-            String[] parts = payload.split("_", 2);
-            
-            // Валидация формата
-            if (parts.length != 2) {
-                log.error("Некорректный формат callback data для back_to_reminder: ожидается 2 части, получено {}. " +
-                         "CallbackData='{}', userId={}", parts.length, callbackData, userId);
-                
-                try {
-                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.INVALID_REQUEST);
-                } catch (TelegramApiException ex) {
-                    log.error("Ошибка отправки callback query answer: userId={}, error={}", 
-                             userId, ex.getMessage());
-                }
+            ReminderEventIds ids = extractReminderEventIds(context);
+            if (ids == null) {
                 return;
             }
             
-            Long eventId;
-            Long reminderId;
-            
-            // Парсинг eventId и reminderId с обработкой NumberFormatException
-            try {
-                eventId = Long.parseLong(parts[0]);
-                reminderId = Long.parseLong(parts[1]);
-                
-                log.debug("Успешно извлечены данные: eventId={}, reminderId={}, userId={}", 
-                         eventId, reminderId, userId);
-            } catch (NumberFormatException e) {
-                log.error("Некорректный eventId или reminderId в callback data: eventId='{}', reminderId='{}', " +
-                         "callbackData='{}', userId={}, error={}", 
-                         parts[0], parts[1], callbackData, userId, e.getMessage());
-                
-                try {
-                    messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.INVALID_REQUEST);
-                } catch (TelegramApiException ex) {
-                    log.error("Ошибка отправки callback query answer: userId={}, error={}", 
-                             userId, ex.getMessage());
-                }
-                return;
-            }
-            
-            // Загружаем напоминание с eager загрузкой события и пользователя
-            Reminder reminder = reminderSchedulingService.getReminderWithEventAndUser(reminderId);
-            
-            log.debug("Напоминание загружено с событием и пользователем: reminderId={}, eventId={}, userId={}", 
-                     reminderId, reminder.getEvent().getId(), userId);
-            
-            // Получаем событие из напоминания
+            Reminder reminder = reminderSchedulingService.getReminderWithEventAndUser(ids.reminderId());
             Event event = reminder.getEvent();
             
-            // Получаем timezone создателя события
-            ZoneId creatorTimezone = event.getUser().getTimezone() != null 
-                ? ZoneId.of(event.getUser().getTimezone()) 
-                : ZoneId.of("UTC");
+            log.debug("Напоминание загружено с событием: reminderId={}, eventId={}, userId={}", 
+                     ids.reminderId(), event.getId(), context.getUserId());
             
-            log.debug("Timezone создателя события получен: eventId={}, creatorTimezone={}, userId={}", 
-                     event.getId(), creatorTimezone, userId);
+            ZoneId creatorTimezone = getTimezone(event.getUser());
             
-            // Восстанавливаем КОРОТКИЙ текст напоминания
             String reminderMessage = reminderNotificationService.formatShortReminderMessage(reminder, creatorTimezone);
+            InlineKeyboardMarkup keyboard = reminderNotificationService.createSimplifiedReminderKeyboard(event, ids.reminderId());
             
-            log.debug("Текст напоминания восстановлен: eventId={}, reminderId={}, userId={}", 
-                     eventId, reminderId, userId);
-            
-            // Создаем упрощенную клавиатуру
-            InlineKeyboardMarkup keyboard = reminderNotificationService.createSimplifiedReminderKeyboard(event, reminderId);
-            
-            log.debug("Упрощенная клавиатура создана: eventId={}, reminderId={}, userId={}", 
-                     eventId, reminderId, userId);
-            
-            // Обновляем сообщение
-            messageService.editMessageText(chatId, messageId, reminderMessage, keyboard);
+            messageService.editMessageText(context.chatId(), context.messageId(), reminderMessage, keyboard);
+            callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
             log.info("Возврат к напоминанию выполнен: eventId={}, reminderId={}, messageId={}, userId={}", 
-                    eventId, reminderId, messageId, userId);
-            
-            // Отвечаем на callback query с подтверждением
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
+                    ids.eventId(), ids.reminderId(), context.messageId(), context.getUserId());
             
         } catch (ReminderNotFoundException e) {
-            log.warn("Напоминание не найдено при возврате к напоминанию: userId={}", userId, e);
-            
-            try {
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.notFound("Напоминание"));
-            } catch (TelegramApiException ex) {
-                log.error("Ошибка отправки callback query answer: userId={}, error={}", 
-                         userId, ex.getMessage());
-            }
-            
+            log.warn("Напоминание не найдено при возврате к напоминанию: userId={}", context.getUserId(), e);
+            answerCallbackQuerySafely(context, CallbackMessageFormatter.notFound("Напоминание"));
+
         } catch (TelegramApiException e) {
             log.warn("Ошибка Telegram API при возврате к напоминанию: messageId={}, userId={}, error={}", 
-                    messageId, userId, e.getMessage());
-            
-            try {
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
-            } catch (TelegramApiException ex) {
-                log.error("Ошибка отправки callback query answer: userId={}, error={}", 
-                         userId, ex.getMessage());
-            }
-            
+                    context.messageId(), context.getUserId(), e.getMessage());
+            answerCallbackQuerySafely(context, CallbackMessages.ERROR);
+
         } catch (Exception e) {
             log.error("Неожиданная ошибка при возврате к напоминанию: userId={}, error={}", 
-                     userId, e.getMessage(), e);
-            
-            try {
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
-            } catch (TelegramApiException ex) {
-                log.error("Ошибка отправки callback query answer: userId={}, error={}", 
-                         userId, ex.getMessage());
-            }
+                     context.getUserId(), e.getMessage(), e);
+            answerCallbackQuerySafely(context, CallbackMessages.ERROR);
         }
     }
     
     /**
-     * Создает клавиатуру для просмотра деталей события из напоминания.
-     * 
-     * @param eventId идентификатор события
-     * @param reminderId идентификатор напоминания
-     * @return inline-клавиатура с кнопкой "Назад к напоминанию"
+     * Извлекает ID события и напоминания из callback data.
      */
-    private InlineKeyboardMarkup createDetailsKeyboard(Long eventId, Long reminderId) {
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+    private @Nullable ReminderEventIds extractReminderEventIds(@NonNull CallbackQueryContext context) {
+        CallbackPrefix prefix = context.callbackData().startsWith("view_event_from_reminder_") 
+            ? CallbackPrefix.VIEW_EVENT_FROM_REMINDER 
+            : CallbackPrefix.BACK_TO_REMINDER;
+            
+        String payload = prefix.extractPayload(context.callbackData());
+        String[] parts = payload.split("_", 2);
         
-        List<InlineKeyboardButton> row = new ArrayList<>();
-        InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("🔙 Назад к напоминанию");
-        backButton.setCallbackData(CallbackPrefix.BACK_TO_REMINDER.withPayload(eventId + "_" + reminderId));
-        row.add(backButton);
-        keyboard.add(row);
+        if (parts.length != 2) {
+            log.error("Некорректный формат callback data: ожидается 2 части, получено {}. " +
+                     "CallbackData='{}', userId={}", parts.length, context.callbackData(), context.getUserId());
+            answerCallbackQuerySafely(context, CallbackMessages.INVALID_REQUEST);
+            return null;
+        }
         
-        markup.setKeyboard(keyboard);
-        return markup;
+        try {
+            Long eventId = Long.parseLong(parts[0]);
+            Long reminderId = Long.parseLong(parts[1]);
+            log.debug("Успешно извлечены данные: eventId={}, reminderId={}, userId={}", 
+                     eventId, reminderId, context.getUserId());
+
+            return new ReminderEventIds(eventId, reminderId);
+
+        } catch (NumberFormatException e) {
+            log.error("Некорректный eventId или reminderId в callback data: " +
+                     "eventId='{}', reminderId='{}', callbackData='{}', userId={}, error={}", 
+                     parts[0], parts[1], context.callbackData(), context.getUserId(), e.getMessage());
+
+            answerCallbackQuerySafely(context, CallbackMessages.INVALID_REQUEST);
+            return null;
+        }
+    }
+    
+    /**
+     * Получает timezone пользователя.
+     */
+    private @NonNull ZoneId getTimezone(@NonNull User user) {
+        return user.getTimezone() != null 
+            ? ZoneId.of(user.getTimezone()) 
+            : ZoneId.of("UTC");
+    }
+    
+    /**
+     * Безопасно отвечает на callback query.
+     */
+    private void answerCallbackQuerySafely(CallbackQueryContext context, String message) {
+        callbackQueryService.answerCallback(context, message);
+    }
+    
+    /**
+     * Создает клавиатуру для просмотра деталей события из напоминания.
+     */
+    private @NonNull InlineKeyboardMarkup createDetailsKeyboard(Long eventId, Long reminderId) {
+        InlineKeyboardButton button = keyboardFactory.createButton(
+                "🔙 Скрыть детали",
+                CallbackPrefix.BACK_TO_REMINDER.withPayload(eventId + "_" + reminderId)
+        );
+        InlineKeyboardRow row = keyboardFactory.createRow(button);
+        return keyboardFactory.createMarkup(row);
     }
 }

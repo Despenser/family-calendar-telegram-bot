@@ -3,7 +3,7 @@ package ru.golubyatnikov.family.calendar.bot.repository;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-import ru.golubyatnikov.family.calendar.bot.model.Attachment;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Attachment;
 import java.util.List;
 
 /**

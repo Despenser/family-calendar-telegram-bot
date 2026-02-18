@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import ru.golubyatnikov.family.calendar.bot.model.Reminder;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Reminder;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -63,16 +63,7 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
      */
     @EntityGraph(attributePaths = {"event"})
     List<Reminder> findByEventIdAndSentFalse(Long eventId);
-    
-    /**
-     * Находит напоминание по ID с загрузкой связанного события.
-     * 
-     * @param id идентификатор напоминания
-     * @return напоминание с загруженным событием или empty если не найдено
-     */
-    @EntityGraph(attributePaths = {"event"})
-    Optional<Reminder> findWithEventById(Long id);
-    
+
     /**
      * Находит напоминание по ID с загрузкой события и пользователя.
      * 

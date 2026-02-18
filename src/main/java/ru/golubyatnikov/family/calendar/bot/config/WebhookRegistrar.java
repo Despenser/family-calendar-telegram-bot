@@ -12,13 +12,13 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-import ru.golubyatnikov.family.calendar.bot.service.authorization.WebhookSecurityService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.authorization.WebhookSecurityService;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * Компонент для регистрации Webhook при старте приложения.
- * Компонент активируется только когда свойство telegram.bot.webhook.enabled=true (по умолчанию true)
+ * Компонент активируется, только когда свойство telegram.bot.webhook.enabled=true (по умолчанию true)
  * Использует secret token для безопасной валидации webhook запросов.
  *
  * @author Golubyatnikov Aleksey
@@ -103,6 +103,7 @@ public class WebhookRegistrar {
             try {
                 Thread.sleep(1000);
                 SpringApplication.exit(applicationContext, () -> 1);
+
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.error("Прерван процесс graceful shutdown", e);

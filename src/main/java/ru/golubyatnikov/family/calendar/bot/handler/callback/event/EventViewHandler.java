@@ -2,31 +2,30 @@ package ru.golubyatnikov.family.calendar.bot.handler.callback.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
-import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
-import ru.golubyatnikov.family.calendar.bot.model.Event;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import ru.golubyatnikov.family.calendar.bot.model.context.CallbackQueryContext;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.CallbackQueryService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 /**
  * Обработчик просмотра деталей события.
- * 
- * <p>Обрабатывает callback query для просмотра полной информации о событии
- * с стандартной клавиатурой действий.</p>
- * 
- * <p><b>Требования:</b> 2.2, 2.4, 8.1, 8.2</p>
- * 
- * @author Family Calendar Bot Team
+ *
+ * @author Golubyatnikov Aleksey
  * @since 2026-02-03
  */
 @Component
@@ -35,9 +34,11 @@ import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 public class EventViewHandler implements CallbackHandler {
     
     private final TelegramMessageService messageService;
+    private final CallbackQueryService callbackQueryService;
+    private final CallbackDataExtractionService callbackDataExtractionService;
     private final KeyboardService keyboardService;
     private final EventService eventService;
-    private final BotMessageBuilder botMessageBuilder;
+    private final BotMessageFormattingService botMessageFormattingService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -46,91 +47,64 @@ public class EventViewHandler implements CallbackHandler {
     
     @Override
     public boolean canHandle(String callbackData) {
-        return callbackData != null && CallbackPrefix.VIEW_EVENT.matches(callbackData);
+        return CallbackPrefix.VIEW_EVENT.matches(callbackData);
     }
     
     @Override
     public void handle(CallbackQuery callbackQuery, User user) throws Exception {
-        String callbackData = callbackQuery.getData();
-        Long chatId = callbackQuery.getMessage().getChatId();
-        Integer messageId = callbackQuery.getMessage().getMessageId();
-        String callbackQueryId = callbackQuery.getId();
-        Long userId = user.getId();
+        CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        Long eventId = extractEventId(callbackData);
+        Long eventId = extractEventId(context.callbackData());
         
         log.debug("Просмотр деталей события: eventId={}, userId={}, messageId={}", 
-                 eventId, userId, messageId);
+                 eventId, context.getUserId(), context.messageId());
         
         try {
-            // Получаем событие
             Event event = eventService.getEventById(eventId);
             
-            log.debug("Событие загружено: eventId={}, userId={}", eventId, userId);
-            log.debug("Определен контекст: Standard_Context, eventId={}, userId={}", 
-                     eventId, userId);
+            log.debug("Событие загружено: eventId={}, userId={}", eventId, context.getUserId());
             
-            // Формируем текст сообщения с учетом флага isMyEventsHeader
-            int eventCount = eventService.getActiveEventsCount(userId);
-            String eventMessage = botMessageBuilder.buildEventMessageWithHeader(event, eventCount);
+            int eventCount = eventService.getActiveEventsCount(context.getUserId());
+            String eventMessage = botMessageFormattingService.buildEventMessageWithHeader(event, eventCount);
+            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, context.getUserId());
             
-            // Используем стандартную клавиатуру с действиями
-            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
-            
-            log.debug("Используется стандартная клавиатура с действиями: eventId={}, userId={}", 
-                     eventId, userId);
-            
-            // Обновляем сообщение
-            messageService.editMessageText(chatId, messageId, eventMessage, keyboard);
+            messageService.editMessageText(context.chatId(), context.messageId(), eventMessage, keyboard);
+            callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
             log.info("Детали события отображены: eventId={}, messageId={}, userId={}", 
-                    eventId, messageId, userId);
-            
-            // Отвечаем на callback query
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
+                    eventId, context.messageId(), context.getUserId());
             
         } catch (EventNotFoundException e) {
             log.warn("Событие не найдено при просмотре деталей: eventId={}, userId={}", 
-                    eventId, userId, e);
-            
-            try {
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.notFound("Событие"));
-            } catch (TelegramApiException ex) {
-                log.error("Ошибка отправки callback query answer: eventId={}, userId={}, error={}", 
-                         eventId, userId, ex.getMessage());
-            }
-            
+                    eventId, context.getUserId(), e);
+
+            answerCallbackQuerySafely(context, CallbackMessageFormatter.notFound("Событие"));
+
         } catch (TelegramApiException e) {
             log.warn("Ошибка Telegram API при просмотре деталей события: eventId={}, messageId={}, userId={}, error={}", 
-                    eventId, messageId, userId, e.getMessage());
-            
-            try {
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
-            } catch (TelegramApiException ex) {
-                log.error("Ошибка отправки callback query answer: eventId={}, userId={}, error={}", 
-                         eventId, userId, ex.getMessage());
-            }
-            
+                    eventId, context.messageId(), context.getUserId(), e.getMessage());
+
+            answerCallbackQuerySafely(context, CallbackMessages.ERROR);
+
         } catch (Exception e) {
             log.error("Неожиданная ошибка при просмотре деталей события: eventId={}, userId={}, error={}", 
-                     eventId, userId, e.getMessage(), e);
-            
-            try {
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
-            } catch (TelegramApiException ex) {
-                log.error("Ошибка отправки callback query answer: eventId={}, userId={}, error={}", 
-                         eventId, userId, ex.getMessage());
-            }
+                     eventId, context.getUserId(), e.getMessage(), e);
+
+            answerCallbackQuerySafely(context, CallbackMessages.ERROR);
         }
     }
     
     /**
-     * Извлекает ID события из callback data.
-     * 
-     * @param callbackData строка callback data
-     * @return ID события
+     * Безопасно отвечает на callback query.
      */
-    private Long extractEventId(String callbackData) {
+    private void answerCallbackQuerySafely(CallbackQueryContext context, String message) {
+        callbackQueryService.answerCallback(context, message);
+    }
+    
+    /**
+     * Извлекает ID события из callback data.
+     */
+    private @NonNull Long extractEventId(String callbackData) {
         String payload = CallbackPrefix.VIEW_EVENT.extractPayload(callbackData);
         return Long.parseLong(payload);
     }

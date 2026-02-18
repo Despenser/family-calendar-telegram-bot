@@ -2,29 +2,31 @@ package ru.golubyatnikov.family.calendar.bot.handler.callback.attachment;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import ru.golubyatnikov.family.calendar.bot.model.Event;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
-import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.context.EventHeaderContext;
+import ru.golubyatnikov.family.calendar.bot.model.context.CallbackQueryContext;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.AttachmentFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.CallbackQueryService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 /**
  * Обработчик для загрузки вложений к событию.
+ * Управляет процессом добавления файлов и отменой загрузки.
  * 
- * <p>Управляет процессом добавления файлов к событию:</p>
- * <ul>
- *   <li>Инициирует режим ожидания файла</li>
- *   <li>Отображает инструкции по загрузке</li>
- *   <li>Обрабатывает отмену загрузки</li>
- * </ul>
- * 
- * @author Family Calendar Bot Team
+ * @author Golubyatnikov Aleksey
  * @since 2026-02-03
  */
 @Component
@@ -33,187 +35,152 @@ import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 public class AttachmentUploadHandler {
     
     private final TelegramMessageService messageService;
+    private final CallbackQueryService callbackQueryService;
     private final EventService eventService;
     private final KeyboardService keyboardService;
     private final ConversationStateService conversationStateService;
-    private final BotMessageBuilder botMessageBuilder;
+    private final BotMessageFormattingService botMessageFormattingService;
+    private final AttachmentFormattingService formattingService;
     
     /**
      * Обрабатывает начало добавления файла.
+     * Переводит пользователя в режим ожидания файла.
      * 
      * @param eventId идентификатор события
-     * @param user пользователь
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения
-     * @param callbackQueryId идентификатор callback query
+     * @param context контекст callback query
+     *
+     * @throws Exception если произошла ошибка при начале добавления файла
      */
-    public void handleAddFile(Long eventId, User user, Long chatId, 
-                              Integer messageId, String callbackQueryId) throws Exception {
-        log.debug("Начало добавления файла для события ID={}, пользователь ID={}", 
-                eventId, user.getId());
+    public void handleAddFile(Long eventId, CallbackQueryContext context) throws Exception {
+        log.debug("Начало добавления файла: eventId={}", eventId);
         
         try {
-            // Получаем событие для проверки прав доступа
-            Event event = eventService.getEventById(eventId);
+            validateUserAccess(eventId, context.user());
             
-            // Проверяем, что пользователь является создателем события
-            if (!event.getUser().getId().equals(user.getId())) {
-                log.warn("Пользователь ID={} попытался добавить вложение к чужому событию ID={}", 
-                        user.getId(), eventId);
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.NO_ACCESS);
-                return;
-            }
-            
-            // Формируем инструкцию по загрузке файла
-            String instruction = buildAttachmentUploadInstruction();
-            
-            // Создаем клавиатуру с кнопкой "Отмена"
+            String instruction = formattingService.formatUploadInstruction();
             InlineKeyboardMarkup keyboard = keyboardService.createAttachmentUploadKeyboard(eventId);
             
-            log.debug("Попытка редактирования сообщения для режима загрузки вложения: " +
-                    "chatId={}, messageId={}, eventId={}", chatId, messageId, eventId);
+            Integer resultMessageId = editOrSendInstruction(context.chatId(), context.messageId(), instruction, keyboard);
+            conversationStateService.setAwaitingFile(context.getUserId(), eventId, context.chatId(), resultMessageId);
             
-            // Попытка редактирования сообщения
-            boolean edited = messageService.tryEditMessageText(chatId, messageId, instruction, keyboard);
-            
-            if (!edited) {
-                // Fallback: отправка нового сообщения
-                log.info("Редактирование не удалось (сообщение удалено/старое), отправка нового сообщения: " +
-                        "chatId={}, oldMessageId={}, eventId={}", chatId, messageId, eventId);
-                
-                org.telegram.telegrambots.meta.api.objects.Message newMessage = 
-                        messageService.sendMessageAndGet(chatId, instruction, keyboard);
-                messageId = newMessage.getMessageId();
-                
-                log.info("Новое сообщение отправлено (fallback): chatId={}, newMessageId={}, eventId={}", 
-                        chatId, messageId, eventId);
-            } else {
-                log.info("Сообщение успешно отредактировано для режима загрузки вложения: " +
-                        "chatId={}, messageId={}, eventId={}", chatId, messageId, eventId);
-            }
-            
-            // Устанавливаем состояние ожидания файла с актуальным messageId
-            conversationStateService.setAwaitingFile(user.getId(), eventId, chatId, messageId);
-            
-            log.debug("Состояние ожидания файла установлено: userId={}, eventId={}, chatId={}, messageId={}", 
-                    user.getId(), eventId, chatId, messageId);
-            
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
-            
-            log.info("Пользователь ID={} переведен в режим ожидания файла для события ID={}", 
-                    user.getId(), eventId);
+            callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
+            log.info("Пользователь переведен в режим ожидания файла: eventId={}", eventId);
             
         } catch (Exception e) {
-            log.error("Ошибка при начале добавления файла: eventId={}, userId={}, error={}", 
-                    eventId, user.getId(), e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
+            log.error("Ошибка при начале добавления файла: eventId={}", eventId, e);
+            callbackQueryService.answerCallback(context, CallbackMessages.ERROR);
             throw e;
         }
     }
     
     /**
      * Обрабатывает отмену добавления файла.
+     * Возвращает пользователя к карточке события.
      * 
      * @param eventId идентификатор события
-     * @param user пользователь
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения
-     * @param callbackQueryId идентификатор callback query
+     * @param context контекст callback query
+     * @throws Exception если произошла ошибка при отмене добавления файла
      */
-    public void handleCancelAddFile(Long eventId, User user, Long chatId, 
-                                    Integer messageId, String callbackQueryId) throws Exception {
-        log.debug("Отмена добавления файла для события ID={}, пользователь ID={}", 
-                eventId, user.getId());
+    public void handleCancelAddFile(Long eventId, @NonNull CallbackQueryContext context) throws Exception {
+        log.debug("Отмена добавления файла: eventId={}", eventId);
         
         try {
-            // Очистка состояния ожидания файла
-            conversationStateService.clearAwaitingFile(user.getId());
-            log.debug("Состояние ожидания файла очищено для пользователя ID={}", user.getId());
+            conversationStateService.clearAwaitingFile(context.getUserId());
             
-            // Получение события для восстановления карточки
             Event event = eventService.getEventById(eventId);
-            log.debug("Событие ID={} получено для восстановления карточки", eventId);
+            String eventMessage = buildEventMessage(event, context.user());
+            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, context.getUserId());
             
-            // Получаем контекст шапки с обработкой ошибок
-            ConversationStateService.EventHeaderContext headerContext = null;
-            try {
-                headerContext = conversationStateService.getEventHeaderContext(user.getId());
-                
-                if (headerContext != null) {
-                    log.debug("Контекст шапки найден для пользователя ID={}: hasMyEventsHeader={}, eventCount={}", 
-                            user.getId(), headerContext.isHasMyEventsHeader(), headerContext.getEventCount());
-                } else {
-                    log.debug("Контекст шапки не найден для пользователя ID={}", user.getId());
-                }
-            } catch (Exception e) {
-                log.error("Ошибка при получении контекста шапки для пользователя ID={}: {}", 
-                        user.getId(), e.getMessage(), e);
-            }
+            editOrSendEventCard(context.chatId(), context.messageId(), eventMessage, keyboard);
+            callbackQueryService.answerCallback(context, CallbackMessages.CANCELLED);
             
-            // Формируем сообщение о событии с учетом контекста шапки
-            String eventMessage;
-            if (headerContext != null && headerContext.isHasMyEventsHeader()) {
-                log.debug("Использование buildEventMessageWithHeader для события ID={} с количеством событий: {}", 
-                        eventId, headerContext.getEventCount());
-                eventMessage = botMessageBuilder.buildEventMessageWithHeader(event, headerContext.getEventCount());
-            } else {
-                log.debug("Использование buildEventMessage для события ID={} (без шапки)", eventId);
-                eventMessage = botMessageBuilder.buildEventMessage(event);
-            }
+            log.info("Добавление файла отменено: eventId={}", eventId);
             
-            // Создание стандартной клавиатуры события
-            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, user.getId());
-            
-            log.debug("Попытка редактирования сообщения для восстановления карточки события: " +
-                    "chatId={}, messageId={}, eventId={}", chatId, messageId, eventId);
-            
-            // Попытка редактирования сообщения
-            boolean edited = messageService.tryEditMessageText(chatId, messageId, eventMessage, keyboard);
-            
-            if (!edited) {
-                // Fallback: отправка нового сообщения
-                log.info("Редактирование не удалось (сообщение удалено/старое), отправка нового сообщения: " +
-                        "chatId={}, oldMessageId={}, eventId={}", chatId, messageId, eventId);
-                
-                messageService.sendMessage(chatId, eventMessage, keyboard);
-                
-                log.info("Новое сообщение отправлено (fallback) при отмене добавления файла: " +
-                        "chatId={}, eventId={}", chatId, eventId);
-            } else {
-                log.info("Сообщение успешно отредактировано для восстановления карточки события: " +
-                        "chatId={}, messageId={}, eventId={}", chatId, messageId, eventId);
-            }
-            
-            // Отправка callback ответа
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.CANCELLED);
-            
-            log.info("Добавление файла отменено для события ID={}, пользователь ID={}", 
-                    eventId, user.getId());
-            
-        } catch (ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException e) {
-            log.error("Событие ID={} не найдено при отмене добавления файла: userId={}", 
-                    eventId, user.getId());
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessageFormatter.notFound("Событие"));
-        } catch (Exception e) {
-            log.error("Ошибка при отмене добавления файла: eventId={}, userId={}, error={}", 
-                    eventId, user.getId(), e.getMessage(), e);
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.ERROR);
-            throw e;
+        } catch (EventNotFoundException e) {
+            log.error("Событие не найдено: eventId={}", eventId);
+            callbackQueryService.answerCallback(context, CallbackMessageFormatter.notFound("Событие"));
         }
     }
     
     /**
-     * Формирует инструкцию по загрузке файла.
+     * Редактирует сообщение с инструкцией или отправляет новое.
      * 
-     * @return отформатированная инструкция
+     * @param chatId идентификатор чата Telegram
+     * @param messageId идентификатор сообщения для редактирования
+     * @param instruction текст инструкции
+     * @param keyboard клавиатура
+     *
+     * @return идентификатор результирующего сообщения
+     * @throws TelegramApiException если произошла ошибка при работе с Telegram API
      */
-    private String buildAttachmentUploadInstruction() {
-        return "📎 *Отправьте файл для прикрепления к событию*\n\n" +
-               "_Максимальный размер: 20 МБ_\n\n" +
-               "Поддерживаемые типы файлов:\n" +
-               "📄 Документы\n" +
-               "🖼️ Фотографии\n" +
-               "🎥 Видео\n" +
-               "🎵 Аудио";
+    private Integer editOrSendInstruction(Long chatId,
+                                          Integer messageId,
+                                          String instruction,
+                                          InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        
+        boolean edited = messageService.tryEditMessageText(chatId, messageId, instruction, keyboard);
+        
+        if (edited) {
+            return messageId;
+        }
+        
+        Message newMessage = messageService.sendMessageAndGet(chatId, instruction, keyboard);
+        return newMessage.getMessageId();
+    }
+    
+    /**
+     * Редактирует сообщение с карточкой события или отправляет новое.
+     * 
+     * @param chatId идентификатор чата Telegram
+     * @param messageId идентификатор сообщения для редактирования
+     * @param eventMessage текст сообщения о событии
+     * @param keyboard клавиатура
+     *
+     * @throws TelegramApiException если произошла ошибка при работе с Telegram API
+     */
+    private void editOrSendEventCard(Long chatId,
+                                     Integer messageId,
+                                     String eventMessage,
+                                     InlineKeyboardMarkup keyboard) throws TelegramApiException {
+        
+        boolean edited = messageService.tryEditMessageText(chatId, messageId, eventMessage, keyboard);
+        
+        if (!edited) {
+            messageService.sendMessage(chatId, eventMessage, keyboard);
+        }
+    }
+    
+    /**
+     * Формирует сообщение о событии с учетом контекста шапки.
+     * 
+     * @param event событие для форматирования
+     * @param user пользователь, для которого формируется сообщение
+     *
+     * @return отформатированное сообщение о событии
+     */
+    private String buildEventMessage(Event event, @NonNull User user) {
+        EventHeaderContext headerContext = conversationStateService.getEventHeaderContext(user.getId());
+        
+        if (headerContext != null && headerContext.isHasMyEventsHeader()) {
+            return botMessageFormattingService.buildEventMessageWithHeader(event, headerContext.getEventCount());
+        }
+        
+        return botMessageFormattingService.buildEventMessage(event);
+    }
+    
+    /**
+     * Валидирует права доступа пользователя к событию.
+     * 
+     * @param eventId идентификатор события
+     * @param user пользователь для проверки прав доступа
+     *
+     * @throws IllegalAccessError если пользователь не является создателем события
+     */
+    private void validateUserAccess(Long eventId, @NonNull User user) {
+        Event event = eventService.getEventById(eventId);
+        if (!event.getUser().getId().equals(user.getId())) {
+            log.warn("Попытка добавления вложения к чужому событию: userId={}, eventId={}", user.getId(), eventId);
+            throw new IllegalAccessError("Только создатель события может добавлять вложения");
+        }
     }
 }

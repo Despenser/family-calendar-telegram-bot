@@ -8,8 +8,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
-
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import java.util.Arrays;
 
 /**
@@ -137,6 +136,7 @@ public class CallbackErrorHandlingAspect {
                 callbackQuery.getId(), 
                 "❌ Произошла ошибка. Попробуйте еще раз."
             );
+
         } catch (Exception ex) {
             log.error("Ошибка при ответе на callback query: callbackId={}, error={}", 
                     callbackQuery.getId(), ex.getMessage());

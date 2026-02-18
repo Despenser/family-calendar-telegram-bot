@@ -7,8 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.UpdateProcessor;
-import ru.golubyatnikov.family.calendar.bot.service.authorization.WebhookSecurityService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.UpdateProcessor;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.authorization.WebhookSecurityService;
 
 /**
  * REST контроллер для приема webhook обновлений от Telegram Bot API.
@@ -30,11 +30,10 @@ public class TelegramWebhookController {
 
     /**
      * Обрабатывает входящие webhook обновления от Telegram Bot API.
-     * Этот метод вызывается Telegram каждый раз, когда происходит событие,
-     * связанное с ботом (новое сообщение, команда, callback и т.д.)
      * 
      * @param secretToken secret token из заголовка X-Telegram-Bot-Api-Secret-Token
      * @param update объект Update от Telegram, содержащий информацию о событии
+     *
      * @return ResponseEntity с HTTP 200 OK при успешной обработке, или HTTP 401 Unauthorized при невалидном токене
      */
     @PostMapping
@@ -51,6 +50,7 @@ public class TelegramWebhookController {
         
         logUpdate(update);
         updateProcessor.processUpdate(update);
+
         return ResponseEntity.ok().build();
     }
 

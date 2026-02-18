@@ -2,34 +2,33 @@ package ru.golubyatnikov.family.calendar.bot.handler.callback.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
-import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
-import ru.golubyatnikov.family.calendar.bot.model.Event;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
-import ru.golubyatnikov.family.calendar.bot.service.event.EventNotificationService;
-import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.util.BotMessageBuilder;
-import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
+import ru.golubyatnikov.family.calendar.bot.model.context.CallbackQueryContext;
+import ru.golubyatnikov.family.calendar.bot.model.context.CompletionNoteContext;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventNotificationService;
+import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.CallbackQueryService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
 
 /**
  * Обработчик завершения события.
- * 
- * <p>Обрабатывает завершение события с переупорядочиванием списка,
- * добавление заметки о завершении и пропуск заметки.</p>
- * 
- * <p><b>Требования:</b> 1.1, 1.2, 2.1, 2.2, 2.3, 3.3</p>
- * 
- * @author Family Calendar Bot Team
+ *
+ * @author Golubyatnikov Aleksey
  * @since 2026-02-03
  */
 @Component
@@ -41,7 +40,9 @@ public class EventCompletionHandler implements CallbackHandler {
     private final TelegramMessageService messageService;
     private final ConversationStateService conversationStateService;
     private final EventNotificationService eventNotificationService;
-    private final BotMessageBuilder botMessageBuilder;
+    private final BotMessageFormattingService botMessageFormattingService;
+    private final CallbackDataExtractionService callbackDataExtractionService;
+    private final CallbackQueryService callbackQueryService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -59,260 +60,123 @@ public class EventCompletionHandler implements CallbackHandler {
     }
     
     @Override
-    public void handle(CallbackQuery callbackQuery, User user) throws Exception {
-        String callbackData = callbackQuery.getData();
-        Long chatId = callbackQuery.getMessage().getChatId();
-        Integer messageId = callbackQuery.getMessage().getMessageId();
-        String callbackQueryId = callbackQuery.getId();
-        Long userId = user.getId();
+    public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
+        CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        if (CallbackPrefix.COMPLETE_EVENT.matches(callbackData)) {
-            handleCompleteEvent(callbackData, userId, chatId, messageId, callbackQueryId);
-        } else if (CallbackPrefix.ADD_COMPLETION_NOTE.matches(callbackData)) {
-            handleAddCompletionNote(callbackData, userId, chatId, messageId, callbackQueryId);
-        } else if (CallbackPrefix.SKIP_COMPLETION_NOTE.matches(callbackData)) {
-            handleSkipCompletionNote(userId, chatId, messageId, callbackQueryId);
+        if (CallbackPrefix.COMPLETE_EVENT.matches(context.callbackData())) {
+            handleCompleteEvent(context);
+
+        } else if (CallbackPrefix.ADD_COMPLETION_NOTE.matches(context.callbackData())) {
+            handleAddCompletionNote(context);
+
+        } else if (CallbackPrefix.SKIP_COMPLETION_NOTE.matches(context.callbackData())) {
+            handleSkipCompletionNote(context);
         }
     }
     
     /**
      * Обрабатывает завершение события с переупорядочиванием списка.
-     * 
-     * <p><b>Требования:</b> 1.1, 1.2, 2.1</p>
-     * 
-     * @param callbackData данные callback (формат: complete_event_{eventId})
-     * @param userId идентификатор пользователя
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения
-     * @param callbackQueryId идентификатор callback query
      */
-    private void handleCompleteEvent(String callbackData, Long userId, Long chatId, 
-                                     Integer messageId, String callbackQueryId) {
-        Long eventId = extractEventId(callbackData, CallbackPrefix.COMPLETE_EVENT);
+    private void handleCompleteEvent(@NonNull CallbackQueryContext context) {
+        Long eventId = extractEventId(context.callbackData(), CallbackPrefix.COMPLETE_EVENT);
         
         log.debug("Начало обработки завершения события с переупорядочиванием: eventId={}, userId={}, messageId={}", 
-                 eventId, userId, messageId);
+                 eventId, context.getUserId(), context.messageId());
         
         try {
-            // Завершаем событие с переупорядочиванием списка
-            Event completedEvent = eventService.completeEventWithReordering(eventId, userId);
+            Event completedEvent = eventService.completeEventWithReordering(eventId, context.getUserId());
             
             log.info("Событие ID={} успешно завершено с переупорядочиванием пользователем ID={}", 
-                    eventId, userId);
-            
-            // Определяем messageId для сохранения в контексте:
-            // - Если у события есть messageId (из списка /my_events), используем его
-            // - Иначе используем messageId из callback query (сообщение создания события)
+                    eventId, context.getUserId());
+
             Integer updatedMessageId = completedEvent.getMessageId() != null 
                 ? completedEvent.getMessageId().intValue() 
-                : messageId;
+                : context.messageId();
             
             conversationStateService.setAwaitingCompletionNote(
-                userId, 
+                context.getUserId(), 
                 eventId, 
-                chatId, 
+                context.chatId(), 
                 updatedMessageId
             );
             
             log.debug("Контекст сохранён для добавления заметки: eventId={}, messageId={}, userId={}", 
-                     eventId, updatedMessageId, userId);
+                     eventId, updatedMessageId, context.getUserId());
             
-            // Отвечаем на callback query
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
+            callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
         } catch (EventNotFoundException e) {
-            log.error("Событие не найдено: eventId={}, userId={}", eventId, userId, e);
+            log.error("Событие не найдено: eventId={}, userId={}", eventId, context.getUserId(), e);
+
         } catch (UnauthorizedAccessException e) {
-            log.error("Нет прав на завершение события: eventId={}, userId={}", eventId, userId, e);
+            log.error("Нет прав на завершение события: eventId={}, userId={}", eventId, context.getUserId(), e);
+
         } catch (IllegalStateException e) {
-            log.error("Неверное состояние события: eventId={}, userId={}", eventId, userId, e);
+            log.error("Неверное состояние события: eventId={}, userId={}", eventId, context.getUserId(), e);
+
         } catch (Exception e) {
             log.error("Ошибка при завершении события с переупорядочиванием: eventId={}, userId={}, error={}", 
-                     eventId, userId, e.getMessage(), e);
+                     eventId, context.getUserId(), e.getMessage(), e);
         }
     }
     
     /**
      * Обрабатывает нажатие кнопки "Добавить заметку" к завершенному событию.
-     * 
-     * <p><b>Требования:</b> 1.2, 2.2</p>
-     * 
-     * @param callbackData данные callback (формат: add_completion_note_{eventId})
-     * @param userId идентификатор пользователя
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения для редактирования
-     * @param callbackQueryId идентификатор callback query
      */
-    private void handleAddCompletionNote(String callbackData, Long userId, Long chatId, 
-                                        Integer messageId, String callbackQueryId) {
-        Long eventId = extractEventId(callbackData, CallbackPrefix.ADD_COMPLETION_NOTE);
+    private void handleAddCompletionNote(@NonNull CallbackQueryContext context) throws TelegramApiException {
+        Long eventId = extractEventId(context.callbackData(), CallbackPrefix.ADD_COMPLETION_NOTE);
         
-        log.debug("Начало обработки добавления заметки к событию: eventId={}, userId={}, messageId={}", 
-                 eventId, userId, messageId);
+        log.debug("Обработка добавления заметки: eventId={}, userId={}", eventId, context.getUserId());
+        
+        String message = formatMessage(
+                """
+                        📝 Напишите заметку о том, как прошло событие.
+                        
+                        Например, что было сделано, какие были результаты или впечатления.
+                        """
+        );
         
         try {
-            // Формируем сообщение с просьбой ввести заметку
-            String message = formatMessage(
-                "📝 Напишите заметку о том, как прошло событие.\n\n" +
-                "Например, что было сделано, какие были результаты или впечатления."
-            );
-            
-            try {
-                // Пытаемся отредактировать текущее сообщение
-                messageService.editMessageText(chatId, messageId, message, null);
-                
-                // Устанавливаем состояние ожидания заметки с messageId
-                conversationStateService.setAwaitingCompletionNote(userId, eventId, chatId, messageId);
-                
-                log.info("Пользователь ID={} переведен в режим ожидания заметки для события ID={}, messageId={}", 
-                        userId, eventId, messageId);
-                
-            } catch (TelegramApiException e) {
-                // Fallback: если редактирование не удалось, отправляем новое сообщение
-                log.warn("Ошибка редактирования сообщения при добавлении заметки, используем fallback: eventId={}, messageId={}, error={}", 
-                        eventId, messageId, e.getMessage());
-                
-                messageService.sendMessage(chatId, message);
-                
-                // Устанавливаем состояние ожидания заметки без messageId
-                conversationStateService.setAwaitingCompletionNote(userId, eventId, chatId, null);
-                
-                log.info("Пользователь ID={} переведен в режим ожидания заметки для события ID={} (fallback без messageId)", 
-                        userId, eventId);
-            }
-            
-            // Отвечаем на callback query
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
+            messageService.editMessageText(context.chatId(), context.messageId(), message, null);
+            conversationStateService.setAwaitingCompletionNote(context.getUserId(), eventId, context.chatId(), context.messageId());
+            log.info("Ожидание заметки для события ID={}, userId={}", eventId, context.getUserId());
             
         } catch (TelegramApiException e) {
-            log.error("Ошибка Telegram API при обработке добавления заметки: eventId={}, userId={}, error={}", 
-                     eventId, userId, e.getMessage(), e);
-            
-            // Очищаем контекст при критической ошибке
-            conversationStateService.clearAwaitingCompletionNote(userId);
-            
-            throw new RuntimeException("Ошибка при обработке добавления заметки", e);
+            log.warn("Не удалось отредактировать сообщение, отправка нового: eventId={}, error={}", 
+                     eventId, e.getMessage());
+            messageService.sendMessage(context.chatId(), message);
+            conversationStateService.setAwaitingCompletionNote(context.getUserId(), eventId, context.chatId(), null);
         }
+
+        callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
     }
-    
+
     /**
      * Обрабатывает нажатие кнопки "Пропустить" при добавлении заметки.
-     * 
-     * <p><b>Требования:</b> 2.3, 3.3</p>
-     * 
-     * @param userId идентификатор пользователя
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения для редактирования
-     * @param callbackQueryId идентификатор callback query
      */
-    private void handleSkipCompletionNote(Long userId, Long chatId, Integer messageId, 
-                                         String callbackQueryId) {
-        log.info("Пользователь ID={} пропустил добавление заметки к завершенному событию", userId);
-        
-        try {
-            // Получаем контекст для доступа к eventId
-            ConversationStateService.CompletionNoteContext context = 
-                conversationStateService.getCompletionNoteContext(userId);
-            
-            if (context == null) {
-                log.warn("Контекст добавления заметки не найден для пользователя ID={}", userId);
-                
-                // Очищаем состояние на всякий случай
-                conversationStateService.clearAwaitingCompletionNote(userId);
-                
-                // Отправляем сообщение об ошибке
-                String errorMessage = formatMessage("❌ Время ожидания истекло. Попробуйте снова.");
-                messageService.sendMessage(chatId, errorMessage);
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
-                return;
-            }
-            
-            Long eventId = context.getEventId();
-            Integer contextMessageId = context.getMessageId();
-            
-            log.debug("Получен контекст для пропуска заметки: eventId={}, messageId={}, userId={}", 
-                     eventId, contextMessageId, userId);
-            
-            // Получаем событие
-            Event event = eventService.getEventById(eventId);
-            
-            // Проверяем, было ли событие частью списка /my_events
-            // Если у события был messageId до завершения, значит оно было в списке
-            boolean wasPartOfMyEventsList = (event.getMessageId() != null);
-            
-            log.debug("Событие ID={} было частью списка /my_events: {}", eventId, wasPartOfMyEventsList);
-            
-            // Формируем финальное сообщение с карточкой события
-            String eventMessage = botMessageBuilder.buildCompletedEventMessage(event);
-            
-            // Используем messageId из контекста, если он есть, иначе из callback query
-            Integer targetMessageId = contextMessageId != null ? contextMessageId : messageId;
-            
-            try {
-                // Пытаемся отредактировать сообщение
-                if (targetMessageId != null) {
-                    messageService.editMessageText(chatId, targetMessageId, eventMessage, null);
-                    
-                    log.info("Сообщение отредактировано при пропуске заметки: eventId={}, messageId={}, userId={}", 
-                            eventId, targetMessageId, userId);
-                } else {
-                    // Fallback: если messageId отсутствует, отправляем новое сообщение
-                    log.warn("MessageId отсутствует при пропуске заметки, отправляем новое сообщение: eventId={}, userId={}", 
-                            eventId, userId);
-                    messageService.sendMessage(chatId, eventMessage);
-                }
-                
-            } catch (TelegramApiException e) {
-                // Fallback: если редактирование не удалось, отправляем новое сообщение
-                log.warn("Ошибка редактирования сообщения при пропуске заметки, используем fallback: eventId={}, messageId={}, error={}", 
-                        eventId, targetMessageId, e.getMessage());
-                
-                messageService.sendMessage(chatId, eventMessage);
-            }
-            
-            // Очищаем контекст
-            conversationStateService.clearAwaitingCompletionNote(userId);
-            
-            log.info("Контекст очищен после пропуска заметки: userId={}, eventId={}", userId, eventId);
-            
-            // Обновляем шапку /my_events только если событие было частью списка
-            if (wasPartOfMyEventsList) {
-                eventNotificationService.updateMyEventsHeaderAfterRemoval(userId);
-                
-                log.info("Шапка /my_events обновлена после пропуска заметки к событию ID={}: userId={}", 
-                        eventId, userId);
-            } else {
-                log.info("Событие ID={} не было частью списка /my_events (только что создано), шапка не обновляется: userId={}", 
-                        eventId, userId);
-            }
-            
-            // Отвечаем на callback query
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
-            
-        } catch (EventNotFoundException e) {
-            log.error("Событие не найдено при пропуске заметки: userId={}", userId, e);
-            
-            // Очищаем контекст при ошибке
-            conversationStateService.clearAwaitingCompletionNote(userId);
-            
-            // Отправляем сообщение об ошибке
-            try {
-                String errorMessage = formatMessage("❌ Событие не найдено.");
-                messageService.sendMessage(chatId, errorMessage);
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
-            } catch (TelegramApiException ex) {
-                log.error("Ошибка отправки сообщения об ошибке: userId={}", userId, ex);
-            }
-            
-        } catch (TelegramApiException e) {
-            log.error("Ошибка Telegram API при пропуске заметки: userId={}, error={}", 
-                     userId, e.getMessage(), e);
-            
-            // Очищаем контекст при критической ошибке
-            conversationStateService.clearAwaitingCompletionNote(userId);
-            
-            throw new RuntimeException("Ошибка при пропуске заметки", e);
+    private void handleSkipCompletionNote(@NonNull CallbackQueryContext context) throws TelegramApiException {
+        log.info("Пропуск добавления заметки: userId={}", context.getUserId());
+
+        CompletionNoteContext completionContext = conversationStateService.getCompletionNoteContext(context.getUserId());
+
+        if (completionContext == null) {
+            handleExpiredContext(context);
+            return;
         }
+
+        Long eventId = completionContext.getEventId();
+        Event event = eventService.getEventById(eventId);
+        boolean wasPartOfMyEventsList = (event.getMessageId() != null);
+
+        sendCompletedEventMessage(context, completionContext, event);
+        conversationStateService.clearAwaitingCompletionNote(context.getUserId());
+
+        if (wasPartOfMyEventsList) {
+            eventNotificationService.updateMyEventsHeaderAfterRemoval(context.getUserId());
+            log.info("Шапка /my_events обновлена: eventId={}, userId={}", eventId, context.getUserId());
+        }
+
+        callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
     }
     
     /**
@@ -320,10 +184,57 @@ public class EventCompletionHandler implements CallbackHandler {
      * 
      * @param callbackData строка callback data
      * @param prefix префикс для извлечения payload
+     *
      * @return ID события
      */
-    private Long extractEventId(String callbackData, CallbackPrefix prefix) {
+    private @NonNull Long extractEventId(String callbackData, @NonNull CallbackPrefix prefix) {
         String payload = prefix.extractPayload(callbackData);
         return Long.parseLong(payload);
     }
+
+
+    /**
+     * Обрабатывает случай истекшего контекста заметки.
+     */
+    private void handleExpiredContext(@NonNull CallbackQueryContext context) throws TelegramApiException {
+        log.warn("Контекст не найден: userId={}", context.getUserId());
+        conversationStateService.clearAwaitingCompletionNote(context.getUserId());
+        messageService.sendMessage(context.chatId(), formatMessage("❌ Время ожидания истекло. Попробуйте снова."));
+        callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
+    }
+
+    /**
+     * Отправляет сообщение о завершенном событии, пытаясь отредактировать существующее или создать новое.
+     */
+    private void sendCompletedEventMessage(@NonNull CallbackQueryContext context,
+                                           @NonNull CompletionNoteContext completionContext,
+                                           @NonNull Event event) throws TelegramApiException {
+
+        String eventMessage = botMessageFormattingService.buildCompletedEventMessage(event);
+        Integer targetMessageId = completionContext.getMessageId() != null
+            ? completionContext.getMessageId()
+            : context.messageId();
+
+        editOrSendMessage(context.chatId(), targetMessageId, eventMessage, event.getId());
+    }
+
+    /**
+     * Пытается отредактировать существующее сообщение, при неудаче отправляет новое.
+     */
+    private void editOrSendMessage(Long chatId, Integer messageId, String text, Long eventId) throws TelegramApiException {
+        if (messageId != null) {
+            try {
+                messageService.editMessageText(chatId, messageId, text, null);
+
+            } catch (TelegramApiException e) {
+                log.warn("Не удалось отредактировать сообщение {}, отправка нового: eventId={}, error={}",
+                         messageId, eventId, e.getMessage());
+
+                messageService.sendMessage(chatId, text);
+            }
+        } else {
+            messageService.sendMessage(chatId, text);
+        }
+    }
+
 }

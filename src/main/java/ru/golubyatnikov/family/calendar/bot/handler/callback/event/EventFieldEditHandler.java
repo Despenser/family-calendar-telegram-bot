@@ -2,31 +2,35 @@ package ru.golubyatnikov.family.calendar.bot.handler.callback.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
-import ru.golubyatnikov.family.calendar.bot.model.CallbackPrefix;
-import ru.golubyatnikov.family.calendar.bot.model.Event;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.conversation.ConversationStateService;
-import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.KeyboardService;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.model.context.CallbackQueryContext;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.model.enums.EditField;
+import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.CallbackQueryService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardFactory;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Обработчик редактирования конкретного поля события.
- * 
- * <p>Обрабатывает выбор поля для редактирования и отображает соответствующий интерфейс.</p>
- * 
- * @author Family Calendar Bot Team
+ *
+ * @author Golubyatnikov Aleksey
  * @since 2026-02-03
  */
 @Component
@@ -38,6 +42,9 @@ public class EventFieldEditHandler implements CallbackHandler {
     private final ConversationStateService conversationStateService;
     private final KeyboardService keyboardService;
     private final EventService eventService;
+    private final KeyboardFactory keyboardFactory;
+    private final CallbackDataExtractionService callbackDataExtractionService;
+    private final CallbackQueryService callbackQueryService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -46,178 +53,189 @@ public class EventFieldEditHandler implements CallbackHandler {
     
     @Override
     public boolean canHandle(String callbackData) {
-        return callbackData != null && CallbackPrefix.EDIT_FIELD.matches(callbackData);
+        return CallbackPrefix.EDIT_FIELD.matches(callbackData);
     }
     
     @Override
-    public void handle(CallbackQuery callbackQuery, User user) throws Exception {
-        String callbackData = callbackQuery.getData();
-        Long chatId = callbackQuery.getMessage().getChatId();
-        Integer messageId = callbackQuery.getMessage().getMessageId();
-        String callbackQueryId = callbackQuery.getId();
-        
-        handleEditField(callbackData, user, chatId, messageId, callbackQueryId);
+    public void handle(@NonNull CallbackQuery callbackQuery, User user) throws Exception {
+        CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
+        handleEditField(context);
     }
     
     /**
      * Обрабатывает редактирование конкретного поля события.
-     * 
-     * @param callbackData данные callback (формат: edit_field_{field}_{eventId})
-     * @param user объект пользователя
-     * @param chatId идентификатор чата
-     * @param messageId идентификатор сообщения
-     * @param callbackQueryId идентификатор callback query
      */
-    private void handleEditField(String callbackData, User user, Long chatId, 
-                                 Integer messageId, String callbackQueryId) {
-        Long userId = user.getId();
+    private void handleEditField(@NonNull CallbackQueryContext context) {
+        Long userId = context.getUserId();
         try {
-            // Извлекаем payload после префикса edit_field_
-            String payload = CallbackPrefix.EDIT_FIELD.extractPayload(callbackData);
+            String payload = CallbackPrefix.EDIT_FIELD.extractPayload(context.callbackData());
             
             log.debug("Извлечен payload из callback data: payload='{}', userId={}", payload, userId);
             
-            // Разделяем payload на поле и eventId
             String[] parts = payload.split("_", 2);
             
-            // Валидация формата
             if (parts.length != 2) {
                 log.error("Некорректный формат callback data: ожидается 2 части, получено {}. " +
-                         "CallbackData='{}', userId={}", parts.length, callbackData, userId);
-                messageService.editMessageText(chatId, messageId, 
-                    "❌ Произошла ошибка при обработке запроса", null);
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
+                         "CallbackData='{}', userId={}", parts.length, context.callbackData(), userId);
+
+                handleInvalidFormat(context);
                 return;
             }
             
             String field = parts[0];
-            Long eventId;
+            Long eventId = parseEventId(parts[1], context);
             
-            // Парсинг eventId с обработкой NumberFormatException
-            try {
-                eventId = Long.parseLong(parts[1]);
-                log.debug("Успешно извлечены данные: field='{}', eventId={}, userId={}", 
-                         field, eventId, userId);
-            } catch (NumberFormatException e) {
-                log.error("Некорректный eventId в callback data: eventId='{}', callbackData='{}', " +
-                         "userId={}, error={}", parts[1], callbackData, userId, e.getMessage());
-                messageService.editMessageText(chatId, messageId, 
-                    "❌ Произошла ошибка при обработке запроса", null);
-                messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
+            if (eventId == null) {
                 return;
             }
             
             log.info("Пользователь ID={} начал редактирование поля '{}' события ID={}", 
                     userId, field, eventId);
             
-            // НЕ перезаписываем контекст редактирования, если он уже существует
-            // (он мог быть создан в handleEditEventFromCalendar с sourceDate)
-            if (!conversationStateService.isEditingEvent(userId)) {
-                conversationStateService.startEventEditing(userId, eventId, chatId, messageId);
-            }
+            updateEditingContext(userId, eventId, context.chatId(), context.messageId(), field);
             
-            // Устанавливаем редактируемое поле
-            ConversationStateService.EditField editField = mapToEditField(field);
-            if (editField != null) {
-                conversationStateService.setEditingField(userId, editField);
-                log.debug("Установлено состояние редактирования: userId={}, eventId={}, field={}, messageId={}", 
-                         userId, eventId, editField, messageId);
-            }
+            String message = buildMessageForField(field, context.user());
+            InlineKeyboardMarkup keyboard = buildKeyboardForField(field, context.user(), eventId);
             
-            // Формируем сообщение и клавиатуру в зависимости от поля
-            String message;
-            InlineKeyboardMarkup keyboard = null;
-            
-            switch (field) {
-                case "date" -> {
-                    log.debug("Выбрано поле для редактирования: DATE, userId={}", userId);
-                    message = "📅 Редактирование даты\n\nВыберите новую дату из календаря:";
-                    // Используем текущий месяц для начального отображения с учетом timezone пользователя и eventId для кнопки "Назад"
-                    LocalDate now = user.getCurrentDate();
-                    keyboard = keyboardService.createCalendarKeyboard(
-                        now.getYear(), 
-                        now.getMonthValue(), 
-                        user,
-                        eventId
-                    );
-                }
-                case "time" -> {
-                    log.debug("Выбрано поле для редактирования: TIME, userId={}", userId);
-                    message = "🕐 Редактирование времени\n\nВыберите новое время:";
-                    
-                    // Получаем событие для определения даты
-                    Event event = eventService.getEventById(eventId);
-                    LocalDate eventDate = event.getEventDate();
-                    
-                    // Показываем фильтрованный выбор часа с учетом даты события, timezone пользователя и eventId для кнопки "Назад"
-                    keyboard = keyboardService.createFilteredHourSelectionKeyboard(eventDate, user, eventId);
-                }
-                case "title" -> {
-                    log.debug("Выбрано поле для редактирования: TITLE, userId={}", userId);
-                    message = "📝 Редактирование названия\n\nОтправьте новое название события:";
-                    // Создаем клавиатуру с кнопкой "Отмена" или "Назад"
-                    keyboard = createCancelOnlyKeyboard(eventId, userId);
-                }
-                case "description" -> {
-                    log.debug("Выбрано поле для редактирования: DESCRIPTION, userId={}", userId);
-                    message = "📄 Редактирование описания\n\nОтправьте новое описание события:";
-                    // Создаем клавиатуру с кнопкой "Отмена" или "Назад"
-                    keyboard = createCancelOnlyKeyboard(eventId, userId);
-                }
-                default -> {
-                    log.warn("Неизвестное поле для редактирования: field='{}', userId={}", field, userId);
-                    message = "❌ Неизвестное поле для редактирования";
-                }
-            }
-            
-            // Обновляем текущее сообщение вместо отправки нового
-            messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, CallbackMessages.EMPTY);
+            messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
+            callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
         } catch (TelegramApiException e) {
             log.error("Ошибка Telegram API при редактировании поля: userId={}, callbackData='{}', error={}", 
-                     userId, callbackData, e.getMessage(), e);
+                     userId, context.callbackData(), e.getMessage(), e);
+
             throw new RuntimeException("Ошибка при редактировании поля", e);
         }
     }
     
     /**
-     * Создает клавиатуру только с кнопкой "Отмена" или "Назад".
-     * 
-     * @param eventId идентификатор события для callback data
-     * @param userId идентификатор пользователя для проверки контекста
-     * @return клавиатура с кнопкой "Отмена" или "Назад"
+     * Обрабатывает некорректный формат callback data.
      */
-    private InlineKeyboardMarkup createCancelOnlyKeyboard(Long eventId, Long userId) {
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+    private void handleInvalidFormat(@NonNull CallbackQueryContext context) throws TelegramApiException {
+        messageService.editMessageText(context.chatId(), context.messageId(),
+                "❌ Произошла ошибка при обработке запроса", null);
+
+        callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
+    }
+    
+    /**
+     * Парсит ID события из строки.
+     */
+    private @Nullable Long parseEventId(String eventIdStr, @NonNull CallbackQueryContext context) {
+        try {
+            Long eventId = Long.parseLong(eventIdStr);
+            log.debug("Успешно извлечены данные: eventId={}, userId={}", eventId, context.getUserId());
+            return eventId;
+
+        } catch (NumberFormatException e) {
+            log.error("Некорректный eventId в callback data: eventId='{}', callbackData='{}', " +
+                     "userId={}, error={}", eventIdStr, context.callbackData(), context.getUserId(), e.getMessage());
+            try {
+                handleInvalidFormat(context);
+
+            } catch (TelegramApiException ex) {
+                log.error("Ошибка при отправке сообщения об ошибке: {}", ex.getMessage());
+            }
+            return null;
+        }
+    }
+    
+    /**
+     * Обновляет контекст редактирования.
+     */
+    private void updateEditingContext(Long userId,
+                                      Long eventId,
+                                      Long chatId,
+                                      Integer messageId,
+                                      String field) {
+
+        if (!conversationStateService.isEditingEvent(userId)) {
+            conversationStateService.startEventEditing(userId, eventId, chatId, messageId);
+        }
         
-        List<InlineKeyboardButton> row = new ArrayList<>();
-        InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-        
-        // Всегда показываем "Назад" для возврата к меню выбора поля
-        cancelButton.setText("🔙 Назад");
-        cancelButton.setCallbackData(CallbackPrefix.EDIT_BACK.withPayload(eventId.toString()));
-        
-        row.add(cancelButton);
-        keyboard.add(row);
-        
-        markup.setKeyboard(keyboard);
-        return markup;
+        EditField editField = mapToEditField(field);
+        if (editField != null) {
+            conversationStateService.setEditingField(userId, editField);
+            log.debug("Установлено состояние редактирования: userId={}, eventId={}, field={}, messageId={}", 
+                     userId, eventId, editField, messageId);
+        }
+    }
+    
+    /**
+     * Формирует сообщение для редактирования поля.
+     */
+    private @NonNull String buildMessageForField(@NonNull String field, User user) {
+        return switch (field) {
+            case "date" -> {
+                log.debug("Выбрано поле для редактирования: DATE, userId={}", user.getId());
+                yield "📅 Редактирование даты\n\nВыберите новую дату из календаря:";
+            }
+            case "time" -> {
+                log.debug("Выбрано поле для редактирования: TIME, userId={}", user.getId());
+                yield "🕐 Редактирование времени\n\nВыберите новое время:";
+            }
+            case "title" -> {
+                log.debug("Выбрано поле для редактирования: TITLE, userId={}", user.getId());
+                yield "📝 Редактирование названия\n\nОтправьте новое название события:";
+            }
+            case "description" -> {
+                log.debug("Выбрано поле для редактирования: DESCRIPTION, userId={}", user.getId());
+                yield "📄 Редактирование описания\n\nОтправьте новое описание события:";
+            }
+            default -> {
+                log.warn("Неизвестное поле для редактирования: field='{}', userId={}", field, user.getId());
+                yield "❌ Неизвестное поле для редактирования";
+            }
+        };
+    }
+    
+    /**
+     * Формирует клавиатуру для редактирования поля.
+     */
+    private @Nullable InlineKeyboardMarkup buildKeyboardForField(@NonNull String field,
+                                                                 User user,
+                                                                 Long eventId) {
+        return switch (field) {
+            case "date" -> {
+                LocalDate now = user.getCurrentDate();
+                yield keyboardService.createCalendarKeyboard(
+                    now.getYear(), 
+                    now.getMonthValue(), 
+                    user,
+                    eventId
+                );
+            }
+            case "time" -> {
+                Event event = eventService.getEventById(eventId);
+                LocalDate eventDate = event.getEventDate();
+                yield keyboardService.createFilteredHourSelectionKeyboard(eventDate, user, eventId);
+            }
+            case "title", "description" -> createCancelOnlyKeyboard(eventId);
+            default -> null;
+        };
+    }
+    
+    /**
+     * Создает клавиатуру только с кнопкой "Назад".
+     */
+    private @NonNull InlineKeyboardMarkup createCancelOnlyKeyboard(@NonNull Long eventId) {
+        InlineKeyboardButton button = keyboardFactory.createButton("🔙 Назад",
+                CallbackPrefix.EDIT_BACK.withPayload(eventId.toString()));
+
+        InlineKeyboardRow row = keyboardFactory.createRow(button);
+
+        return keyboardFactory.createMarkup(row);
     }
     
     /**
      * Преобразует строковое представление поля в EditField enum.
-     * 
-     * @param fieldName строковое имя поля (date, time, title, description)
-     * @return соответствующий EditField или null если поле неизвестно
      */
-    private ConversationStateService.EditField mapToEditField(String fieldName) {
+    private @Nullable EditField mapToEditField(@NonNull String fieldName) {
         return switch (fieldName) {
-            case "date" -> ConversationStateService.EditField.DATE;
-            case "time" -> ConversationStateService.EditField.TIME;
-            case "title" -> ConversationStateService.EditField.TITLE;
-            case "description" -> ConversationStateService.EditField.DESCRIPTION;
+            case "date" -> EditField.DATE;
+            case "time" -> EditField.TIME;
+            case "title" -> EditField.TITLE;
+            case "description" -> EditField.DESCRIPTION;
             default -> null;
         };
     }

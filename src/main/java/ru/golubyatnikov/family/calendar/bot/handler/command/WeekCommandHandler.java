@@ -2,16 +2,16 @@ package ru.golubyatnikov.family.calendar.bot.handler.command;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.meta.api.objects.Message;
-import ru.golubyatnikov.family.calendar.bot.model.Event;
-import ru.golubyatnikov.family.calendar.bot.model.User;
-import ru.golubyatnikov.family.calendar.bot.service.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.reminder.ReminderSchedulingService;
-import ru.golubyatnikov.family.calendar.bot.service.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.util.EventFormatter;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
+import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.domain.reminder.ReminderSchedulingService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.EventFormattingService;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -29,21 +29,23 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 @Slf4j
 public class WeekCommandHandler implements CommandHandler {
 
-    private static final DateTimeFormatter DATE_RANGE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final int WEEK_DAYS = 7;
     
     private final EventService eventService;
     private final ReminderSchedulingService reminderSchedulingService;
+    private final EventFormattingService eventFormattingService;
+    private final DateTimeFormattingService dateTimeFormattingService;
 
     /**
      * Обрабатывает команду /week.
      * 
      * @param message сообщение от пользователя с командой
      * @param user пользователь, отправивший команду
+     *
      * @return сообщение для отправки пользователю
      */
     @Override
-    public String handle(Message message, User user) {
+    public String handle(Message message, @NonNull User user) {
         log.debug("Обработка команды /week для пользователя ID={}, семья ID={}", 
                   user.getId(), user.getFamily().getId());
         
@@ -61,7 +63,7 @@ public class WeekCommandHandler implements CommandHandler {
                     filteredEvents.size(), user.getId());
             
             if (filteredEvents.isEmpty()) {
-                String responseMessage = EventFormatter.formatNoEventsMessage(
+                String responseMessage = eventFormattingService.formatNoEventsMessage(
                     "📆",
                     "События на неделю",
                     "На ближайшую неделю событий не запланировано."
@@ -80,43 +82,44 @@ public class WeekCommandHandler implements CommandHandler {
             // Заголовок команды
             LocalDate startDate = user.getCurrentDate();
             LocalDate endDate = startDate.plusDays(6);
-            String dateRange = startDate.format(DATE_RANGE_FORMATTER) + " - " + endDate.format(DATE_RANGE_FORMATTER);
-            messageBuilder.append(EventFormatter.formatCommandHeader("📆", "События на неделю", dateRange));
+            String dateRange = dateTimeFormattingService.formatDate(startDate) + " - " + dateTimeFormattingService.formatDate(endDate);
+            messageBuilder.append(eventFormattingService.formatCommandHeader("📆", "События на неделю", dateRange));
             messageBuilder.append(escape("\n\n"));
             
             // Сортировка дат и вывод событий по дням
             LocalDate today = user.getCurrentDate();
             boolean firstDay = true;
-            int displayedEventsCount = 0; // Счетчик отображенных событий
+            int displayedEventsCount = 0;
             
-            for (int i = 0; i < 7; i++) {
+            for (int i = 0; i < WEEK_DAYS; i++) {
                 LocalDate date = today.plusDays(i);
                 List<Event> dayEvents = eventsByDate.get(date);
                 
                 if (dayEvents != null && !dayEvents.isEmpty()) {
                     // Добавляем разделитель перед каждым днем, кроме первого
                     if (!firstDay) {
-                        messageBuilder.append(EventFormatter.formatDaySeparator());
-                        messageBuilder.append(escape("\n\n")); // Пустая строка ПОСЛЕ разделителя
+                        messageBuilder.append(eventFormattingService.formatDaySeparator());
+                        messageBuilder.append(escape("\n\n"));
                     }
                     firstDay = false;
                     
-                    messageBuilder.append(EventFormatter.formatDayHeader(date, today));
+                    messageBuilder.append(eventFormattingService.formatDayHeader(date, today));
                     
                     for (Event event : dayEvents) {
                         boolean hasReminders = reminderSchedulingService.hasActiveReminders(event.getId());
-                        messageBuilder.append(EventFormatter.formatEvent(event, user, hasReminders));
-                        displayedEventsCount++; // Увеличиваем счетчик отображенных событий
+                        messageBuilder.append(eventFormattingService.formatEvent(event, user, hasReminders));
+                        displayedEventsCount++;
                     }
                 }
             }
             
             // Добавляем счетчик только отображенных событий
-            messageBuilder.append(EventFormatter.formatEventCounter(displayedEventsCount));
+            messageBuilder.append(eventFormattingService.formatEventCounter(displayedEventsCount));
             
             String responseMessage = messageBuilder.toString();
             log.debug("Пользователю ID={} будет отправлен список из {} событий на неделю", 
                      user.getId(), filteredEvents.size());
+
             return responseMessage;
             
         } catch (Exception e) {
