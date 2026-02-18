@@ -9,6 +9,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import ru.golubyatnikov.family.calendar.bot.model.entity.Attachment;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -248,9 +249,10 @@ public class InlineKeyboardService {
                                                                    User user) {
         List<InlineKeyboardRow> rows = new ArrayList<>();
         
-        // Проверяем, есть ли у пользователя свои события на эту дату
-        boolean hasOwnEvents = events.stream()
-            .anyMatch(event -> event.getUser().getId().equals(user.getId()));
+        // Проверяем, есть ли у пользователя активные события на эту дату
+        boolean hasActiveOwnEvents = events.stream()
+            .filter(event -> event.getUser().getId().equals(user.getId()))
+            .anyMatch(event -> event.getStatus() == EventStatus.ACTIVE);
         
         // Первый ряд: Добавить | Просмотреть
         rows.add(keyboardFactory.createRow(
@@ -258,8 +260,8 @@ public class InlineKeyboardService {
             keyboardFactory.createButton("👁 Просмотреть", "view_events_on_date_" + date)
         ));
         
-        // Второй ряд: Редактировать | Удалить (только если есть свои события)
-        if (hasOwnEvents) {
+        // Второй ряд: Редактировать | Удалить (только если есть активные события)
+        if (hasActiveOwnEvents) {
             rows.add(keyboardFactory.createRow(
                 keyboardFactory.createButton("✏️ Редактировать", "edit_my_events_on_date_" + date),
                 keyboardFactory.createButton("🗑 Удалить", "delete_my_events_on_date_" + date)
