@@ -46,7 +46,10 @@ public class EventHeaderContextManager {
                     .orElseGet(() -> {
                         User user = userRepository.findById(userId)
                                 .orElseThrow(() -> new IllegalArgumentException("Пользователь с ID=" + userId + " не найден"));
-                        return ConversationState.builder().user(user).build();
+
+                        return ConversationState.builder()
+                                .user(user)
+                                .build();
                     });
             
             // Сохраняем контекст шапки
@@ -54,7 +57,7 @@ public class EventHeaderContextManager {
             state.setEventCountForHeader(eventCount);
             conversationStateRepository.save(state);
             
-            } catch (Exception e) {
+        } catch (Exception e) {
             log.error("Ошибка при сохранении контекста шапки: userId={}, error={}", userId, e.getMessage(), e);
             throw e;
         }
@@ -76,15 +79,10 @@ public class EventHeaderContextManager {
         
         return conversationStateRepository.findByUserId(userId)
                 .filter(ConversationState::hasEventHeaderContext)
-                .map(state -> {
-                    EventHeaderContext context = new EventHeaderContext(
-                            state.getEventHasMyEventsHeader(),
-                            state.getEventCountForHeader()
-                    );
-                    return context;
-                })
-                .orElseGet(() -> {
-                    return null;
-                });
+                .map(state -> new EventHeaderContext(
+                        state.getEventHasMyEventsHeader(),
+                        state.getEventCountForHeader()
+                ))
+                .orElse(null);
     }
 }

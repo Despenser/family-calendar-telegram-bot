@@ -48,17 +48,11 @@ public class TelegramApiService {
         
         try {
             telegramClient.execute(answer);
-            } catch (TelegramApiRequestException e) {
-            // Проверяем, не устарел ли callback query
-            if (e.getMessage() != null && e.getMessage().contains("query is too old")) {
-                return;
-            }
-
-            throw e;
             
         } catch (TelegramApiException e) {
-            log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}", 
+            log.error("Ошибка при ответе на callback query: callbackQueryId={}, error={}",
                     callbackQueryId, e.getMessage());
+
             throw e;
         }
     }
@@ -100,12 +94,11 @@ public class TelegramApiService {
         
         try {
             telegramClient.execute(editMessage);
-            } catch (TelegramApiRequestException e) {
-            throw e;
-            
+
         } catch (TelegramApiException e) {
             log.error("Ошибка при редактировании сообщения: chatId={}, messageId={}, error={}", 
                     chatId, messageId, e.getMessage());
+
             throw e;
         }
     }
@@ -181,21 +174,20 @@ public class TelegramApiService {
             
             log.error("Ошибка при удалении сообщения: chatId={}, messageId={}, error={}", 
                     chatId, messageId, e.getMessage());
+
             throw e;
             
         } catch (TelegramApiException e) {
             log.error("Сетевая ошибка при удалении сообщения: chatId={}, messageId={}, error={}", 
                     chatId, messageId, e.getMessage());
+
             throw e;
         }
     }
 
     /**
      * Удаляет сообщение без выброса исключений (silent mode).
-     * 
-     * <p>Этот метод используется, когда удаление сообщения желательно, но не критично.
-     * Все ошибки логируются, но не пробрасываются дальше.</p>
-     * 
+     *
      * @param chatId ID чата
      * @param messageId ID сообщения для удаления
      */
@@ -210,7 +202,8 @@ public class TelegramApiService {
         
         try {
             deleteMessage(chatId, messageId);
-            } catch (TelegramApiException e) {
+
+        } catch (TelegramApiException e) {
             log.warn("Не удалось удалить сообщение (silent mode): chatId={}, messageId={}, error={}", 
                     chatId, messageId, e.getMessage());
         }

@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.golubyatnikov.family.calendar.bot.model.enums.EditField;
 import ru.golubyatnikov.family.calendar.bot.model.context.EditingContext;
-
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,8 +38,7 @@ public class EditingContextManager {
     public void startEventEditing(Long userId, Long eventId, Long chatId, Integer messageId) {
         EditingContext context = new EditingContext(eventId, chatId, null, messageId, null);
         usersEditingEvents.put(userId, context);
-
-        }
+    }
     
     /**
      * Начинает процесс редактирования события для пользователя из календаря.
@@ -60,7 +58,7 @@ public class EditingContextManager {
         EditingContext context = new EditingContext(eventId, chatId, null, messageId, sourceDate);
         usersEditingEvents.put(userId, context);
 
-        }
+    }
     
     /**
      * Проверяет, редактирует ли пользователь событие в данный момент.
@@ -83,17 +81,6 @@ public class EditingContextManager {
     }
     
     /**
-     * Получает messageId для текущего редактирования.
-     * 
-     * @param userId идентификатор пользователя
-     * @return messageId или null, если пользователь не редактирует событие
-     */
-    public Integer getEditingMessageId(Long userId) {
-        EditingContext context = usersEditingEvents.get(userId);
-        return context != null ? context.getMessageId() : null;
-    }
-    
-    /**
      * Устанавливает текущее редактируемое поле для пользователя.
      * 
      * @param userId идентификатор пользователя
@@ -103,7 +90,7 @@ public class EditingContextManager {
         EditingContext context = usersEditingEvents.get(userId);
         if (context != null) {
             context.setCurrentField(field);
-            }
+        }
     }
     
     /**
@@ -113,5 +100,5 @@ public class EditingContextManager {
      */
     public void clearEventEditing(Long userId) {
         usersEditingEvents.remove(userId);
-        }
+    }
 }

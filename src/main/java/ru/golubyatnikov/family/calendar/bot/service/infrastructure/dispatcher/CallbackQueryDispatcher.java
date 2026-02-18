@@ -68,7 +68,8 @@ public class CallbackQueryDispatcher {
         if (handler.isPresent()) {
             try {
                 handler.get().handle(callbackQuery, user);
-                } catch (Exception e) {
+
+            } catch (Exception e) {
                 log.error("Ошибка при обработке callback query: data='{}', telegramId={}, handler={}, error={}, stackTrace={}", 
                         callbackData, telegramId, handler.get().getClass().getSimpleName(), 
                         e.getMessage(), TelegramExceptionUtil.getStackTraceString(e), e);

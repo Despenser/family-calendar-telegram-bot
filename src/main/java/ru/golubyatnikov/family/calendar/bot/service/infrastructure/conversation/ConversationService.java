@@ -46,11 +46,6 @@ public class ConversationService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException(userId));
         
-        // Удаляем предыдущие незавершенные черновики пользователя
-        int deletedCount = cancelPendingDrafts(userId);
-        if (deletedCount > 0) {
-            }
-        
         // Создаем новый черновик
         Event draft = Event.builder()
             .user(user)
@@ -58,9 +53,8 @@ public class ConversationService {
             .status(EventStatus.DRAFT)
             .notified(false)
             .build();
-        
-        Event savedDraft = eventRepository.save(draft);
-        return savedDraft;
+
+        return eventRepository.save(draft);
     }
     
     /**
@@ -68,30 +62,27 @@ public class ConversationService {
      *
      * @param userId идентификатор пользователя
      * @param isPersonal true для персонального события, false для семейного
+     *
      * @throws IllegalStateException если активный черновик не найден
      */
     public void updateEventType(Long userId, boolean isPersonal) {
         Event draft = getActiveDraft(userId);
         draft.setIsPersonal(isPersonal);
-
         eventRepository.save(draft);
-        }
+    }
     
     /**
      * Обновляет дату в черновике события.
-     * 
+     *
      * @param userId идентификатор пользователя
      * @param date выбранная дата события
      *
-     * @return обновленный черновик
      * @throws IllegalStateException если активный черновик не найден
      */
-    public Event updateEventDate(Long userId, LocalDate date) {
+    public void updateEventDate(Long userId, LocalDate date) {
         Event draft = getActiveDraft(userId);
         draft.setEventDate(date);
-        
-        Event updated = eventRepository.save(draft);
-        return updated;
+        eventRepository.save(draft);
     }
     
     /**
@@ -106,26 +97,21 @@ public class ConversationService {
     public Event updateEventTime(Long userId, LocalTime time) {
         Event draft = getActiveDraft(userId);
         draft.setEventTime(time);
-        
-        Event updated = eventRepository.save(draft);
-        return updated;
+        return eventRepository.save(draft);
     }
     
     /**
      * Обновляет название в черновике события.
-     * 
-     * @param userId идентификатор пользователя
-     * @param title название события
      *
-     * @return обновленный черновик
+     * @param userId идентификатор пользователя
+     * @param title  название события
+     *
      * @throws IllegalStateException если активный черновик не найден
      */
-    public Event updateEventTitle(Long userId, String title) {
+    public void updateEventTitle(Long userId, String title) {
         Event draft = getActiveDraft(userId);
         draft.setTitle(title);
-        
-        Event updated = eventRepository.save(draft);
-        return updated;
+        eventRepository.save(draft);
     }
     
     /**
@@ -141,9 +127,8 @@ public class ConversationService {
     public void setCreationMessageId(Long userId, Long messageId) {
         Event draft = getActiveDraft(userId);
         draft.setMessageId(messageId);
-        
         eventRepository.save(draft);
-        }
+    }
     
     /**
      * Завершает создание события, обновляя описание и меняя статус на ACTIVE.
@@ -162,6 +147,7 @@ public class ConversationService {
         draft.setStatus(EventStatus.ACTIVE);
         
         Event completed = eventRepository.save(draft);
+
         // Автоматически создаем напоминания по умолчанию
         eventService.handleEventCreated(completed, draft.getUser());
         
@@ -174,17 +160,12 @@ public class ConversationService {
      * @param userId идентификатор пользователя
      */
     @Transactional
-
     public void cancelEventCreation(Long userId) {
         try {
-            int deletedCount = cancelPendingDrafts(userId);
-            
-            if (deletedCount > 0) {
-                } else {
-                }
+            cancelPendingDrafts(userId);
+
         } catch (Exception e) {
-            log.error("Ошибка при отмене создания события для пользователя {}: {}", 
-                userId, e.getMessage(), e);
+            log.error("Ошибка при отмене создания события для пользователя {}: {}", userId, e.getMessage(), e);
         }
     }
     
@@ -208,7 +189,6 @@ public class ConversationService {
      * @return true, если есть активный черновик, иначе false
      */
     @Transactional(readOnly = true)
-
     public boolean hasActiveDraft(Long userId) {
         return eventRepository.findByUserIdAndStatus(userId, EventStatus.DRAFT)
             .isPresent();
@@ -239,19 +219,13 @@ public class ConversationService {
     /**
      * Удаляет все незавершенные черновики пользователя.
      * Вызывается перед созданием нового черновика или при отмене диалога.
-     * 
+     *
      * @param userId идентификатор пользователя
-     * @return количество удаленных черновиков
      */
-    private int cancelPendingDrafts(Long userId) {
-        List<Event> drafts = eventRepository.findAllByUserIdAndStatus(
-            userId, EventStatus.DRAFT);
-        
+    private void cancelPendingDrafts(Long userId) {
+        List<Event> drafts = eventRepository.findAllByUserIdAndStatus(userId, EventStatus.DRAFT);
         if (!drafts.isEmpty()) {
             eventRepository.deleteAll(drafts);
-            return drafts.size();
         }
-        
-        return 0;
     }
 }

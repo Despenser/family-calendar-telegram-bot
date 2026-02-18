@@ -48,7 +48,7 @@ public class AttachmentContextManager {
     public void setAwaitingFile(Long userId, Long eventId, Long chatId, Integer messageId) {
         AwaitingFileContext context = new AwaitingFileContext(eventId, chatId, messageId);
         usersAwaitingFile.put(userId, context);
-        }
+    }
     
     /**
      * Проверяет, ожидает ли пользователь загрузки файла.
@@ -142,8 +142,7 @@ public class AttachmentContextManager {
                     if (state.hasAttachmentMessageContext()) {
                         state.clearAttachmentMessageContext();
                         conversationStateRepository.save(state);
-                        } else {
-                        }
+                    }
                 });
     }
 }

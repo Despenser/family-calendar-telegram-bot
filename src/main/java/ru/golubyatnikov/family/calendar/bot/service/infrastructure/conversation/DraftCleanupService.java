@@ -48,27 +48,20 @@ public class DraftCleanupService {
         if (event == null) {
             return false;
         }
-        
-        boolean isOrphaned = event.getStatus() == EventStatus.DRAFT
+
+        return event.getStatus() == EventStatus.DRAFT
             && event.getTitle() == null
             && event.getEventDate() == null
             && event.getEventTime() == null;
-        
-        if (isOrphaned) {
-            }
-        
-        return isOrphaned;
     }
     
     /**
      * Удаляет осиротевшие черновики старше указанного возраста.
      *
      * @param age минимальный возраст черновика для удаления
-     *
-     * @return количество удаленных черновиков
      * @throws IllegalArgumentException если age отрицательный или null
      */
-    public int cleanupOrphanedDrafts(Duration age) {
+    public void cleanupOrphanedDrafts(Duration age) {
         if (age == null || age.isNegative()) {
             throw new IllegalArgumentException("Возраст черновика должен быть положительным");
         }
@@ -87,7 +80,6 @@ public class DraftCleanupService {
             .toList();
         
         // Удаляем каждый осиротевший черновик
-        int deletedCount = 0;
         for (Event draft : orphanedDrafts) {
             try {
                 Long draftId = draft.getId();
@@ -95,8 +87,7 @@ public class DraftCleanupService {
                 LocalDateTime createdAt = draft.getCreatedAt();
                 
                 eventRepository.delete(draft);
-                deletedCount++;
-                
+
                 log.info("Удален осиротевший черновик: ID={}, userId={}, createdAt={}, age={}", 
                          draftId, userId, createdAt, Duration.between(createdAt, LocalDateTime.now()));
 
@@ -104,10 +95,10 @@ public class DraftCleanupService {
                 log.error("Ошибка при удалении осиротевшего черновика ID={}: {}", draft.getId(), e.getMessage(), e);
             }
         }
-        
-        return deletedCount;
+
     }
-    
+
+    //TODO cron должны быть в scheduler
     /**
      * Выполняет периодическую очистку осиротевших черновиков.
      */
@@ -119,8 +110,9 @@ public class DraftCleanupService {
         
         try {
             Duration threshold = Duration.ofHours(periodicThresholdHours);
-            int deletedCount = cleanupOrphanedDrafts(threshold);
-            } catch (Exception e) {
+            cleanupOrphanedDrafts(threshold);
+
+        } catch (Exception e) {
             log.error("Ошибка при выполнении периодической очистки черновиков: {}", e.getMessage(), e);
         }
     }
@@ -136,8 +128,9 @@ public class DraftCleanupService {
         
         try {
             Duration threshold = Duration.ofHours(startupThresholdHours);
-            int deletedCount = cleanupOrphanedDrafts(threshold);
-            } catch (Exception e) {
+            cleanupOrphanedDrafts(threshold);
+
+        } catch (Exception e) {
             log.error("Ошибка при очистке черновиков при запуске: {}", e.getMessage(), e);
         }
     }

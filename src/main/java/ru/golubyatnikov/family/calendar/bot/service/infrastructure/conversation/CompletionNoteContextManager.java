@@ -36,7 +36,7 @@ public class CompletionNoteContextManager {
     public void setAwaitingCompletionNote(Long userId, Long eventId, Long chatId, Integer messageId) {
         CompletionNoteContext context = new CompletionNoteContext(eventId, chatId, messageId);
         usersAwaitingCompletionNote.put(userId, context);
-        }
+    }
     
     /**
      * Проверяет, ожидает ли пользователь ввода заметки к завершенному событию.

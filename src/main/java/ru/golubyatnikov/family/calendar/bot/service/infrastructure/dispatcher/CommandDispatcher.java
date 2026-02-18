@@ -1,6 +1,7 @@
 package ru.golubyatnikov.family.calendar.bot.service.infrastructure.dispatcher;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
@@ -36,24 +37,20 @@ public class CommandDispatcher {
      *
      * @throws IllegalArgumentException если список обработчиков пуст
      */
-    public CommandDispatcher(List<CommandHandler> handlers, UserService userService) {
+    public CommandDispatcher(@NonNull List<CommandHandler> handlers, UserService userService) {
         this.userService = userService;
         this.commandHandlers = new HashMap<>();
-        
-        if (handlers == null || handlers.isEmpty()) {
-        } else {
-            handlers.forEach(handler -> {
-                String command = handler.getCommand();
-                if (commandHandlers.containsKey(command)) {
-                    log.warn("Обнаружен дубликат обработчика для команды '{}'. " + "Предыдущий обработчик будет заменен: {} -> {}",
-                            command,
-                            commandHandlers.get(command).getClass().getSimpleName(),
-                            handler.getClass().getSimpleName());
-                }
-                commandHandlers.put(command, handler);
-                });
-            
+
+        handlers.forEach(handler -> {
+            String command = handler.getCommand();
+            if (commandHandlers.containsKey(command)) {
+                log.warn("Обнаружен дубликат обработчика для команды '{}'. " + "Предыдущий обработчик будет заменен: {} -> {}",
+                        command,
+                        commandHandlers.get(command).getClass().getSimpleName(),
+                        handler.getClass().getSimpleName());
             }
+            commandHandlers.put(command, handler);
+        });
     }
 
     /**
@@ -114,17 +111,11 @@ public class CommandDispatcher {
                                 "Пожалуйста, используйте 🚀 /start для регистрации.", command));
             }
             
-            } else {
-            if (user != null) {
-                } else {
-                }
         }
         
         // Делегируем обработку команды
         try {
-            String response = handler.handle(message, user);
-            
-            return response;
+            return handler.handle(message, user);
             
         } catch (Exception e) {
             log.error("Ошибка при обработке команды '{}': telegramId={}, handler={}, error={}", 

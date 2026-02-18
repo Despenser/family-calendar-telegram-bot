@@ -9,7 +9,6 @@ import ru.golubyatnikov.family.calendar.bot.model.context.SearchQueryContext;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.repository.ConversationStateRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -101,16 +100,8 @@ public class SearchContextManager {
         
         return conversationStateRepository.findByUserId(userId)
                 .filter(ConversationState::hasSearchContext)
-                .map(state -> {
-                    SearchQueryContext context = new SearchQueryContext(
-                            state.getSearchChatId(),
-                            state.getSearchMessageId()
-                    );
-                    return context;
-                })
-                .orElseGet(() -> {
-                    return null;
-                });
+                .map(state -> new SearchQueryContext(state.getSearchChatId(), state.getSearchMessageId()))
+                .orElse(null);
     }
     
     /**
@@ -133,9 +124,7 @@ public class SearchContextManager {
                     if (state.hasSearchContext()) {
                         state.clearSearchContext();
                         conversationStateRepository.save(state);
-                        } else {
-                        }
+                    }
                 });
-        
-        }
+    }
 }
