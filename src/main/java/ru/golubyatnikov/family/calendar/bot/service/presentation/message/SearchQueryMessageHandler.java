@@ -44,9 +44,6 @@ public class SearchQueryMessageHandler {
             Long userId = user.getId();
             Long telegramId = user.getTelegramId();
             
-            log.debug("Обработка поискового запроса от пользователя: userId={}, telegramId={}", 
-                    userId, telegramId);
-
             searchCommandHandler.performSearch(chatId, user, query, messageId);
             
         } catch (Exception e) {

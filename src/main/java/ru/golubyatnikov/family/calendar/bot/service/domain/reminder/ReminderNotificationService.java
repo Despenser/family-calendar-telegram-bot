@@ -13,8 +13,6 @@ import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Reminder;
 import ru.golubyatnikov.family.calendar.bot.repository.ReminderRepository;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.ReminderMessageFormattingService;
-
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -48,19 +46,13 @@ public class ReminderNotificationService {
         LocalDateTime nowUTC = LocalDateTime.now(UTC);
         LocalDateTime windowStart = nowUTC.minusHours(REMINDER_WINDOW_HOURS);
         
-        log.debug("Запуск отправки напоминаний: nowUTC={}, windowStart={}", nowUTC, windowStart);
-        
         List<Reminder> reminders = findRemindersToSend(nowUTC, windowStart);
         
         if (reminders.isEmpty()) {
-            log.debug("Нет напоминаний для отправки в окне [{}, {}] UTC", windowStart, nowUTC);
             return;
         }
         
-        log.info("Найдено {} напоминаний для проверки", reminders.size());
-        
-        SendingStatistics stats = processReminders(reminders, nowUTC);
-        logStatistics(stats, nowUTC);
+        processReminders(reminders, nowUTC);
     }
     
     /**
@@ -105,35 +97,25 @@ public class ReminderNotificationService {
         );
     }
     
-    private @NonNull SendingStatistics processReminders(@NonNull List<Reminder> reminders,
-                                                        LocalDateTime nowUTC) {
-
-        SendingStatistics stats = new SendingStatistics();
-        reminders.forEach(reminder -> processReminder(reminder, nowUTC, stats));
-        return stats;
+    private void processReminders(@NonNull List<Reminder> reminders, LocalDateTime nowUTC) {
+        reminders.forEach(reminder -> processReminder(reminder, nowUTC));
     }
     
-    private void processReminder(Reminder reminder, LocalDateTime nowUTC, SendingStatistics stats) {
+    private void processReminder(Reminder reminder, LocalDateTime nowUTC) {
         try {
             Reminder lockedReminder = acquireLock(reminder.getId());
             
             if (lockedReminder == null || Boolean.TRUE.equals(lockedReminder.getSent())) {
-                stats.incrementSkipped();
                 return;
             }
             
             if (!reminderValidator.shouldSendReminder(lockedReminder, nowUTC)) {
-                stats.incrementSkipped();
                 return;
             }
             
-            sendReminderWithRetry(lockedReminder, nowUTC, stats);
-            
-        } catch (PessimisticLockingFailureException e) {
-            stats.incrementLockFailures();
+            sendReminderWithRetry(lockedReminder, nowUTC);
 
         } catch (Exception e) {
-            stats.incrementFailed();
             log.error("Ошибка обработки напоминания ID {}: {}", reminder.getId(), e.getMessage(), e);
         }
     }
@@ -148,30 +130,14 @@ public class ReminderNotificationService {
         }
     }
     
-    private void sendReminderWithRetry(Reminder reminder, LocalDateTime nowUTC, SendingStatistics stats) {
-        boolean isRecovery = isRecoveryReminder(reminder, nowUTC);
-        
-        if (isRecovery) {
-            stats.incrementRecovered();
-            logRecovery(reminder, nowUTC);
-        }
-        
+    private void sendReminderWithRetry(Reminder reminder, LocalDateTime nowUTC) {
         try {
             reminderSender.sendNotification(reminder);
             markAsSent(reminder, nowUTC);
-            stats.incrementSent();
-            
-            logSuccess(reminder, nowUTC, isRecovery);
             
         } catch (TelegramApiException e) {
-            handleSendFailure(reminder, nowUTC, stats, e);
+            handleSendFailure(reminder, nowUTC);
         }
-    }
-    
-    private boolean isRecoveryReminder(@NonNull Reminder reminder,
-                                       @NonNull LocalDateTime nowUTC) {
-
-        return reminder.getReminderTime().isBefore(nowUTC.minusMinutes(2));
     }
     
     private void markAsSent(@NonNull Reminder reminder, LocalDateTime nowUTC) {
@@ -181,72 +147,13 @@ public class ReminderNotificationService {
     }
     
     private void handleSendFailure(@NonNull Reminder reminder,
-                                   @NonNull LocalDateTime nowUTC,
-                                   SendingStatistics stats,
-                                   TelegramApiException e) {
+                                   @NonNull LocalDateTime nowUTC) {
 
-        log.error("Ошибка отправки напоминания ID {}: {}", reminder.getId(), e.getMessage(), e);
-        
         LocalDateTime threshold = nowUTC.minusHours(OLD_REMINDER_THRESHOLD_HOURS);
         
         if (reminder.getReminderTime().isBefore(threshold)) {
             markAsSent(reminder, nowUTC);
-            stats.incrementMarkedAsOld();
-            log.warn("Напоминание ID {} старше {} часа, отмечено как sent", 
-                    reminder.getId(), OLD_REMINDER_THRESHOLD_HOURS);
-
-        } else {
-            stats.incrementFailed();
-        }
-    }
-    
-    private void logRecovery(@NonNull Reminder reminder, LocalDateTime nowUTC) {
-        long delayMinutes = Duration.between(reminder.getReminderTime(), nowUTC).toMinutes();
-        log.warn("Восстановление пропущенного напоминания: id={}, eventId={}, delayMinutes={}", 
-                reminder.getId(), reminder.getEvent().getId(), delayMinutes);
-    }
-    
-    private void logSuccess(Reminder reminder, LocalDateTime nowUTC, boolean isRecovery) {
-        if (isRecovery) {
-            long delayMinutes = Duration.between(reminder.getReminderTime(), nowUTC).toMinutes();
-            log.info("Восстановленное напоминание отправлено: id={}, eventId={}, delayMinutes={}", 
-                    reminder.getId(), reminder.getEvent().getId(), delayMinutes);
-        } else {
-            log.info("Напоминание отправлено: id={}, eventId={}, type={}", 
-                    reminder.getId(), reminder.getEvent().getId(), reminder.getReminderType());
-        }
-    }
-    
-    private void logStatistics(@NonNull SendingStatistics stats, LocalDateTime nowUTC) {
-        if (stats.hasRecoveryOrOld()) {
-            log.info("Отправка завершена: успешно={}, ошибок={}, пропущено={}, блокировок={}, " +
-                    "восстановлено={}, отмечено старыми={}, nowUTC={}", 
-                    stats.sent, stats.failed, stats.skipped, stats.lockFailures, 
-                    stats.recovered, stats.markedAsOld, nowUTC);
-        } else {
-            log.info("Отправка завершена: успешно={}, ошибок={}, пропущено={}, блокировок={}, nowUTC={}", 
-                    stats.sent, stats.failed, stats.skipped, stats.lockFailures, nowUTC);
-        }
-    }
-
-    //TODO видимо надо вынести в model
-    private static class SendingStatistics {
-        private int sent = 0;
-        private int failed = 0;
-        private int skipped = 0;
-        private int lockFailures = 0;
-        private int recovered = 0;
-        private int markedAsOld = 0;
-        
-        void incrementSent() { sent++; }
-        void incrementFailed() { failed++; }
-        void incrementSkipped() { skipped++; }
-        void incrementLockFailures() { lockFailures++; }
-        void incrementRecovered() { recovered++; }
-        void incrementMarkedAsOld() { markedAsOld++; }
-        
-        boolean hasRecoveryOrOld() {
-            return recovered > 0 || markedAsOld > 0;
+            log.warn("Напоминание ID {} старше {} часа, отмечено как sent", reminder.getId(), OLD_REMINDER_THRESHOLD_HOURS);
         }
     }
 }

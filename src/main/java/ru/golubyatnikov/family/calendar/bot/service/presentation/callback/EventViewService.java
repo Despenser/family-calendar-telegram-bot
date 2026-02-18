@@ -90,14 +90,11 @@ public class EventViewService {
         try {
             if (!conversationService.hasActiveDraft(user.getId())) {
                 conversationService.startEventCreation(user.getId());
-                log.info("Создан черновик события для пользователя {} при выборе даты в календаре", user.getId());
-            }
+                }
             
             showTimeSelectionForDate(selectedDate, user, chatId, messageId, callbackQueryId);
             
-            log.info("Пользователь {} выбрал дату {} для создания события", user.getId(), selectedDate);
-
-        } catch (Exception e) {
+            } catch (Exception e) {
             log.error("Ошибка при создании события на дату: userId={}, error={}", user.getId(), e.getMessage());
             throw new RuntimeException("Ошибка при создании события на дату", e);
         }
@@ -158,10 +155,7 @@ public class EventViewService {
         try {
             Event originalEvent = eventService.getEventById(eventId);
             
-            log.info("Пользователь {} начал повторение события ID={}", user.getId(), eventId);
-            
             if (!hasAccessToEvent(originalEvent, user)) {
-                log.warn("Попытка повторить чужое событие: userId={}, eventId={}", user.getId(), eventId);
                 messageService.answerCallbackQuery(callbackQueryId, "У вас нет доступа к этому событию");
                 return;
             }
@@ -171,9 +165,6 @@ public class EventViewService {
             
             copyEventData(draft, originalEvent);
             eventRepository.save(draft);
-            
-            log.debug("Создан черновик для повторения события: draftId={}, originalEventId={}", 
-                     draft.getId(), eventId);
             
             showDateSelectionForRepeat(originalEvent, user, chatId, messageId, callbackQueryId);
             
@@ -262,10 +253,7 @@ public class EventViewService {
             messageService.editMessageText(chatId, messageId, message, keyboard);
             messageService.answerCallbackQuery(callbackQueryId, "Данные скопированы. Выберите новую дату");
             
-            log.info("Пользователь {} начал выбор новой даты для повторения события ID={}", 
-                    user.getId(), originalEvent.getId());
-
-        } catch (TelegramApiException e) {
+            } catch (TelegramApiException e) {
             log.error("Ошибка при показе выбора даты для повторения: userId={}, error={}", 
                      user.getId(), e.getMessage());
 

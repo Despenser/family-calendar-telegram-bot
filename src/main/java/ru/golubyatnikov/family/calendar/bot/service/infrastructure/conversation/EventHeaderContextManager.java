@@ -41,9 +41,6 @@ public class EventHeaderContextManager {
         }
         
         try {
-            log.debug("Сохранение контекста шапки для пользователя ID={}: hasMyEventsHeader={}, eventCount={}", 
-                    userId, hasMyEventsHeader, eventCount);
-            
             // Получаем или создаем состояние диалога
             ConversationState state = conversationStateRepository.findByUserId(userId)
                     .orElseGet(() -> {
@@ -57,10 +54,7 @@ public class EventHeaderContextManager {
             state.setEventCountForHeader(eventCount);
             conversationStateRepository.save(state);
             
-            log.info("Сохранен контекст шапки для пользователя ID={}: hasMyEventsHeader={}, eventCount={}", 
-                    userId, hasMyEventsHeader, eventCount);
-
-        } catch (Exception e) {
+            } catch (Exception e) {
             log.error("Ошибка при сохранении контекста шапки: userId={}, error={}", userId, e.getMessage(), e);
             throw e;
         }
@@ -80,8 +74,6 @@ public class EventHeaderContextManager {
             throw new IllegalArgumentException("userId не может быть null");
         }
         
-        log.debug("Получение контекста шапки для пользователя ID={}", userId);
-        
         return conversationStateRepository.findByUserId(userId)
                 .filter(ConversationState::hasEventHeaderContext)
                 .map(state -> {
@@ -89,12 +81,9 @@ public class EventHeaderContextManager {
                             state.getEventHasMyEventsHeader(),
                             state.getEventCountForHeader()
                     );
-                    log.debug("Найден контекст шапки для пользователя ID={}: hasMyEventsHeader={}, eventCount={}", 
-                            userId, context.isHasMyEventsHeader(), context.getEventCount());
                     return context;
                 })
                 .orElseGet(() -> {
-                    log.debug("Контекст шапки не найден для пользователя ID={}", userId);
                     return null;
                 });
     }

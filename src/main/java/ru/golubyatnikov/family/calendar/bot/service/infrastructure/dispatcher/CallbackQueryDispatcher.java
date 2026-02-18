@@ -40,19 +40,14 @@ public class CallbackQueryDispatcher {
      */
     public void dispatch(CallbackQuery callbackQuery) {
         if (callbackQuery == null) {
-            log.warn("Получен null callback query");
             return;
         }
         
         String callbackData = callbackQuery.getData();
         Long telegramId = callbackQuery.getFrom().getId();
         
-        log.info("Диспетчеризация callback query: data='{}', telegramId={}", 
-                callbackData, telegramId);
-        
         // Игнорируем неактивные кнопки
         if (isIgnoredCallback(callbackData)) {
-            log.debug("Игнорируемый callback: data='{}'", callbackData);
             answerCallbackQuerySafely(callbackQuery.getId(), "");
             return;
         }
@@ -71,15 +66,9 @@ public class CallbackQueryDispatcher {
         Optional<CallbackHandler> handler = findHandler(callbackData);
         
         if (handler.isPresent()) {
-            log.debug("Найден handler для callback: data='{}', handler={}", 
-                    callbackData, handler.get().getClass().getSimpleName());
-            
             try {
                 handler.get().handle(callbackQuery, user);
-                log.info("Callback query успешно обработан: data='{}', handler={}", 
-                        callbackData, handler.get().getClass().getSimpleName());
-
-            } catch (Exception e) {
+                } catch (Exception e) {
                 log.error("Ошибка при обработке callback query: data='{}', telegramId={}, handler={}, error={}, stackTrace={}", 
                         callbackData, telegramId, handler.get().getClass().getSimpleName(), 
                         e.getMessage(), TelegramExceptionUtil.getStackTraceString(e), e);
@@ -102,7 +91,6 @@ public class CallbackQueryDispatcher {
         
         // Проверяем FilterCallbackHandler первым для callback с префиксом "filter_"
         if (callbackData.startsWith("filter_") && filterCallbackHandler.canHandle(callbackData)) {
-            log.debug("Callback с префиксом 'filter_' направлен в FilterCallbackHandler: data='{}'", callbackData);
             return Optional.of(filterCallbackHandler);
         }
         

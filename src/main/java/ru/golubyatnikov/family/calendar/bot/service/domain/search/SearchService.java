@@ -36,19 +36,11 @@ public class SearchService {
      * @throws IllegalArgumentException если поисковый запрос пустой
      */
     public List<Event> searchEvents(Long familyId, Long userId, String searchQuery) {
-        log.debug("Поиск событий для семьи ID {} и пользователя ID {}: query='{}'", familyId, userId, searchQuery);
-        
         if (searchQuery == null || searchQuery.isBlank()) {
-            log.error("Попытка поиска с пустым запросом для пользователя ID {}", userId);
             throw new IllegalArgumentException("Поисковый запрос не может быть пустым");
         }
         
         String trimmedQuery = searchQuery.trim();
-        List<Event> results = eventRepository.searchByTitleOrDescription(familyId, userId, trimmedQuery);
-        
-        log.info("Поиск событий для семьи ID {} и пользователя ID {} по запросу '{}': найдено {} результатов", 
-                 familyId, userId, trimmedQuery, results.size());
-        
-        return results;
+        return eventRepository.searchByTitleOrDescription(familyId, userId, trimmedQuery);
     }
 }

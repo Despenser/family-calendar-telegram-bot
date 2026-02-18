@@ -20,7 +20,6 @@ import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
  * @since 2026-02-01
  */
 @Service
-@Transactional
 @Slf4j
 @RequiredArgsConstructor
 public class EventHistoryService {
@@ -31,15 +30,16 @@ public class EventHistoryService {
     /**
      * Записывает изменение события в историю.
      *
-     * @param eventId    идентификатор события
-     * @param userId     идентификатор пользователя, выполнившего действие
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя, выполнившего действие
      * @param actionType тип действия (CREATED, UPDATED, DELETED, RESTORED)
-     * @param fieldName  название измененного поля (для UPDATED, может быть null)
-     * @param oldValue   старое значение поля (для UPDATED, может быть null)
-     * @param newValue   новое значение поля (для UPDATED, может быть null)
+     * @param fieldName название измененного поля (для UPDATED, может быть null)
+     * @param oldValue старое значение поля (для UPDATED, может быть null)
+     * @param newValue новое значение поля (для UPDATED, может быть null)
      *
      * @throws UserNotFoundException если пользователь не найден
      */
+    @Transactional
     public void recordChange(Long eventId,
                              Long userId,
                              ActionType actionType,
@@ -47,9 +47,6 @@ public class EventHistoryService {
                              String oldValue,
                              String newValue) {
 
-        log.debug("Запись изменения события ID {}: actionType={}, userId={}, field={}", 
-                  eventId, actionType, userId, fieldName);
-        
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException(userId));
         
@@ -62,12 +59,8 @@ public class EventHistoryService {
             .newValue(newValue)
             .build();
         
-        EventHistory saved = eventHistoryRepository.save(history);
-        
-        log.info("Изменение события ID {} записано в историю: actionType={}, historyId={}", 
-                 eventId, actionType, saved.getId());
-
-    }
+        eventHistoryRepository.save(history);
+        }
     
     /**
      * Записывает удаление события в историю.
@@ -77,6 +70,7 @@ public class EventHistoryService {
      *
      * @throws UserNotFoundException если пользователь не найден
      */
+    @Transactional
     public void recordDeletion(Long eventId, Long userId) {
         recordChange(eventId, userId, ActionType.DELETED, null, null, null);
     }

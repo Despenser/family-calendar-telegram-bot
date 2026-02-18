@@ -42,16 +42,10 @@ public class TodayCommandHandler implements CommandHandler {
      */
     @Override
     public String handle(Message message, @NonNull User user) {
-        log.debug("Обработка команды /today для пользователя ID={}, семья ID={}", 
-                  user.getId(), user.getFamily().getId());
-        
         try {
             // Получение событий на сегодня (1 день от текущей даты)
             List<Event> todayEvents = eventService.getUpcomingEvents(
                 user.getFamily().getId(), 1, user.getZoneId());
-            
-            log.debug("Найдено {} событий до фильтрации для семьи ID={}", 
-                    todayEvents.size(), user.getFamily().getId());
             
             // Фильтрация событий: только на сегодня
             LocalDate today = user.getCurrentDate();
@@ -63,17 +57,12 @@ public class TodayCommandHandler implements CommandHandler {
                 .filter(event -> !event.getIsPersonal() || event.belongsToUser(user.getId()))
                 .toList();
             
-            log.debug("После фильтрации осталось {} событий на сегодня для пользователя ID={}", 
-                    filteredEvents.size(), user.getId());
-            
             if (filteredEvents.isEmpty()) {
-                String responseMessage = eventFormattingService.formatNoEventsMessage(
+                return eventFormattingService.formatNoEventsMessage(
                     "📅",
                     "События на сегодня",
                     "На сегодня событий не запланировано."
                 );
-                log.debug("Пользователю ID={} будет отправлено сообщение об отсутствии событий на сегодня", user.getId());
-                return responseMessage;
             }
             
             // Формирование сообщения с событиями
@@ -86,19 +75,14 @@ public class TodayCommandHandler implements CommandHandler {
             messageBuilder.append(escape("\n\n"));
             
             // Для команды /today не добавляем заголовок дня, так как дата уже указана в основном заголовке
-
             filteredEvents.forEach(event -> {
                 boolean hasReminders = reminderSchedulingService.hasActiveReminders(event.getId());
                 messageBuilder.append(eventFormattingService.formatEvent(event, user, hasReminders));
             });
             
             messageBuilder.append(eventFormattingService.formatEventCounter(filteredEvents.size()));
-            
-            String responseMessage = messageBuilder.toString();
-            log.debug("Пользователю ID={} будет отправлен список из {} событий на сегодня", 
-                     user.getId(), filteredEvents.size());
 
-            return responseMessage;
+            return messageBuilder.toString();
             
         } catch (Exception e) {
             log.error("Ошибка при обработке команды /today для пользователя ID={}", user.getId(), e);

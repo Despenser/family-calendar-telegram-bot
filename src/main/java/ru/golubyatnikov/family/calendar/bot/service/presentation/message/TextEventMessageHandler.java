@@ -46,14 +46,9 @@ public class TextEventMessageHandler {
             Long chatId = message.getChatId();
             Long telegramId = user.getTelegramId();
             
-            log.debug("Попытка распознать событие из текста для пользователя: userId={}, telegramId={}", 
-                    user.getId(), telegramId);
-            
             Optional<TextEventParsingService.ParsedEvent> parsedEventOpt = textEventParsingService.parseEvent(text);
             
             if (parsedEventOpt.isEmpty()) {
-                log.debug("Не удалось распознать событие из текста: text='{}', telegramId={}", 
-                        text, telegramId);
                 return;
             }
             
@@ -63,9 +58,6 @@ public class TextEventMessageHandler {
                 handleInvalidEvent(chatId, parsedEvent, telegramId);
                 return;
             }
-            
-            log.debug("Событие успешно распознано: title='{}', date={}, time={}, telegramId={}", 
-                     parsedEvent.title(), parsedEvent.date(), parsedEvent.time(), telegramId);
             
             sendEventPreview(chatId, parsedEvent, user);
             
@@ -81,7 +73,6 @@ public class TextEventMessageHandler {
      * Обрабатывает невалидное распознанное событие.
      */
     private void handleInvalidEvent(Long chatId, TextEventParsingService.ParsedEvent parsedEvent, Long telegramId) {
-        log.warn("Распознанное событие невалидно: parsedEvent={}, telegramId={}", parsedEvent, telegramId);
         
         StringBuilder responseBuilder = new StringBuilder();
         responseBuilder.append("❌ *Не удалось создать событие*\n\n");
@@ -125,10 +116,7 @@ public class TextEventMessageHandler {
             InlineKeyboardMarkup keyboard = createEventConfirmationKeyboard(parsedEvent);
             messageService.sendMessageWithInlineKeyboard(chatId, preview, keyboard);
             
-            log.debug("Отправлен предпросмотр распознанного события пользователю: userId={}, telegramId={}", 
-                    user.getId(), user.getTelegramId());
-
-        } catch (Exception e) {
+            } catch (Exception e) {
             log.error("Ошибка при отправке предпросмотра: {}", e.getMessage());
         }
     }

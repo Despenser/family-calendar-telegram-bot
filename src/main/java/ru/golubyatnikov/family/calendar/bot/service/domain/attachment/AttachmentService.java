@@ -46,7 +46,7 @@ public class AttachmentService {
      *
      * @return сохраненное вложение
      * @throws EventNotFoundException если событие не найдено
-     * @throws FileSizeExceededException если размер файла превышает 20 МБ
+     * @throws FileSizeExceededException если размер файла превышает максимально допустимый размер
      */
     public Attachment saveAttachment(Long eventId,
                                      String fileId,
@@ -54,9 +54,6 @@ public class AttachmentService {
                                      String fileType,
                                      Long fileSize) {
 
-        log.debug("Сохранение вложения для события ID {}: fileName={}, fileType={}, fileSize={}", 
-                  eventId, fileName, fileType, fileSize);
-        
         Event event = eventRepository.findById(eventId).orElseThrow(() -> new EventNotFoundException(eventId));
 
         if (fileSize != null && fileSize > MAX_FILE_SIZE) {
@@ -64,7 +61,7 @@ public class AttachmentService {
                     fileSize, MAX_FILE_SIZE);
 
             throw new FileSizeExceededException(
-                String.format("Размер файла %.2f МБ превышает максимально допустимый размер 20 МБ",
+                String.format("Размер файла %.2f МБ превышает максимально допустимый размер",
                         fileSize / (1024.0 * 1024.0))
             );
         }
@@ -76,11 +73,8 @@ public class AttachmentService {
             .fileType(fileType)
             .fileSize(fileSize)
             .build();
-        
-        Attachment saved = attachmentRepository.save(attachment);
-        log.info("Вложение ID {} успешно сохранено для события ID {}", saved.getId(), eventId);
-        
-        return saved;
+
+        return attachmentRepository.save(attachment);
     }
     
     /**
@@ -93,13 +87,8 @@ public class AttachmentService {
      */
     @Transactional(readOnly = true)
     public Attachment getAttachment(Long attachmentId) {
-        log.debug("Получение вложения ID {}", attachmentId);
-        
         return attachmentRepository.findById(attachmentId)
-            .orElseThrow(() -> {
-                log.warn("Вложение ID {} не найдено", attachmentId);
-                return new AttachmentNotFoundException(attachmentId);
-            });
+            .orElseThrow(() -> new AttachmentNotFoundException(attachmentId));
     }
     
     /**
@@ -110,12 +99,7 @@ public class AttachmentService {
      */
     @Transactional(readOnly = true)
     public List<Attachment> getEventAttachments(Long eventId) {
-        log.debug("Получение вложений для события ID {}", eventId);
-        
-        List<Attachment> attachments = attachmentRepository.findByEventIdOrderByUploadedAtAsc(eventId);
-        
-        log.debug("Найдено {} вложений для события ID {}", attachments.size(), eventId);
-        return attachments;
+        return attachmentRepository.findByEventIdOrderByUploadedAtAsc(eventId);
     }
     
     /**
@@ -126,12 +110,7 @@ public class AttachmentService {
      */
     @Transactional(readOnly = true)
     public long countEventAttachments(Long eventId) {
-        log.debug("Подсчет вложений для события ID {}", eventId);
-        
-        long count = attachmentRepository.countByEventId(eventId);
-        
-        log.debug("Событие ID {} имеет {} вложений", eventId, count);
-        return count;
+        return attachmentRepository.countByEventId(eventId);
     }
     
     /**
@@ -145,8 +124,6 @@ public class AttachmentService {
      */
     @Transactional
     public void deleteAttachment(Long attachmentId, Long userId) {
-        log.debug("Удаление вложения ID {} пользователем ID {}", attachmentId, userId);
-        
         Attachment attachment = attachmentRepository.findById(attachmentId)
             .orElseThrow(() -> new AttachmentNotFoundException(attachmentId));
         
@@ -156,10 +133,10 @@ public class AttachmentService {
                      userId, attachmentId, attachment.getEvent().getUser().getId());
 
             throw new UnauthorizedAccessException(
-                    "Вы не можете удалить это вложение, так как не являетесь создателем события");
+                    "Вы не можете удалить это вложение, так как не являетесь создателем события"
+            );
         }
         
         attachmentRepository.delete(attachment);
-        log.info("Вложение ID {} успешно удалено пользователем ID {}", attachmentId, userId);
-    }
+        }
 }

@@ -92,8 +92,6 @@ public class CalendarNavigationService {
                                                    String callbackQueryId) {
 
         try {
-            log.info("Пользователь {} выбрал дату {} в календаре просмотра", user.getId(), selectedDate);
-            
             DateSelectionContext context = buildContext(user, selectedDate, false, false);
             navigateBasedOnContext(context, chatId, messageId, callbackQueryId);
             
@@ -186,8 +184,6 @@ public class CalendarNavigationService {
                                               Integer messageId,
                                               String callbackQueryId) {
 
-        log.info("Возврат из создания события без выбранной даты: userId={}", user.getId());
-        
         LocalDate currentDate = user.getCurrentDate();
         InlineKeyboardMarkup keyboard = keyboardService.createViewCalendarKeyboard(
             currentDate.getYear(), currentDate.getMonthValue(), user);
@@ -197,8 +193,7 @@ public class CalendarNavigationService {
         conversationService.cancelEventCreation(user.getId());
         updateMessage(chatId, messageId, message, keyboard, callbackQueryId);
         
-        log.debug("Возврат к календарю текущего месяца: userId={}", user.getId());
-    }
+        }
     
     /**
      * Возвращает к календарю месяца.
@@ -213,9 +208,6 @@ public class CalendarNavigationService {
                                        Integer messageId,
                                        String callbackQueryId) {
 
-        log.info("Возврат к календарю (прошлая дата без событий): userId={}, дата={}", 
-                context.user().getId(), context.selectedDate());
-        
         InlineKeyboardMarkup keyboard = keyboardService.createViewCalendarKeyboard(
             context.selectedDate().getYear(),
             context.selectedDate().getMonthValue(),
@@ -239,9 +231,6 @@ public class CalendarNavigationService {
                                 Integer messageId,
                                 String callbackQueryId) {
 
-        log.info("Показ списка событий: userId={}, дата={}, событий={}", 
-                context.user().getId(), context.selectedDate(), context.events().size());
-        
         String message = botMessageFormattingService.buildDateEventsListMessage(
             context.selectedDate(), context.events());
 
@@ -264,9 +253,6 @@ public class CalendarNavigationService {
                                        Integer messageId,
                                        String callbackQueryId) {
 
-        log.info("Показ предложения создать событие: userId={}, дата={}", 
-                context.user().getId(), context.selectedDate());
-        
         String message = botMessageFormattingService.buildCreateEventOnDateMessage(context.selectedDate());
         InlineKeyboardMarkup keyboard = keyboardService.createCreateEventOnDateKeyboard(
             context.selectedDate());
@@ -287,9 +273,6 @@ public class CalendarNavigationService {
                                       Integer messageId,
                                       String callbackQueryId) {
 
-        log.info("Показ управления событиями: userId={}, дата={}, событий={}", 
-                context.user().getId(), context.selectedDate(), context.events().size());
-        
         String message = botMessageFormattingService.buildDateEventsManagementMessage(
             context.selectedDate(), context.events());
 
@@ -353,9 +336,7 @@ public class CalendarNavigationService {
                 } catch (TelegramApiException ex) {
                     log.warn("Не удалось ответить на callback query: {}", ex.getMessage());
                 }
-                log.debug("Повторный клик, сообщение не изменилось");
-
-            } else {
+                } else {
                 throw new RuntimeException("Ошибка при обновлении сообщения", e);
             }
         }

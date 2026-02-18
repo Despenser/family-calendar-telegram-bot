@@ -1,6 +1,5 @@
 package ru.golubyatnikov.family.calendar.bot.service.domain.event;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -21,12 +20,11 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotM
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
 /**
- * TODO очень тяжелая логика в одном месте в одном методе
+ * TODO God Object провести рефакторинг
  * Фасадный сервис для управления событиями в семейном календаре.
  *
  * @author Golubyatnikov Aleksey
@@ -49,17 +47,6 @@ public class EventService {
     private final BotMessageFormattingService botMessageFormattingService;
     
     // ===== Делегирование к EventCommandService =====
-    
-    @Transactional
-    public Event createEvent(Long userId, String title, String description, LocalDateTime eventDateTime) {
-        return eventCommandService.createEvent(userId, title, description, eventDateTime);
-    }
-    
-    @Transactional
-    public Event createEvent(Long userId, String title, String description, LocalDateTime eventDateTime, 
-                            LocalTime endTime, Boolean isPersonal) {
-        return eventCommandService.createEvent(userId, title, description, eventDateTime, endTime, isPersonal);
-    }
     
     @Transactional
     public Event updateEventTitle(Long eventId, Long userId, String newTitle) {
@@ -126,15 +113,10 @@ public class EventService {
     // ===== Делегирование к EventDeletionService =====
     
     @Transactional
-    public Event deleteEvent(Long eventId, Long userId) {
-        return eventDeletionService.deleteEvent(eventId, userId);
+    public void deleteEvent(Long eventId, Long userId) {
+        eventDeletionService.deleteEvent(eventId, userId);
     }
-    
-    @Transactional
-    public Event completeEvent(Long eventId, Long userId) {
-        return eventDeletionService.completeEvent(eventId, userId);
-    }
-    
+
     @Transactional
     public Event completeEventWithoutHeaderUpdate(Long eventId, Long userId) {
         return eventDeletionService.completeEventWithoutHeaderUpdate(eventId, userId);
@@ -153,8 +135,8 @@ public class EventService {
     }
     
     @Transactional
-    public Event sendOrUpdateEventMessage(Event event, Long chatId) throws TelegramApiException {
-        return eventNotificationService.sendOrUpdateEventMessage(event, chatId);
+    public void sendOrUpdateEventMessage(Event event, Long chatId) throws TelegramApiException {
+        eventNotificationService.sendOrUpdateEventMessage(event, chatId);
     }
     
     // ===== Оркестратор: completeEventWithReordering =====
@@ -168,22 +150,11 @@ public class EventService {
      * @return завершённое событие
      */
     @Transactional
-    public Event completeEventWithReordering(
-            @NotNull(message = "eventId не может быть null") Long eventId,
-            @NotNull(message = "userId не может быть null") Long userId) {
-        log.info("Начало завершения события ID={} с переупорядочиванием для пользователя ID={}", 
-                eventId, userId);
-        
+    public Event completeEventWithReordering(Long eventId, Long userId) {
         // 1. Получаем событие
         Event event = getEventById(eventId);
-        log.debug("Событие ID={} получено: title='{}', status={}", 
-                 eventId, event.getTitle(), event.getStatus());
-        
         // 2. Получаем список активных событий ДО завершения
         List<Event> activeEventsBefore = getUserEvents(userId);
-        log.debug("Получен список активных событий ДО завершения: {} событий", 
-                 activeEventsBefore.size());
-        
         // 3. Определяем позицию события в списке
         int eventPosition = findEventPosition(activeEventsBefore, eventId);
         
@@ -204,57 +175,32 @@ public class EventService {
         boolean isPartOfMyEventsList = hasMessageId && isInActiveList && 
                                        (isFirstInMyEventsList || (listHasFirstEvent && eventPosition > 0));
         
-        log.debug("Событие ID={} проверка принадлежности к списку /my_events: hasMessageId={}, isInActiveList={}, eventPosition={}, isMyEventsHeader={}, listHasFirstEvent={}, isPartOfMyEventsList={}", 
-                 eventId, hasMessageId, isInActiveList, eventPosition, event.getIsMyEventsHeader(), listHasFirstEvent, isPartOfMyEventsList);
-        
         // 5. Проверяем, является ли событие последним
         boolean isLastEvent = (eventPosition == activeEventsBefore.size() - 1);
-        log.debug("Событие ID={} находится на позиции {} из {}, является последним: {}", 
-                 eventId, eventPosition, activeEventsBefore.size(), isLastEvent);
-        
         // 6. Завершаем событие БЕЗ обновления шапки
         Event completedEvent = completeEventWithoutHeaderUpdate(eventId, userId);
         log.info("Событие ID={} успешно завершено, статус изменён на COMPLETED", eventId);
         
         // 7. Если событие часть списка /my_events, не последнее и есть другие события - переупорядочиваем список
         if (isPartOfMyEventsList && !isLastEvent && activeEventsBefore.size() > 1) {
-            log.info("Событие ID={} является частью списка /my_events и не последнее (позиция {} из {}), начинаем переупорядочивание", 
-                    eventId, eventPosition, activeEventsBefore.size());
-            reorderMyEventsList(userId, completedEvent, activeEventsBefore);
-            log.info("Переупорядочивание списка завершено для пользователя ID={}", userId);
+            reorderMyEventsList(userId, completedEvent);
         } else {
             if (!isPartOfMyEventsList) {
                 log.info("Событие ID={} не является частью списка /my_events (только что создано), редактируем сообщение создания", 
                         eventId);
-            } else if (isLastEvent) {
-                log.info("Событие ID={} является последним в списке /my_events, редактируем сообщение", 
-                        eventId);
-            } else if (activeEventsBefore.size() <= 1) {
-                log.info("В списке только одно событие, редактируем сообщение");
             }
             
             // Получаем пользователя
             User user = userRepository.findById(userId)
-                .orElseThrow(() -> {
-                    log.error("Пользователь с ID={} не найден при редактировании сообщения последнего события", userId);
-                    return new UserNotFoundException(userId);
-                });
+                .orElseThrow(() -> new UserNotFoundException(userId));
             
             Long chatId = user.getTelegramId();
             
             if (chatId != null) {
-                log.debug("Редактирование сообщения с предложением добавить заметку для последнего события ID={}", eventId);
                 editCompletedEventWithNote(chatId, completedEvent, userId);
-                log.info("Сообщение последнего события ID={} обработано (отредактировано или отправлено новое)", eventId);
-            } else {
-                log.warn("Не удалось получить chatId для пользователя ID={}, сообщение не отправлено", userId);
             }
             
-            log.debug("Обновление шапки /my_events отложено до выбора пользователя (добавить заметку или пропустить)");
         }
-        
-        log.info("Завершение события ID={} с переупорядочиванием успешно выполнено для пользователя ID={}", 
-                eventId, userId);
         
         return completedEvent;
     }
@@ -262,36 +208,25 @@ public class EventService {
     // ===== Вспомогательные методы для completeEventWithReordering =====
     
     private int findEventPosition(@NonNull List<Event> events, Long eventId) {
-        log.debug("Поиск позиции события ID={} в списке из {} событий", eventId, events.size());
-        
         for (int i = 0; i < events.size(); i++) {
             if (events.get(i).getId().equals(eventId)) {
-                log.debug("Событие ID={} найдено на позиции {}", eventId, i);
                 return i;
             }
         }
         
-        log.warn("Событие ID={} не найдено в списке активных событий", eventId);
         return -1;
     }
     
     private void deleteActiveEventMessages(@NonNull List<Event> events, Long userId) {
-        log.debug("Удаление сообщений {} активных событий для пользователя ID={}", 
-                 events.size(), userId);
-        
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> {
-                log.error("Пользователь с ID={} не найден при удалении сообщений событий", userId);
-                return new UserNotFoundException(userId);
-            });
+            .orElseThrow(() -> new UserNotFoundException(userId));
         
         Long chatId = user.getTelegramId();
         
         if (chatId == null) {
             return;
         }
-        
-        int deletedCount = 0;
+
         for (Event event : events) {
             if (event.getMessageId() != null) {
                 try {
@@ -301,23 +236,16 @@ public class EventService {
                     );
                     event.setMessageId(null);
                     eventRepository.save(event);
-                    deletedCount++;
-                    log.debug("Сообщение события ID={} успешно удалено", event.getId());
+
                 } catch (Exception e) {
-                    log.warn("Не удалось удалить сообщение события ID={}: {}", 
-                            event.getId(), e.getMessage());
+                    log.warn("Не удалось удалить сообщение события ID={}: {}", event.getId(), e.getMessage());
                 }
             }
         }
         
-        log.info("Удалено {} из {} сообщений событий для пользователя ID={}", 
-                deletedCount, events.size(), userId);
-    }
+        }
     
     private void sendEventWithHeader(Long chatId, String header, @NonNull Event event, Long userId) {
-        log.debug("Отправка события ID={} с шапкой для пользователя ID={}", 
-                 event.getId(), userId);
-        
         try {
             String eventText = botMessageFormattingService.buildEventMessage(event);
             String combinedMessage = header + "\n" + eventText;
@@ -334,18 +262,12 @@ public class EventService {
             event.setIsMyEventsHeader(true);
             eventRepository.save(event);
             
-            log.info("Событие ID={} с шапкой успешно отправлено, messageId={}", 
-                    event.getId(), sentMessage.getMessageId());
         } catch (Exception e) {
-            log.error("Ошибка при отправке события ID={} с шапкой: {}", 
-                     event.getId(), e.getMessage(), e);
+            log.error("Ошибка при отправке события ID={} с шапкой: {}", event.getId(), e.getMessage(), e);
         }
     }
     
     private void sendEvent(Long chatId, @NonNull Event event, Long userId) {
-        log.debug("Отправка события ID={} без шапки для пользователя ID={}", 
-                 event.getId(), userId);
-        
         try {
             String eventText = botMessageFormattingService.buildEventMessage(event);
             
@@ -361,19 +283,12 @@ public class EventService {
             event.setIsMyEventsHeader(false);
             eventRepository.save(event);
             
-            log.info("Событие ID={} без шапки успешно отправлено, messageId={}", 
-                    event.getId(), sentMessage.getMessageId());
-
         } catch (Exception e) {
-            log.error("Ошибка при отправке события ID={} без шапки: {}", 
-                     event.getId(), e.getMessage(), e);
+            log.error("Ошибка при отправке события ID={} без шапки: {}", event.getId(), e.getMessage(), e);
         }
     }
     
     private void sendCompletedEventWithNote(Long chatId, @NonNull Event event, Long userId) {
-        log.debug("Отправка завершённого события ID={} с предложением добавить заметку для пользователя ID={}", 
-                 event.getId(), userId);
-        
         try {
             String completedMessage = botMessageFormattingService.buildCompletedEventMessage(event);
             
@@ -388,9 +303,6 @@ public class EventService {
             event.setMessageId((long) sentMessage.getMessageId());
             eventRepository.save(event);
             
-            log.info("Завершённое событие ID={} с предложением добавить заметку успешно отправлено, messageId={}", 
-                    event.getId(), sentMessage.getMessageId());
-
         } catch (Exception e) {
             log.error("Ошибка при отправке завершённого события ID={} с предложением добавить заметку: {}", 
                      event.getId(), e.getMessage(), e);
@@ -398,11 +310,7 @@ public class EventService {
     }
     
     private void editCompletedEventWithNote(Long chatId, @NonNull Event event, Long userId) {
-        log.debug("Редактирование сообщения последнего завершённого события ID={} для пользователя ID={}", 
-                 event.getId(), userId);
-        
         if (event.getMessageId() == null) {
-            log.info("У события ID={} отсутствует messageId, отправляем новое сообщение", event.getId());
             sendCompletedEventWithNote(chatId, event, userId);
             return;
         }
@@ -419,36 +327,22 @@ public class EventService {
                 keyboard
             );
             
-            if (edited) {
-                log.info("Сообщение последнего завершённого события ID={} успешно отредактировано, messageId={}", 
-                        event.getId(), event.getMessageId());
-            } else {
-                log.info("Не удалось отредактировать сообщение события ID={} (удалено или не найдено), отправляем новое", 
-                        event.getId());
+            if (!edited) {
                 sendCompletedEventWithNote(chatId, event, userId);
             }
             
         } catch (Exception e) {
             log.error("Ошибка при редактировании сообщения последнего завершённого события ID={}: {}, отправляем новое сообщение", 
                      event.getId(), e.getMessage(), e);
+
             sendCompletedEventWithNote(chatId, event, userId);
         }
     }
     
-    private void reorderMyEventsList(Long userId, @NonNull Event completedEvent,
-                                     List<Event> previousActiveEvents) {
-        log.info("Начало переупорядочивания списка 'Мои события' для пользователя ID={}, завершённое событие ID={}", 
-                userId, completedEvent.getId());
-        
+    private void reorderMyEventsList(Long userId, @NonNull Event completedEvent) {
         List<Event> currentActiveEvents = getUserEvents(userId);
-        log.debug("Получен актуальный список активных событий: {} событий (до завершения было {})", 
-                 currentActiveEvents.size(), previousActiveEvents.size());
-        
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> {
-                log.error("Пользователь с ID={} не найден при удалении сообщения завершённого события", userId);
-                return new UserNotFoundException(userId);
-            });
+            .orElseThrow(() -> new UserNotFoundException(userId));
         
         Long chatId = user.getTelegramId();
         
@@ -458,66 +352,45 @@ public class EventService {
                     chatId, 
                     completedEvent.getMessageId().intValue()
                 );
+
                 completedEvent.setMessageId(null);
                 eventRepository.save(completedEvent);
-                log.debug("Сообщение завершённого события ID={} успешно удалено", completedEvent.getId());
+
             } catch (Exception e) {
                 log.warn("Не удалось удалить сообщение завершённого события ID={}: {}", 
                         completedEvent.getId(), e.getMessage());
             }
         }
         
-        log.debug("Удаление сообщений {} активных событий", currentActiveEvents.size());
         deleteActiveEventMessages(currentActiveEvents, userId);
-        log.debug("Сообщения активных событий удалены");
-        
-        log.debug("Отправка событий в новом порядке: {} активных + 1 завершённое", 
-                 currentActiveEvents.size());
         resendMyEventsWithHeader(userId, currentActiveEvents, completedEvent);
         
-        log.info("Переупорядочивание списка 'Мои события' завершено для пользователя ID={}", userId);
     }
     
-    private void resendMyEventsWithHeader(Long userId, @NonNull List<Event> activeEvents,
-                                          Event completedEvent) {
-        log.debug("Отправка списка событий заново для пользователя ID={}: {} активных + 1 завершённое", 
-                 userId, activeEvents.size());
-        
+    private void resendMyEventsWithHeader(Long userId, @NonNull List<Event> activeEvents, Event completedEvent) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> {
-                log.error("Пользователь с ID={} не найден при отправке списка событий", userId);
-                return new UserNotFoundException(userId);
-            });
+            .orElseThrow(() -> new UserNotFoundException(userId));
         
         Long chatId = user.getTelegramId();
         
         if (chatId == null) {
-            log.warn("Не удалось получить chatId для пользователя ID={}", userId);
             return;
         }
         
         int totalCount = activeEvents.size() + 1;
         String header = botMessageFormattingService.buildMyEventsHeader(totalCount);
-        log.debug("Сформирована шапка для {} событий", totalCount);
-        
         if (!activeEvents.isEmpty()) {
-            Event firstEvent = activeEvents.get(0);
-            log.debug("Отправка первого активного события ID={} с шапкой", firstEvent.getId());
+            Event firstEvent = activeEvents.getFirst();
             sendEventWithHeader(chatId, header, firstEvent, userId);
             
             for (int i = 1; i < activeEvents.size(); i++) {
                 Event event = activeEvents.get(i);
-                log.debug("Отправка активного события ID={} без шапки (позиция {})", event.getId(), i);
                 sendEvent(chatId, event, userId);
             }
             
-            log.debug("Отправка завершённого события ID={} с предложением добавить заметку", 
-                     completedEvent.getId());
             sendCompletedEventWithNote(chatId, completedEvent, userId);
+
         } else {
-            log.debug("Активных событий нет, отправка только завершённого события ID={} с шапкой", 
-                     completedEvent.getId());
-            
             String completedMessage = botMessageFormattingService.buildCompletedEventMessage(completedEvent);
             String combinedMessage = header + "\n" + completedMessage;
             
@@ -534,14 +407,11 @@ public class EventService {
                 completedEvent.setIsMyEventsHeader(true);
                 eventRepository.save(completedEvent);
                 
-                log.info("Завершённое событие ID={} с шапкой успешно отправлено, messageId={}", 
-                        completedEvent.getId(), sentMessage.getMessageId());
             } catch (Exception e) {
                 log.error("Ошибка при отправке завершённого события ID={} с шапкой: {}", 
                          completedEvent.getId(), e.getMessage(), e);
             }
         }
         
-        log.info("Список событий успешно отправлен заново для пользователя ID={}", userId);
     }
 }

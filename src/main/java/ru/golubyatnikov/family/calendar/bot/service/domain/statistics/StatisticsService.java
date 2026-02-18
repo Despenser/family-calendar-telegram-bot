@@ -38,11 +38,7 @@ public class StatisticsService {
      * @throws IllegalArgumentException если месяц некорректен
      */
     public EventStatistics getMonthlyStatistics(Long familyId, Long userId, int year, int month) {
-        log.debug("Получение статистики для семьи ID {} и пользователя ID {}: год={}, месяц={}", 
-                  familyId, userId, year, month);
-        
         if (month < 1 || month > 12) {
-            log.error("Некорректный месяц: {}", month);
             throw new IllegalArgumentException("Месяц должен быть от 1 до 12");
         }
         
@@ -72,11 +68,8 @@ public class StatisticsService {
         long personalEvents = eventRepository.countByUserIdAndEventDateBetweenAndIsPersonalAndStatus(
             userId, startDate, endDate, true, EventStatus.ACTIVE
         );
-        
-        // Подсчет повторяющихся событий (имеют series_id)
-        long recurringEvents = 0; // Временно отключено, так как метод отсутствует в репозитории
-        
-        EventStatistics statistics = EventStatistics.builder()
+
+        return EventStatistics.builder()
             .userId(userId)
             .year(year)
             .month(month)
@@ -85,12 +78,6 @@ public class StatisticsService {
             .completedEvents(completedEvents)
             .familyEvents(familyEvents)
             .personalEvents(personalEvents)
-            .recurringEvents(recurringEvents)
             .build();
-        
-        log.info("Статистика для семьи ID {} и пользователя ID {} за {}/{}: всего={}, активных={}, завершенных={}", 
-                 familyId, userId, month, year, totalEvents, activeEvents, completedEvents);
-        
-        return statistics;
     }
 }

@@ -55,9 +55,6 @@ public class SearchContextManager {
             throw new IllegalArgumentException("messageId не может быть null");
         }
         
-        log.debug("Установка состояния ожидания поискового запроса для пользователя ID={}, чата ID={}, сообщения ID={}", 
-                userId, chatId, messageId);
-
         usersAwaitingSearchQuery.put(userId, chatId);
         
         // Получаем или создаем состояние диалога
@@ -76,8 +73,7 @@ public class SearchContextManager {
         state.setSearchMessageId(messageId);
         conversationStateRepository.save(state);
         
-        log.info("Пользователь ID={} переведен в режим ожидания поискового запроса, messageId={}", userId, messageId);
-    }
+        }
     
     /**
      * Проверяет, ожидает ли пользователь ввода поискового запроса.
@@ -103,8 +99,6 @@ public class SearchContextManager {
             throw new IllegalArgumentException("userId не может быть null");
         }
         
-        log.debug("Получение контекста поискового запроса для пользователя ID={}", userId);
-        
         return conversationStateRepository.findByUserId(userId)
                 .filter(ConversationState::hasSearchContext)
                 .map(state -> {
@@ -112,12 +106,9 @@ public class SearchContextManager {
                             state.getSearchChatId(),
                             state.getSearchMessageId()
                     );
-                    log.debug("Найден контекст поискового запроса для пользователя ID={}: chatId={}, messageId={}", 
-                            userId, context.getChatId(), context.getMessageId());
                     return context;
                 })
                 .orElseGet(() -> {
-                    log.debug("Контекст поискового запроса не найден для пользователя ID={}", userId);
                     return null;
                 });
     }
@@ -134,8 +125,6 @@ public class SearchContextManager {
             throw new IllegalArgumentException("userId не может быть null");
         }
         
-        log.debug("Очистка состояния ожидания поискового запроса для пользователя ID={}", userId);
-
         usersAwaitingSearchQuery.remove(userId);
         
         // Очищаем из базы данных
@@ -144,13 +133,9 @@ public class SearchContextManager {
                     if (state.hasSearchContext()) {
                         state.clearSearchContext();
                         conversationStateRepository.save(state);
-                        log.info("Контекст поиска очищен для пользователя ID={}", userId);
-
-                    } else {
-                        log.debug("Контекст поиска не найден в БД для пользователя ID={}, очистка не требуется", userId);
-                    }
+                        } else {
+                        }
                 });
         
-        log.debug("Состояние ожидания поискового запроса очищено для пользователя ID={}", userId);
-    }
+        }
 }

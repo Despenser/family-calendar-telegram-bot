@@ -49,8 +49,6 @@ public class AttachmentViewHandler {
                                Long eventId,
                                @NonNull CallbackQueryContext context) throws Exception {
 
-        log.debug("Просмотр файла: attachmentId={}", attachmentId);
-        
         try {
             deleteCurrentMessage(context.chatId(), context.messageId());
             
@@ -63,8 +61,7 @@ public class AttachmentViewHandler {
             
             saveMessageContext(context.getUserId(), eventId, context.chatId(), sentMessage.getMessageId());
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
-            log.info("Файл отправлен: attachmentId={}, messageId={}", attachmentId, sentMessage.getMessageId());
-            
+
         } catch (AttachmentNotFoundException e) {
             log.error("Вложение не найдено: attachmentId={}", attachmentId);
             callbackQueryService.answerCallback(context, CallbackMessageFormatter.notFound("Вложение"));
@@ -87,7 +84,7 @@ public class AttachmentViewHandler {
             messageService.deleteMessage(chatId, messageId);
 
         } catch (Exception e) {
-            log.debug("Не удалось удалить сообщение (возможно, уже удалено): messageId={}", messageId);
+            log.error("Не удалось удалить сообщение: messageId={}", messageId);
         }
     }
     

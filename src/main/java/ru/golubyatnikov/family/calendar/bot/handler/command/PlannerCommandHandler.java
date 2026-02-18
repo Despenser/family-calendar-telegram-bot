@@ -12,6 +12,7 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.Plan
 import ru.golubyatnikov.family.calendar.bot.service.domain.planner.PlannerNavigationService;
 import ru.golubyatnikov.family.calendar.bot.service.domain.planner.PlannerQueryService;
 import java.util.List;
+import java.util.stream.IntStream;
 
 /**
  * Координатор команды /my_events для Telegram бота семейного календаря.
@@ -41,17 +42,12 @@ public class PlannerCommandHandler implements CommandHandler, MyEventsHeaderUpda
     @Override
     public String handle(Message message, User user) {
         if (message == null || user == null) {
-            log.error("Получено null сообщение или пользователь в PlannerCommandHandler");
             throw new IllegalArgumentException("Сообщение и пользователь не могут быть null");
         }
 
         Long chatId = message.getChatId();
-        log.info("Обработка команды /my_events: userId={}", user.getId());
-
         try {
             List<Event> userEvents = queryService.getUserEvents(user.getId());
-            log.info("Получено {} событий для пользователя ID={}", userEvents.size(), user.getId());
-
             if (queryService.isEmpty(userEvents)) {
                 sendNoEventsMessage(chatId);
                 return null;
@@ -78,17 +74,13 @@ public class PlannerCommandHandler implements CommandHandler, MyEventsHeaderUpda
     @Override
     public void updateMyEventsHeaderCount(Long userId) {
         if (userId == null) {
-            log.error("Попытка обновить шапку с null userId");
             return;
         }
-        
-        log.debug("Обновление счетчика событий в шапке для пользователя ID={}", userId);
         
         try {
             List<Event> userEvents = queryService.getUserEvents(userId);
             
             if (queryService.isEmpty(userEvents)) {
-                log.debug("Нет активных событий для пользователя ID={}", userId);
                 return;
             }
             
@@ -123,7 +115,6 @@ public class PlannerCommandHandler implements CommandHandler, MyEventsHeaderUpda
         try {
             String noEventsMessage = formattingService.buildNoEventsMessage();
             messageService.sendMessage(chatId, noEventsMessage);
-            log.info("Сообщение об отсутствии событий отправлено пользователю chatId={}", chatId);
 
         } catch (Exception e) {
             log.error("Ошибка при отправке сообщения об отсутствии событий: {}", e.getMessage(), e);
@@ -145,35 +136,22 @@ public class PlannerCommandHandler implements CommandHandler, MyEventsHeaderUpda
         String firstEventText = formattingService.buildEventMessage(firstEvent);
         String combinedMessage = formattingService.buildCombinedMessage(header, firstEventText);
 
-        int successCount = 0;
-        int failureCount = 0;
-
         // Отправляем первое событие с заголовком
         boolean sent = navigationService.sendCombinedMessageWithFallback(
                 chatId, combinedMessage, header, firstEvent, userId);
 
         if (sent) {
-            successCount++;
             navigationService.saveHeaderContext(userId, userEvents.size());
-
-        } else {
-            failureCount++;
         }
 
         // Отправляем остальные события
-        for (int i = 1; i < userEvents.size(); i++) {
-            Event event = userEvents.get(i);
-            String eventText = formattingService.buildEventMessage(event);
-            boolean eventSent = navigationService.sendEventMessageWithFallback(chatId, eventText, event, userId);
-            if (eventSent) {
-                successCount++;
-            } else {
-                failureCount++;
-            }
-        }
+        IntStream.range(1, userEvents.size())
+                .mapToObj(userEvents::get)
+                .forEach(event -> {
+                    String eventText = formattingService.buildEventMessage(event);
+                    navigationService.sendEventMessageWithFallback(chatId, eventText, event, userId);
+                });
 
-        log.info("Завершена отправка событий пользователю ID={}: успешно={}, ошибок={}", 
-                userId, successCount, failureCount);
     }
 
     /**

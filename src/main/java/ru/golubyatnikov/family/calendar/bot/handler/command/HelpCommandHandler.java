@@ -40,28 +40,19 @@ public class HelpCommandHandler implements CommandHandler {
     @Override
     public String handle(Message message, User user) {
         if (message == null) {
-            log.error("Получено null сообщение в HelpCommandHandler");
             throw new IllegalArgumentException("Сообщение не может быть null");
         }
 
-        Long telegramId = message.getFrom().getId();
         boolean isAuthorized = (user != null && user.hasFamily());
 
-        log.debug("Обработка команды /help: telegramId={}, isAuthorized={}", 
-                telegramId, isAuthorized);
-
         if (commandHandlers == null || commandHandlers.isEmpty()) {
-            log.warn("Список обработчиков команд пуст");
             return "В данный момент команды недоступны. Пожалуйста, попробуйте позже.";
         }
 
         Map<CommandCategory, List<String>> groupedCommands = 
                 commandGrouper.groupAndFormat(commandHandlers, isAuthorized);
 
-        String helpMessage = messageBuilder.build(groupedCommands, isAuthorized);
-
-        log.debug("Сформировано сообщение справки: длина={} символов", helpMessage.length());
-        return helpMessage;
+        return messageBuilder.build(groupedCommands, isAuthorized);
     }
 
     /**

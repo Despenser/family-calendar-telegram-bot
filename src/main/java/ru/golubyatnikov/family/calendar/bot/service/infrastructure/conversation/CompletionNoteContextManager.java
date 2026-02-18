@@ -36,9 +36,7 @@ public class CompletionNoteContextManager {
     public void setAwaitingCompletionNote(Long userId, Long eventId, Long chatId, Integer messageId) {
         CompletionNoteContext context = new CompletionNoteContext(eventId, chatId, messageId);
         usersAwaitingCompletionNote.put(userId, context);
-        log.info("Пользователь ID={} переведен в режим ожидания заметки для события ID={}, messageId={}", 
-                userId, eventId, messageId);
-    }
+        }
     
     /**
      * Проверяет, ожидает ли пользователь ввода заметки к завершенному событию.
@@ -67,6 +65,5 @@ public class CompletionNoteContextManager {
      */
     public void clearAwaitingCompletionNote(Long userId) {
         usersAwaitingCompletionNote.remove(userId);
-        log.debug("Состояние ожидания заметки очищено для пользователя ID={}", userId);
-    }
+        }
 }

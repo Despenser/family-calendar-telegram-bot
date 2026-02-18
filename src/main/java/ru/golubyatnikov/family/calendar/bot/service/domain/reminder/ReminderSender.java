@@ -64,16 +64,11 @@ public class ReminderSender {
         InlineKeyboardButton button = keyboardFactory.createButton("👁 Посмотреть детали",
                 CallbackPrefix.VIEW_EVENT_FROM_REMINDER.withPayload(event.getId() + "_" + reminderId)
         );
-
         InlineKeyboardRow row = keyboardFactory.createRow(button);
-
         return keyboardFactory.createMarkup(row);
     }
     
     private void sendToUser(@NonNull Reminder reminder, @NonNull User user) throws TelegramApiException {
-        log.debug("Отправка напоминания о персональном событии ID {} пользователю ID {}", 
-                 reminder.getEvent().getId(), user.getId());
-        
         try {
             ZoneId timezone = reminderConfigurationService.getUserTimezone(user);
             sendMessage(reminder, user, timezone);
@@ -84,8 +79,6 @@ public class ReminderSender {
     }
     
     private void sendToFamily(Reminder reminder, @NonNull Event event) {
-        log.debug("Отправка напоминания о семейном событии ID {} всем членам семьи", event.getId());
-        
         if (event.getFamily() == null || event.getFamily().getMembers() == null) {
             return;
         }
@@ -116,7 +109,6 @@ public class ReminderSender {
         }
 
         try {
-            log.warn("Fallback на UTC для пользователя ID {}", user.getId());
             sendMessage(reminder, user, UTC);
 
         } catch (Exception fallbackError) {

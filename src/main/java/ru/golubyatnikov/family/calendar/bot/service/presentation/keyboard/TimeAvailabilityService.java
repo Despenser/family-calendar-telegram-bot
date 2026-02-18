@@ -39,7 +39,6 @@ public class TimeAvailabilityService {
         
         // Для будущих дат все часы доступны
         if (selectedDate.isAfter(today)) {
-            log.debug("Будущая дата {}, все 24 часа доступны", selectedDate);
             return IntStream.range(0, 24).boxed().collect(Collectors.toList());
         }
         
@@ -70,7 +69,6 @@ public class TimeAvailabilityService {
         
         // Для будущих дат все интервалы доступны
         if (selectedDate.isAfter(today)) {
-            log.debug("Будущая дата {}, все 4 интервала минут доступны", selectedDate);
             return MINUTE_INTERVALS;
         }
         
@@ -90,16 +88,12 @@ public class TimeAvailabilityService {
         
         // Если уже поздно (23:46+), нет доступных часов
         if (currentHour == MAX_HOUR && currentMinute >= CUTOFF_MINUTE) {
-            log.debug("Текущее время {}:{} >= 23:46, нет доступных часов", currentHour, currentMinute);
             return Collections.emptyList();
         }
         
         List<Integer> availableHours = IntStream.rangeClosed(currentHour, MAX_HOUR)
                 .boxed()
                 .collect(Collectors.toList());
-        
-        log.debug("Сегодня, текущее время {}:{}, доступно {} часов", 
-                currentHour, currentMinute, availableHours.size());
         
         return availableHours;
     }
@@ -111,8 +105,6 @@ public class TimeAvailabilityService {
         
         // Если выбран будущий час, все интервалы доступны
         if (selectedHour > currentHour) {
-            log.debug("Выбран будущий час {} (текущий {}), все 4 интервала доступны", 
-                    selectedHour, currentHour);
             return MINUTE_INTERVALS;
         }
         
@@ -129,17 +121,12 @@ public class TimeAvailabilityService {
     private @NonNull List<Integer> getAvailableMinutesForCurrentHour(int currentHour, int currentMinute) {
         // Если уже поздно (XX:46+), нет доступных интервалов
         if (currentMinute >= CUTOFF_MINUTE) {
-            log.debug("Текущее время {}:{} >= XX:46, нет доступных интервалов", 
-                    currentHour, currentMinute);
             return Collections.emptyList();
         }
         
         List<Integer> availableMinutes = MINUTE_INTERVALS.stream()
                 .filter(minute -> minute > currentMinute)
                 .collect(Collectors.toList());
-        
-        log.debug("Текущий час {}, текущие минуты {}, доступно {} интервалов", 
-                currentHour, currentMinute, availableMinutes.size());
         
         return availableMinutes;
     }

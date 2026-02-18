@@ -103,14 +103,10 @@ public class NavigationCallbackHandler implements CallbackHandler {
         String callbackData = callbackQuery.getData();
         
         if (callbackData == null) {
-            log.warn("Получен callback с null данными от пользователя userId={}", user.getId());
             throw new IllegalArgumentException("Callback data не может быть null");
         }
         
-        log.debug("Обработка callback навигации: data='{}', userId={}", callbackData, user.getId());
-        
         if (isReminderCallback(callbackData)) {
-            log.debug("Callback от напоминания, пропускаем обработку: data='{}'", callbackData);
             return;
         }
         
@@ -159,8 +155,6 @@ public class NavigationCallbackHandler implements CallbackHandler {
         String[] parts = yearMonthStr.split("-");
         int year = Integer.parseInt(parts[0]);
         int month = Integer.parseInt(parts[1]);
-        
-        log.info("Возврат к календарю: год={}, месяц={}, userId={}", year, month, ctx.getUserId());
         
         InlineKeyboardMarkup keyboard = keyboardService.createViewCalendarKeyboard(year, month, ctx.user());
         String message = botMessageFormattingService.buildCalendarViewMessage();
@@ -245,7 +239,6 @@ public class NavigationCallbackHandler implements CallbackHandler {
         String[] parts = payload.split("_", 2);
         
         if (parts.length != 2) {
-            log.error("Некорректный формат callback data: {}", callbackData);
             callbackQueryService.answerCallback(ctx.callbackQueryId(), "Ошибка при обработке запроса");
             return;
         }
@@ -253,11 +246,9 @@ public class NavigationCallbackHandler implements CallbackHandler {
         Long eventId = Long.parseLong(parts[0]);
         LocalDate sourceDate = LocalDate.parse(parts[1]);
         
-        log.info("Редактирование события: eventId={}, дата={}, userId={}", eventId, sourceDate, ctx.getUserId());
         Event event = eventService.getEventById(eventId);
         
         if (!event.getUser().getId().equals(ctx.getUserId())) {
-            log.warn("Нет прав для редактирования события: userId={}, eventId={}", ctx.getUserId(), eventId);
             callbackQueryService.answerCallback(ctx.callbackQueryId(), "У вас нет доступа");
             return;
         }
@@ -306,7 +297,6 @@ public class NavigationCallbackHandler implements CallbackHandler {
     private void handleDateActions(String callbackData, @NonNull CallbackQueryContext ctx) {
         String payload = CallbackPrefix.DATE_ACTIONS.extractPayload(callbackData);
         
-        log.info("Действие с датой: payload={}, userId={}", payload, ctx.getUserId());
         String message = switch (payload) {
             case "view" -> "📅 Просмотр событий на дату";
             case "create" -> "➕ Создание нового события";
@@ -342,7 +332,6 @@ public class NavigationCallbackHandler implements CallbackHandler {
         
         if (context == null || context.getEventId() == null) {
             conversationStateService.clearEventEditing(ctx.getUserId());
-            log.warn("Некорректный контекст редактирования при отмене: userId={}", ctx.getUserId());
             return;
         }
         
@@ -352,8 +341,8 @@ public class NavigationCallbackHandler implements CallbackHandler {
             
             if (editingMessageId != null) {
                 returnToEventCard(event, ctx.getUserId(), ctx.chatId(), editingMessageId);
+
             } else {
-                log.warn("MessageId не найден в контексте, используем sendOrUpdateEventMessage");
                 eventService.sendOrUpdateEventMessage(event, ctx.chatId());
             }
             
@@ -361,8 +350,6 @@ public class NavigationCallbackHandler implements CallbackHandler {
             callbackQueryService.answerCallback(ctx.callbackQueryId(), 
                     CallbackMessageFormatter.actionCancelled("Редактирование"));
             
-            log.info("Редактирование отменено: userId={}, eventId={}", ctx.getUserId(), context.getEventId());
-                    
         } catch (Exception e) {
             log.error("Ошибка при отмене редактирования: userId={}, error={}", ctx.getUserId(), e.getMessage());
             conversationStateService.clearEventEditing(ctx.getUserId());
@@ -386,9 +373,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
         
         try {
             messageService.editMessageText(chatId, messageId, eventMessage, keyboard);
-            log.info("Возврат к карточке события: eventId={}, messageId={}", event.getId(), messageId);
-
-        } catch (TelegramApiException e) {
+            } catch (TelegramApiException e) {
             log.warn("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
                     event.getId(), messageId, e.getMessage());
             try {
@@ -409,8 +394,6 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @param ctx контекст обработки callback
      */
     private void showMonthCalendar(int year, int month, @NonNull CallbackQueryContext ctx) {
-        log.debug("Навигация по календарю: год={}, месяц={}, userId={}", year, month, ctx.getUserId());
-        
         boolean isCreatingEvent = conversationService.hasActiveDraft(ctx.getUserId());
         boolean isEditingEvent = conversationStateService.isEditingEvent(ctx.getUserId());
         Long editingEventId = null;
@@ -461,7 +444,6 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @param ctx контекст обработки callback
      */
     private void handleDateSelectionForEventCreation(LocalDate selectedDate, @NonNull CallbackQueryContext ctx) {
-        log.info("Выбрана дата для создания события: date={}, userId={}", selectedDate, ctx.getUserId());
         eventViewService.showTimeSelectionForDate(selectedDate,
                 ctx.user(), ctx.chatId(), ctx.messageId(), ctx.callbackQueryId()
         );

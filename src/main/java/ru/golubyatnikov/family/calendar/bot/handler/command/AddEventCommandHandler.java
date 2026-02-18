@@ -47,11 +47,8 @@ public class AddEventCommandHandler implements CommandHandler {
         validateInput(message, user);
         
         if (!user.hasFamily()) {
-            log.warn("Пользователь без семьи попытался создать событие: userId={}", user.getId());
             return buildNoFamilyMessage();
         }
-        
-        log.debug("Начало создания события: userId={}", user.getId());
         
         try {
             startEventCreationFlow(message.getChatId(), user);
@@ -68,12 +65,10 @@ public class AddEventCommandHandler implements CommandHandler {
 
     private void validateInput(Message message, User user) {
         if (message == null) {
-            log.error("Получено null сообщение в AddEventCommandHandler");
             throw new IllegalArgumentException("Сообщение не может быть null");
         }
         
         if (user == null) {
-            log.error("Получен null пользователь в AddEventCommandHandler");
             throw new IllegalArgumentException("Пользователь не может быть null для команды /add_event");
         }
     }
@@ -98,14 +93,11 @@ public class AddEventCommandHandler implements CommandHandler {
         
         conversationService.setCreationMessageId(user.getId(), sentMessage.getMessageId().longValue());
         
-        log.debug("Календарь отправлен: userId={}, messageId={}", 
-                user.getId(), sentMessage.getMessageId());
-    }
+        }
 
     private void handleCreationError(Long userId) {
         try {
             conversationService.cancelEventCreation(userId);
-            log.debug("Черновик удален после ошибки: userId={}", userId);
 
         } catch (Exception cleanupError) {
             log.error("Ошибка при очистке черновика: userId={}, error={}", 

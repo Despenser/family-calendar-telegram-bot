@@ -64,9 +64,6 @@ public class TextEventCallbackHandler implements CallbackHandler {
     public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
         CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        log.debug("Обработка callback создания события из текста: data='{}', userId={}", 
-                context.callbackData(), user.getId());
-        
         if (CallbackPrefix.CONFIRM_TEXT_EVENT.matches(context.callbackData())) {
             handleConfirmTextEvent(context);
 
@@ -95,13 +92,7 @@ public class TextEventCallbackHandler implements CallbackHandler {
             LocalDate date = LocalDate.parse(parts[1]);
             LocalTime time = LocalTime.parse(parts[2]);
             
-            log.debug("Подтверждение создания события из текста: userId={}, title='{}', date={}, time={}", 
-                     context.getUserId(), title, date, time);
-            
             createdEvent = createEventInTransaction(context.getUserId(), title, date, time);
-            
-            log.info("Событие успешно создано из текста: eventId={}, userId={}", 
-                     createdEvent.getId(), context.getUserId());
             
         } catch (Exception e) {
             log.error("Ошибка при подтверждении создания события из текста: userId={}, " +
@@ -143,7 +134,6 @@ public class TextEventCallbackHandler implements CallbackHandler {
     private void cleanupDraftOnError(Long userId) {
         try {
             conversationService.cancelEventCreation(userId);
-            log.info("Черновик успешно удален после ошибки: userId={}", userId);
 
         } catch (Exception cleanupEx) {
             log.error("Ошибка при удалении черновика после ошибки создания события: userId={}, error={}", 
@@ -161,9 +151,6 @@ public class TextEventCallbackHandler implements CallbackHandler {
                     String eventMessage = botMessageFormattingService.buildEventCreatedMessage(createdEvent);
                     InlineKeyboardMarkup eventKeyboard = keyboardService.createEventActionsKeyboard(createdEvent.getId());
                     messageService.editMessageText(context.chatId(), context.messageId(), eventMessage, eventKeyboard);
-
-                    log.debug("Сообщение о созданном событии отправлено БЕЗ сохранения messageId: eventId={}", 
-                            createdEvent.getId());
 
                     messageService.answerCallbackQuery(context.callbackQueryId(), CallbackMessages.CREATED);
 
@@ -201,8 +188,6 @@ public class TextEventCallbackHandler implements CallbackHandler {
      * Обрабатывает отмену создания события из текста.
      */
     private void handleCancelTextEvent(@NonNull CallbackQueryContext context) {
-        log.info("Отмена создания события из текста: chatId={}", context.chatId());
-        
         String message = botMessageFormattingService.buildEventCancelledMessage();
         try {
             messageService.editMessageText(context.chatId(), context.messageId(), message, null);

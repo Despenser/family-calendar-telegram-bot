@@ -3,13 +3,13 @@ package ru.golubyatnikov.family.calendar.bot.handler.command;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.service.domain.user.UserService;
 
-import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
 
 /**
  * Обработчик команды /start для Telegram бота семейного календаря.
@@ -36,40 +36,21 @@ public class StartCommandHandler implements CommandHandler {
     @Override
     public String handle(Message message, User user) {
         if (message == null) {
-            log.error("Получено null сообщение в StartCommandHandler");
             throw new IllegalArgumentException("Сообщение не может быть null");
         }
 
         Long telegramId = message.getFrom().getId();
         String firstName = message.getFrom().getFirstName();
-        
-        // Извлекаем timezone из сообщения (для будущей автоматической регистрации)
-        String timezone = extractTimezoneFromMessage(message);
-
-        log.debug("Обработка команды /start: telegramId={}, timezone={}", telegramId, timezone);
 
         // Проверяем наличие пользователя в БД
         boolean isRegistered = userService.isUserAuthorized(telegramId);
 
         if (isRegistered) {
-            log.debug("Пользователь зарегистрирован: telegramId={}", telegramId);
             return buildWelcomeMessageForRegisteredUser(firstName);
+
         } else {
-            log.debug("Пользователь не зарегистрирован: telegramId={}", telegramId);
             return buildWelcomeMessageForUnregisteredUser(firstName);
         }
-    }
-
-    /**
-     * Пытается извлечь timezone из Telegram Message.
-     *
-     * @param message Telegram сообщение от пользователя
-     * @return timezone или null если недоступна (будет использован default timezone)
-     */
-    private @Nullable String extractTimezoneFromMessage(@NonNull Message message) {
-        String languageCode = message.getFrom().getLanguageCode();
-        log.debug("Language code from Telegram: {}", languageCode);
-        return null;
     }
 
     /**
@@ -79,12 +60,11 @@ public class StartCommandHandler implements CommandHandler {
      * @return отформатированное приветственное сообщение с кликабельными командами
      */
     private @NonNull String buildWelcomeMessageForRegisteredUser(String firstName) {
-        // Формируем приветствие с экранированием
+
         String greetingText = firstName != null && !firstName.isBlank() 
                 ? escape("Добро пожаловать, " + firstName + "! 👋")
                 : escape("Добро пожаловать! 👋");
 
-        // Собираем сообщение из уже экранированных частей
         return greetingText + "\n\n" +
                 bold("Семейный Календарь") + escape(" - это ваш персональный бот-помощник для управления семейными событиями и планами.") + "\n\n" +
                 escape("Вы уже зарегистрированы в системе и можете пользоваться всеми возможностями бота:") + "\n\n" +
@@ -104,12 +84,11 @@ public class StartCommandHandler implements CommandHandler {
      * @return отформатированное сообщение о необходимости регистрации
      */
     private @NonNull String buildWelcomeMessageForUnregisteredUser(String firstName) {
-        // Формируем приветствие с экранированием
+
         String greetingText = firstName != null && !firstName.isBlank() 
                 ? escape("Добро пожаловать, " + firstName + "! 👋")
                 : escape("Добро пожаловать! 👋");
 
-        // Собираем сообщение из уже экранированных частей
         return greetingText + "\n\n" +
                 bold("Семейный Календарь") + escape(" - это ваш персональный бот-помощник для управления семейными событиями и планами.") + "\n\n" +
                 escape("С помощью этого бота вы сможете:") + "\n" +

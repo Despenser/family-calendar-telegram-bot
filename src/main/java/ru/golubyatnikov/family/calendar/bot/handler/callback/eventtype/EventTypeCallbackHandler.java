@@ -64,9 +64,6 @@ public class EventTypeCallbackHandler implements CallbackHandler {
     public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
         CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        log.debug("Обработка callback типа события: data='{}', userId={}", 
-                context.callbackData(), user.getId());
-        
         if (CallbackPrefix.EVENT_TYPE.matches(context.callbackData())) {
             handleEventTypeSelection(context);
 
@@ -81,22 +78,17 @@ public class EventTypeCallbackHandler implements CallbackHandler {
      * @param context контекст callback query
      */
     private void handleEventTypeSelection(@NonNull CallbackQueryContext context) {
-        // Извлекаем тип события (family или personal)
         String eventType = CallbackPrefix.EVENT_TYPE.extractPayload(context.callbackData());
         boolean isPersonal = eventType.equals("personal");
 
         conversationService.updateEventType(context.getUserId(), isPersonal);
-        log.info("Пользователь {} выбрал тип события: {}", context.getUserId(), eventType);
-        
-        // Показываем запрос на ввод названия события
+
         String message = botMessageFormattingService.buildEventTypeSelectedMessage(isPersonal) + 
                         "\n\n" + bold("Теперь отправьте название события:");
         
         callbackQueryService.editMessageAndAnswer(context, message, null, CallbackMessages.SELECTED);
         
-        log.debug("Сообщение создания обновлено после выбора типа: userId={}, messageId={}, type={}", 
-                 context.getUserId(), context.messageId(), eventType);
-    }
+        }
     
     /**
      * Обрабатывает пропуск описания события.
@@ -110,9 +102,7 @@ public class EventTypeCallbackHandler implements CallbackHandler {
         sendEventCreatedNotification(completedEvent, context.chatId());
         callbackQueryService.answerCallback(context.callbackQueryId(), CallbackMessages.CREATED);
         
-        log.info("Событие успешно создано без описания: eventId={}, userId={}", 
-            completedEvent.getId(), context.getUserId());
-    }
+        }
     
     /**
      * Отправляет уведомление о созданном событии.
@@ -124,7 +114,6 @@ public class EventTypeCallbackHandler implements CallbackHandler {
     private void sendEventCreatedNotification(Event event, Long chatId) {
         try {
             eventService.sendOrUpdateEventMessage(event, chatId);
-            log.debug("Сообщение о созданном событии отправлено и messageId сохранён: eventId={}", event.getId());
 
         } catch (TelegramApiException e) {
             log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
@@ -156,7 +145,6 @@ public class EventTypeCallbackHandler implements CallbackHandler {
 
             ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
             messageService.sendMessage(chatId, response, keyboard);
-            log.debug("Отправлено fallback сообщение о созданном событии: eventId={}", event.getId());
 
         } catch (TelegramApiException e) {
             log.error("Критическая ошибка при отправке fallback сообщения: eventId={}, error={}", 

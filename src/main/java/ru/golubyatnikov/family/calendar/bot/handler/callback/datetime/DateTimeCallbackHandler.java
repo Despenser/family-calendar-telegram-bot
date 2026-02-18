@@ -112,9 +112,6 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         String callbackData = context.callbackData();
         
-        log.debug("Обработка callback для даты/времени: data='{}', userId={}", 
-                callbackData, user.getId());
-        
         if (CallbackPrefix.DATE.matches(callbackData)) {
             handleDateSelection(context);
 
@@ -166,6 +163,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
     private void handleDateSelectionForNewEvent(LocalDate date,
                                                 User user,
                                                 @NonNull CallbackQueryContext context) {
+
         conversationService.updateEventDate(context.getUserId(), date);
         
         InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(date, user);
@@ -182,7 +180,6 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         try {
             callbackQueryService.editMessageAndAnswer(context, message, keyboard,
                     CallbackMessageFormatter.itemSelected("Дата"));
-            log.info("Дата выбрана для пользователя {}: {}", context.getUserId(), date);
 
         } catch (Exception e) {
             log.error("Ошибка при выборе даты: userId={}, date={}, error={}", context.getUserId(), date, e.getMessage());
@@ -245,8 +242,8 @@ public class DateTimeCallbackHandler implements CallbackHandler {
             : botMessageFormattingService.buildHourSelectedMessage(hour);
         
         try {
-            callbackQueryService.editMessageAndAnswer(context, message, keyboard, CallbackMessageFormatter.itemSelected("Час"));
-            log.debug("Час выбран: {}, isEditing={}", hour, hourContext.isEditingEvent());
+            callbackQueryService.editMessageAndAnswer(context, message, keyboard,
+                    CallbackMessageFormatter.itemSelected("Час"));
 
         } catch (Exception e) {
             log.error("Ошибка при выборе часа: hour={}, error={}", hour, e.getMessage());
@@ -309,9 +306,6 @@ public class DateTimeCallbackHandler implements CallbackHandler {
 
             callbackQueryService.editMessageAndAnswer(context, message, filteredHourSelectionKeyboard,
                     CallbackMessages.SELECT_NEXT_HOUR);
-
-            log.warn("Попытка выбрать час, для которого все минуты прошли: userId={}, hour={}, eventDate={}", 
-                    context.getUserId(), hour, hourContext.eventDate());
 
         } catch (Exception e) {
             log.error("Ошибка при отображении сообщения о прошедших минутах: userId={}, hour={}, error={}", 
@@ -377,15 +371,11 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         InlineKeyboardMarkup eventKeyboard = keyboardService.createEventActionsKeyboard(completedEvent.getId());
         
         try {
-            callbackQueryService.editMessageAndAnswer(context, eventMessage, eventKeyboard, "✅ Событие создано");
+            callbackQueryService.editMessageAndAnswer(context, eventMessage,
+                    eventKeyboard, "✅ Событие создано");
             
-            log.info("Событие повторено успешно: eventId={}, userId={}, originalTitle={}", 
-                    completedEvent.getId(), context.getUserId(), completedEvent.getTitle());
-
         } catch (Exception e) {
-            log.error("Ошибка при завершении повторения события: userId={}, error={}", 
-                     context.getUserId(), e.getMessage());
-
+            log.error("Ошибка при завершении повторения события: userId={}, error={}", context.getUserId(), e.getMessage());
             throw new RuntimeException("Ошибка при завершении повторения события", e);
         }
     }
@@ -406,12 +396,9 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         try {
             callbackQueryService.editMessageAndAnswer(context, message, typeKeyboard,
                     CallbackMessageFormatter.itemSelected("Время"));
-            log.info("Время выбрано для пользователя {}: {}", context.getUserId(), time);
 
         } catch (Exception e) {
-            log.error("Ошибка при выборе времени: userId={}, time={}, error={}", 
-                     context.getUserId(), time, e.getMessage());
-
+            log.error("Ошибка при выборе времени: userId={}, time={}, error={}", context.getUserId(), time, e.getMessage());
             throw new RuntimeException("Ошибка при выборе времени", e);
         }
     }
@@ -436,8 +423,6 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         try {
             messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
-            log.debug("Возврат к выбору часа: userId={}, eventDate={}, isEditing={}", 
-                     context.getUserId(), hourContext.eventDate(), hourContext.isEditingEvent());
 
         } catch (TelegramApiException e) {
             log.error("Ошибка при возврате к выбору часа: userId={}, error={}", context.getUserId(), e.getMessage());

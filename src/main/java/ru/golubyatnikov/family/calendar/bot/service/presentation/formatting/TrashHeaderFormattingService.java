@@ -46,11 +46,8 @@ public class TrashHeaderFormattingService {
     @Transactional
     public void updateTrashHeaderAfterRemoval(Long userId) {
         if (userId == null) {
-            log.error("Попытка обновить шапку корзины с userId=null");
             throw new IllegalArgumentException("ID пользователя не может быть null");
         }
-        
-        log.debug("Обновление шапки корзины для пользователя ID={}", userId);
         
         List<Event> trashedEvents = getTrashedEvents(userId);
         Long chatId = getChatId(userId);
@@ -67,8 +64,7 @@ public class TrashHeaderFormattingService {
         updateTrashHeaderFlags(trashedEvents);
         updateTrashHeaderCount(userId);
         
-        log.debug("Шапка корзины обновлена для пользователя ID={}", userId);
-    }
+        }
     
     /**
      * Обновляет счетчик событий в шапке корзины.
@@ -77,16 +73,12 @@ public class TrashHeaderFormattingService {
      */
     public void updateTrashHeaderCount(Long userId) {
         if (userId == null) {
-            log.error("Попытка обновить счетчик корзины с userId=null");
             throw new IllegalArgumentException("ID пользователя не может быть null");
         }
-        
-        log.debug("Обновление счетчика в шапке корзины для пользователя ID={}", userId);
         
         List<Event> trashedEvents = getTrashedEvents(userId);
         
         if (trashedEvents.isEmpty()) {
-            log.debug("Корзина пуста, обновление счетчика не требуется для пользователя ID={}", userId);
             return;
         }
         
@@ -118,7 +110,6 @@ public class TrashHeaderFormattingService {
      * @param userId идентификатор пользователя
      */
     public void updateMyEventsHeaderCount(Long userId) {
-        log.debug("Обновление счетчика 'Мои события' для пользователя ID={}", userId);
         myEventsHeaderUpdater.updateMyEventsHeaderCount(userId);
     }
     
@@ -131,7 +122,6 @@ public class TrashHeaderFormattingService {
             .orElse(null);
         
         if (chatId == null) {
-            log.warn("Не удалось получить chatId для пользователя ID={}", userId);
         }
         
         return chatId;
@@ -145,8 +135,7 @@ public class TrashHeaderFormattingService {
         
         try {
             messageService.sendMessage(chatId, emptyMessage);
-            log.info("Отправлено сообщение о пустой корзине для пользователя ID={}", userId);
-        } catch (Exception e) {
+            } catch (Exception e) {
             log.error("Ошибка при отправке сообщения о пустой корзине для пользователя ID={}: {}", 
                      userId, e.getMessage(), e);
         }
@@ -165,9 +154,7 @@ public class TrashHeaderFormattingService {
             if (shouldBeHeader != isCurrentlyHeader) {
                 event.setIsTrashHeader(shouldBeHeader);
                 eventRepository.save(event);
-                log.debug("Флаг isTrashHeader {} для события ID={}", 
-                         shouldBeHeader ? "установлен" : "сброшен", event.getId());
-            }
+                }
         }
     }
     
@@ -181,7 +168,6 @@ public class TrashHeaderFormattingService {
             .orElse(null);
         
         if (headerEvent == null) {
-            log.warn("Не найдено событие с флагом isTrashHeader");
         }
         
         return headerEvent;
@@ -192,7 +178,6 @@ public class TrashHeaderFormattingService {
      */
     private void updateHeaderMessage(@NonNull Event headerEvent, int totalCount) {
         if (headerEvent.getMessageId() == null) {
-            log.warn("У события с шапкой ID={} отсутствует messageId", headerEvent.getId());
             return;
         }
         
@@ -212,9 +197,7 @@ public class TrashHeaderFormattingService {
             );
             
             if (updated) {
-                log.info("Счетчик в шапке корзины обновлен для события ID={}", headerEvent.getId());
-            } else {
-                log.warn("Не удалось обновить счетчик в шапке корзины для события ID={}", headerEvent.getId());
+                } else {
             }
         } catch (Exception e) {
             log.error("Ошибка при обновлении счетчика в шапке корзины: {}", e.getMessage(), e);

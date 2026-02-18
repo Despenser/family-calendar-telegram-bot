@@ -49,22 +49,14 @@ public class EventCompletionScheduler {
     @Transactional
     public void completeExpiredEvents() {
         CorrelationIdUtil.executeWithCorrelationId(() -> {
-            log.debug("Запуск проверки истекших событий");
-
             try {
                 LocalDateTime now = LocalDateTime.now();
-
-                // Получаем все активные события, которые истекли
                 List<Event> expiredEvents = eventRepository.findExpiredActiveEvents(now);
 
                 if (expiredEvents.isEmpty()) {
-                    log.debug("Истекших событий не найдено");
                     return;
                 }
 
-                log.info("Найдено {} истекших событий для завершения", expiredEvents.size());
-
-                int completedCount = 0;
                 for (Event event : expiredEvents) {
                     try {
                         EventStatus oldStatus = event.getStatus();
@@ -85,21 +77,13 @@ public class EventCompletionScheduler {
                         // Отправляем уведомление создателю
                         sendCompletionNotification(event);
 
-                        completedCount++;
-                        log.debug("Событие ID={} автоматически завершено", event.getId());
-
                     } catch (Exception e) {
-                        log.error("Ошибка при завершении события ID={}: {}",
-                                event.getId(), e.getMessage(), e);
+                        log.error("Ошибка при завершении события ID={}: {}", event.getId(), e.getMessage(), e);
                     }
                 }
 
-                log.info("Автоматическое завершение событий выполнено: {} из {} событий завершено",
-                        completedCount, expiredEvents.size());
-
             } catch (Exception e) {
-                log.error("Ошибка при выполнении автоматического завершения событий: {}",
-                        e.getMessage(), e);
+                log.error("Ошибка при выполнении автоматического завершения событий: {}", e.getMessage(), e);
             }
         });
     }
@@ -147,9 +131,6 @@ public class EventCompletionScheduler {
             InlineKeyboardMarkup keyboard = createCompletionKeyboard(event.getId());
 
             messageService.sendMessage(chatId, message.toString(), keyboard);
-
-            log.info("Уведомление о завершении события ID={} отправлено пользователю ID={}",
-                    event.getId(), event.getUser().getId());
 
         } catch (Exception e) {
             log.error("Ошибка при отправке уведомления о завершении события ID={}: {}",

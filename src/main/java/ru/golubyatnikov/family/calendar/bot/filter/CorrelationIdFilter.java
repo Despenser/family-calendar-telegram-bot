@@ -38,6 +38,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
      * @param request HTTP запрос
      * @param response HTTP ответ
      * @param filterChain цепочка фильтров
+     *
      * @throws ServletException если возникает ошибка сервлета
      * @throws IOException если возникает ошибка ввода-вывода
      */
@@ -49,8 +50,6 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             String correlationId = extractOrGenerateCorrelationId(request);
             MDC.put(CORRELATION_ID_MDC_KEY, correlationId);
             response.setHeader(CORRELATION_ID_HEADER_NAME, correlationId);
-            
-            log.debug("Обработка запроса с correlation ID: {}", correlationId);
 
             filterChain.doFilter(request, response);
             
@@ -67,15 +66,9 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
      */
     private String extractOrGenerateCorrelationId(@NonNull HttpServletRequest request) {
         String correlationId = request.getHeader(CORRELATION_ID_HEADER_NAME);
-        
-        if (correlationId == null || correlationId.trim().isEmpty()) {
-            correlationId = generateCorrelationId();
-            log.debug("Сгенерирован новый correlation ID: {}", correlationId);
-        } else {
-            log.debug("Использован correlation ID из заголовка: {}", correlationId);
-        }
-        
-        return correlationId;
+        return (correlationId == null || correlationId.trim().isEmpty()) 
+            ? generateCorrelationId() 
+            : correlationId;
     }
 
     /**

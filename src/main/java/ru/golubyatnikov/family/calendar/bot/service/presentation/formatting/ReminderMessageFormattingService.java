@@ -151,11 +151,9 @@ public class ReminderMessageFormattingService {
                  reminder.getId(), timezone, e.getMessage(), e);
         
         if (UTC.equals(timezone)) {
-            log.error("Критическая ошибка форматирования с UTC, используется базовый формат");
             return "🔔 " + bold("Напоминание о событии - " + reminder.getEvent().getTitle());
         }
         
-        log.warn("Fallback на UTC для напоминания ID {}", reminder.getId());
         return builder.build(reminder, UTC);
     }
     

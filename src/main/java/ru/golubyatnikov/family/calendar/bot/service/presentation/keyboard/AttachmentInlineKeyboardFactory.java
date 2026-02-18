@@ -36,12 +36,8 @@ public class AttachmentInlineKeyboardFactory {
      */
     public InlineKeyboardMarkup createAttachmentsListKeyboard(Long eventId, List<Attachment> attachments, boolean isCreator) {
         if (eventId == null || eventId <= 0) {
-            log.error("Попытка создать клавиатуру вложений с некорректным eventId: {}", eventId);
             throw new IllegalArgumentException("EventId должен быть положительным числом");
         }
-        
-        log.debug("Создание inline клавиатуры списка вложений для события ID={}, isCreator={}, attachmentsCount={}", 
-                eventId, isCreator, attachments != null ? attachments.size() : 0);
         
         List<InlineKeyboardRow> rows = new ArrayList<>();
         
@@ -93,17 +89,12 @@ public class AttachmentInlineKeyboardFactory {
      */
     public InlineKeyboardMarkup createDeleteAttachmentConfirmationKeyboard(Long eventId, Long attachmentId) {
         if (eventId == null || eventId <= 0) {
-            log.error("Попытка создать клавиатуру подтверждения удаления вложения с некорректным eventId: {}", eventId);
             throw new IllegalArgumentException("EventId должен быть положительным числом");
         }
         
         if (attachmentId == null || attachmentId <= 0) {
-            log.error("Попытка создать клавиатуру подтверждения удаления вложения с некорректным attachmentId: {}", attachmentId);
             throw new IllegalArgumentException("AttachmentId должен быть положительным числом");
         }
-        
-        log.debug("Создание inline клавиатуры подтверждения удаления вложения ID={} для события ID={}", 
-                attachmentId, eventId);
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
@@ -123,11 +114,8 @@ public class AttachmentInlineKeyboardFactory {
      */
     public InlineKeyboardMarkup createFileViewKeyboard(Long eventId) {
         if (eventId == null || eventId <= 0) {
-            log.error("Попытка создать клавиатуру просмотра файла с некорректным eventId: {}", eventId);
             throw new IllegalArgumentException("EventId должен быть положительным числом");
         }
-        
-        log.debug("Создание inline клавиатуры для просмотра файла события ID={}", eventId);
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
@@ -146,11 +134,8 @@ public class AttachmentInlineKeyboardFactory {
      */
     public InlineKeyboardMarkup createAttachmentUploadKeyboard(Long eventId) {
         if (eventId == null || eventId <= 0) {
-            log.error("Попытка создать клавиатуру с некорректным eventId: {}", eventId);
             throw new IllegalArgumentException("EventId должен быть положительным числом");
         }
-        
-        log.debug("Создание inline клавиатуры для загрузки вложения к событию ID={}", eventId);
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(

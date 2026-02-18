@@ -42,8 +42,6 @@ public class CalendarCommandHandler implements CommandHandler {
     public String handle(@NonNull Message message, @NonNull User user) {
         Long chatId = message.getChatId();
         
-        log.info("Пользователь {} вызвал команду /calendar", user.getId());
-        
         try {
             // Получаем текущую дату пользователя
             LocalDate currentDate = user.getCurrentDate();
@@ -56,8 +54,6 @@ public class CalendarCommandHandler implements CommandHandler {
             String messageText = botMessageFormattingService.buildCalendarViewMessage();
             
             messageService.sendMessageWithInlineKeyboard(chatId, messageText, keyboard);
-            
-            log.debug("Календарь просмотра отправлен пользователю {}", user.getId());
             
             return "";
 

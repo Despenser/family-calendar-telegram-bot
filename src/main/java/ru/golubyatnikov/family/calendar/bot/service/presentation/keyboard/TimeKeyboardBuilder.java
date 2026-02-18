@@ -41,9 +41,6 @@ public class TimeKeyboardBuilder {
     public InlineKeyboardMarkup createFilteredHourSelection(LocalDate selectedDate, User user, Long editingEventId) {
         validateParameters(selectedDate, user);
         
-        log.debug("Создание фильтрованной клавиатуры часов: date={}, userId={}, editId={}", 
-                selectedDate, user.getId(), editingEventId);
-        
         List<Integer> availableHours = timeAvailabilityService.getAvailableHours(selectedDate, user);
         
         List<InlineKeyboardRow> rows = new ArrayList<>();
@@ -68,9 +65,6 @@ public class TimeKeyboardBuilder {
 
         validateHour(selectedHour);
         validateParameters(selectedDate, user);
-        
-        log.debug("Создание фильтрованной клавиатуры минут: hour={}, date={}, userId={}, editId={}", 
-                selectedHour, selectedDate, user.getId(), editingEventId);
         
         List<Integer> availableMinutes = timeAvailabilityService.getAvailableMinutes(
             selectedHour, selectedDate, user);
@@ -149,7 +143,6 @@ public class TimeKeyboardBuilder {
     }
 
     private InlineKeyboardMarkup buildKeyboard(@NonNull List<InlineKeyboardRow> rows) {
-        log.debug("Клавиатура создана с {} рядами", rows.size());
         return keyboardFactory.createMarkup(rows);
     }
 

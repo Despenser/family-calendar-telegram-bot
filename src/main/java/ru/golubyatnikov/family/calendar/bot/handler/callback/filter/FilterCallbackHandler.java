@@ -50,27 +50,17 @@ public class FilterCallbackHandler implements CallbackHandler {
     public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
         CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        log.debug("Обработка callback фильтрации: data='{}', userId={}", 
-                context.callbackData(), user.getId());
-
         EventFilter filter = parseFilter(context.callbackData());
-        log.info("Пользователь ID={} выбрал фильтр: {}", user.getId(), filter);
-        
-        // Сохраняем выбор пользователя
         userService.setEventFilter(user.getId(), filter);
 
         List<Event> events = eventService.getFilteredEvents(user, filter);
-        log.debug("Найдено {} событий для фильтра {}", events.size(), filter);
-        
-        // Форматируем и отправляем ответ
         String messageText = formatFilteredEvents(events, filter);
         String confirmationText = "Фильтр применен: " + filter.getDisplayName();
         
         callbackQueryService.editMessageAndAnswer(context, messageText, 
                 keyboardService.createFilterKeyboard(), confirmationText);
         
-        log.info("Фильтр {} успешно применен для пользователя ID={}", filter, user.getId());
-    }
+        }
     
     /**
      * Парсит тип фильтра из callback data.
@@ -82,13 +72,9 @@ public class FilterCallbackHandler implements CallbackHandler {
         String filterType = CallbackPrefix.FILTER.extractPayload(callbackData);
         
         return switch (filterType) {
-            case "all" -> EventFilter.ALL;
             case "family" -> EventFilter.FAMILY;
             case "personal" -> EventFilter.PERSONAL;
-            default -> {
-                log.warn("Неизвестный тип фильтра: '{}', используется ALL по умолчанию", filterType);
-                yield EventFilter.ALL;
-            }
+            default -> EventFilter.ALL;
         };
     }
     
@@ -117,8 +103,7 @@ public class FilterCallbackHandler implements CallbackHandler {
               .append("*")
               .append(events.size())
               .append("*\n\n");
-            
-            // Используем BotMessageBuilder для форматирования каждого события
+
             IntStream.range(0, events.size()).forEach(i -> {
                 Event event = events.get(i);
                 sb.append(botMessageFormattingService.buildEventMessage(event));

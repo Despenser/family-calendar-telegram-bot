@@ -83,7 +83,9 @@ public class HelpMessageBuilder {
     /**
      * Добавляет список команд по категориям.
      */
-    private void appendCommandsList(@NonNull StringBuilder message, Map<CommandCategory, List<String>> groupedCommands) {
+    private void appendCommandsList(@NonNull StringBuilder message,
+                                    Map<CommandCategory, List<String>> groupedCommands) {
+
         message.append(bold("Доступные команды:")).append("\n\n");
 
         Arrays.stream(CATEGORY_ORDER).forEach(category -> {

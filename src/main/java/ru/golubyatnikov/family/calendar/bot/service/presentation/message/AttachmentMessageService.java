@@ -58,20 +58,15 @@ public class AttachmentMessageService {
                                      Long userId,
                                      Long eventId) throws TelegramApiException {
         
-        log.debug("Обновление сообщения: chatId={}, messageId={}, eventId={}", chatId, messageId, eventId);
-        
         boolean edited = messageService.tryEditMessageText(chatId, messageId, text, keyboard);
         
         Integer resultMessageId;
         if (edited) {
             resultMessageId = messageId;
-            log.debug("Сообщение отредактировано: messageId={}", messageId);
-
-        } else {
+            } else {
             Message sentMessage = messageService.sendMessageAndGet(chatId, text, keyboard);
             resultMessageId = sentMessage.getMessageId();
-            log.debug("Отправлено новое сообщение: messageId={}", resultMessageId);
-        }
+            }
         
         conversationStateService.saveAttachmentMessageId(userId, eventId, chatId, resultMessageId);
         return resultMessageId;
@@ -98,14 +93,11 @@ public class AttachmentMessageService {
                                         Long userId,
                                         Long eventId) throws TelegramApiException {
         
-        log.debug("Замена медиа-сообщения на текстовое: chatId={}, messageId={}", chatId, messageId);
-
         try {
             messageService.deleteMessage(chatId, messageId);
 
         } catch (Exception e) {
-            log.debug("Не удалось удалить медиа-сообщение (возможно, уже удалено): {}", e.getMessage());
-        }
+            }
         
         // Отправляем новое текстовое сообщение
         Message sentMessage = messageService.sendMessageAndGet(chatId, text, keyboard);
@@ -113,7 +105,6 @@ public class AttachmentMessageService {
         
         conversationStateService.saveAttachmentMessageId(userId, eventId, chatId, newMessageId);
         
-        log.debug("Медиа заменено на текст: newMessageId={}", newMessageId);
         return newMessageId;
     }
     

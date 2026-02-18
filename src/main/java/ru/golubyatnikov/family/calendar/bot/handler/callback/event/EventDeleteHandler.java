@@ -78,8 +78,6 @@ public class EventDeleteHandler implements CallbackHandler {
             
             updateUIAfterDeletion(context, eventDate, allRemainingEvents, myRemainingEvents, isPastDate, user);
             
-            log.debug("Событие ID={} успешно удалено пользователем ID={}, UI обновлен", eventId, context.getUserId());
-            
         } catch (EventNotFoundException e) {
             log.error("Событие не найдено: eventId={}, userId={}", eventId, context.getUserId(), e);
             callbackQueryService.answerCallback(context, "❌ Событие не найдено");
@@ -125,12 +123,10 @@ public class EventDeleteHandler implements CallbackHandler {
                                          boolean isPastDate) throws TelegramApiException {
 
         if (isPastDate) {
-            log.info("На прошлую дату {} не осталось событий, возвращаемся к календарю", eventDate);
             callbackQueryService.answerCallback(context, CallbackMessages.DELETED + ". На эту дату больше нет событий");
             messageService.deleteMessageSilently(context.chatId(), context.messageId());
 
         } else {
-            log.info("На дату {} не осталось событий, показываем экран создания", eventDate);
             String message = botMessageFormattingService.buildCreateEventOnDateMessage(eventDate);
             InlineKeyboardMarkup keyboard = keyboardService.createCreateEventOnDateKeyboard(eventDate);
             messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
@@ -147,8 +143,6 @@ public class EventDeleteHandler implements CallbackHandler {
                                              boolean isPastDate,
                                              User user) throws TelegramApiException {
 
-        log.info("У пользователя не осталось своих событий на дату {}, но есть события других", eventDate);
-        
         String message;
         InlineKeyboardMarkup keyboard;
         
@@ -172,9 +166,6 @@ public class EventDeleteHandler implements CallbackHandler {
                                            LocalDate eventDate,
                                            @NonNull List<Event> myRemainingEvents) throws TelegramApiException {
 
-        log.info("У пользователя осталось {} своих событий на дату {}, обновляем список для удаления", 
-                myRemainingEvents.size(), eventDate);
-        
         String message = "🗑 Выберите событие для удаления:";
         InlineKeyboardMarkup keyboard = keyboardFactory.createDeleteEventListKeyboard(myRemainingEvents, eventDate);
         

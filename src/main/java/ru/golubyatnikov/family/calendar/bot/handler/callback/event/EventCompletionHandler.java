@@ -80,9 +80,6 @@ public class EventCompletionHandler implements CallbackHandler {
     private void handleCompleteEvent(@NonNull CallbackQueryContext context) {
         Long eventId = extractEventId(context.callbackData(), CallbackPrefix.COMPLETE_EVENT);
         
-        log.debug("Начало обработки завершения события с переупорядочиванием: eventId={}, userId={}, messageId={}", 
-                 eventId, context.getUserId(), context.messageId());
-        
         try {
             Event completedEvent = eventService.completeEventWithReordering(eventId, context.getUserId());
             
@@ -99,9 +96,6 @@ public class EventCompletionHandler implements CallbackHandler {
                 context.chatId(), 
                 updatedMessageId
             );
-            
-            log.debug("Контекст сохранён для добавления заметки: eventId={}, messageId={}, userId={}", 
-                     eventId, updatedMessageId, context.getUserId());
             
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
@@ -126,8 +120,6 @@ public class EventCompletionHandler implements CallbackHandler {
     private void handleAddCompletionNote(@NonNull CallbackQueryContext context) throws TelegramApiException {
         Long eventId = extractEventId(context.callbackData(), CallbackPrefix.ADD_COMPLETION_NOTE);
         
-        log.debug("Обработка добавления заметки: eventId={}, userId={}", eventId, context.getUserId());
-        
         String message = formatMessage(
                 """
                         📝 Напишите заметку о том, как прошло событие.
@@ -138,12 +130,13 @@ public class EventCompletionHandler implements CallbackHandler {
         
         try {
             messageService.editMessageText(context.chatId(), context.messageId(), message, null);
-            conversationStateService.setAwaitingCompletionNote(context.getUserId(), eventId, context.chatId(), context.messageId());
-            log.info("Ожидание заметки для события ID={}, userId={}", eventId, context.getUserId());
-            
+            conversationStateService.setAwaitingCompletionNote(context.getUserId(), eventId,
+                    context.chatId(), context.messageId());
+
         } catch (TelegramApiException e) {
-            log.warn("Не удалось отредактировать сообщение, отправка нового: eventId={}, error={}", 
-                     eventId, e.getMessage());
+            log.warn("Не удалось отредактировать сообщение, отправка нового: eventId={}, error={}",
+                    eventId, e.getMessage());
+
             messageService.sendMessage(context.chatId(), message);
             conversationStateService.setAwaitingCompletionNote(context.getUserId(), eventId, context.chatId(), null);
         }
@@ -155,8 +148,6 @@ public class EventCompletionHandler implements CallbackHandler {
      * Обрабатывает нажатие кнопки "Пропустить" при добавлении заметки.
      */
     private void handleSkipCompletionNote(@NonNull CallbackQueryContext context) throws TelegramApiException {
-        log.info("Пропуск добавления заметки: userId={}", context.getUserId());
-
         CompletionNoteContext completionContext = conversationStateService.getCompletionNoteContext(context.getUserId());
 
         if (completionContext == null) {
@@ -173,7 +164,6 @@ public class EventCompletionHandler implements CallbackHandler {
 
         if (wasPartOfMyEventsList) {
             eventNotificationService.updateMyEventsHeaderAfterRemoval(context.getUserId());
-            log.info("Шапка /my_events обновлена: eventId={}, userId={}", eventId, context.getUserId());
         }
 
         callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
@@ -197,7 +187,6 @@ public class EventCompletionHandler implements CallbackHandler {
      * Обрабатывает случай истекшего контекста заметки.
      */
     private void handleExpiredContext(@NonNull CallbackQueryContext context) throws TelegramApiException {
-        log.warn("Контекст не найден: userId={}", context.getUserId());
         conversationStateService.clearAwaitingCompletionNote(context.getUserId());
         messageService.sendMessage(context.chatId(), formatMessage("❌ Время ожидания истекло. Попробуйте снова."));
         callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);

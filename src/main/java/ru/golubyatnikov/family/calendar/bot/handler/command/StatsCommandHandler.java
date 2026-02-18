@@ -37,9 +37,6 @@ public class StatsCommandHandler implements CommandHandler {
      */
     @Override
     public String handle(Message message, @NonNull User user) {
-        log.debug("Обработка команды /stats для пользователя ID={}, семья ID={}", 
-                  user.getId(), user.getFamily().getId());
-        
         try {
             // Получение статистики за текущий месяц в таймзоне пользователя
             YearMonth currentMonth = YearMonth.now(user.getZoneId());
@@ -118,12 +115,8 @@ public class StatsCommandHandler implements CommandHandler {
             } else {
                 messageBuilder.append(italic("Все события этого месяца завершены! 🎉"));
             }
-            
-            String responseMessage = messageBuilder.toString();
-            log.debug("Пользователю ID={} будет отправлена статистика: всего={}, завершено={}, активных={}", 
-                     user.getId(), stats.getTotalEvents(), stats.getCompletedEvents(), stats.getActiveEvents());
 
-            return responseMessage;
+            return messageBuilder.toString();
             
         } catch (Exception e) {
             log.error("Ошибка при обработке команды /stats для пользователя ID={}", user.getId(), e);

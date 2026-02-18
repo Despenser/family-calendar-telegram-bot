@@ -58,16 +58,12 @@ public class EventEditingMessageHandler {
         EditingContext context = conversationStateService.getEditingContext(userId);
         
         if (context == null || context.getCurrentField() == null) {
-            log.warn("Контекст редактирования не найден для пользователя ID={}", userId);
             return;
         }
         
         Long eventId = context.getEventId();
         EditField field = context.getCurrentField();
         Integer editingMessageId = context.getMessageId();
-        
-        log.info("Обработка ввода текста для поля '{}' события ID={} пользователем ID={}", 
-                field, eventId, userId);
         
         try {
             switch (field) {
@@ -94,8 +90,6 @@ public class EventEditingMessageHandler {
                                  Long eventId, Integer editingMessageId) {
 
         Event updatedEvent = eventService.updateEventTitle(eventId, userId, text);
-        log.debug("Название события обновлено: eventId={}, newTitle='{}'", eventId, text);
-        
         updateEventMessage(userId, chatId, userMessageId, updatedEvent, editingMessageId);
         conversationStateService.clearEventEditing(userId);
     }
@@ -107,8 +101,6 @@ public class EventEditingMessageHandler {
                                        Long eventId, Integer editingMessageId) {
 
         Event updatedEvent = eventService.updateEventDescription(eventId, userId, text);
-        log.debug("Описание события обновлено: eventId={}", eventId);
-        
         updateEventMessage(userId, chatId, userMessageId, updatedEvent, editingMessageId);
         conversationStateService.clearEventEditing(userId);
     }
@@ -121,9 +113,6 @@ public class EventEditingMessageHandler {
                                    Long eventId, Integer editingMessageId, 
                                    EditField field) {
 
-        log.info("Игнорируем текстовый ввод для поля '{}', так как оно редактируется через inline-кнопки: eventId={}, userId={}", 
-                field, eventId, userId);
-        
         messageService.deleteMessageSilently(chatId, userMessageId);
         conversationStateService.clearEventEditing(userId);
         
@@ -137,10 +126,7 @@ public class EventEditingMessageHandler {
                 
                 try {
                     messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
-                    log.debug("Карточка события восстановлена после игнорирования текстового ввода: eventId={}, messageId={}", 
-                            eventId, editingMessageId);
-
-                } catch (TelegramApiException e) {
+                    } catch (TelegramApiException e) {
                     log.warn("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
                             eventId, editingMessageId, e.getMessage());
 
@@ -168,17 +154,13 @@ public class EventEditingMessageHandler {
                 InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(updatedEvent, userId);
                 messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
                 
-                log.info("Поле события обновлено и сообщение обновлено: eventId={}, messageId={}", 
-                        updatedEvent.getId(), editingMessageId);
-
-            } catch (TelegramApiException e) {
+                } catch (TelegramApiException e) {
                 log.error("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
                         updatedEvent.getId(), editingMessageId, e.getMessage());
             }
             
             messageService.deleteMessageSilently(chatId, userMessageId);
-            log.debug("Сообщение пользователя удалено: messageId={}", userMessageId);
-        }
+            }
     }
 
     /**

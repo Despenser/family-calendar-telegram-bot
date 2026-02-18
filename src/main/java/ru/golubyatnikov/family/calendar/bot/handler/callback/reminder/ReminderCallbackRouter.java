@@ -42,29 +42,20 @@ public class ReminderCallbackRouter implements CallbackHandler {
     public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
         CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        log.debug("Обработка callback для напоминаний: data='{}', userId={}, chatId={}", 
-                 context.callbackData(), user.getId(), context.chatId());
-        
         // Отключение автоматических напоминаний
         if (CallbackPrefix.DISABLE_REMINDERS.matches(context.callbackData())) {
             String payload = CallbackPrefix.DISABLE_REMINDERS.extractPayload(context.callbackData());
             Long eventId = Long.parseLong(payload);
             
-            log.debug("Отключение напоминаний для события: eventId={}, userId={}", eventId, user.getId());
             reminderCallbackHandler.handleDisableReminders(eventId, context);
-            return;
         }
         
         // Включение автоматических напоминаний
-        if (CallbackPrefix.ENABLE_REMINDERS.matches(context.callbackData())) {
+        else if (CallbackPrefix.ENABLE_REMINDERS.matches(context.callbackData())) {
             String payload = CallbackPrefix.ENABLE_REMINDERS.extractPayload(context.callbackData());
             Long eventId = Long.parseLong(payload);
             
-            log.debug("Включение напоминаний для события: eventId={}, userId={}", eventId, user.getId());
             reminderCallbackHandler.handleEnableReminders(eventId, context);
-            return;
         }
-        
-        log.warn("Неизвестный callback для напоминаний: data='{}', userId={}", context.callbackData(), user.getId());
     }
 }

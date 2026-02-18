@@ -2,7 +2,6 @@ package ru.golubyatnikov.family.calendar.bot.handler.callback.reminder;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.LazyInitializationException;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
@@ -44,15 +43,12 @@ public class ReminderCallbackHandler {
      * Обрабатывает отключение всех автоматических напоминаний для события.
      */
     public void handleDisableReminders(Long eventId, CallbackQueryContext context) {
-        log.debug("Отключение автоматических напоминаний для события ID={}", eventId);
-        
         try {
             reminderCreationService.disableRemindersForEvent(eventId);
             answerCallbackQuery(context, CallbackMessages.SUCCESS);
 
             updateEventMessage(eventId, context.chatId(), context.messageId());
-            log.info("Автоматические напоминания отключены для события ID={}", eventId);
-            
+
         } catch (Exception e) {
             log.error("Ошибка при отключении напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
                     eventId, context.chatId(), e.getMessage(), TelegramExceptionUtil.getStackTraceString(e), e);
@@ -65,15 +61,12 @@ public class ReminderCallbackHandler {
      * Обрабатывает включение автоматических напоминаний для события.
      */
     public void handleEnableReminders(Long eventId, CallbackQueryContext context) {
-        log.debug("Включение автоматических напоминаний для события ID={}", eventId);
-        
         try {
             Event event = eventRepository.findByIdWithUser(eventId)
                 .orElseThrow(() -> new EventNotFoundException(eventId));
             
             User user = event.getUser();
             if (user == null) {
-                log.error("User is null для события ID {}", eventId);
                 answerCallbackQuery(context, CallbackMessageFormatter.notFound("Пользователь"));
                 return;
             }
@@ -87,14 +80,6 @@ public class ReminderCallbackHandler {
             answerCallbackQuery(context, responseMessage);
 
             updateEventMessage(eventId, context.chatId(), context.messageId());
-            log.info("Автоматические напоминания включены для события ID={}, создано напоминаний: {}", 
-                    eventId, createdReminders.size());
-            
-        } catch (LazyInitializationException e) {
-            log.error("LazyInitializationException при включении напоминаний: eventId={}, chatId={}, error={}", 
-                    eventId, context.chatId(), e.getMessage(), e);
-
-            answerCallbackQuery(context, CallbackMessages.ERROR);
 
         } catch (Exception e) {
             log.error("Ошибка при включении напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
@@ -122,8 +107,6 @@ public class ReminderCallbackHandler {
             
             messageService.editMessageText(chatId, messageId, messageText, keyboard);
             
-            log.debug("Сообщение события обновлено: eventId={}, messageId={}", eventId, messageId);
-
         } catch (Exception e) {
             log.warn("Не удалось обновить сообщение события: eventId={}, messageId={}, error={}", 
                     eventId, messageId, e.getMessage());

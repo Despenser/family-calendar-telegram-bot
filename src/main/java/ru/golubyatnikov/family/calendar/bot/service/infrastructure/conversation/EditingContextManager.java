@@ -40,9 +40,7 @@ public class EditingContextManager {
         EditingContext context = new EditingContext(eventId, chatId, null, messageId, null);
         usersEditingEvents.put(userId, context);
 
-        log.info("Пользователь ID={} начал редактирование события ID={} в сообщении ID={}", 
-                userId, eventId, messageId);
-    }
+        }
     
     /**
      * Начинает процесс редактирования события для пользователя из календаря.
@@ -62,9 +60,7 @@ public class EditingContextManager {
         EditingContext context = new EditingContext(eventId, chatId, null, messageId, sourceDate);
         usersEditingEvents.put(userId, context);
 
-        log.info("Пользователь ID={} начал редактирование события ID={} из календаря (дата={}) в сообщении ID={}", 
-                userId, eventId, sourceDate, messageId);
-    }
+        }
     
     /**
      * Проверяет, редактирует ли пользователь событие в данный момент.
@@ -107,8 +103,7 @@ public class EditingContextManager {
         EditingContext context = usersEditingEvents.get(userId);
         if (context != null) {
             context.setCurrentField(field);
-            log.debug("Пользователь ID={} выбрал поле для редактирования: {}", userId, field);
-        }
+            }
     }
     
     /**
@@ -118,6 +113,5 @@ public class EditingContextManager {
      */
     public void clearEventEditing(Long userId) {
         usersEditingEvents.remove(userId);
-        log.debug("Состояние редактирования очищено для пользователя ID={}", userId);
-    }
+        }
 }

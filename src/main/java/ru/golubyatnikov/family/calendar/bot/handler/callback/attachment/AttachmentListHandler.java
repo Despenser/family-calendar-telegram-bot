@@ -33,7 +33,6 @@ public class AttachmentListHandler {
      * @throws Exception если произошла ошибка при отображении списка
      */
     public void handleAttachmentList(Long eventId, @NonNull CallbackQueryContext context) throws Exception {
-        log.debug("Отображение списка вложений: eventId={}", eventId);
         attachmentMessageService.showAttachmentList(eventId, context.user(), context.chatId(), context.messageId());
         callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
     }

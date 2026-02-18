@@ -7,11 +7,13 @@ import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
-import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
+
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.stream.IntStream;
 
 /**
@@ -44,7 +46,6 @@ public class PlannerNavigationService {
         // Устанавливаем флаг для первого события
         Event firstEvent = userEvents.getFirst();
         if (!Boolean.TRUE.equals(firstEvent.getIsMyEventsHeader())) {
-            log.debug("Установка флага isMyEventsHeader=true для первого события ID={}", firstEvent.getId());
             firstEvent.setIsMyEventsHeader(true);
             eventService.saveEvent(firstEvent);
         }
@@ -53,7 +54,6 @@ public class PlannerNavigationService {
         IntStream.range(1, userEvents.size()).mapToObj(userEvents::get)
                 .filter(event -> Boolean.TRUE.equals(event.getIsMyEventsHeader()))
                 .forEach(event -> {
-                    log.debug("Сброс флага isMyEventsHeader=false для события ID={}", event.getId());
                     event.setIsMyEventsHeader(false);
                     eventService.saveEvent(event);
                 });
@@ -78,9 +78,7 @@ public class PlannerNavigationService {
                                                    Long userId) {
 
         boolean sent = sendCombinedMessage(chatId, combinedMessage, firstEvent, userId);
-        
         if (!sent) {
-            log.warn("Не удалось отправить объединенное сообщение, используем fallback");
             return executeFallback(chatId, header, firstEvent, userId);
         }
         
@@ -90,23 +88,21 @@ public class PlannerNavigationService {
     /**
      * Отправляет событие отдельным сообщением с fallback механизмом.
      * При ошибке форматирования пытается отправить сообщение без форматирования.
-     * 
+     *
      * @param chatId идентификатор чата
      * @param eventText текст события
      * @param event событие
      * @param userId идентификатор пользователя
-     *
-     * @return true, если отправка успешна
      */
-    public boolean sendEventMessageWithFallback(Long chatId, String eventText, Event event, Long userId) {
+    public void sendEventMessageWithFallback(Long chatId,
+                                             String eventText,
+                                             Event event,
+                                             Long userId) {
+
         boolean sent = sendEventMessage(chatId, eventText, event, userId);
-        
         if (!sent) {
-            log.warn("Не удалось отправить событие ID={}, используем fallback", event.getId());
-            return executeFallback(chatId, null, event, userId);
+            executeFallback(chatId, null, event, userId);
         }
-        
-        return true;
     }
 
     /**
@@ -165,33 +161,24 @@ public class PlannerNavigationService {
      * @return true, если отправка успешна
      */
     private boolean sendCombinedMessage(Long chatId, String combinedMessage, Event firstEvent, Long userId) {
-        try {
-            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(firstEvent, userId);
-            
-            if (keyboard == null || keyboard.getKeyboard().isEmpty()) {
-                log.warn("Клавиатура для первого события ID={} некорректна", firstEvent.getId());
-                return false;
-            }
-            
-            Message sentMessage = messageService.sendMessageAndGet(chatId, combinedMessage, keyboard);
-            
-            // Сохраняем messageId
-            firstEvent.setMessageId((long) sentMessage.getMessageId());
-            eventService.saveEvent(firstEvent);
-            
+        boolean success = sendEventMessageWithKeyboard(combinedMessage, firstEvent, userId,
+                (text, keyboard) -> {
+                    try {
+                        return messageService.sendMessageAndGet(chatId, text, keyboard);
+
+                    } catch (Exception e) {
+                        throw new RuntimeException("Ошибка при отправке объединенного сообщения", e);
+                    }
+                }
+        );
+
+        if (success) {
             // Сохраняем контекст шапки
             int eventCount = 1;
             conversationStateService.saveEventHeaderContext(userId, true, eventCount);
-            
-            log.debug("Объединенное сообщение с первым событием ID={} успешно отправлено, messageId={}", 
-                    firstEvent.getId(), sentMessage.getMessageId());
-            
-            return true;
-
-        } catch (Exception e) {
-            log.error("Ошибка при отправке объединенного сообщения: {}", e.getMessage(), e);
-            return false;
         }
+
+        return success;
     }
 
     /**
@@ -205,28 +192,16 @@ public class PlannerNavigationService {
      * @return true, если отправка успешна
      */
     private boolean sendEventMessage(Long chatId, String eventText, Event event, Long userId) {
-        try {
-            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
-            
-            if (keyboard == null || keyboard.getKeyboard().isEmpty()) {
-                log.warn("Клавиатура для события ID={} некорректна", event.getId());
-                return false;
-            }
-            
-            Message sentMessage = messageService.sendMessageAndGet(chatId, eventText, keyboard);
+        return sendEventMessageWithKeyboard(eventText, event, userId,
+                (text, keyboard) -> {
+                    try {
+                        return messageService.sendMessageAndGet(chatId, text, keyboard);
 
-            event.setMessageId((long) sentMessage.getMessageId());
-            eventService.saveEvent(event);
-            
-            log.debug("Событие ID={} успешно отправлено, messageId={}", 
-                    event.getId(), sentMessage.getMessageId());
-            
-            return true;
-
-        } catch (Exception e) {
-            log.error("Ошибка при отправке события ID={}: {}", event.getId(), e.getMessage(), e);
-            return false;
-        }
+                    } catch (Exception e) {
+                        throw new RuntimeException("Ошибка при отправке события", e);
+                    }
+                }
+        );
     }
 
     /**
@@ -240,22 +215,49 @@ public class PlannerNavigationService {
      * @return true, если отправка успешна
      */
     private boolean sendPlainEventMessage(Long chatId, String plainText, Event event, Long userId) {
+        return sendEventMessageWithKeyboard(plainText, event, userId,
+                (text, keyboard) -> {
+                    try {
+                        return messageService.sendMessageWithoutFormattingAndGet(chatId, text, keyboard);
+
+                    } catch (Exception e) {
+                        throw new RuntimeException("Ошибка при отправке события без форматирования", e);
+                    }
+                }
+        );
+    }
+
+    /**
+     * Отправляет сообщение с клавиатурой и сохраняет messageId в событии.
+     * Общий метод для устранения дублирования кода.
+     *
+     * @param messageText текст сообщения
+     * @param event событие для сохранения messageId
+     * @param userId идентификатор пользователя
+     * @param sendFunction функция отправки сообщения
+     *
+     * @return true, если отправка успешна
+     */
+    private boolean sendEventMessageWithKeyboard(String messageText,
+                                                 Event event,
+                                                 Long userId,
+                                                 BiFunction<String, InlineKeyboardMarkup, Message> sendFunction) {
+
         try {
             InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
-            
-            Message sentMessage = messageService.sendMessageWithoutFormattingAndGet(chatId, plainText, keyboard);
-            
-            // Сохраняем messageId
+            if (keyboard == null || keyboard.getKeyboard().isEmpty()) {
+                return false;
+            }
+
+            Message sentMessage = sendFunction.apply(messageText, keyboard);
+
             event.setMessageId((long) sentMessage.getMessageId());
             eventService.saveEvent(event);
-            
-            log.debug("Событие ID={} успешно отправлено без форматирования, messageId={}", 
-                    event.getId(), sentMessage.getMessageId());
-            
-            return true;
 
+            return true;
+            
         } catch (Exception e) {
-            log.error("Ошибка при отправке события без форматирования ID={}: {}", event.getId(), e.getMessage(), e);
+            log.error("Ошибка при отправке сообщения для события ID={}: {}", event.getId(), e.getMessage(), e);
             return false;
         }
     }
@@ -272,9 +274,7 @@ public class PlannerNavigationService {
         if (userId == null || userEvents.isEmpty()) {
             return;
         }
-        
-        log.debug("Обновление счетчика событий в шапке для пользователя ID={}", userId);
-        
+
         try {
             Event headerEvent = userEvents.stream()
                     .filter(e -> Boolean.TRUE.equals(e.getIsMyEventsHeader()))
@@ -282,7 +282,6 @@ public class PlannerNavigationService {
                     .orElse(null);
             
             if (headerEvent == null || headerEvent.getMessageId() == null) {
-                log.warn("Событие с шапкой не найдено или отсутствует messageId для пользователя ID={}", userId);
                 return;
             }
             
@@ -290,17 +289,11 @@ public class PlannerNavigationService {
             InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(headerEvent, userId);
             Long chatId = headerEvent.getUser().getTelegramId();
             
-            boolean updated = messageService.tryEditMessageText(
+            messageService.tryEditMessageText(
                     chatId, 
                     headerEvent.getMessageId().intValue(), 
                     combinedMessage, 
                     keyboard);
-            
-            if (updated) {
-                log.info("Счетчик событий в шапке успешно обновлен для пользователя ID={}", userId);
-            } else {
-                log.warn("Не удалось обновить счетчик событий в шапке для пользователя ID={}", userId);
-            }
             
         } catch (Exception e) {
             log.error("Ошибка при обновлении счетчика событий в шапке для пользователя ID={}: {}", 
@@ -316,6 +309,5 @@ public class PlannerNavigationService {
      */
     public void saveHeaderContext(Long userId, int eventCount) {
         conversationStateService.saveEventHeaderContext(userId, true, eventCount);
-        log.debug("Контекст шапки сохранен для пользователя ID={}: eventCount={}", userId, eventCount);
     }
 }

@@ -34,9 +34,9 @@ public class WebhookSecurityService {
     public String generateSecretToken() {
         byte[] randomBytes = new byte[SECRET_TOKEN_LENGTH];
         SECURE_RANDOM.nextBytes(randomBytes);
+
         this.secretToken = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
         
-        log.debug("Сгенерирован новый secret token для webhook");
         return this.secretToken;
     }
 

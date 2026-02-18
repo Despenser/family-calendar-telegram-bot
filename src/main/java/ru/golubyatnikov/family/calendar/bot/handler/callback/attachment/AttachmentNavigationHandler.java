@@ -58,8 +58,6 @@ public class AttachmentNavigationHandler {
                                         CallbackQueryContext context,
                                         CallbackQuery callbackQuery) throws Exception {
 
-        log.debug("Возврат к списку вложений: eventId={}", eventId);
-        
         try {
             var maybeMessage = callbackQuery.getMessage();
             Message currentMessage = null;
@@ -76,16 +74,15 @@ public class AttachmentNavigationHandler {
             boolean isCreator = event.belongsToUser(context.getUserId());
             var keyboard = keyboardService.createAttachmentsListKeyboard(eventId, attachments, isCreator);
             
-            Integer resultMessageId;
+
             if (attachmentMessageService.isMediaMessage(currentMessage)) {
-                resultMessageId = attachmentMessageService.replaceMediaWithText(
+                attachmentMessageService.replaceMediaWithText(
                         context.chatId(), context.messageId(), message, keyboard, context.getUserId(), eventId);
             } else {
-                resultMessageId = attachmentMessageService.editOrSendMessage(
+                attachmentMessageService.editOrSendMessage(
                         context.chatId(), context.messageId(), message, keyboard, context.getUserId(), eventId);
             }
             
-            log.debug("Список вложений отображен: messageId={}", resultMessageId);
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
         } catch (Exception e) {
@@ -105,8 +102,6 @@ public class AttachmentNavigationHandler {
      * @throws Exception если произошла ошибка при возврате к карточке события
      */
     public void handleBackToEvent(Long eventId, CallbackQueryContext context) throws Exception {
-        log.debug("Возврат к карточке события: eventId={}", eventId);
-        
         try {
             Event event = eventService.getEventById(eventId);
             String message = buildEventMessage(event, context.user());

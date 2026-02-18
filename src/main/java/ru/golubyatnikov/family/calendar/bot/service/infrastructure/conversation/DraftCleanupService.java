@@ -55,10 +55,7 @@ public class DraftCleanupService {
             && event.getEventTime() == null;
         
         if (isOrphaned) {
-            log.debug("Обнаружен осиротевший черновик: ID={}, createdAt={}, userId={}", 
-                     event.getId(), event.getCreatedAt(), 
-                     event.getUser() != null ? event.getUser().getId() : "unknown");
-        }
+            }
         
         return isOrphaned;
     }
@@ -76,8 +73,6 @@ public class DraftCleanupService {
             throw new IllegalArgumentException("Возраст черновика должен быть положительным");
         }
         
-        log.info("Начало очистки осиротевших черновиков старше {}", age);
-        
         LocalDateTime threshold = LocalDateTime.now().minus(age);
         
         // Находим все черновики
@@ -85,15 +80,11 @@ public class DraftCleanupService {
             .filter(event -> event.getStatus() == EventStatus.DRAFT)
             .toList();
         
-        log.debug("Найдено {} черновиков для проверки", allDrafts.size());
-        
         // Фильтруем осиротевшие черновики старше порогового значения
         List<Event> orphanedDrafts = allDrafts.stream()
             .filter(this::isOrphanedDraft)
             .filter(event -> event.getCreatedAt() != null && event.getCreatedAt().isBefore(threshold))
             .toList();
-        
-        log.info("Найдено {} осиротевших черновиков старше {} для удаления", orphanedDrafts.size(), age);
         
         // Удаляем каждый осиротевший черновик
         int deletedCount = 0;
@@ -114,7 +105,6 @@ public class DraftCleanupService {
             }
         }
         
-        log.info("Очистка завершена. Удалено {} осиротевших черновиков", deletedCount);
         return deletedCount;
     }
     
@@ -124,18 +114,13 @@ public class DraftCleanupService {
     @Scheduled(cron = "${draft.cleanup.schedule-cron:0 0 */6 * * *}")
     public void scheduledCleanup() {
         if (!cleanupEnabled) {
-            log.debug("Периодическая очистка черновиков отключена");
             return;
         }
-        
-        log.info("Запуск периодической очистки осиротевших черновиков");
         
         try {
             Duration threshold = Duration.ofHours(periodicThresholdHours);
             int deletedCount = cleanupOrphanedDrafts(threshold);
-            log.info("Периодическая очистка завершена успешно. Удалено черновиков: {}", deletedCount);
-
-        } catch (Exception e) {
+            } catch (Exception e) {
             log.error("Ошибка при выполнении периодической очистки черновиков: {}", e.getMessage(), e);
         }
     }
@@ -146,18 +131,13 @@ public class DraftCleanupService {
     @EventListener(ApplicationReadyEvent.class)
     public void cleanupOrphanedDraftsOnStartup() {
         if (!cleanupEnabled) {
-            log.info("Очистка черновиков при запуске отключена");
             return;
         }
-        
-        log.info("Запуск очистки осиротевших черновиков при старте приложения");
         
         try {
             Duration threshold = Duration.ofHours(startupThresholdHours);
             int deletedCount = cleanupOrphanedDrafts(threshold);
-            log.info("Очистка при запуске завершена успешно. Удалено черновиков: {}", deletedCount);
-
-        } catch (Exception e) {
+            } catch (Exception e) {
             log.error("Ошибка при очистке черновиков при запуске: {}", e.getMessage(), e);
         }
     }

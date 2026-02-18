@@ -45,8 +45,6 @@ public class AttachmentCallbackRouter implements CallbackHandler {
     public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
         CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        log.debug("Маршрутизация callback вложения: userId={}, data='{}'", user.getId(), context.callbackData());
-        
         String payload = extractAndValidatePayload(context);
         if (payload == null) {
             return;
@@ -112,10 +110,7 @@ public class AttachmentCallbackRouter implements CallbackHandler {
             case "confirm" -> handleConfirm(parts, context);
             case "cancel" -> handleCancel(parts, context);
             case "back" -> handleBack(parts, context);
-            default -> {
-                log.warn("Неизвестное действие: action={}, userId={}", action, context.getUserId());
-                callbackQueryService.answerCallback(context, CallbackMessages.UNKNOWN_ACTION);
-            }
+            default -> callbackQueryService.answerCallback(context, CallbackMessages.UNKNOWN_ACTION);
         }
     }
     

@@ -41,10 +41,7 @@ public class CommandDispatcher {
         this.commandHandlers = new HashMap<>();
         
         if (handlers == null || handlers.isEmpty()) {
-            log.warn("Не найдено ни одного обработчика команд. Бот не сможет обрабатывать команды.");
         } else {
-            log.debug("Регистрация обработчиков команд. Всего обработчиков: {}", handlers.size());
-
             handlers.forEach(handler -> {
                 String command = handler.getCommand();
                 if (commandHandlers.containsKey(command)) {
@@ -54,16 +51,9 @@ public class CommandDispatcher {
                             handler.getClass().getSimpleName());
                 }
                 commandHandlers.put(command, handler);
-                log.debug("Зарегистрирован обработчик: команда='{}', handler={}, requiresAuth={}, description='{}'",
-                        command,
-                        handler.getClass().getSimpleName(),
-                        handler.requiresAuth(),
-                        handler.getDescription());
-            });
+                });
             
-            log.debug("Регистрация обработчиков завершена. Зарегистрировано команд: {}", 
-                    commandHandlers.size());
-        }
+            }
     }
 
     /**
@@ -78,7 +68,6 @@ public class CommandDispatcher {
      */
     public String dispatch(Message message) {
         if (message == null) {
-            log.error("Получено null сообщение для маршрутизации");
             throw new IllegalArgumentException("Сообщение не может быть null");
         }
         
@@ -96,41 +85,27 @@ public class CommandDispatcher {
         // Извлекаем команду (первое слово, начинающееся с /)
         String command = extractCommand(messageText);
         
-        log.debug("Начало маршрутизации команды: command='{}', telegramId={}, chatId={}, messageId={}", 
-                command, telegramId, message.getChatId(), message.getMessageId());
-        
         if (command == null) {
-            log.warn("Не удалось извлечь команду из текста, telegramId={}", telegramId);
             return formatMessage("Команда должна начинаться с символа '/'. " +
                     "Используйте 📚 /help для списка доступных команд.");
         }
-        
-        log.debug("Извлечена команда: '{}', telegramId={}", command, telegramId);
         
         // Ищем обработчик для команды
         CommandHandler handler = commandHandlers.get(command);
         
         if (handler == null) {
-            log.warn("Обработчик не найден для команды: '{}', telegramId={}", command, telegramId);
             return formatMessage("""
                     Неизвестная команда: %s
                     
                     Используйте 📚 /help для списка доступных команд.""", command);
         }
         
-        log.debug("Найден обработчик для команды '{}': {}, requiresAuth={}", 
-                command, handler.getClass().getSimpleName(), handler.requiresAuth());
-        
         // Загружаем пользователя из БД (всегда, независимо от требования авторизации)
-        log.debug("Загрузка пользователя из БД: telegramId={}", telegramId);
         Optional<User> userOptional = userService.findByTelegramId(telegramId);
         User user = userOptional.orElse(null);
         
         // Проверяем требование авторизации
         if (handler.requiresAuth()) {
-            log.debug("Команда '{}' требует авторизации. Проверка пользователя: telegramId={}", 
-                    command, telegramId);
-            
             if (user == null) {
                 log.warn("Неавторизованная попытка выполнить команду '{}': telegramId={}", 
                         command, telegramId);
@@ -139,27 +114,15 @@ public class CommandDispatcher {
                                 "Пожалуйста, используйте 🚀 /start для регистрации.", command));
             }
             
-            log.debug("Пользователь авторизован: telegramId={}, userId={}, familyId={}", 
-                    telegramId, user.getId(), 
-                    user.getFamily() != null ? user.getFamily().getId() : null);
-        } else {
-            if (user != null) {
-                log.debug("Команда '{}' не требует авторизации, но пользователь найден: telegramId={}, userId={}", 
-                        command, telegramId, user.getId());
             } else {
-                log.debug("Команда '{}' не требует авторизации. Выполнение без пользователя.", command);
-            }
+            if (user != null) {
+                } else {
+                }
         }
         
         // Делегируем обработку команды
         try {
-            log.debug("Делегирование обработки команды '{}' обработчику: {}, telegramId={}", 
-                    command, handler.getClass().getSimpleName(), telegramId);
-            
             String response = handler.handle(message, user);
-            
-            log.debug("Команда '{}' успешно обработана: telegramId={}, responseLength={}", 
-                    command, telegramId, response != null ? response.length() : 0);
             
             return response;
             

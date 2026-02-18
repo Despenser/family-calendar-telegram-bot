@@ -42,8 +42,6 @@ public class ReminderSchedulingService {
      */
     @Transactional
     public void recalculateReminders(Long eventId) {
-        log.info("Начало пересчета напоминаний для события ID {}", eventId);
-        
         try {
             // Шаг 1: Получаем событие
             Event event = eventRepository.findById(eventId)
@@ -57,27 +55,18 @@ public class ReminderSchedulingService {
                 return;
             }
             
-            log.debug("Событие ID {} имеет дату и время: eventDate={}, eventTime={}",
-                     eventId, event.getEventDate(), event.getEventTime());
-            
             // Шаг 3: Получаем все неотправленные напоминания
             List<Reminder> oldReminders = reminderRepository.findByEventIdAndSentFalse(eventId);
             
             if (oldReminders.isEmpty()) {
-                log.debug("Нет неотправленных напоминаний для пересчета для события ID {}", eventId);
                 return;
             }
-            
-            log.info("Найдено {} неотправленных напоминаний для пересчета для события ID {}",
-                    oldReminders.size(), eventId);
             
             // Шаг 4: Извлекаем типы напоминаний для последующего пересоздания
             List<ReminderType> reminderTypes = extractReminderTypes(oldReminders);
             
             // Шаг 5: Удаляем все старые неотправленные напоминания
             int deletedCount = deleteOldReminders(eventId);
-            
-            log.info("Удалено {} старых напоминаний для события ID {}", deletedCount, eventId);
             
             // Шаг 6: Создаем новые напоминания с пересчитанными временами
             List<Reminder> newReminders = createNewReminders(event, reminderTypes);
@@ -87,10 +76,6 @@ public class ReminderSchedulingService {
                 log.warn("Пересчет напоминаний для события ID {} завершен: " +
                         "удалено={}, создано=0 (все новые времена в прошлом)",
                         eventId, deletedCount);
-            } else {
-                log.info("Пересчет напоминаний для события ID {} успешно завершен: " +
-                        "удалено={}, создано={}",
-                        eventId, deletedCount, newReminders.size());
             }
             
         } catch (EventNotFoundException e) {
@@ -113,24 +98,20 @@ public class ReminderSchedulingService {
      */
     @Transactional
     public void markRemindersAsSent(Long eventId) {
-        log.debug("Отметка напоминаний как отправленных для события ID {}", eventId);
-        
         List<Reminder> reminders = reminderRepository.findByEventIdAndSentFalse(eventId);
         
         if (reminders.isEmpty()) {
-            log.debug("Нет неотправленных напоминаний для события ID {}", eventId);
             return;
         }
         
         LocalDateTime now = LocalDateTime.now();
-        for (Reminder reminder : reminders) {
+        reminders.forEach(reminder -> {
             reminder.setSent(true);
             reminder.setSentAt(now);
-        }
+        });
         
         reminderRepository.saveAll(reminders);
-        log.info("Отмечено {} напоминаний как отправленных для события ID {}", reminders.size(), eventId);
-    }
+        }
     
     /**
      * Проверяет наличие активных (неотправленных) напоминаний для события.
@@ -150,27 +131,13 @@ public class ReminderSchedulingService {
      * @return количество удаленных напоминаний
      */
     private int deleteOldReminders(Long eventId) {
-        log.debug("Удаление старых неотправленных напоминаний для события ID {}", eventId);
-        
         List<Reminder> reminders = reminderRepository.findByEventIdAndSentFalse(eventId);
         
         if (reminders.isEmpty()) {
-            log.debug("Нет неотправленных напоминаний для удаления для события ID {}", eventId);
             return 0;
         }
-
-        String reminderTypes = reminders.stream()
-            .map(r -> r.getReminderType().toString())
-            .toList()
-            .toString();
-        
-        log.info("Удаление {} неотправленных напоминаний для события ID {}: типы={}", 
-                reminders.size(), eventId, reminderTypes);
         
         reminderRepository.deleteAll(reminders);
-        
-        log.info("Удалено {} неотправленных напоминаний для события ID {}", reminders.size(), eventId);
-        
         return reminders.size();
     }
     
@@ -181,16 +148,9 @@ public class ReminderSchedulingService {
      * @return список типов напоминаний
      */
     private @NonNull List<ReminderType> extractReminderTypes(@NonNull List<Reminder> reminders) {
-        log.debug("Извлечение типов из {} напоминаний", reminders.size());
-        
-        List<ReminderType> reminderTypes = reminders.stream()
+        return reminders.stream()
             .map(Reminder::getReminderType)
             .toList();
-        
-        log.info("Извлечены типы из {} напоминаний: {}", 
-                reminderTypes.size(), reminderTypes);
-        
-        return reminderTypes;
     }
     
     /**
@@ -204,13 +164,10 @@ public class ReminderSchedulingService {
     private @NonNull List<Reminder> createNewReminders(@NonNull Event event,
                                                        @NonNull List<ReminderType> reminderTypes) {
 
-        log.debug("Создание {} новых напоминаний для события ID {}", reminderTypes.size(), event.getId());
-        
         // Получаем текущее время в UTC для корректного сравнения
         LocalDateTime nowUTC = LocalDateTime.now(ZoneId.of("UTC"));
         
         List<Reminder> newReminders = new ArrayList<>();
-        int skippedCount = 0;
         
         for (ReminderType reminderType : reminderTypes) {
             try {
@@ -225,7 +182,7 @@ public class ReminderSchedulingService {
                     log.warn("Пропуск создания напоминания типа {} для события ID {}: " +
                             "новое время {} UTC в прошлом (nowUTC={})",
                             reminderType, event.getId(), reminderTimeUTC, nowUTC);
-                    skippedCount++;
+
                     continue;
                 }
                 
@@ -239,51 +196,24 @@ public class ReminderSchedulingService {
                 
                 newReminders.add(reminder);
                 
-                log.debug("Подготовлено новое напоминание типа {} для события ID {}: reminderTimeUTC={}",
-                         reminderType, event.getId(), reminderTimeUTC);
-                
             } catch (Exception e) {
                 log.error("Ошибка при создании напоминания типа {} для события ID {}: {}",
                          reminderType, event.getId(), e.getMessage(), e);
-
-                skippedCount++;
             }
         }
         
         // Сохраняем все новые напоминания
         if (!newReminders.isEmpty()) {
-            List<Reminder> saved = reminderRepository.saveAll(newReminders);
-            
-            String createdTypes = saved.stream()
-                .map(r -> r.getReminderType().toString())
-                .toList()
-                .toString();
-            
-            log.info("Создано {} новых напоминаний для события ID {}: типы={}, пропущено={}",
-                    saved.size(), event.getId(), createdTypes, skippedCount);
-            
-            return saved;
+            return reminderRepository.saveAll(newReminders);
 
         } else {
             log.warn("Не создано ни одного нового напоминания для события ID {} " +
-                    "(все времена в прошлом или ошибки создания), пропущено={}", event.getId(), skippedCount);
+                    "(все времена в прошлом или ошибки создания)", event.getId());
 
             return newReminders;
         }
     }
-    
-    /**
-     * Получает все напоминания для указанного события.
-     * 
-     * @param eventId идентификатор события
-     * @return список всех напоминаний события
-     */
-    @Transactional(readOnly = true)
-    public List<Reminder> getEventReminders(Long eventId) {
-        log.debug("Получение напоминаний для события ID {}", eventId);
-        return reminderRepository.findByEventId(eventId);
-    }
-    
+
     /**
      * Получает напоминание по идентификатору с eager загрузкой события и пользователя.
      * 
@@ -294,12 +224,7 @@ public class ReminderSchedulingService {
      */
     @Transactional(readOnly = true)
     public Reminder getReminderWithEventAndUser(Long reminderId) {
-        log.debug("Получение напоминания с событием и пользователем по ID {}", reminderId);
-        
         return reminderRepository.findWithEventAndUserById(reminderId)
-            .orElseThrow(() -> {
-                log.error("Напоминание с ID {} не найдено", reminderId);
-                return new ReminderNotFoundException(reminderId);
-            });
+            .orElseThrow(() -> new ReminderNotFoundException(reminderId));
     }
 }

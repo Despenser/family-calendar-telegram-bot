@@ -32,7 +32,6 @@ public class CallbackDataExtractionService {
         String callbackData = callbackQuery.getData();
         
         if (callbackData == null) {
-            log.warn("Получен callback с null данными от пользователя userId={}", user.getId());
             throw new IllegalArgumentException("Callback data не может быть null");
         }
         

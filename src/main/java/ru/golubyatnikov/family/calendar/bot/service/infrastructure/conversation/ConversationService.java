@@ -49,9 +49,7 @@ public class ConversationService {
         // Удаляем предыдущие незавершенные черновики пользователя
         int deletedCount = cancelPendingDrafts(userId);
         if (deletedCount > 0) {
-            log.debug("Очищено {} существующих черновиков перед началом создания нового события для пользователя {}", 
-                deletedCount, userId);
-        }
+            }
         
         // Создаем новый черновик
         Event draft = Event.builder()
@@ -62,8 +60,6 @@ public class ConversationService {
             .build();
         
         Event savedDraft = eventRepository.save(draft);
-        log.info("Создан черновик события {} для пользователя {}", savedDraft.getId(), userId);
-        
         return savedDraft;
     }
     
@@ -79,9 +75,7 @@ public class ConversationService {
         draft.setIsPersonal(isPersonal);
 
         eventRepository.save(draft);
-        log.info("Обновлен черновик {} с типом: {}", draft.getId(), isPersonal ? "персональное" : "семейное");
-
-    }
+        }
     
     /**
      * Обновляет дату в черновике события.
@@ -97,8 +91,6 @@ public class ConversationService {
         draft.setEventDate(date);
         
         Event updated = eventRepository.save(draft);
-        log.info("Обновлен черновик {} с датой {}", draft.getId(), date);
-        
         return updated;
     }
     
@@ -116,8 +108,6 @@ public class ConversationService {
         draft.setEventTime(time);
         
         Event updated = eventRepository.save(draft);
-        log.info("Обновлен черновик {} с временем {}", draft.getId(), time);
-        
         return updated;
     }
     
@@ -135,8 +125,6 @@ public class ConversationService {
         draft.setTitle(title);
         
         Event updated = eventRepository.save(draft);
-        log.info("Обновлен черновик {} с названием", draft.getId());
-        
         return updated;
     }
     
@@ -155,9 +143,7 @@ public class ConversationService {
         draft.setMessageId(messageId);
         
         eventRepository.save(draft);
-        log.debug("MessageId сообщения создания сохранен: userId={}, draftId={}, messageId={}", 
-            userId, draft.getId(), messageId);
-    }
+        }
     
     /**
      * Завершает создание события, обновляя описание и меняя статус на ACTIVE.
@@ -176,8 +162,6 @@ public class ConversationService {
         draft.setStatus(EventStatus.ACTIVE);
         
         Event completed = eventRepository.save(draft);
-        log.info("Завершено создание события: {}", completed.getId());
-        
         // Автоматически создаем напоминания по умолчанию
         eventService.handleEventCreated(completed, draft.getUser());
         
@@ -192,17 +176,12 @@ public class ConversationService {
     @Transactional
 
     public void cancelEventCreation(Long userId) {
-        log.debug("Попытка отменить создание события для пользователя {}", userId);
-        
         try {
             int deletedCount = cancelPendingDrafts(userId);
             
             if (deletedCount > 0) {
-                log.info("Успешно отменено создание события для пользователя {}: удалено {} черновиков", 
-                    userId, deletedCount);
-            } else {
-                log.debug("Не найдено черновиков для отмены для пользователя {}", userId);
-            }
+                } else {
+                }
         } catch (Exception e) {
             log.error("Ошибка при отмене создания события для пользователя {}: {}", 
                 userId, e.getMessage(), e);
@@ -269,15 +248,10 @@ public class ConversationService {
             userId, EventStatus.DRAFT);
         
         if (!drafts.isEmpty()) {
-            log.debug("Обнаружено {} ожидающих черновиков для пользователя {}", drafts.size(), userId);
-
             eventRepository.deleteAll(drafts);
-            log.info("Удалены {} ожидающие черновики для пользователя {}", drafts.size(), userId);
-            
             return drafts.size();
         }
         
-        log.debug("Не найдено ни одного незавершенного черновика для пользователя {}", userId);
         return 0;
     }
 }

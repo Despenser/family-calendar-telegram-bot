@@ -82,7 +82,6 @@ public class CalendarKeyboardBuilder {
             rows.add(createCancelRow());
         }
 
-        log.debug("Календарь создан с {} рядами", rows.size());
         return keyboardFactory.createMarkup(rows);
     }
 

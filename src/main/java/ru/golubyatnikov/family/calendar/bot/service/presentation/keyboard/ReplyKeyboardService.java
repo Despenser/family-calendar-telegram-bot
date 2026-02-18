@@ -38,8 +38,6 @@ public class ReplyKeyboardService {
      * @return настроенная ReplyKeyboardMarkup для авторизованного пользователя
      */
     public ReplyKeyboardMarkup createAuthorizedUserKeyboard() {
-        log.debug("Создание клавиатуры для авторизованного пользователя");
-        
         List<KeyboardRow> rows = new ArrayList<>();
         
         // Ряд 1: Календарь
@@ -78,9 +76,6 @@ public class ReplyKeyboardService {
                 .resizeKeyboard(true)
                 .build();
         
-        log.debug("Клавиатура для авторизованного пользователя создана: {} кнопок в {} рядах", 
-                countButtons(rows), rows.size());
-        
         return keyboard;
     }
 
@@ -90,8 +85,6 @@ public class ReplyKeyboardService {
      * @return настроенная ReplyKeyboardMarkup для неавторизованного пользователя
      */
     public ReplyKeyboardMarkup createUnauthorizedUserKeyboard() {
-        log.debug("Создание клавиатуры для неавторизованного пользователя");
-        
         List<KeyboardRow> rows = new ArrayList<>();
         
         // Единственная строка: Начать | Помощь
@@ -104,9 +97,6 @@ public class ReplyKeyboardService {
                 .keyboard(rows)
                 .resizeKeyboard(true)
                 .build();
-        
-        log.debug("Клавиатура для неавторизованного пользователя создана: {} кнопок в {} рядах", 
-                countButtons(rows), rows.size());
         
         return keyboard;
     }
@@ -121,11 +111,8 @@ public class ReplyKeyboardService {
      */
     public String buttonTextToCommand(String buttonText) {
         if (buttonText == null) {
-            log.error("Попытка преобразовать null buttonText в команду");
             throw new IllegalArgumentException("ButtonText не может быть null");
         }
-        
-        log.debug("Преобразование текста кнопки в команду: '{}'", buttonText);
         
         String command = switch (buttonText) {
             case BTN_START -> "/start";
@@ -144,10 +131,8 @@ public class ReplyKeyboardService {
         };
         
         if (!command.equals(buttonText)) {
-            log.debug("Текст кнопки '{}' преобразован в команду '{}'", buttonText, command);
-        } else {
-            log.debug("Текст '{}' не является кнопкой, возвращен без изменений", buttonText);
-        }
+            } else {
+            }
         
         return command;
     }

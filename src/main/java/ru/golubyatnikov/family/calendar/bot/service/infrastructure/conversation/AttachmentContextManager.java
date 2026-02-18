@@ -48,8 +48,7 @@ public class AttachmentContextManager {
     public void setAwaitingFile(Long userId, Long eventId, Long chatId, Integer messageId) {
         AwaitingFileContext context = new AwaitingFileContext(eventId, chatId, messageId);
         usersAwaitingFile.put(userId, context);
-        log.info("Пользователь ID={} переведен в режим ожидания файла для события ID={}", userId, eventId);
-    }
+        }
     
     /**
      * Проверяет, ожидает ли пользователь загрузки файла.
@@ -78,8 +77,7 @@ public class AttachmentContextManager {
      */
     public void clearAwaitingFile(Long userId) {
         usersAwaitingFile.remove(userId);
-        log.debug("Состояние ожидания файла очищено для пользователя ID={}", userId);
-    }
+        }
     
     /**
      * Сохраняет messageId сообщения с вложениями для пользователя.
@@ -106,9 +104,6 @@ public class AttachmentContextManager {
             throw new IllegalArgumentException("messageId не может быть null");
         }
         
-        log.debug("Сохранение attachment messageId={} для пользователя ID={}, события ID={}, чата ID={}", 
-                messageId, userId, eventId, chatId);
-        
         // Получаем или создаем состояние диалога
         ConversationState state = conversationStateRepository.findByUserId(userId)
                 .orElseGet(() -> {
@@ -128,9 +123,7 @@ public class AttachmentContextManager {
         state.setAttachmentContextCreatedAt(Instant.now());
         conversationStateRepository.save(state);
         
-        log.info("Сохранен attachment messageId={} для пользователя ID={}, события ID={}", 
-                messageId, userId, eventId);
-    }
+        }
     
     /**
      * Очищает сохраненный контекст сообщения с вложениями для пользователя.
@@ -144,17 +137,13 @@ public class AttachmentContextManager {
             throw new IllegalArgumentException("userId не может быть null");
         }
         
-        log.debug("Очистка attachment message context для пользователя ID={}", userId);
-        
         conversationStateRepository.findByUserId(userId)
                 .ifPresent(state -> {
                     if (state.hasAttachmentMessageContext()) {
                         state.clearAttachmentMessageContext();
                         conversationStateRepository.save(state);
-                        log.info("Attachment message context очищен для пользователя ID={}", userId);
-                    } else {
-                        log.debug("Attachment message context не найден для пользователя ID={}, очистка не требуется", userId);
-                    }
+                        } else {
+                        }
                 });
     }
 }

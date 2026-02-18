@@ -27,12 +27,9 @@ public class ReminderScheduler {
     @Scheduled(fixedRate = 60000)
     public void checkAndSendReminders() {
         CorrelationIdUtil.executeWithCorrelationId(() -> {
-            log.debug("Запуск планировщика напоминаний");
-            
             try {
                 reminderNotificationService.sendReminders();
-                log.debug("Планировщик напоминаний завершил работу");
-                
+
             } catch (Exception e) {
                 log.error("Ошибка при выполнении планировщика напоминаний: {}", e.getMessage(), e);
             }

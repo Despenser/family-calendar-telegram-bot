@@ -181,12 +181,10 @@ public class EventListService {
                 try {
                     messageService.answerCallbackQuery(callbackQueryId, "");
 
-                } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException ex) {
+                } catch (TelegramApiException ex) {
                     log.warn("Не удалось ответить на callback query: {}", ex.getMessage());
                 }
-                log.debug("Возврат к списку событий, сообщение не изменилось");
-
-            } else {
+                } else {
                 throw new RuntimeException("Ошибка при обновлении сообщения", e);
             }
         }

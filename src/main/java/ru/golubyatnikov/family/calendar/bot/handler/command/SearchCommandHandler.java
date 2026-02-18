@@ -51,8 +51,6 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
      */
     @Override
     public String handle(Message message, @NonNull User user) {
-        log.debug("Обработка команды /search для пользователя ID={}", user.getId());
-        
         try {
             Long chatId = message.getChatId();
             String responseMessage = "🔍 " + bold("Поиск событий") + "\n\n" +
@@ -68,9 +66,6 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
                 sentMessage.getMessageId()
             );
             
-            log.info("Пользователю ID={} отправлен запрос на ввод текста для поиска, messageId={}", 
-                    user.getId(), sentMessage.getMessageId());
-
             return null;
             
         } catch (Exception e) {
@@ -88,8 +83,6 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
      * @param userMessageId идентификатор сообщения пользователя для удаления
      */
     public void performSearch(Long chatId, @NonNull User user, String query, Integer userMessageId) {
-        log.debug("Выполнение поиска для пользователя ID={} по запросу: '{}'", user.getId(), query);
-        
         try {
             searchMessageService.deleteUserMessage(chatId, userMessageId);
             
@@ -133,8 +126,7 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
         
         searchMessageService.sendOrEditSearchMessage(userId, chatId, resultMessage, keyboard, true);
         
-        log.info("Пользователю ID={} отправлено {} результатов поиска", userId, results.size());
-    }
+        }
     
     /**
      * Обрабатывает ошибку при выполнении поиска.
@@ -187,8 +179,6 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
     @Override
     @HandleCallbackErrors
     public void handle(CallbackQuery callbackQuery, @NonNull User user) throws Exception {
-        log.debug("Обработка callback 'search_again' для пользователя ID={}", user.getId());
-        
         try {
             Long chatId = callbackQuery.getMessage().getChatId();
             Integer messageId = callbackQuery.getMessage().getMessageId();
@@ -207,12 +197,9 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
             // Отвечаем на callback query
             messageService.answerCallbackQuery(callbackQuery.getId(), null);
             
-            log.info("Пользователь ID={} инициировал повторный поиск", user.getId());
-            
         } catch (Exception e) {
             log.error("Ошибка при обработке callback 'search_again' для пользователя ID={}", user.getId(), e);
-            
-            // Отвечаем на callback query с сообщением об ошибке
+
             try {
                 messageService.answerCallbackQuery(
                     callbackQuery.getId(), 
@@ -221,7 +208,6 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
             } catch (Exception ex) {
                 log.error("Ошибка при отправке ответа на callback query: {}", ex.getMessage(), ex);
             }
-            
             throw e;
         }
     }

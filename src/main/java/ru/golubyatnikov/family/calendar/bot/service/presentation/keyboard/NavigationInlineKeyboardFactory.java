@@ -26,7 +26,6 @@ public class NavigationInlineKeyboardFactory {
      * @return настроенная InlineKeyboardMarkup
      */
     public InlineKeyboardMarkup createSkipDescriptionKeyboard() {
-        log.debug("Создание inline клавиатуры с кнопкой 'Пропустить'");
         InlineKeyboardButton button = keyboardFactory.createButton("⏭️ Пропустить", "skip_description");
         InlineKeyboardRow row = keyboardFactory.createRow(button);
         return keyboardFactory.createMarkup(row);

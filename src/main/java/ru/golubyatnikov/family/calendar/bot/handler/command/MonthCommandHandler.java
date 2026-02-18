@@ -49,49 +49,30 @@ public class MonthCommandHandler implements CommandHandler {
     @Override
     public String handle(Message message, User user) {
         if (message == null) {
-            log.error("Получено null сообщение в MonthCommandHandler");
             throw new IllegalArgumentException("Сообщение не может быть null");
         }
 
         if (user == null) {
-            log.error("Получен null пользователь в MonthCommandHandler");
             throw new IllegalArgumentException("Пользователь не может быть null");
         }
 
-        Long telegramId = message.getFrom().getId();
-        String username = message.getFrom().getUserName();
-
-        log.info("Обработка команды /month: telegramId={}, username={}, userId={}", 
-                telegramId, username, user.getId());
-
         if (!user.hasFamily()) {
-            log.warn("Пользователь ID={} не принадлежит ни одной семье", user.getId());
             return buildNoFamilyMessage();
         }
 
         Long familyId = user.getFamily().getId();
-        log.debug("Получение предстоящих событий для семьи ID={}", familyId);
-
         // Вычисляем диапазон дат: от текущей даты до той же даты следующего месяца
         LocalDate startDate = user.getCurrentDate();
         LocalDate endDate = calculateEndDate(startDate);
         int daysInPeriod = (int) ChronoUnit.DAYS.between(startDate, endDate) + 1;
 
-        log.debug("Диапазон дат для месяца: {} - {} ({} дней)", startDate, endDate, daysInPeriod);
-
         // Получаем предстоящие события семьи
         List<Event> upcomingEvents = eventService.getUpcomingEvents(
             familyId, daysInPeriod, user.getZoneId());
 
-        log.debug("Найдено {} событий до фильтрации для семьи ID={}", 
-                upcomingEvents.size(), familyId);
-
         List<Event> filteredEvents = upcomingEvents.stream()
                 .filter(event -> !event.getIsPersonal() || event.belongsToUser(user.getId()))
                 .collect(Collectors.toList());
-
-        log.info("После фильтрации осталось {} предстоящих событий для пользователя ID={}, семья ID={}", 
-                filteredEvents.size(), user.getId(), familyId);
 
         if (filteredEvents.isEmpty()) {
             return buildNoEventsMessage(startDate, endDate);

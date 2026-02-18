@@ -30,7 +30,6 @@ public class PlannerQueryService {
      */
     @Transactional(readOnly = true)
     public List<Event> getUserEvents(Long userId) {
-        log.debug("Получение событий для пользователя ID={}", userId);
         return eventService.getUserEvents(userId);
     }
 
@@ -62,7 +61,6 @@ public class PlannerQueryService {
      */
     @Transactional(readOnly = true)
     public Event getEventById(Long eventId) {
-        log.debug("Получение события ID={}", eventId);
         return eventService.getEventById(eventId);
     }
 }

@@ -24,15 +24,14 @@ public class EventCallbackRouter implements CallbackHandler {
     
     private final Map<CallbackPrefix, CallbackHandler> handlerMap;
     private final List<CallbackPrefix> supportedPrefixes;
-    
-    public EventCallbackRouter(
-            EventViewHandler eventViewHandler,
-            EventEditHandler eventEditHandler,
-            EventDeleteHandler eventDeleteHandler,
-            EventCompletionHandler eventCompletionHandler,
-            EventFieldEditHandler eventFieldEditHandler,
-            EventReminderNavigationHandler eventReminderNavigationHandler) {
-        
+
+    public EventCallbackRouter(EventViewHandler eventViewHandler,
+                               EventEditHandler eventEditHandler,
+                               EventDeleteHandler eventDeleteHandler,
+                               EventCompletionHandler eventCompletionHandler,
+                               EventFieldEditHandler eventFieldEditHandler,
+                               EventReminderNavigationHandler eventReminderNavigationHandler) {
+
         // Маппинг префиксов на handlers
         this.handlerMap = Map.of(
             CallbackPrefix.VIEW_EVENT, eventViewHandler,
@@ -46,10 +45,10 @@ public class EventCallbackRouter implements CallbackHandler {
             CallbackPrefix.ADD_COMPLETION_NOTE, eventCompletionHandler,
             CallbackPrefix.SKIP_COMPLETION_NOTE, eventCompletionHandler
         );
-        
+
         this.supportedPrefixes = List.copyOf(handlerMap.keySet());
     }
-    
+
     @Override
     public CallbackPrefix getPrefix() {
         return CallbackPrefix.VIEW_EVENT;
@@ -60,8 +59,6 @@ public class EventCallbackRouter implements CallbackHandler {
         if (callbackData == null) {
             return false;
         }
-        
-        // Проверяем более специфичные префиксы первыми (по длине префикса)
         return supportedPrefixes.stream()
                 .anyMatch(prefix -> prefix.matches(callbackData));
     }
@@ -72,12 +69,8 @@ public class EventCallbackRouter implements CallbackHandler {
         String callbackData = callbackQuery.getData();
         
         if (callbackData == null) {
-            log.warn("Получен callback с null данными от пользователя userId={}", user.getId());
             throw new IllegalArgumentException("Callback data не может быть null");
         }
-        
-        log.debug("Маршрутизация callback для события: data='{}', userId={}", 
-                callbackData, user.getId());
         
         CallbackHandler handler = supportedPrefixes.stream()
                 .sorted((p1, p2) -> Integer.compare(p2.getPrefix().length(), p1.getPrefix().length()))

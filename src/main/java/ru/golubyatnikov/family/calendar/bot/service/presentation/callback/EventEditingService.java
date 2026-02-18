@@ -57,10 +57,7 @@ public class EventEditingService {
             completeEditingAndReturnToCard(updatedEvent, userId, chatId, context.getMessageId(), 
                     callbackQueryId, CallbackMessages.UPDATED);
 
-            log.info("Дата события обновлена: eventId={}, userId={}, date={}", 
-                    context.getEventId(), userId, date);
-
-        } catch (Exception e) {
+            } catch (Exception e) {
             log.error("Ошибка при обновлении даты события: userId={}, date={}, error={}", 
                      userId, date, e.getMessage());
 
@@ -89,10 +86,7 @@ public class EventEditingService {
             completeEditingAndReturnToCard(updatedEvent, userId, chatId, context.getMessageId(), 
                     callbackQueryId, CallbackMessages.UPDATED);
 
-            log.info("Время события обновлено: eventId={}, userId={}, time={}", 
-                    context.getEventId(), userId, time);
-
-        } catch (Exception e) {
+            } catch (Exception e) {
             log.error("Ошибка при обновлении времени события: userId={}, time={}, error={}", 
                      userId, time, e.getMessage());
 
@@ -112,7 +106,6 @@ public class EventEditingService {
     public void cancelEditing(Long userId, Long chatId, String callbackQueryId) {
         EditingContext context = conversationStateService.getEditingContext(userId);
         if (context == null || context.getEventId() == null) {
-            log.warn("Контекст редактирования не найден при отмене: userId={}", userId);
             conversationStateService.clearEventEditing(userId);
             return;
         }
@@ -122,9 +115,7 @@ public class EventEditingService {
             completeEditingAndReturnToCard(event, userId, chatId, context.getMessageId(), 
                     callbackQueryId, "Редактирование отменено");
 
-            log.info("Редактирование отменено: userId={}, eventId={}", userId, context.getEventId());
-
-        } catch (Exception e) {
+            } catch (Exception e) {
             log.error("Ошибка при отмене редактирования: userId={}, error={}", userId, e.getMessage());
             conversationStateService.clearEventEditing(userId);
             throw new RuntimeException("Ошибка при отмене редактирования", e);
@@ -140,7 +131,6 @@ public class EventEditingService {
     private @Nullable EditingContext getEditingContextOrWarn(Long userId) {
         EditingContext context = conversationStateService.getEditingContext(userId);
         if (context == null || context.getEventId() == null) {
-            log.warn("Контекст редактирования не найден: userId={}", userId);
             return null;
         }
         return context;
@@ -204,7 +194,6 @@ public class EventEditingService {
             tryEditMessage(event, chatId, messageId, eventMessage, keyboard);
 
         } else {
-            log.warn("MessageId не найден в контексте, используем sendOrUpdateEventMessage");
             sendEventMessage(event, chatId);
         }
     }
@@ -225,9 +214,7 @@ public class EventEditingService {
                                 InlineKeyboardMarkup keyboard) {
         try {
             messageService.editMessageText(chatId, messageId, eventMessage, keyboard);
-            log.debug("Возврат к карточке события: eventId={}, messageId={}", event.getId(), messageId);
-
-        } catch (TelegramApiException e) {
+            } catch (TelegramApiException e) {
             log.warn("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
                     event.getId(), messageId, e.getMessage());
 

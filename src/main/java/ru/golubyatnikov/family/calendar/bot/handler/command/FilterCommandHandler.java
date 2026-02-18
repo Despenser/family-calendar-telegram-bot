@@ -37,8 +37,6 @@ public class FilterCommandHandler implements CommandHandler {
      */
     @Override
     public String handle(Message message, @NonNull User user) {
-        log.debug("Обработка команды /filter для пользователя ID={}", user.getId());
-        
         try {
             InlineKeyboardMarkup keyboard = keyboardService.createFilterKeyboard();
 
@@ -47,7 +45,6 @@ public class FilterCommandHandler implements CommandHandler {
 
             messageService.sendMessage(message.getChatId(), messageText, keyboard);
             
-            log.debug("Пользователю ID={} отправлено меню фильтрации", user.getId());
             return null;
             
         } catch (Exception e) {

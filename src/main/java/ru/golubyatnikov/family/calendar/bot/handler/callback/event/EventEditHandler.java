@@ -73,8 +73,10 @@ public class EventEditHandler implements CallbackHandler {
         
         if (CallbackPrefix.EDIT_EVENT.matches(context.callbackData())) {
             handleEditEvent(context);
+
         } else if (CallbackPrefix.EDIT_BACK.matches(context.callbackData())) {
             handleEditBack(context);
+
         } else if (CallbackPrefix.EDIT_CANCEL.matches(context.callbackData())) {
             handleEditCancel(context);
         }
@@ -83,7 +85,7 @@ public class EventEditHandler implements CallbackHandler {
     /**
      * Обрабатывает редактирование события.
      */
-    private void handleEditEvent(CallbackQueryContext context) {
+    private void handleEditEvent(@NonNull CallbackQueryContext context) {
         Long eventId = extractEventId(context.callbackData());
         
         log.info("Редактирование события ID={} пользователем ID={}", eventId, context.getUserId());
@@ -92,7 +94,6 @@ public class EventEditHandler implements CallbackHandler {
             Event event = eventService.getEventById(eventId);
             
             if (!event.getUser().getId().equals(context.getUserId())) {
-                log.warn("Пользователь ID={} не имеет прав для редактирования события ID={}", context.getUserId(), eventId);
                 callbackQueryService.answerCallback(context, CallbackMessages.NO_ACCESS);
                 return;
             }
@@ -105,12 +106,10 @@ public class EventEditHandler implements CallbackHandler {
             messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
-            log.debug("Начато редактирование события ID={} в сообщении ID={} пользователем ID={}", 
-                     eventId, context.messageId(), context.getUserId());
-            
         } catch (TelegramApiException e) {
             log.error("Ошибка при редактировании события: eventId={}, userId={}, error={}", 
                      eventId, context.getUserId(), e.getMessage(), e);
+
             throw new RuntimeException("Ошибка при редактировании события", e);
         }
     }
@@ -118,11 +117,9 @@ public class EventEditHandler implements CallbackHandler {
     /**
      * Обрабатывает возврат к меню выбора поля редактирования.
      */
-    private void handleEditBack(CallbackQueryContext context) {
+    private void handleEditBack(@NonNull CallbackQueryContext context) {
         String eventIdStr = CallbackPrefix.EDIT_BACK.extractPayload(context.callbackData());
         Long eventId = Long.parseLong(eventIdStr);
-        
-        log.info("Возврат к меню выбора поля редактирования события ID={} пользователем ID={}", eventId, context.getUserId());
         
         try {
             Event event = eventService.getEventById(eventId);
@@ -133,12 +130,10 @@ public class EventEditHandler implements CallbackHandler {
             messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
-            log.debug("Возврат к меню выбора поля: eventId={}, messageId={}, userId={}", 
-                     eventId, context.messageId(), context.getUserId());
-            
         } catch (TelegramApiException e) {
             log.error("Ошибка Telegram API при возврате к меню выбора поля: eventId={}, userId={}, error={}", 
                      eventId, context.getUserId(), e.getMessage(), e);
+
             throw new RuntimeException("Ошибка при возврате к меню выбора поля", e);
         }
     }
@@ -146,19 +141,14 @@ public class EventEditHandler implements CallbackHandler {
     /**
      * Обрабатывает отмену редактирования события.
      */
-    private void handleEditCancel(CallbackQueryContext context) {
+    private void handleEditCancel(@NonNull CallbackQueryContext context) {
         String eventIdStr = CallbackPrefix.EDIT_CANCEL.extractPayload(context.callbackData());
         Long eventId = Long.parseLong(eventIdStr);
-        
-        log.info("Отмена редактирования события ID={} пользователем ID={}", eventId, context.getUserId());
         
         try {
             EditingContext editingContext = conversationStateService.getEditingContext(context.getUserId());
             Integer messageId = editingContext != null ? editingContext.getMessageId() : null;
             LocalDate sourceDate = editingContext != null ? editingContext.getSourceDate() : null;
-            
-            log.info("Контекст редактирования: userId={}, eventId={}, messageId={}, sourceDate={}, contextExists={}", 
-                    context.getUserId(), eventId, messageId, sourceDate, editingContext != null);
             
             conversationStateService.clearEventEditing(context.getUserId());
             
@@ -173,6 +163,7 @@ public class EventEditHandler implements CallbackHandler {
         } catch (TelegramApiException e) {
             log.error("Ошибка Telegram API при отмене редактирования: eventId={}, userId={}, error={}", 
                      eventId, context.getUserId(), e.getMessage(), e);
+
             throw new RuntimeException("Ошибка при отмене редактирования события", e);
         }
     }
@@ -184,9 +175,6 @@ public class EventEditHandler implements CallbackHandler {
                                           CallbackQueryContext context,
                                           Integer messageId,
                                           LocalDate sourceDate) throws TelegramApiException {
-        log.info("Возврат к списку событий на дату {} после отмены редактирования события ID={}", 
-                sourceDate, event.getId());
-        
         if (messageId != null) {
             List<Event> allEvents = eventService.getEventsByDate(event.getUser().getFamily().getId(), sourceDate);
             List<Event> myEvents = allEvents.stream()
@@ -198,8 +186,6 @@ public class EventEditHandler implements CallbackHandler {
             
             messageService.editMessageText(context.chatId(), messageId, message, keyboard);
             
-            log.debug("Сообщение обновлено при отмене редактирования из календаря: eventId={}, messageId={}, sourceDate={}", 
-                     event.getId(), messageId, sourceDate);
         } else {
             log.warn("MessageId не найден в контексте редактирования из календаря: eventId={}, userId={}", 
                     event.getId(), context.getUserId());
@@ -214,17 +200,17 @@ public class EventEditHandler implements CallbackHandler {
     private void handleCancelFromEvent(Event event,
                                        CallbackQueryContext context,
                                        Integer messageId) throws TelegramApiException {
+
         if (messageId != null) {
             int eventCount = eventService.getActiveEventsCount(event.getUser().getId());
             String eventMessage = botMessageFormattingService.buildEventMessageWithHeader(event, eventCount);
             InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, context.getUserId());
             messageService.editMessageText(context.chatId(), messageId, eventMessage, keyboard);
             
-            log.debug("Сообщение обновлено при отмене редактирования: eventId={}, messageId={}", 
-                     event.getId(), messageId);
         } else {
-            log.warn("MessageId не найден в контексте редактирования, используем sendOrUpdateEventMessage: eventId={}, userId={}", 
+            log.warn("MessageId не найден в контексте редактирования, используем sendOrUpdateEventMessage: eventId={}, userId={}",
                     event.getId(), context.getUserId());
+                    
             eventService.sendOrUpdateEventMessage(event, context.chatId());
         }
         

@@ -112,13 +112,10 @@ public class TextEventParsingService {
      */
     public Optional<ParsedEvent> parseEvent(String text) {
         if (text == null || text.trim().isEmpty()) {
-            log.debug("Пустой текст для парсинга");
             return Optional.empty();
         }
 
         text = text.trim();
-        log.debug("Парсинг текста: {}", text);
-
         // Определяем стратегии парсинга в порядке приоритета
         ParsingStrategy[] strategies = {
                 new ParsingStrategy(STRUCTURED_PATTERN, "структурированный", this::parseStructuredFormat),
@@ -132,13 +129,11 @@ public class TextEventParsingService {
             if (matcher.find()) {
                 Optional<ParsedEvent> result = strategy.parser.apply(matcher);
                 if (result.isPresent()) {
-                    log.info("Распознано событие в формате '{}': {}", strategy.formatName, result.get());
                     return result;
                 }
             }
         }
 
-        log.debug("Не удалось распознать событие из текста: {}", text);
         return Optional.empty();
     }
 
@@ -220,14 +215,13 @@ public class TextEventParsingService {
         for (DateTimeFormatter formatter : DATE_FORMATTERS) {
             try {
                 LocalDate date = LocalDate.parse(dateStr, formatter);
-                log.debug("Дата успешно распознана: {} -> {}", dateStr, date);
                 return Optional.of(date);
+
             } catch (DateTimeParseException e) {
                 // Пробуем следующий формат
             }
         }
 
-        log.debug("Не удалось распознать дату: {}", dateStr);
         return Optional.empty();
     }
 
@@ -247,14 +241,13 @@ public class TextEventParsingService {
         for (DateTimeFormatter formatter : TIME_FORMATTERS) {
             try {
                 LocalTime time = LocalTime.parse(timeStr, formatter);
-                log.debug("Время успешно распознано: {} -> {}", timeStr, time);
                 return Optional.of(time);
+
             } catch (DateTimeParseException e) {
                 // Пробуем следующий формат
             }
         }
 
-        log.debug("Не удалось распознать время: {}", timeStr);
         return Optional.empty();
     }
 

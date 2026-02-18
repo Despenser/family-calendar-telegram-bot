@@ -37,7 +37,6 @@ public class CommandFormatter {
         try {
             String command = handler.getCommand();
             if (command == null) {
-                log.warn("Обработчик {} имеет null команду", handler.getClass().getSimpleName());
                 return Optional.empty();
             }
 

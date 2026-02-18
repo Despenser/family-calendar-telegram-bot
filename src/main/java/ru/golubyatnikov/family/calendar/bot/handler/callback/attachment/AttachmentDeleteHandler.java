@@ -54,8 +54,6 @@ public class AttachmentDeleteHandler {
                                  Long eventId,
                                  @NonNull CallbackQueryContext context) throws Exception {
 
-        log.debug("Запрос удаления файла: attachmentId={}", attachmentId);
-        
         try {
             validateUserAccess(eventId, context.user());
             Attachment attachment = attachmentService.getAttachment(attachmentId);
@@ -87,13 +85,9 @@ public class AttachmentDeleteHandler {
                                     Long eventId,
                                     @NonNull CallbackQueryContext context) throws Exception {
 
-        log.debug("Подтверждение удаления файла: attachmentId={}", attachmentId);
-        
         try {
             attachmentService.deleteAttachment(attachmentId, context.getUserId());
             callbackQueryService.answerCallback(context, CallbackMessages.DELETED);
-            
-            log.info("Вложение удалено: attachmentId={}", attachmentId);
             
             showUpdatedAttachmentList(eventId, context);
             
@@ -117,7 +111,6 @@ public class AttachmentDeleteHandler {
      * @throws Exception если произошла ошибка при отмене
      */
     public void handleCancelDelete(Long eventId, CallbackQueryContext context) throws Exception {
-        log.debug("Отмена удаления файла: eventId={}", eventId);
         callbackQueryService.answerCallback(context, CallbackMessageFormatter.actionCancelled("Удаление"));
         listHandler.handleAttachmentList(eventId, context);
     }

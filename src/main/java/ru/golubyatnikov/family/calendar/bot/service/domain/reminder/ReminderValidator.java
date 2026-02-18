@@ -39,7 +39,6 @@ public class ReminderValidator {
         Event event = reminder.getEvent();
         
         if (isEventDeleted(event)) {
-            log.debug("Пропуск напоминания ID {}: событие удалено", reminder.getId());
             return false;
         }
         
@@ -53,15 +52,8 @@ public class ReminderValidator {
     private boolean isEventInPast(Event event, LocalDateTime nowUTC, Long reminderId) {
         try {
             LocalDateTime eventTimeUTC = convertEventTimeToUTC(event);
-            
-            if (eventTimeUTC.isBefore(nowUTC)) {
-                log.debug("Пропуск напоминания ID {}: событие в прошлом (eventTimeUTC={}, nowUTC={})", 
-                         reminderId, eventTimeUTC, nowUTC);
-                return true;
-            }
-            
-            return false;
-            
+            return eventTimeUTC.isBefore(nowUTC);
+
         } catch (Exception e) {
             log.error("Ошибка проверки времени события для напоминания ID {}: {}", 
                      reminderId, e.getMessage(), e);

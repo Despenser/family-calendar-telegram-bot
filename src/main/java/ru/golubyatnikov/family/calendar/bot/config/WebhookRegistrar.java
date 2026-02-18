@@ -41,9 +41,8 @@ public class WebhookRegistrar {
      */
     @PostConstruct
     public void registerWebhook() {
-        log.info("Начинается регистрация webhook для бота: {}", botConfig.getUsername());
-        log.debug("Webhook URL: {}", botConfig.getWebhookUrl());
-
+        log.info("Регистрация webhook: {}", botConfig.getWebhookUrl());
+        
         try {
             String apiUrl = String.format("https://api.telegram.org/bot%s/setWebhook", botConfig.getToken());
             String secretToken = webhookSecurityService.generateSecretToken();
@@ -64,23 +63,21 @@ public class WebhookRegistrar {
                     Map.class
             );
 
-            // Проверяем результат
             var responseBody = response.getBody();
             if (responseBody != null && Boolean.TRUE.equals(responseBody.get("ok"))) {
-                log.info("✓ Webhook успешно зарегистрирован для бота: {}", botConfig.getUsername());
-                log.info("✓ URL: {}", botConfig.getWebhookUrl());
-                log.debug("✓ Ответ от Telegram API: {}", responseBody);
+                log.info("Webhook зарегистрирован");
 
             } else {
-                String errorDescription = responseBody != null ? 
-                        String.valueOf(responseBody.get("description")) : "Неизвестная ошибка";
-                log.error("✗ Не удалось зарегистрировать webhook. Ответ: {}", responseBody);
+                String errorDescription = responseBody != null
+                        ? String.valueOf(responseBody.get("description"))
+                        : "Неизвестная ошибка";
+
+                log.error("Ошибка регистрации webhook: {}", errorDescription);
                 shutdownApplication("Регистрация webhook не удалась: " + errorDescription);
             }
 
         } catch (Exception e) {
-            log.error("✗ Ошибка при регистрации webhook для бота: {}", botConfig.getUsername(), e);
-            log.error("✗ Детали ошибки: {}", e.getMessage());
+            log.error("Ошибка регистрации webhook: {}", e.getMessage(), e);
             shutdownApplication("Ошибка регистрации webhook: " + e.getMessage());
         }
     }
@@ -92,13 +89,8 @@ public class WebhookRegistrar {
      * @param reason причина остановки приложения
      */
     private void shutdownApplication(String reason) {
-        log.error("═══════════════════════════════════════════════════════════");
-        log.error("КРИТИЧЕСКАЯ ОШИБКА: Приложение будет остановлено");
-        log.error("Причина: {}", reason);
-        log.error("═══════════════════════════════════════════════════════════");
+        log.error("Критическая ошибка - приложение остановлено: {}", reason);
         
-        // Выполняем graceful shutdown в отдельном потоке,
-        // чтобы позволить текущему методу завершиться корректно
         new Thread(() -> {
             try {
                 Thread.sleep(1000);
@@ -106,7 +98,6 @@ public class WebhookRegistrar {
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log.error("Прерван процесс graceful shutdown", e);
             }
         }, "webhook-shutdown-thread").start();
     }

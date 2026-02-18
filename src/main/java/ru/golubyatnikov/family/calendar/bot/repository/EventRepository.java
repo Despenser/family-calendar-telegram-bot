@@ -56,18 +56,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         LocalDate endDate,
         EventStatus status
     );
-    
-    /**
-     * Находит все события пользователя, отсортированные по дате в порядке возрастания.
-     * 
-     * @param userId идентификатор пользователя
-     *
-     * @return список событий пользователя, отсортированный по дате возрастания
-     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
-     */
-    @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findByUserIdOrderByEventDateAsc(Long userId);
-    
+
     /**
      * Находит все события пользователя с определенным статусом, отсортированные по дате и времени в порядке возрастания.
      * 
@@ -188,48 +177,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         @Param("query") String query
     );
 
-    /**
-     * Находит предстоящие события семьи и пользователя.
-     * Включает семейные события и персональные события пользователя.
-     * 
-     * @param familyId идентификатор семьи
-     * @param userId идентификатор пользователя
-     * @param currentDate текущая дата
-     *
-     * @return список предстоящих событий
-     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
-     */
-    @EntityGraph(attributePaths = {"user", "family"})
-    @Query("""
-                SELECT e FROM Event e
-                WHERE e.family.id = :familyId
-                AND e.status = 'ACTIVE'
-                AND e.eventDate >= :currentDate
-                AND (
-                    (e.isPersonal = false)
-                    OR (e.isPersonal = true AND e.user.id = :userId)
-                )
-                ORDER BY e.eventDate ASC, e.eventTime ASC
-    """)
-    List<Event> findUpcomingEvents(
-        @Param("familyId") Long familyId,
-        @Param("userId") Long userId,
-        @Param("currentDate") LocalDate currentDate
-    );
-    
-    /**
-     * Находит все события серии с определенным статусом.
-     * Используется для операций с повторяющимися событиями.
-     * 
-     * @param seriesId UUID серии событий
-     * @param status статус события
-     *
-     * @return список событий серии с указанным статусом
-     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
-     */
-    @EntityGraph(attributePaths = {"user", "family"})
-    List<Event> findBySeriesIdAndStatus(String seriesId, EventStatus status);
-    
     /**
      * Подсчитывает количество событий семьи в диапазоне дат с определенным статусом.
      * 

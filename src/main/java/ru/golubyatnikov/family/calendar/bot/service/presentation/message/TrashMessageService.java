@@ -27,7 +27,6 @@ public class TrashMessageService {
      */
     public void deleteEventMessage(@NonNull Event event) {
         if (event.getMessageId() == null) {
-            log.debug("У события ID={} отсутствует messageId, удаление сообщения не требуется", event.getId());
             return;
         }
         
@@ -35,10 +34,7 @@ public class TrashMessageService {
             Long chatId = event.getUser().getTelegramId();
             messageService.deleteMessageSilently(chatId, event.getMessageId().intValue());
 
-            log.debug("Сообщение события удалено: eventId={}, messageId={}", 
-                     event.getId(), event.getMessageId());
-
-        } catch (Exception e) {
+            } catch (Exception e) {
             log.warn("Не удалось удалить сообщение события ID={}, messageId={}: {}. Продолжаем операцию.", 
                     event.getId(), event.getMessageId(), e.getMessage());
         }

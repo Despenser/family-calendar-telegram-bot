@@ -46,30 +46,19 @@ public class WeekCommandHandler implements CommandHandler {
      */
     @Override
     public String handle(Message message, @NonNull User user) {
-        log.debug("Обработка команды /week для пользователя ID={}, семья ID={}", 
-                  user.getId(), user.getFamily().getId());
-        
         try {
             List<Event> weekEvents = eventService.getUpcomingEvents(user.getFamily().getId(), WEEK_DAYS, user.getZoneId());
             
-            log.debug("Найдено {} событий до фильтрации для семьи ID={}", 
-                    weekEvents.size(), user.getFamily().getId());
-
             List<Event> filteredEvents = weekEvents.stream()
                 .filter(event -> !event.getIsPersonal() || event.belongsToUser(user.getId()))
                 .toList();
             
-            log.debug("После фильтрации осталось {} событий на неделю для пользователя ID={}", 
-                    filteredEvents.size(), user.getId());
-            
             if (filteredEvents.isEmpty()) {
-                String responseMessage = eventFormattingService.formatNoEventsMessage(
+                return eventFormattingService.formatNoEventsMessage(
                     "📆",
                     "События на неделю",
                     "На ближайшую неделю событий не запланировано."
                 );
-                log.debug("Пользователю ID={} будет отправлено сообщение об отсутствии событий на неделю", user.getId());
-                return responseMessage;
             }
             
             // Группировка событий по датам
@@ -115,12 +104,8 @@ public class WeekCommandHandler implements CommandHandler {
             
             // Добавляем счетчик только отображенных событий
             messageBuilder.append(eventFormattingService.formatEventCounter(displayedEventsCount));
-            
-            String responseMessage = messageBuilder.toString();
-            log.debug("Пользователю ID={} будет отправлен список из {} событий на неделю", 
-                     user.getId(), filteredEvents.size());
 
-            return responseMessage;
+            return messageBuilder.toString();
             
         } catch (Exception e) {
             log.error("Ошибка при обработке команды /week для пользователя ID={}", user.getId(), e);

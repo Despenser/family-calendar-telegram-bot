@@ -42,18 +42,13 @@ public class EventInlineKeyboardFactory {
      */
     public InlineKeyboardMarkup createEventActionsKeyboard(Long eventId) {
         if (eventId == null || eventId <= 0) {
-            log.error("Попытка создать клавиатуру с некорректным eventId: {}", eventId);
             throw new IllegalArgumentException("EventId должен быть положительным числом");
         }
-        
-        log.debug("Создание inline клавиатуры для события ID={}", eventId);
         
         long attachmentsCount = attachmentService.countEventAttachments(eventId);
         String attachmentsButtonText = attachmentsCount > 0 
             ? "📎 Вложения (" + attachmentsCount + ")" 
             : "📎 Вложения";
-        
-        log.debug("Inline клавиатура для события ID={} создана", eventId);
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
@@ -77,19 +72,14 @@ public class EventInlineKeyboardFactory {
      */
     public InlineKeyboardMarkup createEventActionsKeyboard(Event event, Long userId) {
         if (event == null || event.getId() == null) {
-            log.error("Попытка создать клавиатуру с некорректным event");
             throw new IllegalArgumentException("Event и Event ID не могут быть null");
         }
         
         if (userId == null || userId <= 0) {
-            log.error("Попытка создать клавиатуру с некорректным userId: {}", userId);
             throw new IllegalArgumentException("UserId должен быть положительным числом");
         }
         
         Long eventId = event.getId();
-        log.debug("Создание inline клавиатуры для события ID={} с учетом прав пользователя ID={}", 
-                eventId, userId);
-        
         List<InlineKeyboardRow> rows = new ArrayList<>();
         
         // Первый ряд: кнопки редактирования и удаления
@@ -136,8 +126,6 @@ public class EventInlineKeyboardFactory {
         
         InlineKeyboardMarkup keyboard = keyboardFactory.createMarkup(rows);
         
-        log.debug("Inline клавиатуру для события ID={} создана с {} рядами", eventId, rows.size());
-        
         return keyboard;
     }
 
@@ -148,8 +136,6 @@ public class EventInlineKeyboardFactory {
      * @return настроенная InlineKeyboardMarkup
      */
     public InlineKeyboardMarkup createDeleteConfirmationKeyboard(Long eventId) {
-        log.debug("Создание inline клавиатуры подтверждения удаления для события {}", eventId);
-        
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
                 keyboardFactory.createButton("✅ Да, удалить", "confirm_delete_" + eventId),
@@ -164,8 +150,6 @@ public class EventInlineKeyboardFactory {
      * @return настроенная InlineKeyboardMarkup
      */
     public InlineKeyboardMarkup createEventTypeSelectionKeyboard() {
-        log.debug("Создание inline клавиатуры для выбора типа события");
-        
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
                 keyboardFactory.createButton("👨‍👩‍👧‍👦 Семейное событие", "event_type_family")
@@ -186,11 +170,8 @@ public class EventInlineKeyboardFactory {
      */
     public InlineKeyboardMarkup createTrashActionsKeyboard(Long eventId) {
         if (eventId == null || eventId <= 0) {
-            log.error("Попытка создать клавиатуру корзины с некорректным eventId: {}", eventId);
             throw new IllegalArgumentException("EventId должен быть положительным числом");
         }
-        
-        log.debug("Создание inline клавиатуры для события в корзине ID={}", eventId);
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
@@ -210,11 +191,8 @@ public class EventInlineKeyboardFactory {
      */
     public InlineKeyboardMarkup createCompletionNoteKeyboard(Long eventId) {
         if (eventId == null || eventId <= 0) {
-            log.error("Попытка создать клавиатуру заметки о завершении с некорректным eventId: {}", eventId);
             throw new IllegalArgumentException("EventId должен быть положительным числом");
         }
-        
-        log.debug("Создание inline клавиатуры для добавления заметки к завершённому событию ID={}", eventId);
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
@@ -249,11 +227,8 @@ public class EventInlineKeyboardFactory {
      */
     public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId, Long userId) {
         if (eventId == null || eventId <= 0) {
-            log.error("Попытка создать клавиатуру выбора поля с некорректным eventId: {}", eventId);
             throw new IllegalArgumentException("EventId должен быть положительным числом");
         }
-        
-        log.debug("Создание inline клавиатуры выбора поля для редактирования события ID={}, userId={}", eventId, userId);
         
         // Проверяем, редактируется ли событие из календаря
         boolean isFromCalendar = false;
@@ -266,11 +241,9 @@ public class EventInlineKeyboardFactory {
         
         if (isFromCalendar) {
             cancelBtn = keyboardFactory.createButton("🔙 Назад", "edit_cancel_" + eventId);
-            log.debug("Создана кнопка 'Назад' для редактирования из календаря: eventId={}, userId={}", eventId, userId);
-        } else {
+            } else {
             cancelBtn = keyboardFactory.createButton("❌ Отмена", "edit_cancel_" + eventId);
-            log.debug("Создана кнопка 'Отмена' для обычного редактирования: eventId={}, userId={}", eventId, userId);
-        }
+            }
         
         InlineKeyboardMarkup keyboard = keyboardFactory.createMarkup(
             keyboardFactory.createRow(
@@ -284,8 +257,6 @@ public class EventInlineKeyboardFactory {
             keyboardFactory.createRow(cancelBtn)
         );
         
-        log.debug("Inline клавиатура выбора поля для события ID={} создана: 3 ряда", eventId);
-        
         return keyboard;
     }
 
@@ -295,8 +266,6 @@ public class EventInlineKeyboardFactory {
      * @return настроенная InlineKeyboardMarkup
      */
     public InlineKeyboardMarkup createFilterKeyboard() {
-        log.debug("Создание inline клавиатуры для фильтрации событий");
-        
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
                 keyboardFactory.createButton("📋 Все события", "filter_all")

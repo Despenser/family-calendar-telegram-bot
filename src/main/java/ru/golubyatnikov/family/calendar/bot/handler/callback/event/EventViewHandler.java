@@ -56,13 +56,8 @@ public class EventViewHandler implements CallbackHandler {
         
         Long eventId = extractEventId(context.callbackData());
         
-        log.debug("Просмотр деталей события: eventId={}, userId={}, messageId={}", 
-                 eventId, context.getUserId(), context.messageId());
-        
         try {
             Event event = eventService.getEventById(eventId);
-            
-            log.debug("Событие загружено: eventId={}, userId={}", eventId, context.getUserId());
             
             int eventCount = eventService.getActiveEventsCount(context.getUserId());
             String eventMessage = botMessageFormattingService.buildEventMessageWithHeader(event, eventCount);
@@ -70,9 +65,6 @@ public class EventViewHandler implements CallbackHandler {
             
             messageService.editMessageText(context.chatId(), context.messageId(), eventMessage, keyboard);
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
-            
-            log.info("Детали события отображены: eventId={}, messageId={}, userId={}", 
-                    eventId, context.messageId(), context.getUserId());
             
         } catch (EventNotFoundException e) {
             log.warn("Событие не найдено при просмотре деталей: eventId={}, userId={}", 

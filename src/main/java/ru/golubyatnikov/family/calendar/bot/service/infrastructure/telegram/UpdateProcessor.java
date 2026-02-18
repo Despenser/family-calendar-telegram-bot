@@ -2,6 +2,7 @@ package ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
@@ -25,16 +26,8 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.format
  *
  * TODO требуется небольшой рефакторинг
  * Координатор обработки обновлений от Telegram Bot API.
- * 
- * <p>Выполняет роль координатора, делегируя обработку специализированным компонентам:</p>
- * <ul>
- *   <li>Callback queries → CallbackQueryDispatcher</li>
- *   <li>Текстовые сообщения → MessageRouter</li>
- *   <li>Файловые сообщения → MessageRouter</li>
- *   <li>Команды → CommandDispatcher</li>
- * </ul>
- * 
- * @author Family Calendar Bot Team
+ *
+ * @author Golubyatnikov Aleksey
  * @since 2026-02-02
  */
 @Service
@@ -59,24 +52,16 @@ public class UpdateProcessor {
     public void processUpdate(Update update) {
         CorrelationIdUtil.executeWithCorrelationId(() -> {
             if (update == null) {
-                log.error("Получено null обновление для обработки");
                 throw new IllegalArgumentException("Update не может быть null");
             }
             
-            log.debug("Начало асинхронной обработки обновления: updateId={}", update.getUpdateId());
-            
             try {
-                // Делегируем обработку callback query
                 if (update.hasCallbackQuery()) {
-                    log.debug("Обновление содержит callback query: updateId={}", update.getUpdateId());
                     callbackQueryDispatcher.dispatch(update.getCallbackQuery());
                     return;
                 }
-                
-                // Проверяем наличие сообщения
+
                 if (!update.hasMessage()) {
-                    log.debug("Обновление не содержит сообщения: updateId={}, hasEditedMessage={}", 
-                            update.getUpdateId(), update.hasEditedMessage());
                     return;
                 }
                 
@@ -87,11 +72,8 @@ public class UpdateProcessor {
                             update.getUpdateId());
                     return;
                 }
-                
-                // Обрабатываем сообщение
+
                 processMessage(message);
-                
-                log.debug("Обновление успешно обработано: updateId={}", update.getUpdateId());
                 
             } catch (Exception e) {
                 log.error("Ошибка при обработке обновления: updateId={}, error={}", 
@@ -103,44 +85,32 @@ public class UpdateProcessor {
     /**
      * Обрабатывает сообщение от пользователя.
      */
-    private void processMessage(Message message) {
+    private void processMessage(@NonNull Message message) {
         String originalText = message.getText();
         Long telegramId = message.getFrom().getId();
         Optional<User> userOpt = userService.findByTelegramId(telegramId);
-        
-        // Обрабатываем файловые сообщения
+
         if (originalText == null || originalText.isBlank()) {
-            log.debug("Сообщение не содержит текста: messageId={}", message.getMessageId());
-            
             if (message.hasDocument() || message.hasPhoto() || message.hasVideo() || message.hasAudio()) {
                 handleFileMessage(message, userOpt);
             }
             return;
         }
         
-        log.debug("Извлечено сообщение: messageId={}, chatId={}, from={}", 
-                message.getMessageId(), message.getChatId(), telegramId);
-        
         // Преобразуем текст кнопки в команду
         String commandText = keyboardService.buttonTextToCommand(originalText);
         
         if (!originalText.equals(commandText)) {
-            log.debug("Текст кнопки '{}' преобразован в команду '{}'", originalText, commandText);
             message.setText(commandText);
         }
-        
-        // Проверяем авторизацию
-        // Если пользователь не авторизован, проверяем требует ли команда авторизации
+
         if (userOpt.isEmpty()) {
             // Проверяем, является ли это командой, которая не требует авторизации
             if (commandText != null && commandText.startsWith("/") && commandDispatcher.hasHandler(commandText)) {
-                // Команда существует - проверяем, требует ли она авторизации
-                // Если команда не требует авторизации (например, /start или /help), обрабатываем её
                 handleCommand(message);
                 return;
             }
-            
-            // Для всех остальных случаев отправляем сообщение о необходимости авторизации
+
             handleUnauthorizedMessage(message, commandText);
             return;
         }
@@ -190,9 +160,6 @@ public class UpdateProcessor {
         Long telegramId = message.getFrom().getId();
         String username = message.getFrom().getUserName();
         
-        log.debug("Сообщение от неавторизованного пользователя: telegramId={}, command={}", 
-                telegramId, commandText);
-        
         // Проверяем, является ли это командой
         if (commandText != null && commandText.startsWith("/")) {
             MessageCategory category = determineMessageCategory(commandText);
@@ -215,9 +182,7 @@ public class UpdateProcessor {
      */
     private void logUserStates(User user) {
         // Эта логика будет реализована через ConversationStateService
-        log.debug("Обработка сообщения от авторизованного пользователя: userId={}, telegramId={}", 
-                user.getId(), user.getTelegramId());
-    }
+        }
 
     /**
      * Обрабатывает команду.
@@ -230,15 +195,10 @@ public class UpdateProcessor {
         
         String commandText = extractCommand(messageText);
         
-        log.debug("Обработка команды: command='{}', telegramId={}, chatId={}", 
-                commandText, telegramId, chatId);
-        
         if (commandText == null) {
             handleInvalidCommand(chatId, telegramId);
             return;
         }
-        
-        log.debug("Извлечена команда: '{}' из текста: '{}'", commandText, messageText);
         
         if (!commandDispatcher.hasHandler(commandText)) {
             handleUnknownCommand(chatId, telegramId, commandText);
@@ -248,9 +208,6 @@ public class UpdateProcessor {
         try {
             String response = commandDispatcher.dispatch(message);
             
-            log.debug("Команда '{}' успешно обработана: telegramId={}, responseLength={}", 
-                    commandText, telegramId, response != null ? response.length() : 0);
-            
             if (response != null && !response.isBlank()) {
                 sendCommandResponse(chatId, telegramId, response);
             } else {
@@ -259,9 +216,6 @@ public class UpdateProcessor {
             }
             
         } catch (ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException e) {
-            log.debug("Команда '{}' отклонена из-за отсутствия авторизации: telegramId={}", 
-                    commandText, telegramId);
-            
             MessageCategory category = determineMessageCategory(commandText);
             authorizationService.checkAuthorizationAndNotify(telegramId, chatId, category, commandText, username);
         }
@@ -271,7 +225,6 @@ public class UpdateProcessor {
      * Обрабатывает невалидную команду.
      */
     private void handleInvalidCommand(Long chatId, Long telegramId) {
-        log.warn("Не удалось извлечь команду из текста: telegramId={}", telegramId);
         
         try {
             Optional<User> userOpt = userService.findByTelegramId(telegramId);
@@ -292,7 +245,6 @@ public class UpdateProcessor {
      * Обрабатывает неизвестную команду.
      */
     private void handleUnknownCommand(Long chatId, Long telegramId, String commandText) {
-        log.warn("Обработчик не найден для команды: '{}', telegramId={}", commandText, telegramId);
         
         try {
             Optional<User> userOpt = userService.findByTelegramId(telegramId);
@@ -302,7 +254,9 @@ public class UpdateProcessor {
             
             String response = formatMessage("Неизвестная команда: %s\n\nИспользуйте 📚 %s для списка доступных команд.", 
                                           commandText, escape("/help"));
+
             messageService.sendMessage(chatId, response, keyboard);
+
         } catch (Exception e) {
             log.error("Ошибка при отправке сообщения об ошибке: {}", e.getMessage(), e);
         }
@@ -319,8 +273,7 @@ public class UpdateProcessor {
                     : keyboardService.createUnauthorizedUserKeyboard();
             
             messageService.sendMessage(chatId, response, keyboard);
-            log.debug("Ответ с клавиатурой успешно отправлен пользователю: chatId={}, responseLength={}", 
-                    chatId, response.length());
+
         } catch (Exception e) {
             log.error("Ошибка при отправке ответа пользователю: telegramId={}, chatId={}, error={}", 
                     telegramId, chatId, e.getMessage(), e);
@@ -351,7 +304,7 @@ public class UpdateProcessor {
     /**
      * Определяет категорию сообщения на основе команды.
      */
-    private MessageCategory determineMessageCategory(String command) {
+    private MessageCategory determineMessageCategory(@NonNull String command) {
         return switch (command) {
             case "/add_event" -> MessageCategory.EVENT_CREATION;
             case "/my_events", "/month", "/today", "/week" -> MessageCategory.EVENT_VIEWING;

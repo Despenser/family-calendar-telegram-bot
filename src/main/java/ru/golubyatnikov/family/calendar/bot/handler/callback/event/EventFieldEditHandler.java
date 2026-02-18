@@ -70,14 +70,9 @@ public class EventFieldEditHandler implements CallbackHandler {
         try {
             String payload = CallbackPrefix.EDIT_FIELD.extractPayload(context.callbackData());
             
-            log.debug("Извлечен payload из callback data: payload='{}', userId={}", payload, userId);
-            
             String[] parts = payload.split("_", 2);
             
             if (parts.length != 2) {
-                log.error("Некорректный формат callback data: ожидается 2 части, получено {}. " +
-                         "CallbackData='{}', userId={}", parts.length, context.callbackData(), userId);
-
                 handleInvalidFormat(context);
                 return;
             }
@@ -88,9 +83,6 @@ public class EventFieldEditHandler implements CallbackHandler {
             if (eventId == null) {
                 return;
             }
-            
-            log.info("Пользователь ID={} начал редактирование поля '{}' события ID={}", 
-                    userId, field, eventId);
             
             updateEditingContext(userId, eventId, context.chatId(), context.messageId(), field);
             
@@ -123,13 +115,12 @@ public class EventFieldEditHandler implements CallbackHandler {
      */
     private @Nullable Long parseEventId(String eventIdStr, @NonNull CallbackQueryContext context) {
         try {
-            Long eventId = Long.parseLong(eventIdStr);
-            log.debug("Успешно извлечены данные: eventId={}, userId={}", eventId, context.getUserId());
-            return eventId;
+            return Long.parseLong(eventIdStr);
 
         } catch (NumberFormatException e) {
             log.error("Некорректный eventId в callback data: eventId='{}', callbackData='{}', " +
                      "userId={}, error={}", eventIdStr, context.callbackData(), context.getUserId(), e.getMessage());
+
             try {
                 handleInvalidFormat(context);
 
@@ -156,8 +147,6 @@ public class EventFieldEditHandler implements CallbackHandler {
         EditField editField = mapToEditField(field);
         if (editField != null) {
             conversationStateService.setEditingField(userId, editField);
-            log.debug("Установлено состояние редактирования: userId={}, eventId={}, field={}, messageId={}", 
-                     userId, eventId, editField, messageId);
         }
     }
     
@@ -166,26 +155,11 @@ public class EventFieldEditHandler implements CallbackHandler {
      */
     private @NonNull String buildMessageForField(@NonNull String field, User user) {
         return switch (field) {
-            case "date" -> {
-                log.debug("Выбрано поле для редактирования: DATE, userId={}", user.getId());
-                yield "📅 Редактирование даты\n\nВыберите новую дату из календаря:";
-            }
-            case "time" -> {
-                log.debug("Выбрано поле для редактирования: TIME, userId={}", user.getId());
-                yield "🕐 Редактирование времени\n\nВыберите новое время:";
-            }
-            case "title" -> {
-                log.debug("Выбрано поле для редактирования: TITLE, userId={}", user.getId());
-                yield "📝 Редактирование названия\n\nОтправьте новое название события:";
-            }
-            case "description" -> {
-                log.debug("Выбрано поле для редактирования: DESCRIPTION, userId={}", user.getId());
-                yield "📄 Редактирование описания\n\nОтправьте новое описание события:";
-            }
-            default -> {
-                log.warn("Неизвестное поле для редактирования: field='{}', userId={}", field, user.getId());
-                yield "❌ Неизвестное поле для редактирования";
-            }
+            case "date" -> "📅 Редактирование даты\n\nВыберите новую дату из календаря:";
+            case "time" -> "🕐 Редактирование времени\n\nВыберите новое время:";
+            case "title" -> "📝 Редактирование названия\n\nОтправьте новое название события:";
+            case "description" -> "📄 Редактирование описания\n\nОтправьте новое описание события:";
+            default -> "❌ Неизвестное поле для редактирования";
         };
     }
     

@@ -53,12 +53,10 @@ public class SearchMessageService {
                 );
                 
                 if (edited) {
-                    log.debug("Сообщение поиска отредактировано для пользователя ID={}", userId);
                     if (clearContext) {
                         conversationStateService.clearAwaitingSearchQuery(userId);
                     }
                 } else {
-                    log.info("Не удалось отредактировать сообщение поиска, отправка нового");
                     sendNewSearchMessage(userId, chatId, message, keyboard, clearContext);
                 }
             } catch (TelegramApiException e) {
@@ -68,7 +66,6 @@ public class SearchMessageService {
                 sendNewSearchMessage(userId, chatId, message, keyboard, clearContext);
             }
         } else {
-            log.warn("Контекст поиска не найден для пользователя ID={}, отправка нового сообщения", userId);
             sendNewSearchMessage(userId, chatId, message, keyboard, clearContext);
         }
     }
@@ -98,9 +95,7 @@ public class SearchMessageService {
                 conversationStateService.clearAwaitingSearchQuery(userId);
             }
             
-            log.debug("Отправлено новое сообщение поиска для пользователя ID={}", userId);
-
-        } catch (TelegramApiException e) {
+            } catch (TelegramApiException e) {
             log.error("Ошибка при отправке нового сообщения поиска для пользователя ID={}: {}", userId, e.getMessage(), e);
 
             if (clearContext) {
@@ -122,10 +117,7 @@ public class SearchMessageService {
         
         try {
             messageService.deleteMessage(chatId, messageId);
-            log.debug("Удалено сообщение пользователя ID={}", messageId);
-
-        } catch (TelegramApiException e) {
-            log.warn("Не удалось удалить сообщение пользователя ID={}: {}", messageId, e.getMessage());
+            } catch (TelegramApiException e) {
         }
     }
 }

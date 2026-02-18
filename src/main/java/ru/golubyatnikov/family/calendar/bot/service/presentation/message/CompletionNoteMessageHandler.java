@@ -54,9 +54,6 @@ public class CompletionNoteMessageHandler {
             Long telegramId = user.getTelegramId();
             Integer userMessageId = message.getMessageId();
             
-            log.debug("Обработка заметки к завершенному событию от пользователя: userId={}, telegramId={}", 
-                    userId, telegramId);
-            
             CompletionNoteContext context = conversationStateService.getCompletionNoteContext(userId);
             
             if (context == null) {
@@ -71,27 +68,16 @@ public class CompletionNoteMessageHandler {
             Event eventBefore = eventService.getEventById(eventId);
             boolean wasPartOfMyEventsList = (eventBefore.getMessageId() != null);
             
-            log.debug("Событие ID={} было частью списка /my_events: {}", eventId, wasPartOfMyEventsList);
-            
             messageService.deleteMessageSilently(chatId, userMessageId);
-            log.debug("Сообщение пользователя с заметкой удалено: chatId={}, messageId={}, userId={}", 
-                    chatId, userMessageId, userId);
-            
             Event event = eventService.addCompletionNote(eventId, userId, noteText);
-            
-            log.info("Заметка успешно добавлена к завершенному событию ID={} пользователем ID={}: noteLength={}", 
-                    eventId, userId, noteText != null ? noteText.length() : 0);
             
             updateEventCard(chatId, messageId, event);
             
             conversationStateService.clearAwaitingCompletionNote(userId);
-            log.debug("Контекст добавления заметки очищен: userId={}", userId);
-            
             // Обновляем шапку /my_events только если событие было частью списка
             if (wasPartOfMyEventsList) {
                 eventNotificationService.updateMyEventsHeaderAfterRemoval(userId);
-                log.info("Шапка /my_events обновлена после добавления заметки: userId={}", userId);
-            } else {
+                } else {
                 log.info("Событие ID={} не было частью списка /my_events (только что создано), шапка не обновляется: userId={}", 
                         eventId, userId);
             }
@@ -114,7 +100,6 @@ public class CompletionNoteMessageHandler {
      * Обрабатывает отсутствие контекста.
      */
     private void handleMissingContext(Long userId, Long chatId) {
-        log.warn("Контекст добавления заметки не найден для пользователя: userId={}", userId);
         conversationStateService.clearAwaitingCompletionNote(userId);
         
         try {
@@ -136,10 +121,7 @@ public class CompletionNoteMessageHandler {
                 String eventMessage = botMessageFormattingService.buildCompletedEventMessage(event);
                 messageService.editMessageText(chatId, messageId, eventMessage, null);
                 
-                log.debug("Сообщение отредактировано с финальной карточкой события: chatId={}, messageId={}, eventId={}", 
-                        chatId, messageId, event.getId());
-                
-            } catch (TelegramApiException e) {
+                } catch (TelegramApiException e) {
                 log.warn("Не удалось отредактировать сообщение, отправка нового (fallback): chatId={}, messageId={}, error={}", 
                         chatId, messageId, e.getMessage());
                 
@@ -152,7 +134,6 @@ public class CompletionNoteMessageHandler {
                 }
             }
         } else {
-            log.warn("messageId отсутствует в контексте, отправка нового сообщения: eventId={}", event.getId());
             
             try {
                 String eventMessage = botMessageFormattingService.buildCompletedEventMessage(event);
@@ -165,7 +146,6 @@ public class CompletionNoteMessageHandler {
     }
 
     private void handleEventNotFoundError(@NonNull User user, Long chatId, @NonNull EventNotFoundException e) {
-        log.error("Событие не найдено при добавлении заметки: userId={}, error={}", user.getId(), e.getMessage());
         
         try {
             conversationStateService.clearAwaitingCompletionNote(user.getId());
@@ -180,7 +160,6 @@ public class CompletionNoteMessageHandler {
     }
 
     private void handleUnauthorizedError(@NonNull User user, Long chatId, @NonNull UnauthorizedAccessException e) {
-        log.error("Нет прав для добавления заметки: userId={}, error={}", user.getId(), e.getMessage());
         
         try {
             conversationStateService.clearAwaitingCompletionNote(user.getId());
@@ -195,7 +174,6 @@ public class CompletionNoteMessageHandler {
     }
 
     private void handleIllegalStateError(@NonNull User user, Long chatId, @NonNull IllegalStateException e) {
-        log.error("Событие не завершено при добавлении заметки: userId={}, error={}", user.getId(), e.getMessage());
         
         try {
             conversationStateService.clearAwaitingCompletionNote(user.getId());

@@ -85,9 +85,6 @@ public class EventReminderNavigationHandler implements CallbackHandler {
      * Обрабатывает просмотр деталей события из уведомления о напоминании.
      */
     private void handleViewEventFromReminder(@NonNull CallbackQueryContext context) {
-        log.debug("Просмотр деталей события из напоминания: callbackData='{}', userId={}, messageId={}", 
-                 context.callbackData(), context.getUserId(), context.messageId());
-        
         try {
             ReminderEventIds ids = extractReminderEventIds(context);
             if (ids == null) {
@@ -95,9 +92,6 @@ public class EventReminderNavigationHandler implements CallbackHandler {
             }
 
             Reminder reminder = reminderSchedulingService.getReminderWithEventAndUser(ids.reminderId());
-            
-            log.debug("Событие и напоминание загружены: eventId={}, reminderId={}, userId={}", 
-                     ids.eventId(), ids.reminderId(), context.getUserId());
             
             User recipient = userService.findById(context.getUserId())
                 .orElseThrow(() -> new UserNotFoundException("Пользователь не найден: userId=" + context.getUserId()));
@@ -110,9 +104,6 @@ public class EventReminderNavigationHandler implements CallbackHandler {
             messageService.editMessageText(context.chatId(), context.messageId(), eventMessage, keyboard);
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
-            log.info("Детали события отображены из напоминания: eventId={}, reminderId={}, " +
-                    "messageId={}, userId={}", ids.eventId(), ids.reminderId(), context.messageId(), context.getUserId());
-            
         } catch (EventNotFoundException e) {
             log.warn("Событие не найдено при просмотре деталей из напоминания: userId={}", context.getUserId(), e);
             answerCallbackQuerySafely(context, CallbackMessageFormatter.notFound("Событие"));
@@ -120,11 +111,13 @@ public class EventReminderNavigationHandler implements CallbackHandler {
         } catch (TelegramApiException e) {
             log.warn("Ошибка Telegram API при просмотре деталей из напоминания: " +
                     "messageId={}, userId={}, error={}", context.messageId(), context.getUserId(), e.getMessage());
+
             answerCallbackQuerySafely(context, CallbackMessages.ERROR);
 
         } catch (Exception e) {
             log.error("Неожиданная ошибка при просмотре деталей из напоминания: " +
                      "userId={}, error={}", context.getUserId(), e.getMessage(), e);
+                     
             answerCallbackQuerySafely(context, CallbackMessages.ERROR);
         }
     }
@@ -133,9 +126,6 @@ public class EventReminderNavigationHandler implements CallbackHandler {
      * Обрабатывает возврат к минималистичному виду напоминания.
      */
     private void handleBackToReminder(@NonNull CallbackQueryContext context) {
-        log.debug("Возврат к напоминанию: callbackData='{}', userId={}, messageId={}", 
-                 context.callbackData(), context.getUserId(), context.messageId());
-        
         try {
             ReminderEventIds ids = extractReminderEventIds(context);
             if (ids == null) {
@@ -145,9 +135,6 @@ public class EventReminderNavigationHandler implements CallbackHandler {
             Reminder reminder = reminderSchedulingService.getReminderWithEventAndUser(ids.reminderId());
             Event event = reminder.getEvent();
             
-            log.debug("Напоминание загружено с событием: reminderId={}, eventId={}, userId={}", 
-                     ids.reminderId(), event.getId(), context.getUserId());
-            
             ZoneId creatorTimezone = getTimezone(event.getUser());
             
             String reminderMessage = reminderNotificationService.formatShortReminderMessage(reminder, creatorTimezone);
@@ -156,9 +143,6 @@ public class EventReminderNavigationHandler implements CallbackHandler {
             messageService.editMessageText(context.chatId(), context.messageId(), reminderMessage, keyboard);
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
             
-            log.info("Возврат к напоминанию выполнен: eventId={}, reminderId={}, messageId={}, userId={}", 
-                    ids.eventId(), ids.reminderId(), context.messageId(), context.getUserId());
-            
         } catch (ReminderNotFoundException e) {
             log.warn("Напоминание не найдено при возврате к напоминанию: userId={}", context.getUserId(), e);
             answerCallbackQuerySafely(context, CallbackMessageFormatter.notFound("Напоминание"));
@@ -166,11 +150,13 @@ public class EventReminderNavigationHandler implements CallbackHandler {
         } catch (TelegramApiException e) {
             log.warn("Ошибка Telegram API при возврате к напоминанию: messageId={}, userId={}, error={}", 
                     context.messageId(), context.getUserId(), e.getMessage());
+
             answerCallbackQuerySafely(context, CallbackMessages.ERROR);
 
         } catch (Exception e) {
             log.error("Неожиданная ошибка при возврате к напоминанию: userId={}, error={}", 
                      context.getUserId(), e.getMessage(), e);
+
             answerCallbackQuerySafely(context, CallbackMessages.ERROR);
         }
     }
@@ -187,8 +173,6 @@ public class EventReminderNavigationHandler implements CallbackHandler {
         String[] parts = payload.split("_", 2);
         
         if (parts.length != 2) {
-            log.error("Некорректный формат callback data: ожидается 2 части, получено {}. " +
-                     "CallbackData='{}', userId={}", parts.length, context.callbackData(), context.getUserId());
             answerCallbackQuerySafely(context, CallbackMessages.INVALID_REQUEST);
             return null;
         }
@@ -196,9 +180,6 @@ public class EventReminderNavigationHandler implements CallbackHandler {
         try {
             Long eventId = Long.parseLong(parts[0]);
             Long reminderId = Long.parseLong(parts[1]);
-            log.debug("Успешно извлечены данные: eventId={}, reminderId={}, userId={}", 
-                     eventId, reminderId, context.getUserId());
-
             return new ReminderEventIds(eventId, reminderId);
 
         } catch (NumberFormatException e) {

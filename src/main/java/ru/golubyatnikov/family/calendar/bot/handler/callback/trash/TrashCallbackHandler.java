@@ -52,8 +52,6 @@ public class TrashCallbackHandler implements CallbackHandler {
     public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
         CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        log.debug("Обработка callback корзины: data='{}', userId={}", context.callbackData(), user.getId());
-        
         if (context.callbackData().startsWith("trash_restore_")) {
             Long eventId = extractEventId(context.callbackData());
             handleRestore(context, eventId);
@@ -63,7 +61,7 @@ public class TrashCallbackHandler implements CallbackHandler {
             handlePermanentDelete(context, eventId);
 
         } else {
-            log.warn("Неизвестный формат callback data корзины: data='{}', userId={}", 
+            log.warn("Неизвестный формат callback data корзины: data='{}', userId={}",
                     context.callbackData(), user.getId());
         }
     }
@@ -87,8 +85,7 @@ public class TrashCallbackHandler implements CallbackHandler {
             prefix = "trash_delete_";
 
         } else {
-            log.error("Неизвестный формат callback data: {}", callbackData);
-            throw new IllegalArgumentException("Unknown callback data format: " + callbackData);
+            throw new IllegalArgumentException("Неизвестный формат callback data: " + callbackData);
         }
         
         String eventIdStr = callbackData.substring(prefix.length());
@@ -106,13 +103,8 @@ public class TrashCallbackHandler implements CallbackHandler {
      * Обрабатывает восстановление события из корзины.
      */
     private void handleRestore(@NonNull CallbackQueryContext context, Long eventId) {
-        log.debug("handleRestore вызван: chatId={}, userId={}, eventId={}", 
-                context.chatId(), context.getUserId(), eventId);
-        
         try {
             trashService.restoreEvent(eventId, context.getUserId());
-            log.info("Событие ID={} успешно восстановлено пользователем ID={}", 
-                    eventId, context.getUserId());
 
         } catch (EventNotFoundException e) {
             log.error("Событие ID={} не найдено при попытке восстановления пользователем ID={}", 
@@ -132,9 +124,6 @@ public class TrashCallbackHandler implements CallbackHandler {
      * Обрабатывает окончательное удаление события.
      */
     private void handlePermanentDelete(@NonNull CallbackQueryContext context, Long eventId) {
-        log.debug("handlePermanentDelete вызван: chatId={}, userId={}, eventId={}", 
-                context.chatId(), context.getUserId(), eventId);
-        
         try {
             trashService.permanentlyDelete(eventId, context.getUserId());
             log.info("Событие ID={} успешно удалено навсегда пользователем ID={}", 

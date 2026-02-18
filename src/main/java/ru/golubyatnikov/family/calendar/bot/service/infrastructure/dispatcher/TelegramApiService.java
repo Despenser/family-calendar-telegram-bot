@@ -41,8 +41,6 @@ public class TelegramApiService {
             throw new IllegalArgumentException("CallbackQueryId не может быть пустым");
         }
         
-        log.debug("Отправка ответа на callback query: callbackQueryId={}", callbackQueryId);
-        
         AnswerCallbackQuery answer = AnswerCallbackQuery.builder()
                 .callbackQueryId(callbackQueryId)
                 .text(text != null ? text : "")
@@ -50,12 +48,9 @@ public class TelegramApiService {
         
         try {
             telegramClient.execute(answer);
-            log.debug("Ответ на callback query успешно отправлен: callbackQueryId={}", callbackQueryId);
-            
-        } catch (TelegramApiRequestException e) {
+            } catch (TelegramApiRequestException e) {
             // Проверяем, не устарел ли callback query
             if (e.getMessage() != null && e.getMessage().contains("query is too old")) {
-                log.info("Callback query устарел (старше 30 секунд): callbackQueryId={}", callbackQueryId);
                 return;
             }
 
@@ -95,8 +90,6 @@ public class TelegramApiService {
             throw new IllegalArgumentException("Новый текст не может быть пустым");
         }
         
-        log.debug("Редактирование сообщения: chatId={}, messageId={}", chatId, messageId);
-        
         EditMessageText editMessage = EditMessageText.builder()
                 .chatId(chatId.toString())
                 .messageId(messageId)
@@ -107,9 +100,7 @@ public class TelegramApiService {
         
         try {
             telegramClient.execute(editMessage);
-            log.debug("Сообщение успешно отредактировано: chatId={}, messageId={}", chatId, messageId);
-            
-        } catch (TelegramApiRequestException e) {
+            } catch (TelegramApiRequestException e) {
             throw e;
             
         } catch (TelegramApiException e) {
@@ -141,18 +132,14 @@ public class TelegramApiService {
             
         } catch (TelegramApiRequestException e) {
             if (messageFormatter.isMessageNotFoundError(e)) {
-                log.info("Сообщение не найдено или удалено: chatId={}, messageId={}", chatId, messageId);
                 return false;
             }
             
             if (messageFormatter.isMessageTooOldError(e)) {
-                log.info("Сообщение слишком старое для редактирования: chatId={}, messageId={}", 
-                        chatId, messageId);
                 return false;
             }
             
             if (messageFormatter.isMessageNotModifiedError(e)) {
-                log.debug("Сообщение не изменилось: chatId={}, messageId={}", chatId, messageId);
                 return true;
             }
             
@@ -178,8 +165,6 @@ public class TelegramApiService {
             throw new IllegalArgumentException("MessageId не может быть null");
         }
         
-        log.debug("Удаление сообщения: chatId={}, messageId={}", chatId, messageId);
-        
         DeleteMessage deleteMessage = DeleteMessage.builder()
                 .chatId(chatId.toString())
                 .messageId(messageId)
@@ -187,13 +172,10 @@ public class TelegramApiService {
         
         try {
             telegramClient.execute(deleteMessage);
-            log.debug("Сообщение успешно удалено: chatId={}, messageId={}", chatId, messageId);
             return true;
             
         } catch (TelegramApiRequestException e) {
             if (messageFormatter.isMessageDeleteNotFoundError(e)) {
-                log.info("Сообщение для удаления не найдено: chatId={}, messageId={}", 
-                        chatId, messageId);
                 return false;
             }
             
@@ -219,20 +201,16 @@ public class TelegramApiService {
      */
     public void deleteMessageSilently(Long chatId, Integer messageId) {
         if (chatId == null) {
-            log.error("Попытка удалить сообщение с null chatId");
             return;
         }
         
         if (messageId == null) {
-            log.error("Попытка удалить сообщение с null messageId: chatId={}", chatId);
             return;
         }
         
         try {
             deleteMessage(chatId, messageId);
-            log.debug("Сообщение успешно удалено (silent): chatId={}, messageId={}", chatId, messageId);
-
-        } catch (TelegramApiException e) {
+            } catch (TelegramApiException e) {
             log.warn("Не удалось удалить сообщение (silent mode): chatId={}, messageId={}, error={}", 
                     chatId, messageId, e.getMessage());
         }

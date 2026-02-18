@@ -54,9 +54,6 @@ public class ConversationMessageHandler {
             Integer userMessageId = message.getMessageId();
             Long creationMessageId = draft.getMessageId();
             
-            log.debug("Обработка сообщения в контексте диалога: userId={}, telegramId={}, step={}, creationMessageId={}", 
-                user.getId(), telegramId, step, creationMessageId);
-            
             switch (step) {
                 case WAITING_FOR_TITLE -> handleTitleInput(user, chatId, userMessageId, text, creationMessageId);
                 case WAITING_FOR_DESCRIPTION -> handleDescriptionInput(user, chatId, userMessageId, text, creationMessageId);
@@ -84,13 +81,8 @@ public class ConversationMessageHandler {
         
         // 1. Удаляем сообщение пользователя
         messageService.deleteMessageSilently(chatId, userMessageId);
-        log.debug("Сообщение пользователя с названием удалено: chatId={}, messageId={}, userId={}", 
-                chatId, userMessageId, userId);
-        
         // 2. Сохраняем название в черновике
         conversationService.updateEventTitle(userId, text);
-        log.debug("Название события сохранено: userId={}, title='{}'", userId, text);
-        
         // 3. Обновляем сообщение создания
         String response = bold("📋 Создание нового события") + "\n\n" +
             "✅ Название: " + escape(text) + "\n\n" +
@@ -101,10 +93,7 @@ public class ConversationMessageHandler {
         if (creationMessageId != null) {
             try {
                 messageService.editMessageText(chatId, creationMessageId.intValue(), response, skipKeyboard);
-                log.debug("Сообщение создания обновлено с названием: chatId={}, messageId={}, userId={}", 
-                        chatId, creationMessageId, userId);
-
-            } catch (TelegramApiException e) {
+                } catch (TelegramApiException e) {
                 log.warn("Не удалось обновить сообщение создания, отправка нового: chatId={}, messageId={}, error={}", 
                         chatId, creationMessageId, e.getMessage());
 
@@ -115,7 +104,6 @@ public class ConversationMessageHandler {
                 }
             }
         } else {
-            log.warn("creationMessageId отсутствует в черновике, отправка нового сообщения: userId={}", userId);
             try {
                 messageService.sendMessageWithInlineKeyboard(chatId, response, skipKeyboard);
             } catch (Exception e) {
@@ -137,23 +125,15 @@ public class ConversationMessageHandler {
         
         // 1. Удаляем сообщение пользователя
         messageService.deleteMessageSilently(chatId, userMessageId);
-        log.debug("Сообщение пользователя с описанием удалено: chatId={}, messageId={}, userId={}", 
-                chatId, userMessageId, userId);
-        
         // 2. Обрабатываем текст описания (включая "пропустить")
         String description = text.equalsIgnoreCase("пропустить") ? null : text;
         
         // 3. Завершаем создание события
         Event completedEvent = conversationService.completeEventCreation(userId, description);
-        log.debug("Создание события завершено: eventId={}, userId={}", 
-                completedEvent.getId(), userId);
-        
         // 4. Обновляем сообщение создания с финальной карточкой события
         updateWithFinalCard(chatId, creationMessageId, completedEvent, userId, description);
         
-        log.debug("Событие успешно создано: eventId={}, userId={}, telegramId={}", 
-            completedEvent.getId(), userId, user.getTelegramId());
-    }
+        }
 
     /**
      * Обновляет сообщение с финальной карточкой события.
@@ -171,16 +151,12 @@ public class ConversationMessageHandler {
                 InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
                 
                 messageService.editMessageText(chatId, creationMessageId.intValue(), eventMessage, keyboard);
-                log.debug("Сообщение создания обновлено с финальной карточкой: chatId={}, messageId={}, eventId={}", 
-                        chatId, creationMessageId, event.getId());
-                
-            } catch (TelegramApiException e) {
+                } catch (TelegramApiException e) {
                 log.warn("Не удалось обновить сообщение создания с финальной карточкой, отправка нового: chatId={}, messageId={}, error={}", 
                         chatId, creationMessageId, e.getMessage());
                 sendEventMessageFallback(chatId, event, description);
             }
         } else {
-            log.warn("creationMessageId отсутствует в черновике, отправка нового сообщения: userId={}", userId);
             sendEventMessageFallback(chatId, event, description);
         }
     }
@@ -191,9 +167,7 @@ public class ConversationMessageHandler {
     private void sendEventMessageFallback(Long chatId, Event event, String description) {
         try {
             eventService.sendOrUpdateEventMessage(event, chatId);
-            log.debug("Сообщение о созданном событии отправлено (fallback): eventId={}", event.getId());
-
-        } catch (TelegramApiException ex) {
+            } catch (TelegramApiException ex) {
             log.error("Ошибка при отправке сообщения о созданном событии (fallback): eventId={}, error={}", 
                     event.getId(), ex.getMessage());
             
@@ -204,8 +178,10 @@ public class ConversationMessageHandler {
                     "🕐 Время: " + escape(event.getFormattedTime()) + "\n" +
                     "📝 Название: " + escape(event.getTitle()) + "\n" +
                     (description != null ? "📄 Описание: " + escape(description) : "");
+
                 ReplyKeyboardMarkup fallbackKeyboard = keyboardService.createAuthorizedUserKeyboard();
                 messageService.sendMessage(chatId, response, fallbackKeyboard);
+                
             } catch (Exception e) {
                 log.error("Ошибка при отправке последнего fallback сообщения: {}", e.getMessage());
             }

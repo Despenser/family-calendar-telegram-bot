@@ -2,12 +2,12 @@ package ru.golubyatnikov.family.calendar.bot.service.domain.reminder;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.Hibernate;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
-import ru.golubyatnikov.family.calendar.bot.model.enums.ReminderType;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.model.enums.ReminderType;
+
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -53,18 +53,11 @@ public class ReminderConfigurationService {
                                                            ReminderType type,
                                                            ZoneId userTimezone) {
 
-        log.debug("Расчет времени напоминания: eventId={}, type={}, timezone={}", 
-                 event.getId(), type, userTimezone);
-        
         try {
             ZonedDateTime eventZonedDateTime = createEventZonedDateTime(event, userTimezone);
             ZonedDateTime reminderZonedDateTime = calculateReminderDateTime(eventZonedDateTime, type, event);
-            LocalDateTime reminderTimeUTC = convertToUTC(reminderZonedDateTime);
-            
-            log.info("Время напоминания рассчитано: eventId={}, type={}, reminderTimeUTC={}", 
-                     event.getId(), type, reminderTimeUTC);
-            
-            return reminderTimeUTC;
+
+            return convertToUTC(reminderZonedDateTime);
             
         } catch (Exception e) {
             return handleCalculationError(e, event, type, userTimezone);
@@ -79,14 +72,10 @@ public class ReminderConfigurationService {
      */
     public ZoneId getUserTimezone(User user) {
         if (user == null) {
-            log.error("Пользователь null, используется UTC");
             return UTC;
         }
-        
-        warnIfNotInitialized(user);
-        
+
         if (user.getTimezone() == null || user.getTimezone().isBlank()) {
-            log.warn("Пользователь ID {} не имеет timezone, используется UTC", user.getId());
             return UTC;
         }
         
@@ -101,13 +90,13 @@ public class ReminderConfigurationService {
                                                              @NonNull ReminderType type,
                                                              Event event) {
         return switch (type) {
-            case EVENING_BEFORE -> ZonedDateTime.of(
-                event.getEventDate().minusDays(1), 
-                LocalTime.of(20, 0), 
-                eventDateTime.getZone()
-            );
-            case ONE_HOUR_BEFORE -> eventDateTime.minusHours(1);
             case FIFTEEN_MINUTES_BEFORE -> eventDateTime.minusMinutes(15);
+            case ONE_HOUR_BEFORE -> eventDateTime.minusHours(1);
+            case EVENING_BEFORE -> ZonedDateTime.of(
+                    event.getEventDate().minusDays(1),
+                    LocalTime.of(20, 0),
+                    eventDateTime.getZone()
+            );
         };
     }
     
@@ -127,21 +116,12 @@ public class ReminderConfigurationService {
             throw new RuntimeException("Не удалось рассчитать время напоминания с UTC: " + e.getMessage(), e);
         }
         
-        log.warn("Fallback на UTC для расчета времени: eventId={}, type={}", event.getId(), type);
         return calculateReminderTimeWithTimezone(event, type, UTC);
-    }
-    
-    private void warnIfNotInitialized(User user) {
-        if (!Hibernate.isInitialized(user)) {
-            log.warn("Пользователь ID {} не инициализирован (Hibernate proxy)", user.getId());
-        }
     }
     
     private ZoneId parseTimezone(User user) {
         try {
-            ZoneId zoneId = ZoneId.of(user.getTimezone());
-            log.debug("Timezone получен для пользователя ID {}: {}", user.getId(), zoneId);
-            return zoneId;
+            return ZoneId.of(user.getTimezone());
 
         } catch (Exception e) {
             log.error("Некорректный timezone '{}' у пользователя ID {}, используется UTC", 

@@ -47,15 +47,11 @@ public class TrashCommandHandler implements CommandHandler {
     public String handle(@NonNull Message message,
                          @NonNull User user) {
         Long chatId = message.getChatId();
-        log.debug("Обработка команды /trash для пользователя ID={}", user.getId());
-        
         try {
             List<Event> trashedEvents = trashService.getUserTrash(user.getId());
 
             if (trashedEvents.isEmpty()) {
-                String responseMessage = buildEmptyTrashMessage();
-                log.debug("Пользователю ID={} будет отправлено сообщение о пустой корзине", user.getId());
-                return responseMessage;
+                return buildEmptyTrashMessage();
             }
             
             // Управление флагами isTrashHeader
@@ -63,8 +59,7 @@ public class TrashCommandHandler implements CommandHandler {
             if (!Boolean.TRUE.equals(firstEvent.getIsTrashHeader())) {
                 firstEvent.setIsTrashHeader(true);
                 eventService.saveEvent(firstEvent);
-                log.debug("Установлен флаг isTrashHeader=true для первого события ID={}", firstEvent.getId());
-            }
+                }
             
             // Сбрасываем флаг для остальных событий
             IntStream.range(1, trashedEvents.size())
@@ -73,8 +68,7 @@ public class TrashCommandHandler implements CommandHandler {
                     .forEach(event -> {
                         event.setIsTrashHeader(false);
                         eventService.saveEvent(event);
-                        log.debug("Сброшен флаг isTrashHeader для события ID={}", event.getId());
-            });
+                        });
             
             // Формируем шапку
             String header = botMessageFormattingService.buildTrashHeader(trashedEvents.size());
@@ -84,27 +78,21 @@ public class TrashCommandHandler implements CommandHandler {
             String combinedMessage = header + "\n" + firstEventText;
             InlineKeyboardMarkup keyboard = keyboardService.createTrashActionsKeyboard(firstEvent.getId());
             
-            log.debug("Отправка первого события ID={} с шапкой корзины", firstEvent.getId());
             Message sentMessage = messageService.sendMessageAndGet(chatId, combinedMessage, keyboard);
             firstEvent.setMessageId((long) sentMessage.getMessageId());
             eventService.saveEvent(firstEvent);
-            log.debug("Сохранен messageId={} для первого события ID={}", sentMessage.getMessageId(), firstEvent.getId());
-            
             // Отправляем остальные события
             for (int i = 1; i < trashedEvents.size(); i++) {
                 Event event = trashedEvents.get(i);
                 String eventText = botMessageFormattingService.buildEventMessage(event);
                 InlineKeyboardMarkup eventKeyboard = keyboardService.createTrashActionsKeyboard(event.getId());
                 
-                log.debug("Отправка события ID={} (позиция {})", event.getId(), i + 1);
                 Message eventMessage = messageService.sendMessageAndGet(chatId, eventText, eventKeyboard);
 
                 event.setMessageId((long) eventMessage.getMessageId());
                 eventService.saveEvent(event);
-                log.debug("Сохранен messageId={} для события ID={}", eventMessage.getMessageId(), event.getId());
             }
             
-            log.debug("Пользователю ID={} отправлено {} удаленных событий", user.getId(), trashedEvents.size());
             return null;
             
         } catch (Exception e) {

@@ -7,7 +7,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.validation.annotation.Validated;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.InvalidDateException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
@@ -18,6 +17,7 @@ import ru.golubyatnikov.family.calendar.bot.model.enums.ActionType;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 import ru.golubyatnikov.family.calendar.bot.service.domain.reminder.ReminderSchedulingService;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -29,7 +29,6 @@ import java.time.LocalTime;
  * @since 2026-02-01
  */
 @Service
-@Validated
 @Slf4j
 @RequiredArgsConstructor
 public class EventCommandService {
@@ -40,9 +39,6 @@ public class EventCommandService {
     private final ReminderSchedulingService reminderSchedulingService;
     private final ApplicationEventPublisher eventPublisher;
 
-    /**
-     * Доменное событие о создании события.
-     */
     public record EventCreatedEvent(Event event) {}
     
     /**
@@ -58,7 +54,6 @@ public class EventCommandService {
     @Transactional
     @CacheEvict(value = {"upcomingEvents", "userEvents"}, allEntries = true)
     public Event createEvent(Long userId, String title, String description,LocalDateTime eventDateTime) {
-
         return createEvent(userId, title, description, eventDateTime, null, false);
     }
     
@@ -79,33 +74,22 @@ public class EventCommandService {
     public Event createEvent(Long userId,
                              String title,
                              String description,
-                             LocalDateTime eventDateTime,
+                             @NonNull LocalDateTime eventDateTime,
                              LocalTime endTime,
                              Boolean isPersonal) {
 
-        log.debug("Создание события для пользователя ID={}: title='{}', dateTime={}, endTime={}, isPersonal={}", 
-                  userId, title, eventDateTime, endTime, isPersonal);
-        
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> {
-                log.error("Пользователь с ID={} не найден при создании события", userId);
-                return new UserNotFoundException(userId);
-            });
+            .orElseThrow(() -> new UserNotFoundException(userId));
         
         if (eventDateTime.toLocalDate().isBefore(user.getCurrentDate())) {
-            log.warn("Попытка создать событие с датой в прошлом: {} для пользователя ID={}", eventDateTime, userId);
             throw new InvalidDateException("Дата события не может быть в прошлом");
         }
         
         if (endTime != null && endTime.isBefore(eventDateTime.toLocalTime())) {
-            log.warn("Попытка создать событие с временем окончания раньше времени начала: start={}, end={}", 
-                     eventDateTime.toLocalTime(), endTime);
-
             throw new InvalidDateException("Время окончания не может быть раньше времени начала");
         }
         
         if (user.getFamily() == null) {
-            log.error("Пользователь ID={} не принадлежит ни одной семье", userId);
             throw new IllegalStateException("Пользователь должен принадлежать семье для создания событий");
         }
         
@@ -137,7 +121,7 @@ public class EventCommandService {
         publishEventCreated(savedEvent);
         return savedEvent;
     }
-    
+
     /**
      * Обновляет название события.
      * 
@@ -150,20 +134,12 @@ public class EventCommandService {
     @Transactional
     @CacheEvict(value = {"upcomingEvents", "userEvents"}, allEntries = true)
     public Event updateEventTitle(Long eventId, Long userId, String newTitle) {
-        log.debug("Обновление названия события ID={} пользователем ID={}", eventId, userId);
-        
-        Event event = eventRepository.findById(eventId)
-            .orElseThrow(() -> new EventNotFoundException(eventId));
+        Event event = getEventAndCheckEditPermission(eventId, userId);
 
-        checkEditPermission(event, userId);
-        
         String oldTitle = event.getTitle();
         event.setTitle(newTitle);
         Event updated = eventRepository.save(event);
-        
-        log.info("Название события ID={} обновлено пользователем ID={}: '{}' → '{}'", 
-                 eventId, userId, oldTitle, newTitle);
-        
+
         eventHistoryService.recordChange(
             eventId,
             userId,
@@ -172,40 +148,32 @@ public class EventCommandService {
             oldTitle,
             newTitle
         );
-        
+
         return updated;
     }
-    
+
     /**
      * Обновляет дату события.
      * 
      * @param eventId идентификатор события
      * @param userId идентификатор пользователя
      * @param newDate новая дата события
+     *
      * @return обновленное событие
      */
     @Transactional
     @CacheEvict(value = {"upcomingEvents", "userEvents"}, allEntries = true)
     public Event updateEventDate(Long eventId, Long userId, @NonNull LocalDate newDate) {
+        Event event = getEventAndCheckEditPermission(eventId, userId);
 
-        log.debug("Обновление даты события ID={} пользователем ID={}", eventId, userId);
-        
-        Event event = eventRepository.findById(eventId)
-            .orElseThrow(() -> new EventNotFoundException(eventId));
-        checkEditPermission(event, userId);
-        
         if (newDate.isBefore(event.getUser().getCurrentDate())) {
-            log.warn("Попытка установить дату в прошлом для события ID={}: {}", eventId, newDate);
             throw new InvalidDateException("Дата события не может быть в прошлом");
         }
-        
+
         LocalDate oldDate = event.getEventDate();
         event.setEventDate(newDate);
         Event updated = eventRepository.save(event);
-        
-        log.info("Дата события ID={} обновлена пользователем ID={}: {} → {}", 
-                 eventId, userId, oldDate, newDate);
-        
+
         eventHistoryService.recordChange(
             eventId,
             userId,
@@ -214,12 +182,12 @@ public class EventCommandService {
             oldDate.toString(),
             newDate.toString()
         );
-        
+
         // Пересчет напоминаний
         handleEventDateTimeChange(eventId);
         return updated;
     }
-    
+
     /**
      * Обновляет время события.
      * 
@@ -232,21 +200,12 @@ public class EventCommandService {
     @Transactional
     @CacheEvict(value = {"upcomingEvents", "userEvents"}, allEntries = true)
     public Event updateEventTime(Long eventId, Long userId, LocalTime newTime) {
+        Event event = getEventAndCheckEditPermission(eventId, userId);
 
-        log.debug("Обновление времени события ID={} пользователем ID={}", eventId, userId);
-        
-        Event event = eventRepository.findById(eventId)
-            .orElseThrow(() -> new EventNotFoundException(eventId));
-
-        checkEditPermission(event, userId);
-        
         LocalTime oldTime = event.getEventTime();
         event.setEventTime(newTime);
         Event updated = eventRepository.save(event);
-        
-        log.info("Время события ID={} обновлено пользователем ID={}: {} → {}", 
-                 eventId, userId, oldTime, newTime);
-        
+
         eventHistoryService.recordChange(
             eventId,
             userId,
@@ -255,12 +214,12 @@ public class EventCommandService {
             oldTime != null ? oldTime.toString() : null,
             newTime.toString()
         );
-        
+
         // Пересчет напоминаний
         handleEventDateTimeChange(eventId);
         return updated;
     }
-    
+
     /**
      * Обновляет описание события.
      * 
@@ -273,20 +232,12 @@ public class EventCommandService {
     @Transactional
     @CacheEvict(value = {"upcomingEvents", "userEvents"}, allEntries = true)
     public Event updateEventDescription(Long eventId, Long userId, String newDescription) {
+        Event event = getEventAndCheckEditPermission(eventId, userId);
 
-        log.debug("Обновление описания события ID={} пользователем ID={}", eventId, userId);
-        
-        Event event = eventRepository.findById(eventId)
-            .orElseThrow(() -> new EventNotFoundException(eventId));
-
-        checkEditPermission(event, userId);
-        
         String oldDescription = event.getDescription();
         event.setDescription(newDescription);
         Event updated = eventRepository.save(event);
-        
-        log.info("Описание события ID={} обновлено пользователем ID={}", eventId, userId);
-        
+
         eventHistoryService.recordChange(
             eventId,
             userId,
@@ -295,7 +246,7 @@ public class EventCommandService {
             oldDescription,
             newDescription
         );
-        
+
         return updated;
     }
     
@@ -307,9 +258,25 @@ public class EventCommandService {
     @Transactional
     @CacheEvict(value = {"upcomingEvents", "userEvents"}, allEntries = true)
     public void saveEvent(@NonNull Event event) {
-        log.debug("Сохранение события ID={}", event.getId());
-        Event savedEvent = eventRepository.save(event);
-        log.debug("Событие ID={} успешно сохранено", savedEvent.getId());
+        eventRepository.save(event);
+    }
+    
+    /**
+     * Получает событие и проверяет права на его редактирование.
+     * 
+     * @param eventId идентификатор события
+     * @param userId идентификатор пользователя
+     * @return событие, готовое к редактированию
+     *
+     * @throws EventNotFoundException если событие не найдено
+     * @throws UnauthorizedAccessException если нет прав на редактирование
+     */
+    private Event getEventAndCheckEditPermission(Long eventId, Long userId) {
+        Event event = eventRepository.findById(eventId)
+            .orElseThrow(() -> new EventNotFoundException(eventId));
+
+        checkEditPermission(event, userId);
+        return event;
     }
     
     /**
@@ -333,11 +300,8 @@ public class EventCommandService {
                 return;
             }
         }
-        
-        log.warn("Пользователь ID={} попытался отредактировать событие ID={} без прав доступа", 
-                 userId, event.getId());
-        throw new UnauthorizedAccessException(
-            "У вас нет прав для редактирования этого события");
+
+        throw new UnauthorizedAccessException("У пользователя нет прав для редактирования этого события");
     }
     
     /**
@@ -348,7 +312,6 @@ public class EventCommandService {
     private void publishEventCreated(Event event) {
         try {
             eventPublisher.publishEvent(new EventCreatedEvent(event));
-            log.debug("Опубликовано доменное событие EventCreatedEvent для события ID={}", event.getId());
 
         } catch (Exception e) {
             log.error("Ошибка при публикации EventCreatedEvent для события ID={}: {}", event.getId(), e.getMessage(), e);
@@ -363,11 +326,8 @@ public class EventCommandService {
      */
     @Transactional
     public void handleEventDateTimeChange(Long eventId) {
-        log.info("Обработка изменения даты/времени события ID={}", eventId);
-        
         try {
             reminderSchedulingService.recalculateReminders(eventId);
-            log.info("Напоминания пересчитаны для события ID={}", eventId);
 
         } catch (Exception e) {
             log.error("Ошибка при пересчете напоминаний для события ID={}: {}", eventId, e.getMessage(), e);
