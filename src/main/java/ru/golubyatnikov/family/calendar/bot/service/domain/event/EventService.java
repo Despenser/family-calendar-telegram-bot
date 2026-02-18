@@ -21,6 +21,7 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.Keyboa
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -76,7 +77,7 @@ public class EventService {
     // ===== Делегирование к EventQueryService =====
     
     @Transactional(readOnly = true)
-    public List<Event> getUpcomingEvents(Long familyId, int days, java.time.ZoneId zoneId) {
+    public List<Event> getUpcomingEvents(Long familyId, int days, ZoneId zoneId) {
         return eventQueryService.getUpcomingEvents(familyId, days, zoneId);
     }
     
@@ -279,7 +280,7 @@ public class EventService {
         }
     }
     
-    private void sendCompletedEventWithNote(Long chatId, @NonNull Event event, Long userId) {
+    private void sendCompletedEventWithNote(Long chatId, @NonNull Event event) {
         try {
             String completedMessage = botMessageFormattingService.buildCompletedEventMessage(event);
             
@@ -302,7 +303,7 @@ public class EventService {
     
     private void editCompletedEventWithNote(Long chatId, @NonNull Event event, Long userId) {
         if (event.getMessageId() == null) {
-            sendCompletedEventWithNote(chatId, event, userId);
+            sendCompletedEventWithNote(chatId, event);
             return;
         }
         
@@ -319,14 +320,14 @@ public class EventService {
             );
             
             if (!edited) {
-                sendCompletedEventWithNote(chatId, event, userId);
+                sendCompletedEventWithNote(chatId, event);
             }
             
         } catch (Exception e) {
             log.error("Ошибка при редактировании сообщения последнего завершённого события ID={}: {}, отправляем новое сообщение", 
                      event.getId(), e.getMessage(), e);
 
-            sendCompletedEventWithNote(chatId, event, userId);
+            sendCompletedEventWithNote(chatId, event);
         }
     }
     
@@ -378,7 +379,7 @@ public class EventService {
                     .mapToObj(activeEvents::get)
                     .forEach(event -> sendEvent(chatId, event, userId));
             
-            sendCompletedEventWithNote(chatId, completedEvent, userId);
+            sendCompletedEventWithNote(chatId, completedEvent);
 
         } else {
             String completedMessage = botMessageFormattingService.buildCompletedEventMessage(completedEvent);
