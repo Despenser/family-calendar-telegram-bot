@@ -51,12 +51,9 @@ public class EventListService {
                                  String callbackQueryId) {
 
         try {
-            LocalDate today = user.getCurrentDate();
-            boolean isPastOrToday = selectedDate.isBefore(today) || selectedDate.equals(today);
-            
-            List<Event> events = isPastOrToday
-                ? eventService.getEventsByDateIncludingCompleted(user.getFamily().getId(), selectedDate)
-                : eventService.getEventsByDate(user.getFamily().getId(), selectedDate);
+            // Всегда показываем события включая завершенные
+            List<Event> events = eventService.getEventsByDateIncludingCompleted(
+                user.getFamily().getId(), selectedDate);
             
             events = filterPersonalEvents(events, user.getId());
             

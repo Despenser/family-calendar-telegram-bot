@@ -117,11 +117,10 @@ public class CalendarNavigationService {
                                               boolean isEditingEvent) {
 
         LocalDate today = user.getCurrentDate();
-        boolean isPastOrToday = selectedDate.isBefore(today) || selectedDate.equals(today);
         
-        List<Event> events = isPastOrToday
-            ? eventService.getEventsByDateIncludingCompleted(user.getFamily().getId(), selectedDate)
-            : eventService.getEventsByDate(user.getFamily().getId(), selectedDate);
+        // Всегда загружаем все события включая завершенные
+        List<Event> events = eventService.getEventsByDateIncludingCompleted(
+            user.getFamily().getId(), selectedDate);
         
         // Фильтруем персональные события других пользователей
         events = events.stream()
