@@ -22,9 +22,9 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.Keyboa
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.stream.IntStream;
 
 /**
- * TODO God Object провести рефакторинг
  * Фасадный сервис для управления событиями в семейном календаре.
  *
  * @author Golubyatnikov Aleksey
@@ -151,19 +151,20 @@ public class EventService {
      */
     @Transactional
     public Event completeEventWithReordering(Long eventId, Long userId) {
-        // 1. Получаем событие
+        // Получаем событие
         Event event = getEventById(eventId);
-        // 2. Получаем список активных событий ДО завершения
+
+        // Получаем список активных событий ДО завершения
         List<Event> activeEventsBefore = getUserEvents(userId);
-        // 3. Определяем позицию события в списке
+
+        // Определяем позицию события в списке
         int eventPosition = findEventPosition(activeEventsBefore, eventId);
         
         if (eventPosition == -1) {
-            log.warn("Событие ID={} не найдено в списке активных событий пользователя ID={}", 
-                    eventId, userId);
+            log.warn("Событие ID={} не найдено в списке активных событий пользователя ID={}", eventId, userId);
         }
 
-        // 4. Проверяем, является ли событие частью списка /my_events
+        // Проверяем, является ли событие частью списка /my_events
         boolean hasMessageId = (event.getMessageId() != null);
         boolean isInActiveList = (eventPosition != -1);
         boolean isFirstInMyEventsList = Boolean.TRUE.equals(event.getIsMyEventsHeader());
@@ -172,34 +173,30 @@ public class EventService {
         boolean listHasFirstEvent = activeEventsBefore.stream()
             .anyMatch(e -> Boolean.TRUE.equals(e.getIsMyEventsHeader()));
 
-        boolean isPartOfMyEventsList = hasMessageId && isInActiveList && 
-                                       (isFirstInMyEventsList || (listHasFirstEvent && eventPosition > 0));
+        boolean isPartOfMyEventsList = hasMessageId
+                && isInActiveList
+                && (isFirstInMyEventsList || (listHasFirstEvent && eventPosition > 0));
         
-        // 5. Проверяем, является ли событие последним
+        // Проверяем, является ли событие последним
         boolean isLastEvent = (eventPosition == activeEventsBefore.size() - 1);
-        // 6. Завершаем событие БЕЗ обновления шапки
+
+        // Завершаем событие БЕЗ обновления шапки
         Event completedEvent = completeEventWithoutHeaderUpdate(eventId, userId);
         log.info("Событие ID={} успешно завершено, статус изменён на COMPLETED", eventId);
         
-        // 7. Если событие часть списка /my_events, не последнее и есть другие события - переупорядочиваем список
+        // Если событие часть списка /my_events, не последнее и есть другие события - переупорядочиваем список
         if (isPartOfMyEventsList && !isLastEvent && activeEventsBefore.size() > 1) {
             reorderMyEventsList(userId, completedEvent);
+
         } else {
-            if (!isPartOfMyEventsList) {
-                log.info("Событие ID={} не является частью списка /my_events (только что создано), редактируем сообщение создания", 
-                        eventId);
-            }
-            
-            // Получаем пользователя
             User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(userId));
+                    .orElseThrow(() -> new UserNotFoundException(userId));
             
             Long chatId = user.getTelegramId();
             
             if (chatId != null) {
                 editCompletedEventWithNote(chatId, completedEvent, userId);
             }
-            
         }
         
         return completedEvent;
@@ -208,13 +205,10 @@ public class EventService {
     // ===== Вспомогательные методы для completeEventWithReordering =====
     
     private int findEventPosition(@NonNull List<Event> events, Long eventId) {
-        for (int i = 0; i < events.size(); i++) {
-            if (events.get(i).getId().equals(eventId)) {
-                return i;
-            }
-        }
-        
-        return -1;
+        return IntStream.range(0, events.size())
+                .filter(i -> events.get(i).getId().equals(eventId))
+                .findFirst()
+                .orElse(-1);
     }
     
     private void deleteActiveEventMessages(@NonNull List<Event> events, Long userId) {
@@ -230,10 +224,7 @@ public class EventService {
         for (Event event : events) {
             if (event.getMessageId() != null) {
                 try {
-                    telegramMessageService.deleteMessageSilently(
-                        chatId, 
-                        event.getMessageId().intValue()
-                    );
+                    telegramMessageService.deleteMessageSilently(chatId, event.getMessageId().intValue());
                     event.setMessageId(null);
                     eventRepository.save(event);
 
@@ -270,9 +261,9 @@ public class EventService {
     private void sendEvent(Long chatId, @NonNull Event event, Long userId) {
         try {
             String eventText = botMessageFormattingService.buildEventMessage(event);
-            
+
             InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
-            
+
             Message sentMessage = telegramMessageService.sendMessageAndGet(
                 chatId, 
                 eventText, 
@@ -357,7 +348,7 @@ public class EventService {
                 eventRepository.save(completedEvent);
 
             } catch (Exception e) {
-                log.warn("Не удалось удалить сообщение завершённого события ID={}: {}", 
+                log.warn("Не удалось удалить сообщение завершённого события ID={}: {}",
                         completedEvent.getId(), e.getMessage());
             }
         }
@@ -382,11 +373,10 @@ public class EventService {
         if (!activeEvents.isEmpty()) {
             Event firstEvent = activeEvents.getFirst();
             sendEventWithHeader(chatId, header, firstEvent, userId);
-            
-            for (int i = 1; i < activeEvents.size(); i++) {
-                Event event = activeEvents.get(i);
-                sendEvent(chatId, event, userId);
-            }
+
+            IntStream.range(1, activeEvents.size())
+                    .mapToObj(activeEvents::get)
+                    .forEach(event -> sendEvent(chatId, event, userId));
             
             sendCompletedEventWithNote(chatId, completedEvent, userId);
 
