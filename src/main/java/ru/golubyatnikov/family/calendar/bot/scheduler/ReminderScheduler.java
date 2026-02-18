@@ -24,7 +24,7 @@ public class ReminderScheduler {
      * Проверяет и отправляет напоминания по расписанию.
 
      */
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRateString = "${app.scheduler.reminder-check-interval}")
     public void checkAndSendReminders() {
         CorrelationIdUtil.executeWithCorrelationId(() -> {
             try {

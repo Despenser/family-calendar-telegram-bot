@@ -15,7 +15,7 @@ public final class CorrelationIdUtil {
     /**
      * Ключ для хранения correlation ID в MDC.
      */
-    private static final String CORRELATION_ID_KEY = "correlationId";
+    public static final String CORRELATION_ID_KEY = "correlationId";
     
     /**
      * Приватный конструктор для предотвращения создания экземпляров.

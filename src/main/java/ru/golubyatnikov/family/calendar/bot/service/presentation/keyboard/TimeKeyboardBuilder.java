@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
+import ru.golubyatnikov.family.calendar.bot.config.TimeSelectionConfig;
 import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import java.time.LocalDate;
@@ -30,10 +31,10 @@ public class TimeKeyboardBuilder {
     private static final String TIME_BACK = "time_back";
     private static final String HOUR_PREFIX = "hour_";
     private static final String TIME_PREFIX = "time_";
-    private static final int HOURS_PER_ROW = 4;
 
     private final TimeAvailabilityService timeAvailabilityService;
     private final KeyboardFactory keyboardFactory;
+    private final TimeSelectionConfig timeSelectionConfig;
 
     /**
      * Создает клавиатуру выбора часа с фильтрацией прошедших часов.
@@ -98,7 +99,7 @@ public class TimeKeyboardBuilder {
                 HOUR_PREFIX + String.format("%02d", hour)
             ));
             
-            if ((i + 1) % HOURS_PER_ROW == 0 || i == hours.size() - 1) {
+            if ((i + 1) % timeSelectionConfig.getHoursPerRow() == 0 || i == hours.size() - 1) {
                 rows.add(keyboardFactory.createRow(new ArrayList<>(currentRow)));
                 currentRow.clear();
             }

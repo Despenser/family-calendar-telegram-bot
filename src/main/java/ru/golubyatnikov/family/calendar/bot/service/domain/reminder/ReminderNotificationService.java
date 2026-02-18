@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import ru.golubyatnikov.family.calendar.bot.config.ReminderNotificationConfig;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Reminder;
 import ru.golubyatnikov.family.calendar.bot.repository.ReminderRepository;
@@ -30,14 +31,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReminderNotificationService {
     
-    private static final int REMINDER_WINDOW_HOURS = 1;
-    private static final int OLD_REMINDER_THRESHOLD_HOURS = 1;
-    
     private final ReminderRepository reminderRepository;
     private final ReminderValidator reminderValidator;
     private final ReminderSender reminderSender;
     private final ReminderMessageFormattingService messageFormatter;
     private final DateTimeFormattingService dateTimeFormattingService;
+    private final ReminderNotificationConfig reminderNotificationConfig;
     
     /**
      * Автоматически отправляет напоминания по расписанию.
@@ -45,7 +44,7 @@ public class ReminderNotificationService {
     @Transactional
     public void sendReminders() {
         LocalDateTime nowUTC = LocalDateTime.now(dateTimeFormattingService.getUtc());
-        LocalDateTime windowStart = nowUTC.minusHours(REMINDER_WINDOW_HOURS);
+        LocalDateTime windowStart = nowUTC.minusHours(reminderNotificationConfig.getWindowHours());
         
         List<Reminder> reminders = findRemindersToSend(nowUTC, windowStart);
         
@@ -150,11 +149,12 @@ public class ReminderNotificationService {
     private void handleSendFailure(@NonNull Reminder reminder,
                                    @NonNull LocalDateTime nowUTC) {
 
-        LocalDateTime threshold = nowUTC.minusHours(OLD_REMINDER_THRESHOLD_HOURS);
+        LocalDateTime threshold = nowUTC.minusHours(reminderNotificationConfig.getOldThresholdHours());
         
         if (reminder.getReminderTime().isBefore(threshold)) {
             markAsSent(reminder, nowUTC);
-            log.warn("Напоминание ID {} старше {} часа, отмечено как sent", reminder.getId(), OLD_REMINDER_THRESHOLD_HOURS);
+            log.warn("Напоминание ID {} старше {} часа, отмечено как sent", reminder.getId(), 
+                    reminderNotificationConfig.getOldThresholdHours());
         }
     }
 }

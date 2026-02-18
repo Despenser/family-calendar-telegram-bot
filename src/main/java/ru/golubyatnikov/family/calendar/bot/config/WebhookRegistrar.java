@@ -34,6 +34,7 @@ public class WebhookRegistrar {
     private final ApplicationContext applicationContext;
     private final RestTemplate restTemplate;
     private final WebhookSecurityService webhookSecurityService;
+    private final TelegramApiConfig telegramApiConfig;
 
     /**
      * Регистрирует webhook в Telegram Bot API при старте приложения.
@@ -44,7 +45,8 @@ public class WebhookRegistrar {
         log.info("Регистрация webhook: {}", botConfig.getWebhookUrl());
         
         try {
-            String apiUrl = String.format("https://api.telegram.org/bot%s/setWebhook", botConfig.getToken());
+            String apiUrl = telegramApiConfig.getBaseUrl() + 
+                String.format(telegramApiConfig.getSetWebhookPath(), botConfig.getToken());
             String secretToken = webhookSecurityService.generateSecretToken();
 
             Map<String, String> requestBody = new HashMap<>();

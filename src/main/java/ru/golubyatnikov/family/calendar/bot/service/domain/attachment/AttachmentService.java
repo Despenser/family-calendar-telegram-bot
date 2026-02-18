@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.golubyatnikov.family.calendar.bot.config.FileConfig;
 import ru.golubyatnikov.family.calendar.bot.exception.AttachmentNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.FileSizeExceededException;
@@ -27,13 +28,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AttachmentService {
     
-    /**
-     * Максимальный размер файла в байтах (20 МБ)
-     */
-    private static final long MAX_FILE_SIZE = 20 * 1024 * 1024;
-    
     private final AttachmentRepository attachmentRepository;
     private final EventRepository eventRepository;
+    private final FileConfig fileConfig;
     
     /**
      * Сохраняет вложение к событию с проверкой размера файла.
@@ -56,9 +53,9 @@ public class AttachmentService {
 
         Event event = eventRepository.findById(eventId).orElseThrow(() -> new EventNotFoundException(eventId));
 
-        if (fileSize != null && fileSize > MAX_FILE_SIZE) {
+        if (fileSize != null && fileSize > fileConfig.getMaxSizeBytes()) {
             log.warn("Попытка загрузить файл размером {} байт, что превышает лимит {} байт",
-                    fileSize, MAX_FILE_SIZE);
+                    fileSize, fileConfig.getMaxSizeBytes());
 
             throw new FileSizeExceededException(
                 String.format("Размер файла %.2f МБ превышает максимально допустимый размер",

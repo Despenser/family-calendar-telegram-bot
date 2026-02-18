@@ -1,8 +1,10 @@
 package ru.golubyatnikov.family.calendar.bot.service.presentation.formatting;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.golubyatnikov.family.calendar.bot.config.DateTimeFormatConfig;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -19,39 +21,43 @@ import java.util.Locale;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class DateTimeFormattingService {
 
-    private static final Locale RUSSIAN_LOCALE = Locale.forLanguageTag("ru");
+    private final DateTimeFormatConfig config;
 
-    private final DateTimeFormatter dateFormatter;
-    private final DateTimeFormatter timeFormatter;
-    private final DateTimeFormatter dateTimeFormatter;
-    private final DateTimeFormatter shortDateFormatter;
-    private final DateTimeFormatter dateRangeFormatter;
-    private final DateTimeFormatter monthFormatter;
-    private final DateTimeFormatter shortDateWithoutYearFormatter;
-    private final DateTimeFormatter dayOfWeekFormatter;
-    private final DateTimeFormatter dateWithDayOfWeekFormatter;
-
-    @Getter
-    private final ZoneId utc;
+    private DateTimeFormatter dateFormatter;
+    private DateTimeFormatter timeFormatter;
+    private DateTimeFormatter dateTimeFormatter;
+    private DateTimeFormatter shortDateFormatter;
+    private DateTimeFormatter dateRangeFormatter;
+    private DateTimeFormatter monthFormatter;
+    private DateTimeFormatter shortDateWithoutYearFormatter;
+    private DateTimeFormatter dayOfWeekFormatter;
+    private DateTimeFormatter dateWithDayOfWeekFormatter;
 
     @Getter
-    private final DateTimeFormatter[] dateParseFormatters;
+    private ZoneId utc;
 
     @Getter
-    private final DateTimeFormatter[] timeParseFormatters;
+    private DateTimeFormatter[] dateParseFormatters;
 
-    public DateTimeFormattingService() {
-        this.dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-        this.timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
-        this.dateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
-        this.shortDateFormatter = DateTimeFormatter.ofPattern("dd.MM (EEEE)", RUSSIAN_LOCALE);
-        this.dateRangeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-        this.monthFormatter = DateTimeFormatter.ofPattern("LLLL yyyy", RUSSIAN_LOCALE);
-        this.shortDateWithoutYearFormatter = DateTimeFormatter.ofPattern("dd.MM", RUSSIAN_LOCALE);
-        this.dayOfWeekFormatter = DateTimeFormatter.ofPattern("EEEE", RUSSIAN_LOCALE);
-        this.dateWithDayOfWeekFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy - EEEE", RUSSIAN_LOCALE);
+    @Getter
+    private DateTimeFormatter[] timeParseFormatters;
+
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        Locale locale = Locale.forLanguageTag(config.getLocale());
+        
+        this.dateFormatter = DateTimeFormatter.ofPattern(config.getDatePattern());
+        this.timeFormatter = DateTimeFormatter.ofPattern(config.getTimePattern());
+        this.dateTimeFormatter = DateTimeFormatter.ofPattern(config.getDateTimePattern());
+        this.shortDateFormatter = DateTimeFormatter.ofPattern(config.getShortDatePattern(), locale);
+        this.dateRangeFormatter = DateTimeFormatter.ofPattern(config.getDatePattern());
+        this.monthFormatter = DateTimeFormatter.ofPattern(config.getMonthPattern(), locale);
+        this.shortDateWithoutYearFormatter = DateTimeFormatter.ofPattern(config.getShortDateWithoutYearPattern(), locale);
+        this.dayOfWeekFormatter = DateTimeFormatter.ofPattern(config.getDayOfWeekPattern(), locale);
+        this.dateWithDayOfWeekFormatter = DateTimeFormatter.ofPattern(config.getDateWithDayOfWeekPattern(), locale);
 
         this.dateParseFormatters = new DateTimeFormatter[]{
                 DateTimeFormatter.ofPattern("dd.MM.yyyy"),

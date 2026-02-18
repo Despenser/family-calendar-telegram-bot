@@ -142,14 +142,13 @@ public class TelegramApiService {
 
     /**
      * Удаляет сообщение и возвращает результат операции.
-     * 
+     *
      * @param chatId ID чата
      * @param messageId ID сообщения для удаления
      *
-     * @return true, если удаление успешно, false, если сообщение не найдено
      * @throws TelegramApiException если удаление не удалось
      */
-    public boolean deleteMessage(Long chatId, Integer messageId) throws TelegramApiException {
+    public void deleteMessage(Long chatId, Integer messageId) throws TelegramApiException {
         if (chatId == null) {
             throw new IllegalArgumentException("ChatId не может быть null");
         }
@@ -165,11 +164,10 @@ public class TelegramApiService {
         
         try {
             telegramClient.execute(deleteMessage);
-            return true;
-            
+
         } catch (TelegramApiRequestException e) {
             if (messageFormatter.isMessageDeleteNotFoundError(e)) {
-                return false;
+                return;
             }
             
             log.error("Ошибка при удалении сообщения: chatId={}, messageId={}, error={}", 

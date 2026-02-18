@@ -6,6 +6,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import ru.golubyatnikov.family.calendar.bot.config.TrashConfig;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
@@ -35,8 +36,7 @@ public class TrashHeaderFormattingService {
     private final BotMessageFormattingService botMessageFormattingService;
     private final KeyboardService keyboardService;
     private final MyEventsHeaderUpdater myEventsHeaderUpdater;
-    
-    private static final int TRASH_RETENTION_DAYS = 30;
+    private final TrashConfig trashConfig;
     
     /**
      * Обновляет шапку корзины после удаления или восстановления события.
@@ -198,6 +198,6 @@ public class TrashHeaderFormattingService {
         return "🗑️ " + bold("Корзина") + "\n\n" +
                 escape("Корзина пуста.\n\n") +
                 italic("Удаленные события хранятся здесь " +
-                    TRASH_RETENTION_DAYS + " дней, после чего автоматически удаляются навсегда.");
+                    trashConfig.getRetentionDays() + " дней, после чего автоматически удаляются навсегда.");
     }
 }

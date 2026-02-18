@@ -1,8 +1,9 @@
 package ru.golubyatnikov.family.calendar.bot.service.infrastructure.authorization;
 
-import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.golubyatnikov.family.calendar.bot.config.WebhookConfig;
 import java.security.SecureRandom;
 import java.util.Base64;
 
@@ -13,13 +14,14 @@ import java.util.Base64;
  * @author Golubyatnikov Aleksey
  * @since 2026-01-31
  */
-@Getter
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class WebhookSecurityService {
 
-    private static final int SECRET_TOKEN_LENGTH = 64;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    
+    private final WebhookConfig webhookConfig;
 
     /**
      * Текущий secret token или null если не инициализирован
@@ -32,7 +34,7 @@ public class WebhookSecurityService {
      * @return сгенерированный secret token
      */
     public String generateSecretToken() {
-        byte[] randomBytes = new byte[SECRET_TOKEN_LENGTH];
+        byte[] randomBytes = new byte[webhookConfig.getSecretTokenLength()];
         SECURE_RANDOM.nextBytes(randomBytes);
 
         this.secretToken = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);

@@ -45,7 +45,7 @@ public class EventCompletionScheduler {
      * Автоматически завершает истекшие события.
      *
      */
-    @Scheduled(fixedDelay = 600000)
+    @Scheduled(fixedDelayString = "${app.scheduler.event-completion-interval}")
     @Transactional
     public void completeExpiredEvents() {
         CorrelationIdUtil.executeWithCorrelationId(() -> {

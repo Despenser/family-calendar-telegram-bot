@@ -265,11 +265,10 @@ public class TelegramMessageService {
      * @param chatId ID чата
      * @param messageId ID сообщения для удаления
      *
-     * @return true, если удаление успешно, false, если сообщение не найдено
      * @throws TelegramApiException если удаление не удалось
      */
-    public boolean deleteMessage(Long chatId, Integer messageId) throws TelegramApiException {
-        return telegramApiService.deleteMessage(chatId, messageId);
+    public void deleteMessage(Long chatId, Integer messageId) throws TelegramApiException {
+        telegramApiService.deleteMessage(chatId, messageId);
     }
 
     /**

@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import ru.golubyatnikov.family.calendar.bot.config.TelegramApiConfig;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.UpdateProcessor;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.authorization.WebhookSecurityService;
 
@@ -23,10 +24,9 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.authorization
 @Slf4j
 public class TelegramWebhookController {
 
-    private static final String SECRET_TOKEN_HEADER = "X-Telegram-Bot-Api-Secret-Token";
-
     private final UpdateProcessor updateProcessor;
     private final WebhookSecurityService webhookSecurityService;
+    private final TelegramApiConfig telegramApiConfig;
 
     /**
      * Обрабатывает входящие webhook обновления от Telegram Bot API.
@@ -37,7 +37,7 @@ public class TelegramWebhookController {
      */
     @PostMapping
     public ResponseEntity<Void> onUpdateReceived(
-            @RequestHeader(value = SECRET_TOKEN_HEADER, required = false) String secretToken,
+            @RequestHeader(value = "#{telegramApiConfig.secretTokenHeader}", required = false) String secretToken,
             @NonNull @RequestBody Update update) {
 
         if (!webhookSecurityService.validateSecretToken(secretToken)) {

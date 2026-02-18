@@ -1,8 +1,10 @@
 package ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
+import ru.golubyatnikov.family.calendar.bot.config.TimeSelectionConfig;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import java.time.LocalDate;
 import java.util.Collections;
@@ -16,11 +18,12 @@ import java.util.stream.IntStream;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class TimeAvailabilityService {
 
-    private static final int MAX_HOUR = 23;
-    private static final int CUTOFF_MINUTE = 46;
     private static final List<Integer> MINUTE_INTERVALS = List.of(0, 15, 30, 45);
+    
+    private final TimeSelectionConfig timeSelectionConfig;
 
     /**
      * Определяет доступные часы для выбора на основе текущего времени пользователя.
@@ -60,7 +63,7 @@ public class TimeAvailabilityService {
      * @return список доступных минут (0, 15, 30, 45)
      */
     public List<Integer> getAvailableMinutes(int selectedHour, LocalDate selectedDate, User user) {
-        if (selectedHour < 0 || selectedHour > MAX_HOUR || selectedDate == null || user == null) {
+        if (selectedHour < 0 || selectedHour > timeSelectionConfig.getMaxHour() || selectedDate == null || user == null) {
             throw new IllegalArgumentException("Invalid parameters");
         }
         
@@ -85,11 +88,11 @@ public class TimeAvailabilityService {
         int currentMinute = currentDateTime.getMinute();
         
         // Если уже поздно (23:46+), нет доступных часов
-        if (currentHour == MAX_HOUR && currentMinute >= CUTOFF_MINUTE) {
+        if (currentHour == timeSelectionConfig.getMaxHour() && currentMinute >= timeSelectionConfig.getCutoffMinute()) {
             return Collections.emptyList();
         }
 
-        return IntStream.rangeClosed(currentHour, MAX_HOUR)
+        return IntStream.rangeClosed(currentHour, timeSelectionConfig.getMaxHour())
                 .boxed()
                 .collect(Collectors.toList());
     }
@@ -114,7 +117,7 @@ public class TimeAvailabilityService {
 
     private @NonNull List<Integer> getAvailableMinutesForCurrentHour(int currentMinute) {
         // Если уже поздно (XX:46+), нет доступных интервалов
-        if (currentMinute >= CUTOFF_MINUTE) {
+        if (currentMinute >= timeSelectionConfig.getCutoffMinute()) {
             return Collections.emptyList();
         }
 

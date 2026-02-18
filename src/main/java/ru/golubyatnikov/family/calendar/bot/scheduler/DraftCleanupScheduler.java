@@ -2,12 +2,12 @@ package ru.golubyatnikov.family.calendar.bot.scheduler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import ru.golubyatnikov.family.calendar.bot.config.DraftCleanupConfig;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.DraftCleanupService;
 import ru.golubyatnikov.family.calendar.bot.util.CorrelationIdUtil;
 
@@ -25,29 +25,21 @@ import java.time.Duration;
 public class DraftCleanupScheduler {
 
     private final DraftCleanupService draftCleanupService;
-
-    @Value("${draft.cleanup.enabled:true}")
-    private boolean cleanupEnabled;
-
-    @Value("${draft.cleanup.startup-threshold-hours:1}")
-    private int startupThresholdHours;
-
-    @Value("${draft.cleanup.periodic-threshold-hours:24}")
-    private int periodicThresholdHours;
+    private final DraftCleanupConfig draftCleanupConfig;
 
     /**
      * Выполняет периодическую очистку осиротевших черновиков.
      */
-    @Scheduled(cron = "${draft.cleanup.schedule-cron:0 0 */6 * * *}")
+    @Scheduled(cron = "${app.draft.cleanup.schedule-cron:0 0 */6 * * *}")
     @Transactional
     public void scheduledCleanup() {
-        if (!cleanupEnabled) {
+        if (!draftCleanupConfig.isEnabled()) {
             return;
         }
 
         CorrelationIdUtil.executeWithCorrelationId(() -> {
             try {
-                Duration threshold = Duration.ofHours(periodicThresholdHours);
+                Duration threshold = Duration.ofHours(draftCleanupConfig.getPeriodicThresholdHours());
                 draftCleanupService.cleanupOrphanedDrafts(threshold);
 
             } catch (Exception e) {
@@ -62,13 +54,13 @@ public class DraftCleanupScheduler {
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void cleanupOrphanedDraftsOnStartup() {
-        if (!cleanupEnabled) {
+        if (!draftCleanupConfig.isEnabled()) {
             return;
         }
 
         CorrelationIdUtil.executeWithCorrelationId(() -> {
             try {
-                Duration threshold = Duration.ofHours(startupThresholdHours);
+                Duration threshold = Duration.ofHours(draftCleanupConfig.getStartupThresholdHours());
                 draftCleanupService.cleanupOrphanedDrafts(threshold);
 
             } catch (Exception e) {

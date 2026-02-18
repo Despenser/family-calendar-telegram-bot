@@ -11,13 +11,13 @@ import java.util.Map;
 
 /**
  * Конфигурация сообщений для неавторизованных пользователей.
- * Загружается из application.yml с префиксом bot.messages.unauthorized
+ * Загружается из application.yml с префиксом app.bot-messages.unauthorized
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-02-18
  */
 @Configuration
-@ConfigurationProperties(prefix = "bot.messages.unauthorized")
+@ConfigurationProperties(prefix = "app.bot-messages.unauthorized")
 @Getter
 @Setter
 public class UnauthorizedMessagesConfig {

@@ -11,7 +11,9 @@ import org.springframework.lang.NonNull;
  */
 public final class CallbackMessageFormatter {
 
-    private CallbackMessageFormatter() {}
+    private CallbackMessageFormatter() {
+         throw new UnsupportedOperationException("Это утилитный класс и не может быть инстанцирован");
+    }
 
     /**
      * Форматирует сообщение "не найдено" для конкретной сущности.

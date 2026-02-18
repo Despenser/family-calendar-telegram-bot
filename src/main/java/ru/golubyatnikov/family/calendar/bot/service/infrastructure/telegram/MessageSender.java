@@ -14,6 +14,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMar
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
+import ru.golubyatnikov.family.calendar.bot.config.RetryConfig;
 import ru.golubyatnikov.family.calendar.bot.util.TelegramExceptionUtil;
 
 /**
@@ -28,6 +29,7 @@ import ru.golubyatnikov.family.calendar.bot.util.TelegramExceptionUtil;
 public class MessageSender {
 
     private final TelegramClient telegramClient;
+    private final RetryConfig retryConfig;
 
     /**
      * Отправляет текстовое сообщение пользователю.
@@ -39,8 +41,11 @@ public class MessageSender {
      */
     @Retryable(
         retryFor = TelegramApiException.class,
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000, multiplier = 2.0)
+        maxAttemptsExpression = "#{@retryConfig.maxAttempts}",
+        backoff = @Backoff(
+            delayExpression = "#{@retryConfig.initialDelay}",
+            multiplierExpression = "#{@retryConfig.multiplier}"
+        )
     )
     public void sendMessage(Long telegramId, String text) throws TelegramApiException {
         validateSendMessageParams(telegramId, text);
@@ -139,8 +144,11 @@ public class MessageSender {
      */
     @Retryable(
         retryFor = TelegramApiException.class,
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000, multiplier = 2.0)
+        maxAttemptsExpression = "#{@retryConfig.maxAttempts}",
+        backoff = @Backoff(
+            delayExpression = "#{@retryConfig.initialDelay}",
+            multiplierExpression = "#{@retryConfig.multiplier}"
+        )
     )
     public Message sendMessageAndGet(Long chatId, String text) throws TelegramApiException {
         validateSendMessageParams(chatId, text);
@@ -257,8 +265,11 @@ public class MessageSender {
      */
     @Retryable(
         retryFor = TelegramApiException.class,
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000, multiplier = 2.0)
+        maxAttemptsExpression = "#{@retryConfig.maxAttempts}",
+        backoff = @Backoff(
+            delayExpression = "#{@retryConfig.initialDelay}",
+            multiplierExpression = "#{@retryConfig.multiplier}"
+        )
     )
     public Message sendFileWithKeyboardAndGet(Long chatId,
                                               String fileId,

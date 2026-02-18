@@ -28,8 +28,6 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 @RequiredArgsConstructor
 @Slf4j
 public class WeekCommandHandler implements CommandHandler {
-
-    private static final int WEEK_DAYS = 7;
     
     private final EventService eventService;
     private final ReminderSchedulingService reminderSchedulingService;
@@ -47,7 +45,7 @@ public class WeekCommandHandler implements CommandHandler {
     @Override
     public String handle(Message message, @NonNull User user) {
         try {
-            List<Event> weekEvents = eventService.getUpcomingEvents(user.getFamily().getId(), WEEK_DAYS, user.getZoneId());
+            List<Event> weekEvents = eventService.getUpcomingEvents(user.getFamily().getId(), 7, user.getZoneId());
             
             List<Event> filteredEvents = weekEvents.stream()
                 .filter(event -> !event.getIsPersonal() || event.belongsToUser(user.getId()))
@@ -80,7 +78,7 @@ public class WeekCommandHandler implements CommandHandler {
             boolean firstDay = true;
             int displayedEventsCount = 0;
             
-            for (int i = 0; i < WEEK_DAYS; i++) {
+            for (int i = 0; i < 7; i++) {
                 LocalDate date = today.plusDays(i);
                 List<Event> dayEvents = eventsByDate.get(date);
                 

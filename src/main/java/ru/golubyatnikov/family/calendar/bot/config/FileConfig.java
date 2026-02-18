@@ -1,0 +1,24 @@
+package ru.golubyatnikov.family.calendar.bot.config;
+
+import lombok.Getter;
+import lombok.Setter;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * Конфигурация работы с файлами.
+ *
+ * @author Golubyatnikov Aleksey
+ * @since 2026-02-18
+ */
+@Configuration
+@ConfigurationProperties(prefix = "app.file")
+@Getter
+@Setter
+public class FileConfig {
+
+    /**
+     * Максимальный размер файла в байтах (по умолчанию: 20 МБ)
+     */
+    private long maxSizeBytes = 20 * 1024 * 1024;
+}

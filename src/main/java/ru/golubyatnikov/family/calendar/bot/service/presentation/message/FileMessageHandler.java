@@ -13,6 +13,7 @@ import org.telegram.telegrambots.meta.api.objects.photo.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import ru.golubyatnikov.family.calendar.bot.config.FileConfig;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.FileSizeExceededException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
@@ -28,6 +29,7 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
+
 import java.util.List;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
@@ -48,6 +50,7 @@ public class FileMessageHandler {
     private final ConversationService conversationService;
     private final ConversationStateService conversationStateService;
     private final AttachmentService attachmentService;
+    private final FileConfig fileConfig;
     private final EventService eventService;
     private final DateTimeFormattingService dateTimeFormattingService;
 
@@ -155,18 +158,18 @@ public class FileMessageHandler {
         if (fileInfo == null) {
             return;
         }
-        
-        final long MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 МБ
 
-        if (fileInfo.fileSize() > MAX_FILE_SIZE) {
+        if (fileInfo.fileSize() > fileConfig.getMaxSizeBytes()) {
             log.warn("Файл слишком большой: size={}, max={}, telegramId={}", 
-                    fileInfo.fileSize(), MAX_FILE_SIZE, telegramId);
+                    fileInfo.fileSize(), fileConfig.getMaxSizeBytes(), telegramId);
 
             sendMessage(chatId,
                     formatMessage("""
-                        ❌ Размер файла превышает максимально допустимый (20 МБ).
+                        ❌ Размер файла превышает максимально допустимый (%.0f МБ).
                         
-                        Размер вашего файла: %.2f МБ""", fileInfo.fileSize() / (1024.0 * 1024.0))
+                        Размер вашего файла: %.2f МБ""", 
+                        fileConfig.getMaxSizeBytes() / (1024.0 * 1024.0),
+                        fileInfo.fileSize() / (1024.0 * 1024.0))
             );
 
             return;

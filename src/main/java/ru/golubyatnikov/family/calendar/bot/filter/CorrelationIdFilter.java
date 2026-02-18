@@ -4,11 +4,14 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import ru.golubyatnikov.family.calendar.bot.config.HttpHeadersConfig;
+import ru.golubyatnikov.family.calendar.bot.util.CorrelationIdUtil;
 import java.io.IOException;
 import java.util.UUID;
 
@@ -20,17 +23,10 @@ import java.util.UUID;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class CorrelationIdFilter extends OncePerRequestFilter {
 
-    /**
-     * Имя заголовка для correlation ID в запросе.
-     */
-    private static final String CORRELATION_ID_HEADER_NAME = "X-Correlation-ID";
-    
-    /**
-     * Ключ для хранения correlation ID в MDC.
-     */
-    private static final String CORRELATION_ID_MDC_KEY = "correlationId";
+    private final HttpHeadersConfig httpHeadersConfig;
 
     /**
      * Обрабатывает каждый HTTP запрос, добавляя correlation ID.
@@ -48,13 +44,13 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
         try {
             String correlationId = extractOrGenerateCorrelationId(request);
-            MDC.put(CORRELATION_ID_MDC_KEY, correlationId);
-            response.setHeader(CORRELATION_ID_HEADER_NAME, correlationId);
+            MDC.put(CorrelationIdUtil.CORRELATION_ID_KEY, correlationId);
+            response.setHeader(httpHeadersConfig.getCorrelationIdHeader(), correlationId);
 
             filterChain.doFilter(request, response);
             
         } finally {
-            MDC.remove(CORRELATION_ID_MDC_KEY);
+            MDC.remove(CorrelationIdUtil.CORRELATION_ID_KEY);
         }
     }
 
@@ -65,7 +61,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
      * @return correlation ID
      */
     private String extractOrGenerateCorrelationId(@NonNull HttpServletRequest request) {
-        String correlationId = request.getHeader(CORRELATION_ID_HEADER_NAME);
+        String correlationId = request.getHeader(httpHeadersConfig.getCorrelationIdHeader());
         return (correlationId == null || correlationId.trim().isEmpty()) 
             ? generateCorrelationId() 
             : correlationId;

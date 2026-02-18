@@ -6,6 +6,8 @@ import org.springframework.lang.NonNull;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import ru.golubyatnikov.family.calendar.bot.config.SchedulerConfig;
+import ru.golubyatnikov.family.calendar.bot.config.TrashConfig;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
@@ -26,20 +28,20 @@ import java.util.List;
 @Slf4j
 public class TrashCleanupScheduler {
 
-    private static final int TRASH_RETENTION_DAYS = 30;
-
     private final EventRepository eventRepository;
     private final TrashMessageService trashMessageService;
+    private final TrashConfig trashConfig;
+    private final SchedulerConfig schedulerConfig;
 
     /**
      * Автоматически очищает корзину от старых событий.
      */
-    @Scheduled(cron = "0 0 2 * * ?")
+    @Scheduled(cron = "${app.scheduler.trash-cleanup-cron}")
     @Transactional
     public void cleanupOldTrash() {
         CorrelationIdUtil.executeWithCorrelationId(() -> {
             try {
-                LocalDateTime cutoffDate = LocalDateTime.now().minusDays(TRASH_RETENTION_DAYS);
+                LocalDateTime cutoffDate = LocalDateTime.now().minusDays(trashConfig.getRetentionDays());
                 List<Event> oldEvents = eventRepository.findByStatusAndDeletedAtBefore(
                     EventStatus.DELETED,
                     cutoffDate
