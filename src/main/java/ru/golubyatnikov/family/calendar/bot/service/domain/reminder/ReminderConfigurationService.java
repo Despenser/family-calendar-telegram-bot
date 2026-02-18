@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.model.enums.ReminderType;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -25,7 +26,7 @@ import java.time.ZonedDateTime;
 @RequiredArgsConstructor
 public class ReminderConfigurationService {
     
-    private static final ZoneId UTC = ZoneId.of("UTC");
+    private final DateTimeFormattingService dateTimeFormattingService;
     
     /**
      * Рассчитывает время отправки напоминания на основе типа.
@@ -72,11 +73,11 @@ public class ReminderConfigurationService {
      */
     public ZoneId getUserTimezone(User user) {
         if (user == null) {
-            return UTC;
+            return dateTimeFormattingService.getUtc();
         }
 
         if (user.getTimezone() == null || user.getTimezone().isBlank()) {
-            return UTC;
+            return dateTimeFormattingService.getUtc();
         }
         
         return parseTimezone(user);
@@ -101,7 +102,7 @@ public class ReminderConfigurationService {
     }
     
     private LocalDateTime convertToUTC(@NonNull ZonedDateTime zonedDateTime) {
-        return zonedDateTime.withZoneSameInstant(UTC).toLocalDateTime();
+        return zonedDateTime.withZoneSameInstant(dateTimeFormattingService.getUtc()).toLocalDateTime();
     }
     
     private LocalDateTime handleCalculationError(Exception e,
@@ -112,11 +113,11 @@ public class ReminderConfigurationService {
         log.error("Ошибка расчета времени напоминания: eventId={}, type={}, timezone={}, error={}", 
                  event.getId(), type, timezone, e.getMessage(), e);
         
-        if (UTC.equals(timezone)) {
+        if (dateTimeFormattingService.getUtc().equals(timezone)) {
             throw new RuntimeException("Не удалось рассчитать время напоминания с UTC: " + e.getMessage(), e);
         }
         
-        return calculateReminderTimeWithTimezone(event, type, UTC);
+        return calculateReminderTimeWithTimezone(event, type, dateTimeFormattingService.getUtc());
     }
     
     private ZoneId parseTimezone(User user) {
@@ -127,7 +128,7 @@ public class ReminderConfigurationService {
             log.error("Некорректный timezone '{}' у пользователя ID {}, используется UTC", 
                      user.getTimezone(), user.getId(), e);
 
-            return UTC;
+            return dateTimeFormattingService.getUtc();
         }
     }
 }

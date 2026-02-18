@@ -22,7 +22,6 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.Keyboa
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
 
 /**
- * TODO сделать рефакторинг класса
  * Обработчик ввода заметки к завершенному событию.
  *
  * @author Golubyatnikov Aleksey
@@ -51,7 +50,6 @@ public class CompletionNoteMessageHandler {
         try {
             Long chatId = message.getChatId();
             Long userId = user.getId();
-            Long telegramId = user.getTelegramId();
             Integer userMessageId = message.getMessageId();
             
             CompletionNoteContext context = conversationStateService.getCompletionNoteContext(userId);
@@ -74,25 +72,26 @@ public class CompletionNoteMessageHandler {
             updateEventCard(chatId, messageId, event);
             
             conversationStateService.clearAwaitingCompletionNote(userId);
-            // Обновляем шапку /my_events только если событие было частью списка
+
             if (wasPartOfMyEventsList) {
                 eventNotificationService.updateMyEventsHeaderAfterRemoval(userId);
-                } else {
+
+            } else {
                 log.info("Событие ID={} не было частью списка /my_events (только что создано), шапка не обновляется: userId={}", 
                         eventId, userId);
             }
-            
+
         } catch (EventNotFoundException e) {
-            handleEventNotFoundError(user, message.getChatId(), e);
+            handleEventNotFoundError(user, message.getChatId());
 
         } catch (UnauthorizedAccessException e) {
-            handleUnauthorizedError(user, message.getChatId(), e);
+            handleUnauthorizedError(user, message.getChatId());
 
         } catch (IllegalStateException e) {
-            handleIllegalStateError(user, message.getChatId(), e);
+            handleIllegalStateError(user, message.getChatId());
 
         } catch (Exception e) {
-            handleGeneralError(user, message.getChatId(), e);
+            handleGeneralError(user, message.getChatId());
         }
     }
 
@@ -108,7 +107,7 @@ public class CompletionNoteMessageHandler {
             messageService.sendMessage(chatId, response, keyboard);
 
         } catch (Exception e) {
-            log.error("Ошибка при отправке сообщения: {}", e.getMessage());
+            logMessageSendError(e);
         }
     }
 
@@ -116,84 +115,70 @@ public class CompletionNoteMessageHandler {
      * Обновляет карточку события с заметкой.
      */
     private void updateEventCard(Long chatId, Integer messageId, Event event) {
+        String eventMessage = botMessageFormattingService.buildCompletedEventMessage(event);
+        
         if (messageId != null) {
             try {
-                String eventMessage = botMessageFormattingService.buildCompletedEventMessage(event);
                 messageService.editMessageText(chatId, messageId, eventMessage, null);
                 
-                } catch (TelegramApiException e) {
+            } catch (TelegramApiException e) {
                 log.warn("Не удалось отредактировать сообщение, отправка нового (fallback): chatId={}, messageId={}, error={}", 
                         chatId, messageId, e.getMessage());
-                
-                try {
-                    String eventMessage = botMessageFormattingService.buildCompletedEventMessage(event);
-                    messageService.sendMessage(chatId, eventMessage);
 
-                } catch (Exception ex) {
-                    log.error("Ошибка при отправке сообщения: {}", ex.getMessage());
-                }
+                sendEventMessage(chatId, eventMessage);
             }
+
         } else {
-            
-            try {
-                String eventMessage = botMessageFormattingService.buildCompletedEventMessage(event);
-                messageService.sendMessage(chatId, eventMessage);
-
-            } catch (Exception e) {
-                log.error("Ошибка при отправке сообщения: {}", e.getMessage());
-            }
+            sendEventMessage(chatId, eventMessage);
         }
     }
 
-    private void handleEventNotFoundError(@NonNull User user, Long chatId, @NonNull EventNotFoundException e) {
-        
+    /**
+     * Отправляет сообщение с информацией о событии.
+     */
+    private void sendEventMessage(Long chatId, String eventMessage) {
         try {
-            conversationStateService.clearAwaitingCompletionNote(user.getId());
-            String response = formatMessage("❌ Событие не найдено. Возможно, оно было удалено.");
-            ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
-            messageService.sendMessage(chatId, response, keyboard);
+            messageService.sendMessage(chatId, eventMessage);
 
-        } catch (Exception ex) {
-            log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
-                    user.getTelegramId(), ex.getMessage(), ex);
+        } catch (Exception e) {
+            logMessageSendError(e);
         }
     }
 
-    private void handleUnauthorizedError(@NonNull User user, Long chatId, @NonNull UnauthorizedAccessException e) {
-        
-        try {
-            conversationStateService.clearAwaitingCompletionNote(user.getId());
-            String response = formatMessage("❌ У вас нет прав для добавления заметки к этому событию.");
-            ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
-            messageService.sendMessage(chatId, response, keyboard);
-
-        } catch (Exception ex) {
-            log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
-                    user.getTelegramId(), ex.getMessage(), ex);
-        }
+    /**
+     * Логирует ошибку при отправке сообщения.
+     */
+    private void logMessageSendError(@NonNull Exception e) {
+        log.error("Ошибка при отправке сообщения: {}", e.getMessage());
     }
 
-    private void handleIllegalStateError(@NonNull User user, Long chatId, @NonNull IllegalStateException e) {
-        
-        try {
-            conversationStateService.clearAwaitingCompletionNote(user.getId());
-            String response = formatMessage("❌ Заметку можно добавить только к завершенному событию.");
-            ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
-            messageService.sendMessage(chatId, response, keyboard);
-
-        } catch (Exception ex) {
-            log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
-                    user.getTelegramId(), ex.getMessage(), ex);
-        }
+    private void handleEventNotFoundError(@NonNull User user, Long chatId) {
+        String errorMessage = "❌ Событие не найдено. Возможно, оно было удалено.";
+        sendErrorResponse(user, chatId, errorMessage);
     }
 
-    private void handleGeneralError(@NonNull User user, Long chatId, Exception e) {
-        log.error("Ошибка при обработке заметки к событию: userId={}, telegramId={}, error={}", 
-                 user.getId(), user.getTelegramId(), e.getMessage(), e);
-        
+    private void handleUnauthorizedError(@NonNull User user, Long chatId) {
+        String errorMessage = "❌ У вас нет прав для добавления заметки к этому событию.";
+        sendErrorResponse(user, chatId, errorMessage);
+    }
+
+    private void handleIllegalStateError(@NonNull User user, Long chatId) {
+        String errorMessage = "❌ Заметку можно добавить только к завершенному событию.";
+        sendErrorResponse(user, chatId, errorMessage);
+    }
+
+    private void handleGeneralError(@NonNull User user, Long chatId) {
+        String errorMessage = "❌ Произошла ошибка при добавлении заметки. Попробуйте еще раз.";
+        sendErrorResponse(user, chatId, errorMessage);
+    }
+
+    /**
+     * Отправляет сообщение об ошибке пользователю и очищает состояние.
+     */
+    private void sendErrorResponse(@NonNull User user, Long chatId, String errorMessage) {
         try {
             conversationStateService.clearAwaitingCompletionNote(user.getId());
-            String response = formatMessage("❌ Произошла ошибка при добавлении заметки. Попробуйте еще раз.");
+            String response = formatMessage(errorMessage);
             ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
             messageService.sendMessage(chatId, response, keyboard);
 

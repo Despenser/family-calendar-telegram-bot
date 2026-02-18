@@ -11,6 +11,7 @@ import ru.golubyatnikov.family.calendar.bot.model.entity.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.model.enums.ReminderType;
 import ru.golubyatnikov.family.calendar.bot.repository.ReminderRepository;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -29,11 +30,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReminderCreationService {
     
-    private static final ZoneId UTC = ZoneId.of("UTC");
-    
     private final ReminderRepository reminderRepository;
     private final ReminderConfigurationService reminderConfigurationService;
     private final DefaultReminderConfig defaultReminderConfig;
+    private final DateTimeFormattingService dateTimeFormattingService;
     
     /**
      * Создает автоматические напоминания по умолчанию для события.
@@ -85,7 +85,7 @@ public class ReminderCreationService {
                                                                ZoneId timezone) {
 
         List<Reminder> reminders = new ArrayList<>();
-        LocalDateTime nowUTC = LocalDateTime.now(UTC);
+        LocalDateTime nowUTC = LocalDateTime.now(dateTimeFormattingService.getUtc());
 
         types.forEach(type -> {
             try {

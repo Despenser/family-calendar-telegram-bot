@@ -1,8 +1,11 @@
 package ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
+import ru.golubyatnikov.family.calendar.bot.model.dto.ParsedEvent;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -23,7 +26,10 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class TextEventParsingService {
+
+    private final DateTimeFormattingService dateTimeFormattingService;
 
     /**
      * Паттерн для формата "Событие: [название] Дата: [дата] Время: [время]"
@@ -49,54 +55,6 @@ public class TextEventParsingService {
     );
 
     /**
-     * Форматы дат для парсинга
-     */
-    private static final DateTimeFormatter[] DATE_FORMATTERS = {
-            DateTimeFormatter.ofPattern("dd.MM.yyyy"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
-            DateTimeFormatter.ofPattern("dd.MM.yy"),
-            DateTimeFormatter.ofPattern("dd/MM/yy")
-    };
-
-    /**
-     * Форматы времени для парсинга
-     */
-    private static final DateTimeFormatter[] TIME_FORMATTERS = {
-            DateTimeFormatter.ofPattern("HH:mm"),
-            DateTimeFormatter.ofPattern("H:mm")
-    };
-
-    /**
-     * Результат парсинга текстового сообщения.
-     */
-    public record ParsedEvent(String title, LocalDate date, LocalTime time) {
-
-        /**
-         * Проверяет валидность распознанного события.
-         *
-         * @return true, если все поля заполнены и дата не в прошлом
-         */
-        public boolean isValid() {
-            if (title == null || title.trim().isEmpty()) {
-                return false;
-            }
-            if (date == null || time == null) {
-                return false;
-            }
-            LocalDate today = LocalDate.now();
-            return !date.isBefore(today);
-        }
-
-        @Override
-        public @NonNull String toString() {
-            return String.format("Событие: %s\nДата: %s\nВремя: %s",
-                    title,
-                    date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
-                    time.format(DateTimeFormatter.ofPattern("HH:mm")));
-        }
-    }
-
-    /**
      * Стратегия парсинга для конкретного формата.
      */
     private record ParsingStrategy(
@@ -108,7 +66,7 @@ public class TextEventParsingService {
      * Парсит текстовое сообщение и извлекает информацию о событии.
      *
      * @param text текстовое сообщение от пользователя
-     * @return Optional с распознанным событием или empty если не удалось распознать
+     * @return Optional с распознанным событием или empty, если не удалось распознать
      */
     public Optional<ParsedEvent> parseEvent(String text) {
         if (text == null || text.trim().isEmpty()) {
@@ -212,7 +170,7 @@ public class TextEventParsingService {
 
         dateStr = dateStr.trim();
 
-        for (DateTimeFormatter formatter : DATE_FORMATTERS) {
+        for (DateTimeFormatter formatter : dateTimeFormattingService.getDateParseFormatters()) {
             try {
                 LocalDate date = LocalDate.parse(dateStr, formatter);
                 return Optional.of(date);
@@ -238,7 +196,7 @@ public class TextEventParsingService {
 
         timeStr = timeStr.trim();
 
-        for (DateTimeFormatter formatter : TIME_FORMATTERS) {
+        for (DateTimeFormatter formatter : dateTimeFormattingService.getTimeParseFormatters()) {
             try {
                 LocalTime time = LocalTime.parse(timeStr, formatter);
                 return Optional.of(time);

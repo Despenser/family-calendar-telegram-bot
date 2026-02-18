@@ -1,10 +1,13 @@
 package ru.golubyatnikov.family.calendar.bot.service.presentation.formatting;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
@@ -30,6 +33,15 @@ public class DateTimeFormattingService {
     private final DateTimeFormatter dayOfWeekFormatter;
     private final DateTimeFormatter dateWithDayOfWeekFormatter;
 
+    @Getter
+    private final ZoneId utc;
+
+    @Getter
+    private final DateTimeFormatter[] dateParseFormatters;
+
+    @Getter
+    private final DateTimeFormatter[] timeParseFormatters;
+
     public DateTimeFormattingService() {
         this.dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
         this.timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
@@ -40,6 +52,20 @@ public class DateTimeFormattingService {
         this.shortDateWithoutYearFormatter = DateTimeFormatter.ofPattern("dd.MM", RUSSIAN_LOCALE);
         this.dayOfWeekFormatter = DateTimeFormatter.ofPattern("EEEE", RUSSIAN_LOCALE);
         this.dateWithDayOfWeekFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy - EEEE", RUSSIAN_LOCALE);
+
+        this.dateParseFormatters = new DateTimeFormatter[]{
+                DateTimeFormatter.ofPattern("dd.MM.yyyy"),
+                DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                DateTimeFormatter.ofPattern("dd.MM.yy"),
+                DateTimeFormatter.ofPattern("dd/MM/yy")
+        };
+        
+        this.timeParseFormatters = new DateTimeFormatter[]{
+                DateTimeFormatter.ofPattern("HH:mm"),
+                DateTimeFormatter.ofPattern("H:mm")
+        };
+
+        this.utc = ZoneId.of("UTC");
     }
 
     /**
@@ -140,12 +166,5 @@ public class DateTimeFormattingService {
             return "";
         }
         return date.format(dateWithDayOfWeekFormatter);
-    }
-
-    /**
-     * Возвращает русскую локаль
-     */
-    public Locale getRussianLocale() {
-        return RUSSIAN_LOCALE;
     }
 }

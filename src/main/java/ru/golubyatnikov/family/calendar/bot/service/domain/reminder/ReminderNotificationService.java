@@ -12,6 +12,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Reminder;
 import ru.golubyatnikov.family.calendar.bot.repository.ReminderRepository;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.ReminderMessageFormattingService;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -29,7 +30,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReminderNotificationService {
     
-    private static final ZoneId UTC = ZoneId.of("UTC");
     private static final int REMINDER_WINDOW_HOURS = 1;
     private static final int OLD_REMINDER_THRESHOLD_HOURS = 1;
     
@@ -37,13 +37,14 @@ public class ReminderNotificationService {
     private final ReminderValidator reminderValidator;
     private final ReminderSender reminderSender;
     private final ReminderMessageFormattingService messageFormatter;
+    private final DateTimeFormattingService dateTimeFormattingService;
     
     /**
      * Автоматически отправляет напоминания по расписанию.
      */
     @Transactional
     public void sendReminders() {
-        LocalDateTime nowUTC = LocalDateTime.now(UTC);
+        LocalDateTime nowUTC = LocalDateTime.now(dateTimeFormattingService.getUtc());
         LocalDateTime windowStart = nowUTC.minusHours(REMINDER_WINDOW_HOURS);
         
         List<Reminder> reminders = findRemindersToSend(nowUTC, windowStart);

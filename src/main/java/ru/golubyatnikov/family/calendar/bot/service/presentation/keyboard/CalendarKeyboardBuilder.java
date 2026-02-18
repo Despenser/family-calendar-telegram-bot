@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
+import ru.golubyatnikov.family.calendar.bot.model.context.CalendarContext;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
@@ -20,9 +21,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * TODO пробежаться свежим взглядом но как будто бы нужен рефакторинг
  * Компонент для построения календарных клавиатур.
  * Отвечает за создание inline-клавиатур с календарем для выбора даты.
+ *
+ * @author Golubyatnikov Aleksey
+ * @since 2026-02-18
  */
 @Component
 @Slf4j
@@ -42,6 +45,13 @@ public class CalendarKeyboardBuilder {
 
     /**
      * Создает календарь для создания нового события.
+     * Прошлые даты недоступны для выбора.
+     *
+     * @param year год для отображения
+     * @param month месяц для отображения (1-12)
+     * @param user пользователь, для которого создается календарь
+     *
+     * @return разметка inline-клавиатуры с календарем
      */
     public InlineKeyboardMarkup createForNewEvent(int year, int month, User user) {
         return createCalendar(year, month, user, false, null);
@@ -49,13 +59,28 @@ public class CalendarKeyboardBuilder {
 
     /**
      * Создает календарь для редактирования существующего события.
+     * Прошлые даты недоступны для выбора.
+     *
+     * @param year год для отображения
+     * @param month месяц для отображения (1-12)
+     * @param user пользователь, для которого создается календарь
+     * @param eventId ID редактируемого события
+     *
+     * @return разметка inline-клавиатуры с календарем
      */
     public InlineKeyboardMarkup createForEventEdit(int year, int month, User user, Long eventId) {
         return createCalendar(year, month, user, false, eventId);
     }
 
     /**
-     * Создает календарь для просмотра событий (с возможностью навигации в прошлое).
+     * Создает календарь для просмотра событий.
+     * Доступна навигация по прошлым датам, отображаются завершенные события.
+     *
+     * @param year год для отображения
+     * @param month месяц для отображения (1-12)
+     * @param user пользователь, для которого создается календарь
+     *
+     * @return разметка inline-клавиатуры с календарем
      */
     public InlineKeyboardMarkup createForEventView(int year, int month, User user) {
         return createCalendar(year, month, user, true, null);
@@ -63,6 +88,15 @@ public class CalendarKeyboardBuilder {
 
     /**
      * Основной метод создания календаря.
+     * Создает полную структуру календаря с заголовком, днями недели, датами и навигацией.
+     *
+     * @param year год для отображения
+     * @param month месяц для отображения (1-12)
+     * @param user пользователь, для которого создается календарь
+     * @param allowPastDates разрешить ли выбор прошлых дат
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     *
+     * @return разметка inline-клавиатуры с календарем
      */
     private InlineKeyboardMarkup createCalendar(int year, int month, @NonNull User user,
                                                 boolean allowPastDates, Long editingEventId) {
@@ -85,21 +119,38 @@ public class CalendarKeyboardBuilder {
         return keyboardFactory.createMarkup(rows);
     }
 
+    /**
+     * Валидирует номер месяца.
+     *
+     * @param month номер месяца (должен быть от 1 до 12)
+     * @throws IllegalArgumentException если месяц вне допустимого диапазона
+     */
     private void validateMonth(int month) {
         if (month < 1 || month > 12) {
             throw new IllegalArgumentException("Month must be between 1 and 12");
         }
     }
 
+    /**
+     * Создает строку заголовка календаря с названием месяца и года.
+     *
+     * @param context контекст календаря
+     * @return строка клавиатуры с заголовком
+     */
     private InlineKeyboardRow createHeaderRow(@NonNull CalendarContext context) {
         return keyboardFactory.createRow(
             keyboardFactory.createButton(
-                dateTimeFormattingService.formatMonth(context.yearMonth.atDay(1)),
+                dateTimeFormattingService.formatMonth(context.yearMonth().atDay(1)),
                 IGNORE_CALLBACK
             )
         );
     }
 
+    /**
+     * Создает строку с названиями дней недели (Пн, Вт, Ср, Чт, Пт, Сб, Вс).
+     *
+     * @return строка клавиатуры с днями недели
+     */
     private InlineKeyboardRow createWeekDaysRow() {
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         for (String day : WEEK_DAYS) {
@@ -108,6 +159,14 @@ public class CalendarKeyboardBuilder {
         return keyboardFactory.createRow(buttons);
     }
 
+    /**
+     * Создает строки с датами месяца.
+     * Каждая дата отображается с индикаторами событий (инициал создателя и счетчик).
+     * Прошлые даты могут быть скрыты в зависимости от контекста.
+     *
+     * @param context контекст календаря
+     * @return список строк клавиатуры с датами
+     */
     private @NonNull List<InlineKeyboardRow> createDaysRows(@NonNull CalendarContext context) {
         Map<LocalDate, Event> eventsByDate = loadEventsForMonth(context);
         Map<LocalDate, Long> eventCountByDate = countEventsByDate(eventsByDate);
@@ -116,14 +175,14 @@ public class CalendarKeyboardBuilder {
         List<InlineKeyboardButton> currentRow = new ArrayList<>();
         
         // Пустые ячейки до первого дня месяца
-        int firstDayOfWeek = context.firstDay.getDayOfWeek().getValue();
+        int firstDayOfWeek = context.firstDay().getDayOfWeek().getValue();
         for (int i = 1; i < firstDayOfWeek; i++) {
             currentRow.add(createEmptyButton());
         }
         
         // Дни месяца
-        for (int day = 1; day <= context.daysInMonth; day++) {
-            LocalDate date = LocalDate.of(context.year, context.month, day);
+        for (int day = 1; day <= context.daysInMonth(); day++) {
+            LocalDate date = LocalDate.of(context.year(), context.month(), day);
             currentRow.add(createDayButton(date, context, eventsByDate, eventCountByDate));
             
             // Переход на новую строку после воскресенья
@@ -144,13 +203,20 @@ public class CalendarKeyboardBuilder {
         return rows;
     }
 
+    /**
+     * Загружает события для отображаемого месяца.
+     * В режиме просмотра включает завершенные события, в режиме создания - только активные.
+     *
+     * @param context контекст календаря
+     * @return карта событий по датам (первое событие дня по времени)
+     */
     private Map<LocalDate, Event> loadEventsForMonth(@NonNull CalendarContext context) {
-        Long familyId = context.user.getFamily() != null ? context.user.getFamily().getId() : null;
-        LocalDate monthStart = context.yearMonth.atDay(1);
-        LocalDate monthEnd = context.yearMonth.atEndOfMonth();
+        Long familyId = context.user().getFamily() != null ? context.user().getFamily().getId() : null;
+        LocalDate monthStart = context.yearMonth().atDay(1);
+        LocalDate monthEnd = context.yearMonth().atEndOfMonth();
         
         List<Event> monthEvents;
-        if (context.allowPastDates) {
+        if (context.isViewingCalendar()) {
             // Календарь просмотра - включаем завершенные события
             monthEvents = eventRepository
                 .findByFamilyIdAndEventDateBetween(familyId, monthStart, monthEnd).stream()
@@ -174,20 +240,43 @@ public class CalendarKeyboardBuilder {
             ));
     }
 
+    /**
+     * Подсчитывает количество событий для каждой даты.
+     *
+     * @param eventsByDate карта событий по датам
+     * @return карта с количеством событий для каждой даты
+     */
     private Map<LocalDate, Long> countEventsByDate(@NonNull Map<LocalDate, Event> eventsByDate) {
         return eventsByDate.values().stream()
             .collect(Collectors.groupingBy(Event::getEventDate, Collectors.counting()));
     }
 
+    /**
+     * Создает пустую кнопку для заполнения календарной сетки.
+     *
+     * @return пустая кнопка
+     */
     private InlineKeyboardButton createEmptyButton() {
         return keyboardFactory.createButton(" ", IGNORE_CALLBACK);
     }
 
+    /**
+     * Создает кнопку для отображения дня в календаре.
+     * Прошлые даты могут быть скрыты в зависимости от контекста.
+     *
+     * @param date дата для кнопки
+     * @param context контекст календаря
+     * @param eventsByDate карта событий по датам
+     * @param eventCountByDate карта с количеством событий по датам
+     *
+     * @return кнопка с датой или пустая кнопка
+     */
     private InlineKeyboardButton createDayButton(LocalDate date, @NonNull CalendarContext context,
                                                   Map<LocalDate, Event> eventsByDate,
                                                   Map<LocalDate, Long> eventCountByDate) {
+
         // Прошлые даты отображаются как пустые (если не разрешены)
-        if (!context.allowPastDates && date.isBefore(context.today)) {
+        if (!context.allowPastDates() && date.isBefore(context.today())) {
             return createEmptyButton();
         }
         
@@ -198,13 +287,25 @@ public class CalendarKeyboardBuilder {
         return keyboardFactory.createButton(dayText, callbackData);
     }
 
+    /**
+     * Формирует текст для кнопки дня.
+     * Добавляет квадратные скобки для текущего дня и индикаторы событий
+     * (инициал создателя в верхнем индексе и счетчик событий).
+     *
+     * @param date дата
+     * @param context контекст календаря
+     * @param eventsByDate карта событий по датам
+     * @param eventCountByDate карта с количеством событий по датам
+     *
+     * @return отформатированный текст для кнопки
+     */
     private String buildDayText(@NonNull LocalDate date,
                                 @NonNull CalendarContext context,
                                 Map<LocalDate, Event> eventsByDate,
                                 Map<LocalDate, Long> eventCountByDate) {
 
         int day = date.getDayOfMonth();
-        boolean isToday = date.equals(context.today);
+        boolean isToday = date.equals(context.today());
         
         String dayText = String.valueOf(day);
         
@@ -232,12 +333,19 @@ public class CalendarKeyboardBuilder {
         return dayText;
     }
 
+    /**
+     * Создает строку навигации с кнопками перехода между месяцами.
+     * Включает кнопки "Предыдущий месяц", "Сегодня"/"Назад" и "Следующий месяц".
+     *
+     * @param context контекст календаря
+     * @return строка клавиатуры с навигацией
+     */
     private InlineKeyboardRow createNavigationRow(@NonNull CalendarContext context) {
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         
         // Кнопка "Назад" (предыдущий месяц)
-        YearMonth prevMonth = context.yearMonth.minusMonths(1);
-        if (!context.allowPastDates && prevMonth.isBefore(context.currentYearMonth)) {
+        YearMonth prevMonth = context.yearMonth().minusMonths(1);
+        if (!context.allowPastDates() && prevMonth.isBefore(context.currentYearMonth())) {
             buttons.add(createDisabledNavigationButton());
         } else {
             buttons.add(createPrevMonthButton(prevMonth));
@@ -247,75 +355,83 @@ public class CalendarKeyboardBuilder {
         buttons.add(createCenterButton(context));
         
         // Кнопка "Вперед" (следующий месяц)
-        buttons.add(createNextMonthButton(context.yearMonth.plusMonths(1)));
+        buttons.add(createNextMonthButton(context.yearMonth().plusMonths(1)));
         
         return keyboardFactory.createRow(buttons);
     }
 
+    /**
+     * Создает неактивную кнопку навигации (заглушку).
+     *
+     * @return неактивная кнопка
+     */
     private InlineKeyboardButton createDisabledNavigationButton() {
         return keyboardFactory.createButton("   ", IGNORE_CALLBACK);
     }
 
+    /**
+     * Создает кнопку перехода к предыдущему месяцу.
+     *
+     * @param month месяц для перехода
+     * @return кнопка "Назад"
+     */
     private InlineKeyboardButton createPrevMonthButton(@NonNull YearMonth month) {
         return keyboardFactory.createButton("⬅️", 
             String.format("%s%d-%02d", CALENDAR_PREFIX, month.getYear(), month.getMonthValue()));
     }
 
+    /**
+     * Создает кнопку перехода к следующему месяцу.
+     *
+     * @param month месяц для перехода
+     * @return кнопка "Вперед"
+     */
     private InlineKeyboardButton createNextMonthButton(@NonNull YearMonth month) {
         return keyboardFactory.createButton("➡️", 
             String.format("%s%d-%02d", CALENDAR_PREFIX, month.getYear(), month.getMonthValue()));
     }
 
+    /**
+     * Создает центральную кнопку навигации.
+     * В режиме редактирования - кнопка "Назад к событию",
+     * в остальных режимах - кнопка "Сегодня".
+     *
+     * @param context контекст календаря
+     * @return центральная кнопка навигации
+     */
     private InlineKeyboardButton createCenterButton(@NonNull CalendarContext context) {
-        if (context.editingEventId != null) {
+        if (context.isEditingEvent()) {
             // При редактировании - кнопка "Назад"
             return keyboardFactory.createButton("🔙 Назад", 
-                CallbackPrefix.EDIT_BACK.withPayload(context.editingEventId.toString()));
+                CallbackPrefix.EDIT_BACK.withPayload(context.editingEventId().toString()));
+
         } else {
             // При создании или просмотре - кнопка "Сегодня"
             return keyboardFactory.createButton("Сегодня", 
                 String.format("%s%d-%02d", CALENDAR_PREFIX, 
-                    context.currentYearMonth.getYear(), context.currentYearMonth.getMonthValue()));
+                    context.currentYearMonth().getYear(), context.currentYearMonth().getMonthValue()));
         }
     }
 
+    /**
+     * Определяет, нужно ли отображать кнопку "Отмена".
+     * Кнопка отображается только при создании нового события.
+     *
+     * @param context контекст календаря
+     * @return true, если нужно показать кнопку отмены
+     */
     private boolean shouldShowCancelButton(@NonNull CalendarContext context) {
-        return context.editingEventId == null && !context.allowPastDates;
+        return context.isCreatingEvent();
     }
 
+    /**
+     * Создает строку с кнопкой "Отмена".
+     *
+     * @return строка клавиатуры с кнопкой отмены
+     */
     private InlineKeyboardRow createCancelRow() {
         return keyboardFactory.createRow(
             keyboardFactory.createButton("🔙 Назад", CANCEL_CALLBACK)
         );
-    }
-
-    /**
-     * TODO вынести в model.context
-     * Контекст для построения календаря.
-     */
-    private static class CalendarContext {
-        final YearMonth yearMonth;
-        final YearMonth currentYearMonth;
-        final User user;
-        final boolean allowPastDates;
-        final Long editingEventId;
-        final LocalDate today;
-        final LocalDate firstDay;
-        final int year;
-        final int month;
-        final int daysInMonth;
-
-        CalendarContext(YearMonth yearMonth, User user, boolean allowPastDates, Long editingEventId) {
-            this.yearMonth = yearMonth;
-            this.user = user;
-            this.allowPastDates = allowPastDates;
-            this.editingEventId = editingEventId;
-            this.today = user.getCurrentDate();
-            this.currentYearMonth = YearMonth.now(user.getZoneId());
-            this.firstDay = yearMonth.atDay(1);
-            this.year = yearMonth.getYear();
-            this.month = yearMonth.getMonthValue();
-            this.daysInMonth = yearMonth.lengthOfMonth();
-        }
     }
 }

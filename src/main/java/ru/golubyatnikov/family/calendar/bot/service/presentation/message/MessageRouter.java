@@ -41,7 +41,11 @@ public class MessageRouter {
      *
      * @return true, если сообщение обработано, false, если требуется обработка команды
      */
-    public boolean routeMessage(Message message, @NonNull User user, String originalText, String commandText) {
+    public boolean routeMessage(Message message,
+                                @NonNull User user,
+                                String originalText,
+                                String commandText) {
+
         Long userId = user.getId();
         
         // Приоритет 1: Редактирование события

@@ -57,7 +57,7 @@ public class EventEditingService {
             completeEditingAndReturnToCard(updatedEvent, userId, chatId, context.getMessageId(), 
                     callbackQueryId, CallbackMessages.UPDATED);
 
-            } catch (Exception e) {
+        } catch (Exception e) {
             log.error("Ошибка при обновлении даты события: userId={}, date={}, error={}", 
                      userId, date, e.getMessage());
 
@@ -86,7 +86,7 @@ public class EventEditingService {
             completeEditingAndReturnToCard(updatedEvent, userId, chatId, context.getMessageId(), 
                     callbackQueryId, CallbackMessages.UPDATED);
 
-            } catch (Exception e) {
+        } catch (Exception e) {
             log.error("Ошибка при обновлении времени события: userId={}, time={}, error={}", 
                      userId, time, e.getMessage());
 
@@ -115,7 +115,7 @@ public class EventEditingService {
             completeEditingAndReturnToCard(event, userId, chatId, context.getMessageId(), 
                     callbackQueryId, "Редактирование отменено");
 
-            } catch (Exception e) {
+        } catch (Exception e) {
             log.error("Ошибка при отмене редактирования: userId={}, error={}", userId, e.getMessage());
             conversationStateService.clearEventEditing(userId);
             throw new RuntimeException("Ошибка при отмене редактирования", e);
@@ -214,7 +214,8 @@ public class EventEditingService {
                                 InlineKeyboardMarkup keyboard) {
         try {
             messageService.editMessageText(chatId, messageId, eventMessage, keyboard);
-            } catch (TelegramApiException e) {
+
+        } catch (TelegramApiException e) {
             log.warn("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
                     event.getId(), messageId, e.getMessage());
 

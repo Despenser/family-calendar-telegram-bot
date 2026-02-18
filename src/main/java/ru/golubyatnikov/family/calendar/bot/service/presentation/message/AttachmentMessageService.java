@@ -40,36 +40,35 @@ public class AttachmentMessageService {
     /**
      * Редактирует существующее сообщение или отправляет новое при неудаче.
      * Автоматически сохраняет messageId в ConversationState.
-     * 
+     *
      * @param chatId идентификатор чата Telegram
      * @param messageId идентификатор сообщения для редактирования
      * @param text текст сообщения
-     * @param keyboard inline-клавиатура для сообщения
+     * @param keyboard  inline-клавиатура для сообщения
      * @param userId идентификатор пользователя
      * @param eventId идентификатор события
      *
-     * @return messageId отредактированного или нового сообщения
      * @throws TelegramApiException если произошла критическая ошибка при отправке сообщения
      */
-    public Integer editOrSendMessage(Long chatId,
-                                     Integer messageId,
-                                     String text,
-                                     InlineKeyboardMarkup keyboard, 
-                                     Long userId,
-                                     Long eventId) throws TelegramApiException {
+    public void editOrSendMessage(Long chatId,
+                                  Integer messageId,
+                                  String text,
+                                  InlineKeyboardMarkup keyboard,
+                                  Long userId,
+                                  Long eventId) throws TelegramApiException {
         
         boolean edited = messageService.tryEditMessageText(chatId, messageId, text, keyboard);
         
         Integer resultMessageId;
         if (edited) {
             resultMessageId = messageId;
-            } else {
+
+        } else {
             Message sentMessage = messageService.sendMessageAndGet(chatId, text, keyboard);
             resultMessageId = sentMessage.getMessageId();
-            }
+        }
         
         conversationStateService.saveAttachmentMessageId(userId, eventId, chatId, resultMessageId);
-        return resultMessageId;
     }
     
     /**
@@ -83,10 +82,9 @@ public class AttachmentMessageService {
      * @param userId идентификатор пользователя
      * @param eventId идентификатор события
      *
-     * @return messageId нового текстового сообщения
      * @throws TelegramApiException если произошла критическая ошибка при отправке сообщения
      */
-    public Integer replaceMediaWithText(Long chatId,
+    public void replaceMediaWithText(Long chatId,
                                         Integer messageId,
                                         String text,
                                         InlineKeyboardMarkup keyboard,
@@ -97,15 +95,14 @@ public class AttachmentMessageService {
             messageService.deleteMessage(chatId, messageId);
 
         } catch (Exception e) {
-            }
+            log.warn("Не удалось удалить медиа-сообщение (возможно, уже удалено): {}", e.getMessage());
+        }
         
         // Отправляем новое текстовое сообщение
         Message sentMessage = messageService.sendMessageAndGet(chatId, text, keyboard);
         Integer newMessageId = sentMessage.getMessageId();
         
         conversationStateService.saveAttachmentMessageId(userId, eventId, chatId, newMessageId);
-        
-        return newMessageId;
     }
     
     /**

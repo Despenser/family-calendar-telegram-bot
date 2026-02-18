@@ -32,7 +32,10 @@ public class KeyboardLayoutService {
      * @return настроенная InlineKeyboardMarkup с календарем
      * @throws IllegalArgumentException если month не в диапазоне 1-12
      */
-    public InlineKeyboardMarkup createCalendarKeyboard(int year, int month, User user) {
+    public InlineKeyboardMarkup createCalendarKeyboard(int year,
+                                                       int month,
+                                                       User user) {
+
         return calendarKeyboardBuilder.createForNewEvent(year, month, user);
     }
 
@@ -47,7 +50,11 @@ public class KeyboardLayoutService {
      * @return настроенная InlineKeyboardMarkup с календарем
      * @throws IllegalArgumentException если month не в диапазоне 1-12
      */
-    public InlineKeyboardMarkup createCalendarKeyboard(int year, int month, User user, Long editingEventId) {
+    public InlineKeyboardMarkup createCalendarKeyboard(int year,
+                                                       int month,
+                                                       User user,
+                                                       Long editingEventId) {
+
         return calendarKeyboardBuilder.createForEventEdit(year, month, user, editingEventId);
     }
 
@@ -61,7 +68,10 @@ public class KeyboardLayoutService {
      * @return настроенная InlineKeyboardMarkup с календарем
      * @throws IllegalArgumentException если month не в диапазоне 1-12
      */
-    public InlineKeyboardMarkup createViewCalendarKeyboard(int year, int month, User user) {
+    public InlineKeyboardMarkup createViewCalendarKeyboard(int year,
+                                                           int month,
+                                                           User user) {
+
         return calendarKeyboardBuilder.createForEventView(year, month, user);
     }
 
@@ -74,7 +84,9 @@ public class KeyboardLayoutService {
      * @return настроенная InlineKeyboardMarkup
      * @throws IllegalArgumentException если параметры некорректны
      */
-    public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate, User user) {
+    public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate,
+                                                                    User user) {
+
         return timeKeyboardBuilder.createFilteredHourSelection(selectedDate, user, null);
     }
 

@@ -17,6 +17,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.FileSizeExceededException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.model.context.AwaitingFileContext;
+import ru.golubyatnikov.family.calendar.bot.model.dto.FileInfo;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Attachment;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
@@ -25,14 +26,13 @@ import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
-
 import java.util.List;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
- * TODO сделать рефакторинг класса
  * Обработчик файловых сообщений.
  *
  * @author Golubyatnikov Aleksey
@@ -49,6 +49,7 @@ public class FileMessageHandler {
     private final ConversationStateService conversationStateService;
     private final AttachmentService attachmentService;
     private final EventService eventService;
+    private final DateTimeFormattingService dateTimeFormattingService;
 
     /**
      * Обрабатывает подсказку при ожидании файла (текстовое сообщение).
@@ -59,11 +60,7 @@ public class FileMessageHandler {
             "📎 Пожалуйста, отправьте файл " + escape("(документ, фото, видео или аудио)") + "\n\n" +
             "_Для отмены нажмите кнопку 'Отмена' в списке вложений_"
         );
-        try {
-            messageService.sendMessage(chatId, hintMessage);
-            } catch (Exception e) {
-            log.error("Ошибка при отправке подсказки: {}", e.getMessage());
-        }
+        sendMessage(chatId, hintMessage);
     }
 
     /**
@@ -86,7 +83,7 @@ public class FileMessageHandler {
             Long eventId = context.getEventId();
             Integer messageId = context.getMessageId();
             
-            FileInfo fileInfo = extractFileInfo(message, telegramId, eventId);
+            FileInfo fileInfo = extractFileInfo(message);
             if (fileInfo == null) {
                 conversationStateService.clearAwaitingFile(userId);
                 messageService.sendMessage(chatId,
@@ -95,22 +92,23 @@ public class FileMessageHandler {
                 return;
             }
             
-            Attachment attachment = attachmentService.saveAttachment(
-                    eventId, fileInfo.fileId, fileInfo.fileName, fileInfo.fileType, fileInfo.fileSize
+            attachmentService.saveAttachment(
+                    eventId, fileInfo.fileId(), fileInfo.fileName(), fileInfo.fileType(), fileInfo.fileSize()
             );
             
             messageService.deleteMessageSilently(chatId, message.getMessageId());
             updateAttachmentsList(chatId, messageId, eventId, userId);
             
             conversationStateService.clearAwaitingFile(userId);
-            } catch (FileSizeExceededException e) {
-            handleFileSizeError(chatId, userId, telegramId, e);
+
+        } catch (FileSizeExceededException e) {
+            handleFileSizeError(chatId, userId, telegramId);
 
         } catch (EventNotFoundException e) {
-            handleEventNotFoundError(chatId, userId, telegramId, e);
+            handleEventNotFoundError(chatId, userId, telegramId);
 
         } catch (UnauthorizedAccessException e) {
-            handleUnauthorizedError(chatId, userId, telegramId, e);
+            handleUnauthorizedError(chatId, userId, telegramId);
 
         } catch (Exception e) {
             handleGeneralError(chatId, userId, telegramId, e);
@@ -126,90 +124,110 @@ public class FileMessageHandler {
         Long telegramId = user.getTelegramId();
         
         if (!conversationService.hasActiveDraft(user.getId())) {
-            try {
-                messageService.sendMessage(chatId, 
-                    "❌ Для прикрепления файлов сначала создайте событие с помощью ➕ " + escape("/add_event"));
-            } catch (Exception e) {
-                log.error("Ошибка при отправке сообщения: {}", e.getMessage());
-            }
+            sendMessage(chatId, 
+                "❌ Для прикрепления файлов сначала создайте событие с помощью ➕ " + escape("/add_event"));
             return;
         }
         
         Event draft = conversationService.getActiveDraft(user.getId());
         
         if (draft.getEventDate() == null || draft.getEventTime() == null) {
-            try {
-                messageService.sendMessage(chatId, 
-                    "❌ Сначала завершите создание события, затем вы сможете прикрепить файлы");
-            } catch (Exception e) {
-                log.error("Ошибка при отправке сообщения: {}", e.getMessage());
-            }
+            sendMessage(chatId, "❌ Сначала завершите создание события, затем вы сможете прикрепить файлы");
             return;
         }
         
         try {
-            FileInfo fileInfo = extractFileInfo(message, telegramId, draft.getId());
-            if (fileInfo == null) {
-                return;
-            }
-            
-            final long MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 МБ
-            if (fileInfo.fileSize > MAX_FILE_SIZE) {
-                log.warn("Файл слишком большой: size={}, max={}, telegramId={}", 
-                        fileInfo.fileSize, MAX_FILE_SIZE, telegramId);
+            processGeneralFileAttachment(message, chatId, telegramId, draft);
 
-                messageService.sendMessage(
-                        chatId,
-                        formatMessage("""
-                            ❌ Размер файла превышает максимально допустимый (20 МБ).
-                            
-                            Размер вашего файла: %.2f МБ""", fileInfo.fileSize / (1024.0 * 1024.0))
-                );
+        } catch (FileSizeExceededException e) {
+            handleFileSizeExceededForGeneralFile(chatId, telegramId, e);
 
-                return;
-            }
-            
-            attachmentService.saveAttachment(draft.getId(), fileInfo.fileId, fileInfo.fileName, 
-                                           fileInfo.fileType, fileInfo.fileSize);
-            
-            String response = bold("✅ Файл успешно прикреплен!") + "\n\n" +
-                "📎 Название: " + escape(fileInfo.fileName) + "\n" +
-                formatMessage("📊 Размер: %.2f МБ\n\n", fileInfo.fileSize / (1024.0 * 1024.0)) +
-                "Вы можете продолжить прикреплять файлы или завершить создание события.";
-            
-            ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
-            try {
-                messageService.sendMessage(chatId, response, keyboard);
-            } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: {}", ex.getMessage());
-            }
-            
-            } catch (FileSizeExceededException e) {
-            log.warn("Размер файла превышает лимит: error={}, telegramId={}", e.getMessage(), telegramId);
-            try {
-                messageService.sendMessage(chatId, "❌ " + e.getMessage());
-
-            } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: {}", ex.getMessage());
-            }
         } catch (Exception e) {
-            log.error("Ошибка при сохранении вложения: eventId={}, telegramId={}, error={}", 
-                     draft.getId(), telegramId, e.getMessage(), e);
-            try {
-                messageService.sendMessage(chatId, 
-                    "❌ " + bold("Произошла ошибка при сохранении файла") + "\\. " + 
-                    italic("Попробуйте еще раз\\."));
-
-            } catch (Exception ex) {
-                log.error("Ошибка при отправке сообщения: {}", ex.getMessage());
-            }
+            handleGeneralFileError(chatId, telegramId, draft, e);
         }
+    }
+
+    /**
+     * Обрабатывает прикрепление файла к черновику события.
+     */
+    private void processGeneralFileAttachment(Message message, Long chatId, Long telegramId, Event draft) {
+        FileInfo fileInfo = extractFileInfo(message);
+        if (fileInfo == null) {
+            return;
+        }
+        
+        final long MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 МБ
+
+        if (fileInfo.fileSize() > MAX_FILE_SIZE) {
+            log.warn("Файл слишком большой: size={}, max={}, telegramId={}", 
+                    fileInfo.fileSize(), MAX_FILE_SIZE, telegramId);
+
+            sendMessage(chatId,
+                    formatMessage("""
+                        ❌ Размер файла превышает максимально допустимый (20 МБ).
+                        
+                        Размер вашего файла: %.2f МБ""", fileInfo.fileSize() / (1024.0 * 1024.0))
+            );
+
+            return;
+        }
+        
+        attachmentService.saveAttachment(draft.getId(), fileInfo.fileId(), fileInfo.fileName(), 
+                                       fileInfo.fileType(), fileInfo.fileSize());
+        
+        sendSuccessfulAttachmentMessage(chatId, fileInfo);
+    }
+
+    /**
+     * Отправляет сообщение об успешном прикреплении файла.
+     */
+    private void sendSuccessfulAttachmentMessage(Long chatId, @NonNull FileInfo fileInfo) {
+        String response = bold("✅ Файл успешно прикреплен!") + "\n\n" +
+            "📎 Название: " + escape(fileInfo.fileName()) + "\n" +
+            formatMessage("📊 Размер: %.2f МБ\n\n", fileInfo.fileSize() / (1024.0 * 1024.0)) +
+            "Вы можете продолжить прикреплять файлы или завершить создание события.";
+        
+        ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+
+        try {
+            messageService.sendMessage(chatId, response, keyboard);
+
+        } catch (Exception ex) {
+            logMessageSendError(ex);
+        }
+    }
+
+    /**
+     * Обрабатывает ошибку превышения размера файла для общего файла.
+     */
+    private void handleFileSizeExceededForGeneralFile(Long chatId,
+                                                      Long telegramId,
+                                                      @NonNull FileSizeExceededException e) {
+
+        log.warn("Размер файла превышает лимит: error={}, telegramId={}", e.getMessage(), telegramId);
+        sendMessage(chatId, "❌ " + e.getMessage());
+    }
+
+    /**
+     * Обрабатывает общую ошибку при сохранении файла.
+     */
+    private void handleGeneralFileError(Long chatId,
+                                        Long telegramId,
+                                        @NonNull Event draft,
+                                        Exception e) {
+
+        log.error("Ошибка при сохранении вложения: eventId={}, telegramId={}, error={}", 
+                 draft.getId(), telegramId, e.getMessage(), e);
+        
+        sendMessage(chatId, 
+            "❌ " + bold("Произошла ошибка при сохранении файла") + "\\. " + 
+            italic("Попробуйте еще раз\\."));
     }
 
     /**
      * Извлекает информацию о файле из сообщения.
      */
-    private @Nullable FileInfo extractFileInfo(@NonNull Message message, Long telegramId, Long eventId) {
+    private @Nullable FileInfo extractFileInfo(@NonNull Message message) {
         if (message.hasDocument()) {
             Document document = message.getDocument();
             return new FileInfo(document.getFileId(), document.getFileName(), "document", document.getFileSize());
@@ -258,6 +276,7 @@ public class FileMessageHandler {
             
             if (attachments.isEmpty()) {
                 messageBuilder.append(italic("У этого события пока нет вложений\\."));
+
             } else {
                 for (int i = 0; i < attachments.size(); i++) {
                     Attachment att = attachments.get(i);
@@ -272,12 +291,12 @@ public class FileMessageHandler {
                     String sizeStr;
                     if (att.getFileSize() >= 1024 * 1024) {
                         sizeStr = String.format("%.2f МБ", att.getFileSize() / (1024.0 * 1024.0));
+
                     } else {
                         sizeStr = String.format("%.2f КБ", att.getFileSize() / 1024.0);
                     }
                     
-                    String dateStr = att.getUploadedAt()
-                        .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH-mm"));
+                    String dateStr = dateTimeFormattingService.formatDateTime(att.getUploadedAt());
                     
                     messageBuilder.append(emoji).append(" ")
                                  .append(bold(att.getFileName())).append("\n")
@@ -295,9 +314,9 @@ public class FileMessageHandler {
             
             String fullText = messageBuilder.toString();
             
-            Integer resultMessageId = editOrSendMessage(chatId, messageId, fullText, keyboard, userId, eventId);
+            editOrSendMessage(chatId, messageId, fullText, keyboard, userId, eventId);
             
-            } catch (TelegramApiException e) {
+        } catch (TelegramApiException e) {
             log.warn("Не удалось обновить список вложений: eventId={}, messageId={}, error={}", 
                     eventId, messageId, e.getMessage());
         }
@@ -306,78 +325,96 @@ public class FileMessageHandler {
     /**
      * Редактирует существующее сообщение или отправляет новое.
      */
-    private Integer editOrSendMessage(Long chatId, Integer messageId, String text, 
-                                     InlineKeyboardMarkup keyboard, Long userId, Long eventId) 
-            throws TelegramApiException {
+    private void editOrSendMessage(Long chatId,
+                                   Integer messageId,
+                                   String text,
+                                   InlineKeyboardMarkup keyboard,
+                                   Long userId,
+                                   Long eventId) throws TelegramApiException {
         
         try {
             boolean edited = messageService.tryEditMessageText(chatId, messageId, text, keyboard);
             
             if (edited) {
                 conversationStateService.saveAttachmentMessageId(userId, eventId, chatId, messageId);
-                return messageId;
+
             } else {
-                org.telegram.telegrambots.meta.api.objects.message.Message sentMessage = 
-                        messageService.sendMessageAndGet(chatId, text, keyboard);
+                Message sentMessage = messageService.sendMessageAndGet(chatId, text, keyboard);
                 
                 Integer newMessageId = sentMessage.getMessageId();
                 conversationStateService.saveAttachmentMessageId(userId, eventId, chatId, newMessageId);
-                return newMessageId;
             }
+
         } catch (TelegramApiException e) {
             log.error("Критическая ошибка при редактировании/отправке сообщения: chatId={}, messageId={}, userId={}, eventId={}, error={}", 
                      chatId, messageId, userId, eventId, e.getMessage(), e);
+
             throw e;
         }
     }
 
-    private void handleFileSizeError(Long chatId, Long userId, Long telegramId, @NonNull FileSizeExceededException e) {
-        conversationStateService.clearAwaitingFile(userId);
-        try {
-            messageService.sendMessage(chatId, 
-                formatMessage("❌ Размер файла превышает максимально допустимый \\(20 МБ\\)\\."));
-
-        } catch (TelegramApiException ex) {
-            log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", telegramId, ex.getMessage(), ex);
-        }
+    private void handleFileSizeError(Long chatId, Long userId, Long telegramId) {
+        String errorMessage = formatMessage("❌ Размер файла превышает максимально допустимый.");
+        sendErrorMessageAndClearState(chatId, userId, telegramId, errorMessage);
     }
 
-    private void handleEventNotFoundError(Long chatId, Long userId, Long telegramId, @NonNull EventNotFoundException e) {
-        conversationStateService.clearAwaitingFile(userId);
-        try {
-            messageService.sendMessage(chatId, "❌ Событие не найдено. Возможно, оно было удалено.");
-
-        } catch (TelegramApiException ex) {
-            log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", telegramId, ex.getMessage(), ex);
-        }
+    private void handleEventNotFoundError(Long chatId, Long userId, Long telegramId) {
+        String errorMessage = "❌ Событие не найдено. Возможно, оно было удалено.";
+        sendErrorMessageAndClearState(chatId, userId, telegramId, errorMessage);
     }
 
-    private void handleUnauthorizedError(Long chatId, Long userId, Long telegramId, @NonNull UnauthorizedAccessException e) {
-        conversationStateService.clearAwaitingFile(userId);
-        try {
-            messageService.sendMessage(chatId, "❌ У вас нет прав для добавления вложений к этому событию.");
-
-        } catch (TelegramApiException ex) {
-            log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", telegramId, ex.getMessage(), ex);
-        }
+    private void handleUnauthorizedError(Long chatId, Long userId, Long telegramId) {
+        String errorMessage = "❌ У вас нет прав для добавления вложений к этому событию.";
+        sendErrorMessageAndClearState(chatId, userId, telegramId, errorMessage);
     }
 
     private void handleGeneralError(Long chatId, Long userId, Long telegramId, Exception e) {
         log.error("Ошибка при обработке загрузки файла для вложения: userId={}, telegramId={}, error={}", 
                 userId, telegramId, e.getMessage(), e);
+
+        String errorMessage = "❌ "
+                + bold("Произошла ошибка при сохранении файла") + "\\. "
+                + italic("Попробуйте еще раз\\.");
+
+        sendErrorMessageAndClearState(chatId, userId, telegramId, errorMessage);
+    }
+
+    /**
+     * Отправляет сообщение об ошибке и очищает состояние ожидания файла.
+     */
+    private void sendErrorMessageAndClearState(Long chatId, Long userId, Long telegramId, String errorMessage) {
         conversationStateService.clearAwaitingFile(userId);
         try {
-            messageService.sendMessage(chatId, 
-                "❌ " + bold("Произошла ошибка при сохранении файла") + "\\. " + 
-                italic("Попробуйте еще раз\\."));
+            messageService.sendMessage(chatId, errorMessage);
 
-        } catch (Exception ex) {
-            log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", telegramId, ex.getMessage(), ex);
+        } catch (TelegramApiException ex) {
+            logErrorMessageSendFailure(telegramId, ex);
         }
     }
 
     /**
-     * Вспомогательный класс для хранения информации о файле.
+     * Отправляет сообщение с обработкой ошибок.
      */
-    private record FileInfo(String fileId, String fileName, String fileType, Long fileSize) {}
+    private void sendMessage(Long chatId, String message) {
+        try {
+            messageService.sendMessage(chatId, message);
+
+        } catch (Exception e) {
+            logMessageSendError(e);
+        }
+    }
+
+    /**
+     * Логирует ошибку при отправке сообщения об ошибке.
+     */
+    private void logErrorMessageSendFailure(Long telegramId, TelegramApiException ex) {
+        log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", telegramId, ex.getMessage(), ex);
+    }
+
+    /**
+     * Логирует ошибку при отправке сообщения.
+     */
+    private void logMessageSendError(@NonNull Exception ex) {
+        log.error("Ошибка при отправке сообщения: {}", ex.getMessage());
+    }
 }

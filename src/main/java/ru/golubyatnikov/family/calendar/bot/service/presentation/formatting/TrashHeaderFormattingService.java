@@ -117,14 +117,9 @@ public class TrashHeaderFormattingService {
      * Получает chatId пользователя.
      */
     private Long getChatId(Long userId) {
-        Long chatId = userRepository.findById(userId)
+        return userRepository.findById(userId)
             .map(User::getTelegramId)
             .orElse(null);
-        
-        if (chatId == null) {
-        }
-        
-        return chatId;
     }
     
     /**
@@ -135,7 +130,8 @@ public class TrashHeaderFormattingService {
         
         try {
             messageService.sendMessage(chatId, emptyMessage);
-            } catch (Exception e) {
+
+        } catch (Exception e) {
             log.error("Ошибка при отправке сообщения о пустой корзине для пользователя ID={}: {}", 
                      userId, e.getMessage(), e);
         }
@@ -154,7 +150,7 @@ public class TrashHeaderFormattingService {
             if (shouldBeHeader != isCurrentlyHeader) {
                 event.setIsTrashHeader(shouldBeHeader);
                 eventRepository.save(event);
-                }
+            }
         }
     }
     
@@ -162,15 +158,10 @@ public class TrashHeaderFormattingService {
      * Находит событие с шапкой.
      */
     private Event findHeaderEvent(@NonNull List<Event> trashedEvents) {
-        Event headerEvent = trashedEvents.stream()
+        return trashedEvents.stream()
             .filter(e -> Boolean.TRUE.equals(e.getIsTrashHeader()))
             .findFirst()
             .orElse(null);
-        
-        if (headerEvent == null) {
-        }
-        
-        return headerEvent;
     }
     
     /**
@@ -189,16 +180,12 @@ public class TrashHeaderFormattingService {
         Long chatId = headerEvent.getUser().getTelegramId();
         
         try {
-            boolean updated = messageService.tryEditMessageText(
+            messageService.tryEditMessageText(
                 chatId,
                 headerEvent.getMessageId().intValue(),
                 combinedMessage,
-                keyboard
-            );
-            
-            if (updated) {
-                } else {
-            }
+                keyboard);
+
         } catch (Exception e) {
             log.error("Ошибка при обновлении счетчика в шапке корзины: {}", e.getMessage(), e);
         }

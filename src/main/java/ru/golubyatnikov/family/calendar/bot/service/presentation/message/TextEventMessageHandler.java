@@ -9,9 +9,11 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
+import ru.golubyatnikov.family.calendar.bot.model.dto.ParsedEvent;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.TextEventParsingService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 
 import java.util.Base64;
@@ -33,6 +35,7 @@ public class TextEventMessageHandler {
     private final TextEventParsingService textEventParsingService;
     private final TelegramMessageService messageService;
     private final KeyboardService keyboardService;
+    private final DateTimeFormattingService dateTimeFormattingService;
 
     /**
      * Обрабатывает распознавание события из текстового сообщения.
@@ -44,18 +47,17 @@ public class TextEventMessageHandler {
     public void handle(Message message, User user, String text) {
         try {
             Long chatId = message.getChatId();
-            Long telegramId = user.getTelegramId();
             
-            Optional<TextEventParsingService.ParsedEvent> parsedEventOpt = textEventParsingService.parseEvent(text);
+            Optional<ParsedEvent> parsedEventOpt = textEventParsingService.parseEvent(text);
             
             if (parsedEventOpt.isEmpty()) {
                 return;
             }
             
-            TextEventParsingService.ParsedEvent parsedEvent = parsedEventOpt.get();
+            ParsedEvent parsedEvent = parsedEventOpt.get();
             
             if (!parsedEvent.isValid()) {
-                handleInvalidEvent(chatId, parsedEvent, telegramId);
+                handleInvalidEvent(chatId, parsedEvent);
                 return;
             }
             
@@ -72,7 +74,7 @@ public class TextEventMessageHandler {
     /**
      * Обрабатывает невалидное распознанное событие.
      */
-    private void handleInvalidEvent(Long chatId, TextEventParsingService.ParsedEvent parsedEvent, Long telegramId) {
+    private void handleInvalidEvent(Long chatId, @NonNull ParsedEvent parsedEvent) {
         
         StringBuilder responseBuilder = new StringBuilder();
         responseBuilder.append("❌ *Не удалось создать событие*\n\n");
@@ -92,39 +94,28 @@ public class TextEventMessageHandler {
                       .append("• `Встреча завтра в 14:30`\n\n")
                       .append("Или используйте команду ➕ /add_event для пошагового создания.");
         
-        try {
-            String response = formatMessage(responseBuilder.toString());
-            ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
-            messageService.sendMessage(chatId, response, keyboard);
-
-        } catch (Exception e) {
-            log.error("Ошибка при отправке сообщения: {}", e.getMessage());
-        }
+        String response = formatMessage(responseBuilder.toString());
+        ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+        sendMessage(chatId, response, keyboard);
     }
 
     /**
      * Отправляет предпросмотр распознанного события.
      */
-    private void sendEventPreview(Long chatId, @NonNull TextEventParsingService.ParsedEvent parsedEvent, User user) {
+    private void sendEventPreview(Long chatId, @NonNull ParsedEvent parsedEvent, User user) {
         String preview = bold("✅ Распознано событие из текста:") + "\n\n" +
             "📝 Название: " + escape(parsedEvent.title()) + "\n" +
-            "📅 Дата: " + escape(parsedEvent.date().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))) + "\n" +
-            "🕐 Время: " + escape(parsedEvent.time().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))) + "\n\n" +
+            "📅 Дата: " + escape(dateTimeFormattingService.formatDate(parsedEvent.date())) + "\n" +
+            "🕐 Время: " + escape(dateTimeFormattingService.formatTime(parsedEvent.time())) + "\n\n" +
             "Подтвердите создание события:";
         
-        try {
-            InlineKeyboardMarkup keyboard = createEventConfirmationKeyboard(parsedEvent);
-            messageService.sendMessageWithInlineKeyboard(chatId, preview, keyboard);
-            
-            } catch (Exception e) {
-            log.error("Ошибка при отправке предпросмотра: {}", e.getMessage());
-        }
+        sendMessageWithKeyboard(chatId, preview, createEventConfirmationKeyboard(parsedEvent));
     }
 
     /**
      * Создает inline-клавиатуру для подтверждения создания события из текста.
      */
-    private InlineKeyboardMarkup createEventConfirmationKeyboard(@NonNull TextEventParsingService.ParsedEvent parsedEvent) {
+    private InlineKeyboardMarkup createEventConfirmationKeyboard(@NonNull ParsedEvent parsedEvent) {
         String eventData = parsedEvent.title() + "|" +
                           parsedEvent.date().toString() + "|" +
                           parsedEvent.time().toString();
@@ -160,5 +151,36 @@ public class TextEventMessageHandler {
             log.error("Ошибка при отправке сообщения об ошибке: telegramId={}, error={}", 
                     user.getTelegramId(), ex.getMessage(), ex);
         }
+    }
+
+    /**
+     * Отправляет сообщение с inline клавиатурой.
+     */
+    private void sendMessageWithKeyboard(Long chatId, String message, InlineKeyboardMarkup keyboard) {
+        try {
+            messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+            
+        } catch (Exception e) {
+            logMessageSendError(e);
+        }
+    }
+
+    /**
+     * Отправляет сообщение с reply клавиатурой.
+     */
+    private void sendMessage(Long chatId, String message, ReplyKeyboardMarkup keyboard) {
+        try {
+            messageService.sendMessage(chatId, message, keyboard);
+
+        } catch (Exception e) {
+            logMessageSendError(e);
+        }
+    }
+
+    /**
+     * Логирует ошибку при отправке сообщения.
+     */
+    private void logMessageSendError(@NonNull Exception e) {
+        log.error("Ошибка при отправке сообщения: {}", e.getMessage());
     }
 }

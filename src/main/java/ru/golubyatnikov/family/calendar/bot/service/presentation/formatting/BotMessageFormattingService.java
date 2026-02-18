@@ -116,7 +116,12 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение с шапкой
      */
     public String buildEditTimeSelectHourMessage() {
-        return "🕐 Редактирование времени\n\nВыберите новое время:";
+        return """
+                🕐 Редактирование времени
+                
+                
+                Выберите новое время:
+                """;
     }
 
     /**
@@ -191,16 +196,6 @@ public class BotMessageFormattingService {
     }
     
     /**
-     * Формирует сообщение об ошибке.
-     * 
-     * @param errorText текст ошибки
-     * @return отформатированное сообщение
-     */
-    public String buildErrorMessage(String errorText) {
-        return "❌ " + bold("Произошла ошибка") + "\\. " + italic(escape(errorText));
-    }
-    
-    /**
      * Формирует заголовок для списка "Мои события".
      * 
      * @param eventCount количество событий пользователя (должно быть больше 0)
@@ -247,27 +242,27 @@ public class BotMessageFormattingService {
             throw new IllegalArgumentException("Event не может быть null");
         }
         
-        StringBuilder formatted = new StringBuilder();
-        
-        // Используем escape() для эмодзи и bold() для названия
-        formatted.append(escape("📌 ")).append(bold(event.getTitle())).append(escape("\n"));
-        formatted.append(escape("📅 Дата: ")).append(escape(event.getFormattedDate())).append(escape("\n"));
-        formatted.append(escape("🕐 Время: ")).append(escape(event.getFormattedTime()));
+        StringBuilder sb = new StringBuilder();
+
+        sb.append(escape("📌 ")).append(bold(event.getTitle())).append(escape("\n"));
+        sb.append(escape("📅 Дата: ")).append(escape(formatDate(event.getEventDate()))).append(escape("\n"));
+        sb.append(escape("🕐 Время: ")).append(escape(formatTime(event.getEventTime())));
         
         // Добавляем тип события
-        formatted.append(escape("\n"));
+        sb.append(escape("\n"));
         boolean isPersonalValue = event.getIsPersonal() != null ? event.getIsPersonal() : false;
         if (isPersonalValue) {
-            formatted.append(escape(PERSONAL_EVENT_TYPE));
+            sb.append(escape(PERSONAL_EVENT_TYPE));
+
         } else {
-            formatted.append(escape(FAMILY_EVENT_TYPE));
+            sb.append(escape(FAMILY_EVENT_TYPE));
         }
         
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            formatted.append(escape("\n📝 Описание: ")).append(escape(event.getDescription()));
+            sb.append(escape("\n📝 Описание: ")).append(escape(event.getDescription()));
         }
         
-        return formatted.toString();
+        return sb.toString();
     }
     
     /**

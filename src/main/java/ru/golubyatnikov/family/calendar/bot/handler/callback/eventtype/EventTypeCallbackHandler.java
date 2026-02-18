@@ -19,6 +19,7 @@ import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.CallbackQueryService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
@@ -43,6 +44,7 @@ public class EventTypeCallbackHandler implements CallbackHandler {
     private final EventService eventService;
     private final CallbackDataExtractionService callbackDataExtractionService;
     private final CallbackQueryService callbackQueryService;
+    private final DateTimeFormattingService dateTimeFormattingService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -138,8 +140,8 @@ public class EventTypeCallbackHandler implements CallbackHandler {
                             📅 Дата: %s
                             🕐 Время: %s
                             📝 Название: %s""",
-                event.getFormattedDate(),
-                event.getFormattedTime(),
+                dateTimeFormattingService.formatDate(event.getEventDate()),
+                dateTimeFormattingService.formatTime(event.getEventTime()),
                 event.getTitle()
             );
 

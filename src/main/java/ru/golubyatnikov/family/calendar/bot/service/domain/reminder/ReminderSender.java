@@ -12,6 +12,7 @@ import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardFactory;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.ReminderMessageFormattingService;
@@ -29,12 +30,11 @@ import java.time.ZoneId;
 @RequiredArgsConstructor
 public class ReminderSender {
     
-    private static final ZoneId UTC = ZoneId.of("UTC");
-    
     private final TelegramMessageService telegramMessageService;
     private final ReminderConfigurationService reminderConfigurationService;
     private final ReminderMessageFormattingService messageFormatter;
     private final KeyboardFactory keyboardFactory;
+    private final DateTimeFormattingService dateTimeFormattingService;
     
     /**
      * Отправляет уведомление о напоминании.
@@ -109,7 +109,7 @@ public class ReminderSender {
         }
 
         try {
-            sendMessage(reminder, user, UTC);
+            sendMessage(reminder, user, dateTimeFormattingService.getUtc());
 
         } catch (Exception fallbackError) {
             log.error("Критическая ошибка отправки с UTC для пользователя ID {}: {}", 

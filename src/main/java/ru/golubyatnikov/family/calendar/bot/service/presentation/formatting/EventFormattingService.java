@@ -85,7 +85,10 @@ public class EventFormattingService {
      * @return отформатированный заголовок команды
      * @throws IllegalArgumentException если любой из параметров null или пустой
      */
-    public String formatCommandHeader(@NonNull String emoji, @NonNull String commandName, @NonNull String additionalInfo) {
+    public String formatCommandHeader(@NonNull String emoji,
+                                      @NonNull String commandName,
+                                      @NonNull String additionalInfo) {
+
         if (emoji.isBlank()) {
             throw new IllegalArgumentException("Эмодзи не может быть пустым");
         }
@@ -109,7 +112,10 @@ public class EventFormattingService {
      * @return отформатированное сообщение об отсутствии событий
      * @throws IllegalArgumentException если любой из параметров null или пустой
      */
-    public String formatNoEventsMessage(@NonNull String emoji, @NonNull String commandName, @NonNull String message) {
+    public String formatNoEventsMessage(@NonNull String emoji,
+                                        @NonNull String commandName,
+                                        @NonNull String message) {
+
         if (emoji.isBlank()) {
             throw new IllegalArgumentException("Эмодзи не может быть пустым");
         }
@@ -152,9 +158,11 @@ public class EventFormattingService {
         if (date.equals(today)) {
             sb.append(escape("📍 "));
             sb.append(escape(formatDateWithDayOfWeek(date, "сегодня")));
+
         } else if (date.equals(today.plusDays(1))) {
             sb.append(escape("🔜 "));
             sb.append(escape(formatDateWithDayOfWeek(date, "завтра")));
+
         } else {
             sb.append(escape("📆 "));
             sb.append(escape(dateTimeFormattingService.formatShortDate(date)));
@@ -169,6 +177,7 @@ public class EventFormattingService {
      * 
      * @param date дата для форматирования
      * @param label метка (например, "сегодня" или "завтра")
+     *
      * @return отформатированная строка с датой и днем недели
      */
     private @NonNull String formatDateWithDayOfWeek(LocalDate date, String label) {

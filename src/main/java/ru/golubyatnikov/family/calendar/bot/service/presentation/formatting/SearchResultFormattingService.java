@@ -37,6 +37,7 @@ public class SearchResultFormattingService {
         
         if (results.isEmpty()) {
             appendEmptyResults(messageBuilder, query);
+
         } else {
             appendEventResults(messageBuilder, results);
         }

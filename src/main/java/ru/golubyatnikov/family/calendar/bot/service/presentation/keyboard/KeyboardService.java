@@ -82,16 +82,6 @@ public class KeyboardService {
     }
 
     /**
-     * Создает inline клавиатуру для подтверждения удаления события.
-     *
-     * @param eventId идентификатор события
-     * @return настроенная InlineKeyboardMarkup для подтверждения
-     */
-    public InlineKeyboardMarkup createDeleteConfirmationKeyboard(Long eventId) {
-        return inlineKeyboardService.createDeleteConfirmationKeyboard(eventId);
-    }
-
-    /**
      * Создает inline клавиатуру для выбора типа события при создании.
      *
      * @return настроенная InlineKeyboardMarkup с типами событий

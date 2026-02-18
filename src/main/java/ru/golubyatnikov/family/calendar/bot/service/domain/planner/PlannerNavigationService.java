@@ -10,6 +10,7 @@ import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 
 import java.util.List;
@@ -31,6 +32,7 @@ public class PlannerNavigationService {
     private final KeyboardService keyboardService;
     private final TelegramMessageService messageService;
     private final ConversationStateService conversationStateService;
+    private final DateTimeFormattingService dateTimeFormattingService;
 
     /**
      * Управляет флагами isMyEventsHeader для событий.
@@ -140,8 +142,8 @@ public class PlannerNavigationService {
         StringBuilder plainText = new StringBuilder();
         
         plainText.append("📌 ").append(event.getTitle()).append("\n");
-        plainText.append("📅 Дата: ").append(event.getFormattedDate()).append("\n");
-        plainText.append("🕐 Время: ").append(event.getFormattedTime());
+        plainText.append("📅 Дата: ").append(dateTimeFormattingService.formatDate(event.getEventDate())).append("\n");
+        plainText.append("🕐 Время: ").append(dateTimeFormattingService.formatTime(event.getEventTime()));
         
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
             plainText.append("\n📝 Описание: ").append(event.getDescription());

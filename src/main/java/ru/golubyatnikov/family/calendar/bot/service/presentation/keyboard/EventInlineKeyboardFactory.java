@@ -103,6 +103,7 @@ public class EventInlineKeyboardFactory {
             InlineKeyboardButton remindersBtn;
             if (hasReminders) {
                 remindersBtn = keyboardFactory.createButton("🔕 Откл. напоминания", "disable_reminders_" + eventId);
+
             } else {
                 remindersBtn = keyboardFactory.createButton("🔔 Вкл. напоминания", "enable_reminders_" + eventId);
             }
@@ -111,6 +112,7 @@ public class EventInlineKeyboardFactory {
                 keyboardFactory.createButton(attachmentsButtonText, "attach_file_list_" + eventId),
                 remindersBtn
             ));
+
         } else {
             rows.add(keyboardFactory.createRow(
                 keyboardFactory.createButton(attachmentsButtonText, "attach_file_list_" + eventId)
@@ -123,10 +125,8 @@ public class EventInlineKeyboardFactory {
                 keyboardFactory.createButton("✅ Завершить", "complete_event_" + eventId)
             ));
         }
-        
-        InlineKeyboardMarkup keyboard = keyboardFactory.createMarkup(rows);
-        
-        return keyboard;
+
+        return keyboardFactory.createMarkup(rows);
     }
 
     /**
@@ -244,8 +244,8 @@ public class EventInlineKeyboardFactory {
             } else {
             cancelBtn = keyboardFactory.createButton("❌ Отмена", "edit_cancel_" + eventId);
             }
-        
-        InlineKeyboardMarkup keyboard = keyboardFactory.createMarkup(
+
+        return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
                 keyboardFactory.createButton("📝 Название", "edit_field_title_" + eventId),
                 keyboardFactory.createButton("📅 Дата", "edit_field_date_" + eventId)
@@ -256,8 +256,6 @@ public class EventInlineKeyboardFactory {
             ),
             keyboardFactory.createRow(cancelBtn)
         );
-        
-        return keyboard;
     }
 
     /**

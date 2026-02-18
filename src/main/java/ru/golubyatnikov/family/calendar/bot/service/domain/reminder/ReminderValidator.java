@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Reminder;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -23,9 +24,8 @@ import java.time.ZonedDateTime;
 @RequiredArgsConstructor
 public class ReminderValidator {
     
-    private static final ZoneId UTC = ZoneId.of("UTC");
-    
     private final ReminderConfigurationService reminderConfigurationService;
+    private final DateTimeFormattingService dateTimeFormattingService;
     
     /**
      * Проверяет, следует ли отправлять напоминание.
@@ -72,7 +72,7 @@ public class ReminderValidator {
         );
         
         return eventZonedDateTime
-            .withZoneSameInstant(UTC)
+            .withZoneSameInstant(dateTimeFormattingService.getUtc())
             .toLocalDateTime();
     }
 }

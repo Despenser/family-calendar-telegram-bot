@@ -5,13 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -38,17 +38,10 @@ public class EventListService {
      * 
      * @param selectedDate выбранная дата для просмотра событий
      * @param user пользователь, запросивший список событий
-     * @param chatId идентификатор чата Telegram
-     * @param messageId идентификатор сообщения для редактирования
-     * @param callbackQueryId идентификатор callback query для ответа
      *
      * @throws RuntimeException если произошла ошибка при просмотре событий на дату
      */
-    public void viewEventsOnDate(LocalDate selectedDate,
-                                 User user,
-                                 Long chatId,
-                                 Integer messageId,
-                                 String callbackQueryId) {
+    public void viewEventsOnDate(LocalDate selectedDate, User user) {
 
         try {
             LocalDate today = user.getCurrentDate();
@@ -60,10 +53,8 @@ public class EventListService {
             
             events = filterPersonalEvents(events, user.getId());
             
-            String message = botMessageFormattingService.buildDateEventsListMessage(selectedDate, events);
-            InlineKeyboardMarkup keyboard = keyboardService.createDateEventsListKeyboard(selectedDate, events);
-            
-            updateMessageSafe(chatId, messageId, message, keyboard, callbackQueryId);
+            botMessageFormattingService.buildDateEventsListMessage(selectedDate, events);
+            keyboardService.createDateEventsListKeyboard(selectedDate, events);
 
         } catch (Exception e) {
             log.error("Ошибка при просмотре событий на дату: userId={}, error={}", user.getId(), e.getMessage());
@@ -97,8 +88,7 @@ public class EventListService {
             InlineKeyboardMarkup keyboard = keyboardService.createMyEventsEditKeyboard(selectedDate, myEvents);
             String message = "✏️ Выберите событие для редактирования:";
             
-            messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.safeEditMessageAndAnswer(chatId, messageId, message, keyboard, callbackQueryId, "");
 
         } catch (Exception e) {
             log.error("Ошибка при редактировании событий на дату: userId={}, error={}", user.getId(), e.getMessage());
@@ -132,8 +122,7 @@ public class EventListService {
             InlineKeyboardMarkup keyboard = keyboardService.createMyEventsDeleteKeyboard(selectedDate, myEvents);
             String message = "🗑 Выберите событие для удаления:";
             
-            messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.safeEditMessageAndAnswer(chatId, messageId, message, keyboard, callbackQueryId, "");
 
         } catch (Exception e) {
             log.error("Ошибка при удалении событий на дату: userId={}, error={}", user.getId(), e.getMessage());
@@ -153,40 +142,5 @@ public class EventListService {
         return events.stream()
             .filter(event -> !event.getIsPersonal() || event.belongsToUser(userId))
             .collect(Collectors.toList());
-    }
-    
-    /**
-     * Безопасно обновляет сообщение, обрабатывая ошибку "message is not modified".
-     * 
-     * @param chatId идентификатор чата Telegram
-     * @param messageId идентификатор сообщения для редактирования
-     * @param message текст сообщения
-     * @param keyboard клавиатура
-     * @param callbackQueryId идентификатор callback query для ответа
-     *
-     * @throws RuntimeException если произошла ошибка при обновлении сообщения
-     */
-    private void updateMessageSafe(Long chatId,
-                                   Integer messageId,
-                                   String message,
-                                   InlineKeyboardMarkup keyboard,
-                                   String callbackQueryId) {
-
-        try {
-            messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "");
-
-        } catch (TelegramApiException e) {
-            if (e.getMessage() != null && e.getMessage().contains("message is not modified")) {
-                try {
-                    messageService.answerCallbackQuery(callbackQueryId, "");
-
-                } catch (TelegramApiException ex) {
-                    log.warn("Не удалось ответить на callback query: {}", ex.getMessage());
-                }
-                } else {
-                throw new RuntimeException("Ошибка при обновлении сообщения", e);
-            }
-        }
     }
 }

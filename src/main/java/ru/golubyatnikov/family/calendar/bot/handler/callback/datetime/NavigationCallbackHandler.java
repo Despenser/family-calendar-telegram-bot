@@ -203,7 +203,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
      */
     private void handleViewEventsOnDate(String callbackData, @NonNull CallbackQueryContext ctx) {
         LocalDate date = ctx.extractDate("view_events_on_date_");
-        eventListService.viewEventsOnDate(date, ctx.user(), ctx.chatId(), ctx.messageId(), ctx.callbackQueryId());
+        eventListService.viewEventsOnDate(date, ctx.user());
     }
     
     /**

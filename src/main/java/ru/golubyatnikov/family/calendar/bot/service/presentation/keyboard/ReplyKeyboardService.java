@@ -70,13 +70,11 @@ public class ReplyKeyboardService {
         row5.add(new KeyboardButton(BTN_TRASH));
         row5.add(new KeyboardButton(BTN_HELP));
         rows.add(row5);
-        
-        ReplyKeyboardMarkup keyboard = ReplyKeyboardMarkup.builder()
+
+        return ReplyKeyboardMarkup.builder()
                 .keyboard(rows)
                 .resizeKeyboard(true)
                 .build();
-        
-        return keyboard;
     }
 
     /**
@@ -92,13 +90,11 @@ public class ReplyKeyboardService {
         row.add(new KeyboardButton(BTN_START));
         row.add(new KeyboardButton(BTN_HELP));
         rows.add(row);
-        
-        ReplyKeyboardMarkup keyboard = ReplyKeyboardMarkup.builder()
+
+        return ReplyKeyboardMarkup.builder()
                 .keyboard(rows)
                 .resizeKeyboard(true)
                 .build();
-        
-        return keyboard;
     }
 
     /**
@@ -114,7 +110,7 @@ public class ReplyKeyboardService {
             throw new IllegalArgumentException("ButtonText не может быть null");
         }
         
-        String command = switch (buttonText) {
+        return switch (buttonText) {
             case BTN_START -> "/start";
             case BTN_MONTH -> "/month";
             case BTN_ADD -> "/add_event";
@@ -129,27 +125,5 @@ public class ReplyKeyboardService {
             case BTN_CALENDAR -> "/calendar";
             default -> buttonText;
         };
-        
-        if (!command.equals(buttonText)) {
-            } else {
-            }
-        
-        return command;
-    }
-
-    /**
-     * Подсчитывает общее количество кнопок в списке рядов клавиатуры.
-     * 
-     * @param rows список рядов клавиатуры
-     * @return общее количество кнопок
-     */
-    private int countButtons(List<KeyboardRow> rows) {
-        if (rows == null) {
-            return 0;
-        }
-        
-        return rows.stream()
-                .mapToInt(row -> row != null ? row.size() : 0)
-                .sum();
     }
 }

@@ -46,8 +46,7 @@ public class TimeAvailabilityService {
         if (selectedDate.equals(today)) {
             return getAvailableHoursForToday(user);
         }
-        
-        log.warn("Попытка получить доступные часы для прошлой даты {}", selectedDate);
+
         return Collections.emptyList();
     }
 
@@ -76,8 +75,7 @@ public class TimeAvailabilityService {
         if (selectedDate.equals(today)) {
             return getAvailableMinutesForToday(selectedHour, user);
         }
-        
-        log.warn("Попытка получить доступные минуты для прошлой даты {}", selectedDate);
+
         return Collections.emptyList();
     }
 
@@ -90,12 +88,10 @@ public class TimeAvailabilityService {
         if (currentHour == MAX_HOUR && currentMinute >= CUTOFF_MINUTE) {
             return Collections.emptyList();
         }
-        
-        List<Integer> availableHours = IntStream.rangeClosed(currentHour, MAX_HOUR)
+
+        return IntStream.rangeClosed(currentHour, MAX_HOUR)
                 .boxed()
                 .collect(Collectors.toList());
-        
-        return availableHours;
     }
 
     private List<Integer> getAvailableMinutesForToday(int selectedHour, @NonNull User user) {
@@ -110,24 +106,20 @@ public class TimeAvailabilityService {
         
         // Если выбран текущий час, фильтруем прошедшие интервалы
         if (selectedHour == currentHour) {
-            return getAvailableMinutesForCurrentHour(currentHour, currentMinute);
+            return getAvailableMinutesForCurrentHour(currentMinute);
         }
-        
-        log.warn("Попытка получить доступные минуты для прошлого часа {} (текущий {})", 
-                selectedHour, currentHour);
+
         return Collections.emptyList();
     }
 
-    private @NonNull List<Integer> getAvailableMinutesForCurrentHour(int currentHour, int currentMinute) {
+    private @NonNull List<Integer> getAvailableMinutesForCurrentHour(int currentMinute) {
         // Если уже поздно (XX:46+), нет доступных интервалов
         if (currentMinute >= CUTOFF_MINUTE) {
             return Collections.emptyList();
         }
-        
-        List<Integer> availableMinutes = MINUTE_INTERVALS.stream()
+
+        return MINUTE_INTERVALS.stream()
                 .filter(minute -> minute > currentMinute)
                 .collect(Collectors.toList());
-        
-        return availableMinutes;
     }
 }

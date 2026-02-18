@@ -192,8 +192,7 @@ public class CalendarNavigationService {
         
         conversationService.cancelEventCreation(user.getId());
         updateMessage(chatId, messageId, message, keyboard, callbackQueryId);
-        
-        }
+    }
     
     /**
      * Возвращает к календарю месяца.
@@ -237,7 +236,7 @@ public class CalendarNavigationService {
         InlineKeyboardMarkup keyboard = keyboardService.createDateEventsListKeyboard(
             context.selectedDate(), context.events());
         
-        updateMessageSafe(chatId, messageId, message, keyboard, callbackQueryId);
+        updateMessage(chatId, messageId, message, keyboard, callbackQueryId);
     }
     
     /**
@@ -257,7 +256,7 @@ public class CalendarNavigationService {
         InlineKeyboardMarkup keyboard = keyboardService.createCreateEventOnDateKeyboard(
             context.selectedDate());
         
-        updateMessageSafe(chatId, messageId, message, keyboard, callbackQueryId);
+        updateMessage(chatId, messageId, message, keyboard, callbackQueryId);
     }
     
     /**
@@ -279,7 +278,7 @@ public class CalendarNavigationService {
         InlineKeyboardMarkup keyboard = keyboardService.createDateEventsManagementKeyboard(
             context.selectedDate(), context.events(), context.user());
         
-        updateMessageSafe(chatId, messageId, message, keyboard, callbackQueryId);
+        updateMessage(chatId, messageId, message, keyboard, callbackQueryId);
     }
     
     /**
@@ -299,46 +298,12 @@ public class CalendarNavigationService {
                                InlineKeyboardMarkup keyboard,
                                String callbackQueryId) {
         try {
-            messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.safeEditMessageAndAnswer(chatId, messageId, message,
+                    keyboard, callbackQueryId, "");
 
         } catch (TelegramApiException e) {
             log.error("Ошибка при обновлении сообщения: error={}", e.getMessage());
             throw new RuntimeException("Ошибка при обновлении сообщения", e);
-        }
-    }
-    
-    /**
-     * Безопасно обновляет сообщение, обрабатывая ошибку "message is not modified".
-     * 
-     * @param chatId идентификатор чата Telegram
-     * @param messageId идентификатор сообщения для редактирования
-     * @param message текст сообщения
-     * @param keyboard клавиатура
-     * @param callbackQueryId идентификатор callback query для ответа
-     *
-     * @throws RuntimeException если произошла ошибка при обновлении сообщения
-     */
-    private void updateMessageSafe(Long chatId,
-                                   Integer messageId,
-                                   String message,
-                                   InlineKeyboardMarkup keyboard,
-                                   String callbackQueryId) {
-        try {
-            messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "");
-
-        } catch (TelegramApiException e) {
-            if (e.getMessage() != null && e.getMessage().contains("message is not modified")) {
-                try {
-                    messageService.answerCallbackQuery(callbackQueryId, "");
-
-                } catch (TelegramApiException ex) {
-                    log.warn("Не удалось ответить на callback query: {}", ex.getMessage());
-                }
-                } else {
-                throw new RuntimeException("Ошибка при обновлении сообщения", e);
-            }
         }
     }
 }

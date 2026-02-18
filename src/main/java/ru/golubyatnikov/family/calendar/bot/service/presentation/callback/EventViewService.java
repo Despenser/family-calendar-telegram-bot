@@ -65,8 +65,7 @@ public class EventViewService {
             LocalDate eventDate = event.getEventDate();
             InlineKeyboardMarkup keyboard = buildEventViewKeyboard(event, eventDate);
             
-            messageService.editMessageText(chatId, messageId, eventMessage, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "");
+            messageService.safeEditMessageAndAnswer(chatId, messageId, eventMessage, keyboard, callbackQueryId, "");
 
         } catch (Exception e) {
             log.error("Ошибка при просмотре события: userId={}, error={}", user.getId(), e.getMessage());
@@ -90,11 +89,11 @@ public class EventViewService {
         try {
             if (!conversationService.hasActiveDraft(user.getId())) {
                 conversationService.startEventCreation(user.getId());
-                }
+            }
             
             showTimeSelectionForDate(selectedDate, user, chatId, messageId, callbackQueryId);
             
-            } catch (Exception e) {
+        } catch (Exception e) {
             log.error("Ошибка при создании события на дату: userId={}, error={}", user.getId(), e.getMessage());
             throw new RuntimeException("Ошибка при создании события на дату", e);
         }
@@ -124,8 +123,7 @@ public class EventViewService {
             InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(selectedDate, user);
             String message = botMessageFormattingService.buildSelectTimeMessage(selectedDate);
             
-            messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "Дата выбрана");
+            messageService.safeEditMessageAndAnswer(chatId, messageId, message, keyboard, callbackQueryId, "Дата выбрана");
 
         } catch (Exception e) {
             log.error("Ошибка при показе выбора времени: userId={}, date={}, error={}", 
@@ -250,13 +248,10 @@ public class EventViewService {
         String message = botMessageFormattingService.buildRepeatEventSelectDateMessage(originalEvent);
         
         try {
-            messageService.editMessageText(chatId, messageId, message, keyboard);
-            messageService.answerCallbackQuery(callbackQueryId, "Данные скопированы. Выберите новую дату");
+            messageService.safeEditMessageAndAnswer(chatId, messageId, message, keyboard, callbackQueryId, "Данные скопированы. Выберите новую дату");
             
-            } catch (TelegramApiException e) {
-            log.error("Ошибка при показе выбора даты для повторения: userId={}, error={}", 
-                     user.getId(), e.getMessage());
-
+        } catch (TelegramApiException e) {
+            log.error("Ошибка при показе выбора даты для повторения: userId={}, error={}", user.getId(), e.getMessage());
             throw new RuntimeException("Ошибка при показе выбора даты", e);
         }
     }

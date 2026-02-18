@@ -41,8 +41,6 @@ public class SearchQueryMessageHandler {
             String query = message.getText();
             Long chatId = message.getChatId();
             Integer messageId = message.getMessageId();
-            Long userId = user.getId();
-            Long telegramId = user.getTelegramId();
             
             searchCommandHandler.performSearch(chatId, user, query, messageId);
             

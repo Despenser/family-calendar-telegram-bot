@@ -34,7 +34,7 @@ public class TrashMessageService {
             Long chatId = event.getUser().getTelegramId();
             messageService.deleteMessageSilently(chatId, event.getMessageId().intValue());
 
-            } catch (Exception e) {
+        } catch (Exception e) {
             log.warn("Не удалось удалить сообщение события ID={}, messageId={}: {}. Продолжаем операцию.", 
                     event.getId(), event.getMessageId(), e.getMessage());
         }

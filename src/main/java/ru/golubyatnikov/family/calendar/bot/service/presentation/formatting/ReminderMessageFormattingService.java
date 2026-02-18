@@ -8,6 +8,8 @@ import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Reminder;
 import ru.golubyatnikov.family.calendar.bot.model.enums.ReminderType;
 import ru.golubyatnikov.family.calendar.bot.service.domain.reminder.ReminderConfigurationService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
+
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
@@ -25,8 +27,6 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.format
 @Slf4j
 @RequiredArgsConstructor
 public class ReminderMessageFormattingService {
-    
-    private static final ZoneId UTC = ZoneId.of("UTC");
     
     private final ReminderConfigurationService reminderConfigurationService;
     private final DateTimeFormattingService dateTimeFormattingService;
@@ -150,11 +150,11 @@ public class ReminderMessageFormattingService {
         log.error("Ошибка форматирования напоминания ID {} в timezone {}: {}", 
                  reminder.getId(), timezone, e.getMessage(), e);
         
-        if (UTC.equals(timezone)) {
+        if (dateTimeFormattingService.getUtc().equals(timezone)) {
             return "🔔 " + bold("Напоминание о событии - " + reminder.getEvent().getTitle());
         }
         
-        return builder.build(reminder, UTC);
+        return builder.build(reminder, dateTimeFormattingService.getUtc());
     }
     
     @FunctionalInterface

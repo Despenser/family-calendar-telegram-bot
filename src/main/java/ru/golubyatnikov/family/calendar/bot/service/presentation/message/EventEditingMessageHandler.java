@@ -20,7 +20,6 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotM
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 
 /**
- * TODO сделать рефакторинг класса
  * Обработчик редактирования полей события.
  *
  * @author Golubyatnikov Aleksey
@@ -69,25 +68,30 @@ public class EventEditingMessageHandler {
             switch (field) {
                 case TITLE -> handleTitleEdit(userId, chatId, userMessageId, text, eventId, editingMessageId);
                 case DESCRIPTION -> handleDescriptionEdit(userId, chatId, userMessageId, text, eventId, editingMessageId);
-                case TIME, DATE -> handleNonTextEdit(userId, chatId, userMessageId, eventId, editingMessageId, field);
+                case TIME, DATE -> handleNonTextEdit(userId, chatId, userMessageId, eventId, editingMessageId);
                 default -> log.warn("Неподдерживаемое поле для текстового ввода: {}", field);
             }
+
         } catch (UnauthorizedAccessException e) {
-            handleUnauthorizedError(userId, chatId, eventId, e);
+            handleUnauthorizedError(userId, chatId);
 
         } catch (EventNotFoundException e) {
-            handleEventNotFoundError(userId, chatId, eventId, e);
+            handleEventNotFoundError(userId, chatId);
 
         } catch (Exception e) {
-            handleGeneralError(userId, chatId, eventId, field, e);
+            handleGeneralError(userId, chatId, field);
         }
     }
 
     /**
      * Обрабатывает редактирование названия события.
      */
-    private void handleTitleEdit(Long userId, Long chatId, Integer userMessageId, String text, 
-                                 Long eventId, Integer editingMessageId) {
+    private void handleTitleEdit(Long userId,
+                                 Long chatId,
+                                 Integer userMessageId,
+                                 String text,
+                                 Long eventId,
+                                 Integer editingMessageId) {
 
         Event updatedEvent = eventService.updateEventTitle(eventId, userId, text);
         updateEventMessage(userId, chatId, userMessageId, updatedEvent, editingMessageId);
@@ -97,8 +101,12 @@ public class EventEditingMessageHandler {
     /**
      * Обрабатывает редактирование описания события.
      */
-    private void handleDescriptionEdit(Long userId, Long chatId, Integer userMessageId, String text, 
-                                       Long eventId, Integer editingMessageId) {
+    private void handleDescriptionEdit(Long userId,
+                                       Long chatId,
+                                       Integer userMessageId,
+                                       String text,
+                                       Long eventId,
+                                       Integer editingMessageId) {
 
         Event updatedEvent = eventService.updateEventDescription(eventId, userId, text);
         updateEventMessage(userId, chatId, userMessageId, updatedEvent, editingMessageId);
@@ -109,41 +117,66 @@ public class EventEditingMessageHandler {
     /**
      * Обрабатывает попытку текстового ввода для полей, редактируемых через inline-кнопки.
      */
-    private void handleNonTextEdit(Long userId, Long chatId, Integer userMessageId, 
-                                   Long eventId, Integer editingMessageId, 
-                                   EditField field) {
+    private void handleNonTextEdit(Long userId,
+                                   Long chatId,
+                                   Integer userMessageId,
+                                   Long eventId,
+                                   Integer editingMessageId) {
 
         messageService.deleteMessageSilently(chatId, userMessageId);
         conversationStateService.clearEventEditing(userId);
         
         try {
             Event event = eventService.getEventById(eventId);
-            
-            if (editingMessageId != null) {
-                int eventCount = eventService.getActiveEventsCount(event.getUser().getId());
-                String eventMessage = botMessageFormattingService.buildEventMessageWithHeader(event, eventCount);
-                InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
-                
-                try {
-                    messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
-                    } catch (TelegramApiException e) {
-                    log.warn("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
-                            eventId, editingMessageId, e.getMessage());
+            restoreEventCard(userId, chatId, event, eventId, editingMessageId);
 
-                    eventService.sendOrUpdateEventMessage(event, chatId);
-                }
-            } else {
-                eventService.sendOrUpdateEventMessage(event, chatId);
-            }
         } catch (Exception e) {
             log.error("Ошибка при восстановлении карточки события: eventId={}, error={}", eventId, e.getMessage());
         }
     }
 
     /**
+     * Восстанавливает карточку события.
+     */
+    private void restoreEventCard(Long userId, Long chatId, Event event, Long eventId, Integer editingMessageId) {
+        if (editingMessageId != null) {
+            int eventCount = eventService.getActiveEventsCount(event.getUser().getId());
+            String eventMessage = botMessageFormattingService.buildEventMessageWithHeader(event, eventCount);
+            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
+            
+            try {
+                messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
+
+            } catch (TelegramApiException e) {
+                log.warn("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
+                        eventId, editingMessageId, e.getMessage());
+
+                sendOrUpdateEventMessage(event, chatId);
+            }
+        } else {
+            sendOrUpdateEventMessage(event, chatId);
+        }
+    }
+
+    /**
+     * Отправляет или обновляет сообщение о событии.
+     */
+    private void sendOrUpdateEventMessage(Event event, Long chatId) {
+        try {
+            eventService.sendOrUpdateEventMessage(event, chatId);
+
+        } catch (Exception e) {
+            log.error("Ошибка при отправке сообщения о событии: eventId={}, error={}", 
+                    event.getId(), e.getMessage());
+        }
+    }
+
+    /**
      * Обновляет сообщение о событии после редактирования.
      */
-    private void updateEventMessage(Long userId, Long chatId, Integer userMessageId, 
+    private void updateEventMessage(Long userId,
+                                    Long chatId,
+                                    Integer userMessageId,
                                     Event updatedEvent,
                                     Integer editingMessageId) {
 
@@ -154,73 +187,60 @@ public class EventEditingMessageHandler {
                 InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(updatedEvent, userId);
                 messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
                 
-                } catch (TelegramApiException e) {
+            } catch (TelegramApiException e) {
                 log.error("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
                         updatedEvent.getId(), editingMessageId, e.getMessage());
             }
             
             messageService.deleteMessageSilently(chatId, userMessageId);
-            }
+        }
     }
 
     /**
      * Обрабатывает ошибку отсутствия прав.
      */
-    private void handleUnauthorizedError(Long userId, Long chatId, Long eventId, 
-                                        @NonNull UnauthorizedAccessException e) {
-
-        log.error("Нет прав для редактирования события: userId={}, eventId={}, error={}", 
-                userId, eventId, e.getMessage());
-        
-        try {
-            String errorMessage = "❌ У вас нет прав для редактирования этого события.";
-            messageService.sendMessage(chatId, errorMessage);
-
-        } catch (TelegramApiException ex) {
-            log.error("Не удалось отправить сообщение об ошибке: {}", ex.getMessage());
-        }
-        
-        conversationStateService.clearEventEditing(userId);
+    private void handleUnauthorizedError(Long userId, Long chatId) {
+        String errorMessage = "❌ У вас нет прав для редактирования этого события.";
+        sendErrorMessageAndClearState(userId, chatId, errorMessage);
     }
 
     /**
      * Обрабатывает ошибку отсутствия события.
      */
-    private void handleEventNotFoundError(Long userId, Long chatId, Long eventId, 
-                                         @NonNull EventNotFoundException e) {
-        log.error("Событие не найдено при редактировании: userId={}, eventId={}, error={}", 
-                userId, eventId, e.getMessage());
-        
+    private void handleEventNotFoundError(Long userId, Long chatId) {
+        String errorMessage = "❌ Событие не найдено. Возможно, оно было удалено.";
+        sendErrorMessageAndClearState(userId, chatId, errorMessage);
+    }
+
+    /**
+     * Обрабатывает общую ошибку.
+     */
+    private void handleGeneralError(Long userId, Long chatId, EditField field) {
+        String errorMessage = "❌ Произошла ошибка при обновлении " + 
+                            (field == EditField.TITLE ? "названия" : "описания") + 
+                            " события. Попробуйте еще раз.";
+
+        sendErrorMessageAndClearState(userId, chatId, errorMessage);
+    }
+
+    /**
+     * Отправляет сообщение об ошибке и очищает состояние редактирования.
+     */
+    private void sendErrorMessageAndClearState(Long userId, Long chatId, String errorMessage) {
         try {
-            String errorMessage = "❌ Событие не найдено. Возможно, оно было удалено.";
             messageService.sendMessage(chatId, errorMessage);
 
         } catch (TelegramApiException ex) {
-            log.error("Не удалось отправить сообщение об ошибке: {}", ex.getMessage());
+            logErrorMessageSendFailure(ex);
         }
         
         conversationStateService.clearEventEditing(userId);
     }
 
     /**
-     * Обрабатывает общую ошибку.
+     * Логирует ошибку при отправке сообщения об ошибке.
      */
-    private void handleGeneralError(Long userId, Long chatId, Long eventId, 
-                                   EditField field, Exception e) {
-
-        log.error("Ошибка при обновлении поля события: userId={}, eventId={}, field={}, error={}", 
-                userId, eventId, field, e.getMessage(), e);
-        
-        try {
-            String errorMessage = "❌ Произошла ошибка при обновлении " + 
-                                (field == EditField.TITLE ? "названия" : "описания") + 
-                                " события. Попробуйте еще раз.";
-            messageService.sendMessage(chatId, errorMessage);
-
-        } catch (TelegramApiException ex) {
-            log.error("Не удалось отправить сообщение об ошибке: {}", ex.getMessage());
-        }
-        
-        conversationStateService.clearEventEditing(userId);
+    private void logErrorMessageSendFailure(@NonNull TelegramApiException ex) {
+        log.error("Не удалось отправить сообщение об ошибке: {}", ex.getMessage());
     }
 }

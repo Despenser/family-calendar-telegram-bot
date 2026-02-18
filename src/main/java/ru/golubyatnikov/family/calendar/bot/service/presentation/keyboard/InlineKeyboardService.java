@@ -9,7 +9,6 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import ru.golubyatnikov.family.calendar.bot.model.entity.Attachment;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +27,6 @@ public class InlineKeyboardService {
     private final EventInlineKeyboardFactory eventFactory;
     private final AttachmentInlineKeyboardFactory attachmentFactory;
     private final NavigationInlineKeyboardFactory navigationFactory;
-    private final DateTimeFormattingService dateTimeFormattingService;
     private final KeyboardFactory keyboardFactory;
 
     /**
@@ -207,23 +205,13 @@ public class InlineKeyboardService {
     public InlineKeyboardMarkup createDateEventsListKeyboard(@NonNull LocalDate date,
                                                              @NonNull List<Event> events) {
 
-        List<InlineKeyboardRow> rows = new ArrayList<>();
-        
-        // Кнопки с событиями
-        events.forEach(event -> {
-            String buttonText = String.format("%s - %s",
-                    dateTimeFormattingService.formatTime(event.getEventTime()),
-                    event.getTitle());
-            rows.add(keyboardFactory.createRow(
-                keyboardFactory.createButton(buttonText, "view_event_" + event.getId())
-            ));
-        });
-        
-        // Кнопка "Назад" - возвращаемся к экрану выбора действий с датой
+        List<InlineKeyboardRow> rows = keyboardFactory.createEventButtonRows(events, 
+                event -> "view_event_" + event.getId());
+
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", "calendar_" + date)
+                keyboardFactory.createButton("🔙 Назад", "calendar_" + date)
         ));
-        
+
         return keyboardFactory.createMarkup(rows);
     }
     
@@ -288,28 +276,18 @@ public class InlineKeyboardService {
     }
     
     /**
-     * TODO есть дублирование нужен рефакторинг
      * Создает клавиатуру для выбора события пользователя для редактирования.
      */
     public InlineKeyboardMarkup createMyEventsEditKeyboard(@NonNull LocalDate selectedDate,
                                                            @NonNull List<Event> myEvents) {
 
-        List<InlineKeyboardRow> rows = new ArrayList<>();
+        List<InlineKeyboardRow> rows = keyboardFactory.createEventButtonRows(myEvents,
+                event -> "edit_event_from_calendar_" + event.getId() + "_" + selectedDate);
 
-        myEvents.forEach(event -> {
-            String buttonText = String.format("%s - %s",
-                    dateTimeFormattingService.formatTime(event.getEventTime()),
-                    event.getTitle());
-            rows.add(keyboardFactory.createRow(
-                    keyboardFactory.createButton(buttonText, "edit_event_from_calendar_"
-                            + event.getId() + "_" + selectedDate.toString())
-            ));
-        });
-        
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", "calendar_" + selectedDate.toString())
+            keyboardFactory.createButton("🔙 Назад", "calendar_" + selectedDate)
         ));
-        
+
         return keyboardFactory.createMarkup(rows);
     }
     
@@ -319,21 +297,13 @@ public class InlineKeyboardService {
     public InlineKeyboardMarkup createMyEventsDeleteKeyboard(@NonNull LocalDate selectedDate,
                                                              @NonNull List<Event> myEvents) {
 
-        List<InlineKeyboardRow> rows = new ArrayList<>();
+        List<InlineKeyboardRow> rows = keyboardFactory.createEventButtonRows(myEvents,
+                event -> "delete_event_" + event.getId());
 
-        myEvents.forEach(event -> {
-            String buttonText = String.format("%s - %s",
-                    dateTimeFormattingService.formatTime(event.getEventTime()),
-                    event.getTitle());
-            rows.add(keyboardFactory.createRow(
-                    keyboardFactory.createButton(buttonText, "delete_event_" + event.getId())
-            ));
-        });
-        
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", "calendar_" + selectedDate.toString())
+            keyboardFactory.createButton("🔙 Назад", "calendar_" + selectedDate)
         ));
-        
+
         return keyboardFactory.createMarkup(rows);
     }
 }

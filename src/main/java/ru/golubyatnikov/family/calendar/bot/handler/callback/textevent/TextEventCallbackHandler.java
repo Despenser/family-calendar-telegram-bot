@@ -18,6 +18,7 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.Keyboa
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 import java.time.LocalDate;
@@ -43,6 +44,7 @@ public class TextEventCallbackHandler implements CallbackHandler {
     private final BotMessageFormattingService botMessageFormattingService;
     private final KeyboardService keyboardService;
     private final CallbackDataExtractionService callbackDataExtractionService;
+    private final DateTimeFormattingService dateTimeFormattingService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -150,33 +152,32 @@ public class TextEventCallbackHandler implements CallbackHandler {
                 try {
                     String eventMessage = botMessageFormattingService.buildEventCreatedMessage(createdEvent);
                     InlineKeyboardMarkup eventKeyboard = keyboardService.createEventActionsKeyboard(createdEvent.getId());
-                    messageService.editMessageText(context.chatId(), context.messageId(), eventMessage, eventKeyboard);
-
-                    messageService.answerCallbackQuery(context.callbackQueryId(), CallbackMessages.CREATED);
+                    messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(), eventMessage, eventKeyboard, context.callbackQueryId(), CallbackMessages.CREATED);
 
                 } catch (TelegramApiException e) {
                     log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
                             createdEvent.getId(), e.getMessage());
 
                     String response = formatMessage(
-                        "✅ *Событие успешно создано!*\n\n" +
-                        "📅 Дата: %s\n" +
-                        "🕐 Время: %s\n" +
-                        "📝 Название: %s",
-                        createdEvent.getFormattedDate(),
-                        createdEvent.getFormattedTime(),
+                            """
+                                    ✅ *Событие успешно создано!*
+                                    
+                                    📅 Дата: %s
+                                    🕐 Время: %s
+                                    📝 Название: %s""",
+                        dateTimeFormattingService.formatDate(createdEvent.getEventDate()),
+                        dateTimeFormattingService.formatTime(createdEvent.getEventTime()),
                         createdEvent.getTitle()
                     );
-                    messageService.editMessageText(context.chatId(), context.messageId(), response, null);
-                    messageService.answerCallbackQuery(context.callbackQueryId(), CallbackMessages.CREATED);
+                    messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(),
+                            response, null, context.callbackQueryId(), CallbackMessages.CREATED);
                 }
             } else {
                 String response = "❌ " + bold("Произошла ошибка при создании события") + "\\.\n\n" +
                                 italic("Попробуйте использовать команду /add_event для пошагового создания.") + "\n\n" +
                                 "Детали ошибки: " + escape(errorMessage);
                 
-                messageService.editMessageText(context.chatId(), context.messageId(), response, null);
-                messageService.answerCallbackQuery(context.callbackQueryId(), CallbackMessages.ERROR);
+                messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(), response, null, context.callbackQueryId(), CallbackMessages.ERROR);
             }
         } catch (Exception ex) {
             log.error("Ошибка при отправке сообщения через Telegram API: chatId={}, error={}", 
@@ -190,8 +191,7 @@ public class TextEventCallbackHandler implements CallbackHandler {
     private void handleCancelTextEvent(@NonNull CallbackQueryContext context) {
         String message = botMessageFormattingService.buildEventCancelledMessage();
         try {
-            messageService.editMessageText(context.chatId(), context.messageId(), message, null);
-            messageService.answerCallbackQuery(context.callbackQueryId(), CallbackMessages.CANCELLED);
+            messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(), message, null, context.callbackQueryId(), CallbackMessages.CANCELLED);
 
         } catch (TelegramApiException e) {
             log.error("Ошибка при отмене создания события из текста: chatId={}, error={}", 

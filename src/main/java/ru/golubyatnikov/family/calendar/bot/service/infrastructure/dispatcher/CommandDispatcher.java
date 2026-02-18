@@ -8,6 +8,7 @@ import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessExceptio
 import ru.golubyatnikov.family.calendar.bot.handler.command.CommandHandler;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.service.domain.user.UserService;
+import ru.golubyatnikov.family.calendar.bot.util.CommandUtil;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +17,6 @@ import java.util.Optional;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
 
 /**
- * TODO возможно требуется рефакторинг, сложные методы
  * Сервис для маршрутизации команд к соответствующим обработчикам.
  *
  * @author Golubyatnikov Aleksey
@@ -41,16 +41,7 @@ public class CommandDispatcher {
         this.userService = userService;
         this.commandHandlers = new HashMap<>();
 
-        handlers.forEach(handler -> {
-            String command = handler.getCommand();
-            if (commandHandlers.containsKey(command)) {
-                log.warn("Обнаружен дубликат обработчика для команды '{}'. " + "Предыдущий обработчик будет заменен: {} -> {}",
-                        command,
-                        commandHandlers.get(command).getClass().getSimpleName(),
-                        handler.getClass().getSimpleName());
-            }
-            commandHandlers.put(command, handler);
-        });
+        handlers.forEach(handler -> commandHandlers.put(handler.getCommand(), handler));
     }
 
     /**
@@ -69,9 +60,6 @@ public class CommandDispatcher {
         }
         
         if (!message.hasText()) {
-            log.warn("Получено сообщение без текста от пользователя: telegramId={}, chatId={}", 
-                    message.getFrom().getId(), message.getChatId());
-
             return formatMessage("Пожалуйста, отправьте текстовую команду. " +
                     "Используйте 📚 /help для списка доступных команд.");
         }
@@ -80,7 +68,7 @@ public class CommandDispatcher {
         Long telegramId = message.getFrom().getId();
         
         // Извлекаем команду (первое слово, начинающееся с /)
-        String command = extractCommand(messageText);
+        String command = CommandUtil.extractCommand(messageText);
         
         if (command == null) {
             return formatMessage("Команда должна начинаться с символа '/'. " +
@@ -104,11 +92,7 @@ public class CommandDispatcher {
         // Проверяем требование авторизации
         if (handler.requiresAuth()) {
             if (user == null) {
-                log.warn("Неавторизованная попытка выполнить команду '{}': telegramId={}", 
-                        command, telegramId);
-                throw new UnauthorizedAccessException(
-                        formatMessage("Команда %s требует авторизации. " +
-                                "Пожалуйста, используйте 🚀 /start для регистрации.", command));
+                throw new UnauthorizedAccessException(String.format("Команда %s требует авторизации", command));
             }
             
         }
@@ -120,35 +104,11 @@ public class CommandDispatcher {
         } catch (Exception e) {
             log.error("Ошибка при обработке команды '{}': telegramId={}, handler={}, error={}", 
                     command, telegramId, handler.getClass().getSimpleName(), e.getMessage(), e);
+
             throw e;
         }
     }
 
-    /**
-     * //TODO код дублируется в UpdateProcessor
-     * Извлекает команду из текста сообщения.
-     *
-     * @param text текст сообщения
-     * @return команда (включая символ '/') или null, если команда не найдена
-     */
-    private String extractCommand(String text) {
-        if (text == null || text.isEmpty()) {
-            return null;
-        }
-        
-        String trimmed = text.trim();
-        if (!trimmed.startsWith("/")) {
-            return null;
-        }
-        
-        // Находим первый пробел или берем всю строку
-        int spaceIndex = trimmed.indexOf(' ');
-        if (spaceIndex > 0) {
-            return trimmed.substring(0, spaceIndex).toLowerCase();
-        }
-        
-        return trimmed.toLowerCase();
-    }
     /**
      * Проверяет, зарегистрирован ли обработчик для указанной команды.
      *

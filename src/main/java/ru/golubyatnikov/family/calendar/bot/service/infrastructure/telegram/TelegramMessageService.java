@@ -7,7 +7,9 @@ import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.dispatcher.TelegramApiService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.MessageFormatter;
 
 /**
  * Фасад для отправки сообщений через Telegram Bot API.
@@ -22,10 +24,11 @@ public class TelegramMessageService {
 
     private final MessageSender messageSender;
     private final TelegramApiService telegramApiService;
+    private final MessageFormatter messageFormatter;
 
     /**
      * Отправляет текстовое сообщение пользователю.
-     * 
+     *
      * @param telegramId Telegram ID пользователя-получателя
      * @param text текст сообщения (поддерживает MarkdownV2)
      *
@@ -37,7 +40,7 @@ public class TelegramMessageService {
 
     /**
      * Отправляет текстовое сообщение с inline клавиатурой.
-     * 
+     *
      * @param telegramId Telegram ID пользователя
      * @param text текст сообщения
      * @param replyMarkup inline клавиатура
@@ -53,7 +56,7 @@ public class TelegramMessageService {
 
     /**
      * Отправляет текстовое сообщение с reply клавиатурой.
-     * 
+     *
      * @param telegramId Telegram ID пользователя
      * @param text текст сообщения
      * @param keyboard reply клавиатура
@@ -69,7 +72,7 @@ public class TelegramMessageService {
 
     /**
      * Отправляет сообщение и возвращает объект Message.
-     * 
+     *
      * @param chatId Telegram ID пользователя
      * @param text текст сообщения
      *
@@ -82,7 +85,7 @@ public class TelegramMessageService {
 
     /**
      * Отправляет сообщение с inline клавиатурой и возвращает объект Message.
-     * 
+     *
      * @param telegramId Telegram ID пользователя
      * @param text текст сообщения
      * @param replyMarkup inline клавиатура
@@ -99,7 +102,7 @@ public class TelegramMessageService {
 
     /**
      * Отправляет сообщение с inline клавиатурой.
-     * 
+     *
      * @param chatId ID чата
      * @param text текст сообщения
      * @param keyboard inline клавиатура
@@ -115,7 +118,7 @@ public class TelegramMessageService {
 
     /**
      * Отправляет сообщение с inline клавиатурой и возвращает объект Message.
-     * 
+     *
      * @param chatId Telegram ID пользователя
      * @param text текст сообщения
      * @param keyboard inline клавиатура
@@ -132,7 +135,7 @@ public class TelegramMessageService {
 
     /**
      * Отправляет сообщение без форматирования и возвращает объект Message.
-     * 
+     *
      * @param chatId ID чата
      * @param text текст сообщения
      * @param keyboard inline клавиатура
@@ -149,7 +152,7 @@ public class TelegramMessageService {
 
     /**
      * Редактирует текст существующего сообщения.
-     * 
+     *
      * @param chatId ID чата
      * @param messageId ID сообщения для редактирования
      * @param newText новый текст сообщения
@@ -167,7 +170,7 @@ public class TelegramMessageService {
 
     /**
      * Пытается отредактировать сообщение с обработкой ошибок удаленных сообщений.
-     * 
+     *
      * @param chatId ID чата
      * @param messageId ID сообщения
      * @param newText новый текст
@@ -185,8 +188,47 @@ public class TelegramMessageService {
     }
 
     /**
+     * Безопасно обновляет сообщение и отвечает на callback query.
+     * Обрабатывает ошибку "message is not modified", когда содержимое сообщения не изменилось.
+     *
+     * @param chatId ID чата
+     * @param messageId ID сообщения для редактирования
+     * @param text новый текст сообщения
+     * @param keyboard новая inline клавиатура (может быть null)
+     * @param callbackQueryId ID callback query для ответа
+     * @param callbackText текст для отображения в callback query
+     *
+     * @throws TelegramApiException если произошла ошибка, отличная от "message is not modified"
+     */
+    public void safeEditMessageAndAnswer(Long chatId,
+                                         Integer messageId,
+                                         String text,
+                                         InlineKeyboardMarkup keyboard,
+                                         String callbackQueryId,
+                                         String callbackText) throws TelegramApiException {
+        try {
+            editMessageText(chatId, messageId, text, keyboard);
+            answerCallbackQuery(callbackQueryId, callbackText);
+
+        } catch (TelegramApiException e) {
+            if (e instanceof TelegramApiRequestException requestException
+                && messageFormatter.isMessageNotModifiedError(requestException)) {
+
+                try {
+                    answerCallbackQuery(callbackQueryId, callbackText);
+
+                } catch (TelegramApiException ex) {
+                    log.warn("Не удалось ответить на callback query: {}", ex.getMessage());
+                }
+            } else {
+                throw new RuntimeException("Ошибка при обновлении сообщения", e);
+            }
+        }
+    }
+
+    /**
      * Отправляет ответ на callback query от inline кнопки.
-     * 
+     *
      * @param callbackQueryId ID callback query для ответа
      * @param text текст для отображения пользователю
      *
@@ -198,7 +240,7 @@ public class TelegramMessageService {
 
     /**
      * Отправляет файл с клавиатурой и возвращает отправленное сообщение.
-     * 
+     *
      * @param chatId идентификатор чата
      * @param fileId Telegram file_id файла
      * @param fileType тип файла
@@ -219,7 +261,7 @@ public class TelegramMessageService {
 
     /**
      * Удаляет сообщение и возвращает результат операции.
-     * 
+     *
      * @param chatId ID чата
      * @param messageId ID сообщения для удаления
      *
@@ -232,7 +274,7 @@ public class TelegramMessageService {
 
     /**
      * Удаляет сообщение без выброса исключений (silent mode).
-     * 
+     *
      * @param chatId ID чата
      * @param messageId ID сообщения для удаления
      */

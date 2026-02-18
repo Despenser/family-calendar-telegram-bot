@@ -9,7 +9,6 @@ import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -207,23 +206,7 @@ public class Event {
         return LocalDateTime.of(eventDate, eventTime);
     }
 
-    /**
-     * Форматирует дату события в читаемый формат.
-     * 
-     * @return дата в формате "dd.MM.yyyy", или null если дата не заполнена
-     */
-    public String getFormattedDate() {
-        return eventDate != null ? eventDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")) : null;
-    }
 
-    /**
-     * Форматирует время события в читаемый формат.
-     * 
-     * @return время в формате "HH:mm", или null если время не заполнено
-     */
-    public String getFormattedTime() {
-        return eventTime != null ? eventTime.format(DateTimeFormatter.ofPattern("HH:mm")) : null;
-    }
 
     /**
      * Проверяет, находится ли событие в прошлом.

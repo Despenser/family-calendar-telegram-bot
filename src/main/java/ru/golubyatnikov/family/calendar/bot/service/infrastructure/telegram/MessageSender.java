@@ -17,7 +17,6 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ru.golubyatnikov.family.calendar.bot.util.TelegramExceptionUtil;
 
 /**
- * TODO нужен рефакторинг много дублирующихся методов
  * Сервис для базовой отправки сообщений через Telegram Bot API.
  *
  * @author Golubyatnikov Aleksey

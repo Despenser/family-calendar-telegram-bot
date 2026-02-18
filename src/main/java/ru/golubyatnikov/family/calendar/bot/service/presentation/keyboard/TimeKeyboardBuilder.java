@@ -148,16 +148,16 @@ public class TimeKeyboardBuilder {
 
     private void validateHour(int hour) {
         if (hour < 0 || hour > 23) {
-            throw new IllegalArgumentException("Hour must be between 0 and 23");
+            throw new IllegalArgumentException("Переданные часы должны быть в диапазоне от 0 до 23");
         }
     }
 
     private void validateParameters(LocalDate date, User user) {
         if (date == null) {
-            throw new IllegalArgumentException("Selected date cannot be null");
+            throw new IllegalArgumentException("Выбранная дата не должна быть null");
         }
         if (user == null) {
-            throw new IllegalArgumentException("User cannot be null");
+            throw new IllegalArgumentException("Пользователь не должен быть null");
         }
     }
 }
