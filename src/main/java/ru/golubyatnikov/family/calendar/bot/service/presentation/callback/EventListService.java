@@ -38,10 +38,17 @@ public class EventListService {
      * 
      * @param selectedDate выбранная дата для просмотра событий
      * @param user пользователь, запросивший список событий
+     * @param chatId идентификатор чата Telegram
+     * @param messageId идентификатор сообщения для редактирования
+     * @param callbackQueryId идентификатор callback query для ответа
      *
      * @throws RuntimeException если произошла ошибка при просмотре событий на дату
      */
-    public void viewEventsOnDate(LocalDate selectedDate, User user) {
+    public void viewEventsOnDate(LocalDate selectedDate,
+                                 User user,
+                                 Long chatId,
+                                 Integer messageId,
+                                 String callbackQueryId) {
 
         try {
             LocalDate today = user.getCurrentDate();
@@ -53,8 +60,10 @@ public class EventListService {
             
             events = filterPersonalEvents(events, user.getId());
             
-            botMessageFormattingService.buildDateEventsListMessage(selectedDate, events);
-            keyboardService.createDateEventsListKeyboard(selectedDate, events);
+            String message = botMessageFormattingService.buildDateEventsListMessage(selectedDate, events);
+            InlineKeyboardMarkup keyboard = keyboardService.createDateEventsListKeyboard(selectedDate, events);
+            
+            messageService.safeEditMessageAndAnswer(chatId, messageId, message, keyboard, callbackQueryId, "");
 
         } catch (Exception e) {
             log.error("Ошибка при просмотре событий на дату: userId={}, error={}", user.getId(), e.getMessage());
