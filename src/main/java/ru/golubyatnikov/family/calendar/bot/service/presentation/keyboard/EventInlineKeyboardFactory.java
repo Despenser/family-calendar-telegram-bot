@@ -237,13 +237,7 @@ public class EventInlineKeyboardFactory {
             isFromCalendar = context != null && context.getSourceDate() != null;
         }
 
-        InlineKeyboardButton cancelBtn;
-        
-        if (isFromCalendar) {
-            cancelBtn = keyboardFactory.createButton("🔙 Назад", "edit_cancel_" + eventId);
-            } else {
-            cancelBtn = keyboardFactory.createButton("❌ Отмена", "edit_cancel_" + eventId);
-            }
+        InlineKeyboardButton cancelBtn = keyboardFactory.createButton("🔙 Назад", "edit_cancel_" + eventId);
 
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
