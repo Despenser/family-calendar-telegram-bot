@@ -4,13 +4,14 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.lang.NonNull;
+
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -44,11 +45,6 @@ public class CacheConfig {
     private int expireAfterAccessMinutes = 30;
 
     /**
-     * Включить статистику кэша для мониторинга
-     */
-    private boolean recordStats = true;
-
-    /**
      * Список имен кэшей для создания
      */
     private List<String> names = List.of("upcomingEvents", "userEvents");
@@ -60,8 +56,8 @@ public class CacheConfig {
      */
     @Bean
     public CacheManager cacheManager() {
-        log.info("Настройки кэша: maximumSize={}, expireAfterWrite={}min, expireAfterAccess={}min, recordStats={}", 
-                maximumSize, expireAfterWriteMinutes, expireAfterAccessMinutes, recordStats);
+        log.info("Настройки кэша: maximumSize={}, expireAfterWrite={}min, expireAfterAccess={}min",
+                maximumSize, expireAfterWriteMinutes, expireAfterAccessMinutes);
 
         log.info("Создаваемые кэши: {}", names);
 
@@ -77,16 +73,11 @@ public class CacheConfig {
      *
      * @return настроенный Caffeine builder
      */
-    private @NonNull Caffeine<?, ?> caffeineCacheBuilder() {
-        Caffeine<Object, Object> builder = Caffeine.newBuilder()
+    private @NotNull Caffeine<@NotNull Object, @NotNull Object> caffeineCacheBuilder() {
+        return Caffeine.newBuilder()
                 .maximumSize(maximumSize)
                 .expireAfterWrite(expireAfterWriteMinutes, TimeUnit.MINUTES)
-                .expireAfterAccess(expireAfterAccessMinutes, TimeUnit.MINUTES);
-
-        if (recordStats) {
-            builder.recordStats();
-        }
-
-        return builder;
+                .expireAfterAccess(expireAfterAccessMinutes, TimeUnit.MINUTES)
+                .recordStats();
     }
 }

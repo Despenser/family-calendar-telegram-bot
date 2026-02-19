@@ -269,8 +269,6 @@ app:
     expire-after-write-minutes: 60
     # Время жизни записи после последнего доступа (в минутах)
     expire-after-access-minutes: 30
-    # Включить статистику кэша для мониторинга
-    record-stats: true
     # Список имен кэшей
     names:
       - upcomingEvents  # Кэш предстоящих событий семьи (ключ: familyId_days_zoneId)
