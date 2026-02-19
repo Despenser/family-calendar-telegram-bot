@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Configuration;
 public class FileConfig {
 
     /**
-     * Максимальный размер файла в байтах (по умолчанию: 20 МБ)
+     * Максимальный размер файла в байтах
      */
     private long maxSizeBytes = 20 * 1024 * 1024;
 }

@@ -1,4 +1,4 @@
-package ru.golubyatnikov.family.calendar.bot.model.context;
+package ru.golubyatnikov.family.calendar.bot.model.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

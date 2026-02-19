@@ -11,7 +11,6 @@ import java.util.Map;
 
 /**
  * Конфигурация сообщений для неавторизованных пользователей.
- * Загружается из application.yml с префиксом app.bot-messages.unauthorized
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-02-18

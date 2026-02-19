@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Configuration;
 public class HttpHeadersConfig {
 
     /**
-     * Имя заголовка для correlation ID (по умолчанию: X-Correlation-ID)
+     * Имя заголовка для correlation ID
      */
     private String correlationIdHeader = "X-Correlation-ID";
 

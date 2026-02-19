@@ -18,17 +18,17 @@ import org.springframework.context.annotation.Configuration;
 public class SchedulerConfig {
 
     /**
-     * Cron выражение для очистки корзины (по умолчанию: каждый день в 2:00)
+     * Cron выражение для очистки корзины
      */
     private String trashCleanupCron = "0 0 2 * * ?";
 
     /**
-     * Интервал проверки напоминаний в миллисекундах (по умолчанию: 60000 = 1 минута)
+     * Интервал проверки напоминаний в миллисекундах
      */
     private long reminderCheckInterval = 60000;
 
     /**
-     * Интервал завершения событий в миллисекундах (по умолчанию: 600000 = 10 минут)
+     * Интервал завершения событий в миллисекундах
      */
     private long eventCompletionInterval = 600000;
 }

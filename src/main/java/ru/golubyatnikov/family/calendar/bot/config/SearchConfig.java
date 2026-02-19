@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Configuration;
 public class SearchConfig {
 
     /**
-     * Минимальная длина поискового запроса (по умолчанию: 2)
+     * Минимальная длина поискового запроса
      */
     private int minQueryLength = 2;
 }

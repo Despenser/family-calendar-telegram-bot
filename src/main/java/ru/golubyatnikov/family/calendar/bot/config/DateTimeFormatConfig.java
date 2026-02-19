@@ -18,52 +18,52 @@ import org.springframework.context.annotation.Configuration;
 public class DateTimeFormatConfig {
 
     /**
-     * Формат даты (по умолчанию: dd.MM.yyyy)
+     * Формат даты
      */
     private String datePattern = "dd.MM.yyyy";
 
     /**
-     * Формат времени (по умолчанию: HH:mm)
+     * Формат времени
      */
     private String timePattern = "HH:mm";
 
     /**
-     * Формат даты и времени (по умолчанию: dd.MM.yyyy HH:mm)
+     * Формат даты и времени
      */
     private String dateTimePattern = "dd.MM.yyyy HH:mm";
 
     /**
-     * Формат короткой даты с днем недели (по умолчанию: dd.MM (EEEE))
+     * Формат короткой даты с днем недели
      */
     private String shortDatePattern = "dd.MM (EEEE)";
 
     /**
-     * Формат месяца (по умолчанию: LLLL yyyy)
+     * Формат месяца
      */
     private String monthPattern = "LLLL yyyy";
 
     /**
-     * Формат короткой даты без года (по умолчанию: dd.MM)
+     * Формат короткой даты без года
      */
     private String shortDateWithoutYearPattern = "dd.MM";
 
     /**
-     * Формат дня недели (по умолчанию: EEEE)
+     * Формат дня недели
      */
     private String dayOfWeekPattern = "EEEE";
 
     /**
-     * Формат даты с днем недели (по умолчанию: dd.MM.yyyy - EEEE)
+     * Формат даты с днем недели
      */
     private String dateWithDayOfWeekPattern = "dd.MM.yyyy - EEEE";
 
     /**
-     * Локаль для форматирования (по умолчанию: ru)
+     * Локаль для форматирования
      */
     private String locale = "ru";
 
     /**
-     * Часовой пояс по умолчанию (по умолчанию: Europe/Moscow)
+     * Часовой пояс по умолчанию
      */
     private String defaultTimezone = "Europe/Moscow";
 }

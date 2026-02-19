@@ -33,6 +33,7 @@ public class TelegramWebhookController {
      *
      * @param secretToken secret token из заголовка X-Telegram-Bot-Api-Secret-Token
      * @param update объект Update от Telegram, содержащий информацию о событии
+     *
      * @return ResponseEntity с HTTP 200 OK при успешной обработке, или HTTP 401 Unauthorized при невалидном токене
      */
     @PostMapping

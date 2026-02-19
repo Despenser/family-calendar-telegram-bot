@@ -13,9 +13,6 @@ import java.time.LocalDate;
  * @since 2026-02-16
  */
 @Builder
-public record HourSelectionContext(
-    @NonNull LocalDate eventDate,
-    Long editingEventId,
-    boolean isEditingEvent
-) {
-}
+public record HourSelectionContext(@NonNull LocalDate eventDate,
+                                    Long editingEventId,
+                                    boolean isEditingEvent) { }

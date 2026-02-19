@@ -18,12 +18,12 @@ import org.springframework.context.annotation.Configuration;
 public class ReminderNotificationConfig {
 
     /**
-     * Окно проверки напоминаний в часах (по умолчанию: 1)
+     * Окно проверки напоминаний в часах
      */
     private int windowHours = 1;
 
     /**
-     * Порог для старых напоминаний в часах (по умолчанию: 1)
+     * Порог для старых напоминаний в часах
      */
     private int oldThresholdHours = 1;
 }

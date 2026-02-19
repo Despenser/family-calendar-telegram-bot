@@ -16,13 +16,4 @@ public class AttachmentNotFoundException extends RuntimeException {
     public AttachmentNotFoundException(Long attachmentId) {
         super("Вложение с ID " + attachmentId + " не найдено");
     }
-    
-    /**
-     * Создает новое исключение с указанным сообщением.
-     * 
-     * @param message сообщение об ошибке
-     */
-    public AttachmentNotFoundException(String message) {
-        super(message);
-    }
 }

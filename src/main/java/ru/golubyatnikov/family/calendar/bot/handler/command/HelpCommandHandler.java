@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
-import ru.golubyatnikov.family.calendar.bot.service.infrastructure.help.CommandCategory;
-import ru.golubyatnikov.family.calendar.bot.service.infrastructure.help.CommandGrouper;
-import ru.golubyatnikov.family.calendar.bot.service.infrastructure.help.HelpMessageBuilder;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CommandCategory;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.help.CommandGrouper;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.help.HelpMessageBuilder;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 
 import java.util.List;

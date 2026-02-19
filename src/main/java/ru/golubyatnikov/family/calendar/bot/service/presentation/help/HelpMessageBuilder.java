@@ -1,8 +1,10 @@
-package ru.golubyatnikov.family.calendar.bot.service.infrastructure.help;
+package ru.golubyatnikov.family.calendar.bot.service.presentation.help;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CommandCategory;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;

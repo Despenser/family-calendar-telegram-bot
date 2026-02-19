@@ -16,14 +16,4 @@ public class FileSizeExceededException extends RuntimeException {
     public FileSizeExceededException(String message) {
         super(message);
     }
-    
-    /**
-     * Создает новое исключение с указанным сообщением и причиной.
-     * 
-     * @param message сообщение об ошибке
-     * @param cause причина исключения
-     */
-    public FileSizeExceededException(String message, Throwable cause) {
-        super(message, cause);
-    }
 }

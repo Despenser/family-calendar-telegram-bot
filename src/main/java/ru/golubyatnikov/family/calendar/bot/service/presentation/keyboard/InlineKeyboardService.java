@@ -210,7 +210,9 @@ public class InlineKeyboardService {
                 event -> "view_event_" + event.getId());
 
         rows.add(keyboardFactory.createRow(
-                keyboardFactory.createButton("🔙 Назад", "calendar_" + date)
+                keyboardFactory.createButton("🔙 Назад к календарю",
+                        String.format("calendar_%d-%02d", date.getYear(), date.getMonthValue())
+                )
         ));
 
         return keyboardFactory.createMarkup(rows);

@@ -18,17 +18,17 @@ import org.springframework.context.annotation.Configuration;
 public class TelegramApiConfig {
 
     /**
-     * Базовый URL Telegram Bot API (по умолчанию: https://api.telegram.org)
+     * Базовый URL Telegram Bot API
      */
     private String baseUrl = "https://api.telegram.org";
 
     /**
-     * Путь для установки webhook (по умолчанию: /bot{token}/setWebhook)
+     * Путь для установки webhook
      */
     private String setWebhookPath = "/bot%s/setWebhook";
 
     /**
-     * Имя заголовка для secret token (по умолчанию: X-Telegram-Bot-Api-Secret-Token)
+     * Имя заголовка для secret token
      */
     private String secretTokenHeader = "X-Telegram-Bot-Api-Secret-Token";
 }

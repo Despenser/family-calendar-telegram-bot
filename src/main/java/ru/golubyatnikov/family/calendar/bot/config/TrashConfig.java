@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Configuration;
 public class TrashConfig {
 
     /**
-     * Количество дней хранения событий в корзине (по умолчанию: 30)
+     * Количество дней хранения событий в корзине
      */
     private int retentionDays = 30;
 }

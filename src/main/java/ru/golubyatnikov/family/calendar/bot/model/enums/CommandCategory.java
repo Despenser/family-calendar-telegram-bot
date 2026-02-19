@@ -1,4 +1,4 @@
-package ru.golubyatnikov.family.calendar.bot.service.infrastructure.help;
+package ru.golubyatnikov.family.calendar.bot.model.enums;
 
 import lombok.Getter;
 

@@ -18,17 +18,17 @@ import org.springframework.context.annotation.Configuration;
 public class RetryConfig {
 
     /**
-     * Максимальное количество попыток (по умолчанию: 3)
+     * Максимальное количество попыток
      */
     private int maxAttempts = 3;
 
     /**
-     * Начальная задержка между попытками в миллисекундах (по умолчанию: 1000)
+     * Начальная задержка между попытками в миллисекундах
      */
     private long initialDelay = 1000;
 
     /**
-     * Множитель для увеличения задержки (по умолчанию: 2.0)
+     * Множитель для увеличения задержки
      */
     private double multiplier = 2.0;
 }

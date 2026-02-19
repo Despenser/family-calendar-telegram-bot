@@ -18,17 +18,17 @@ import org.springframework.context.annotation.Configuration;
 public class TimeSelectionConfig {
 
     /**
-     * Максимальный час для выбора времени (по умолчанию: 23)
+     * Максимальный час для выбора времени
      */
     private int maxHour = 23;
 
     /**
-     * Пороговая минута для отсечки (по умолчанию: 46)
+     * Пороговая минута для отсечки
      */
     private int cutoffMinute = 46;
 
     /**
-     * Количество часов в одном ряду клавиатуры (по умолчанию: 4)
+     * Количество часов в одном ряду клавиатуры
      */
     private int hoursPerRow = 4;
 }

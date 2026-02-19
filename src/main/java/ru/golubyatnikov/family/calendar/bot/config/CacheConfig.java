@@ -10,17 +10,12 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
+import org.springframework.lang.NonNull;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Конфигурация кэширования с использованием Caffeine.
- * 
- * Настраивает кэш-менеджер для оптимизации производительности приложения
- * путем кэширования часто запрашиваемых данных.
- * 
- * Параметры конфигурации задаются в application.yml под префиксом app.cache
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-02-19
@@ -60,18 +55,14 @@ public class CacheConfig {
 
     /**
      * Создает и настраивает CacheManager с использованием Caffeine.
-     * 
-     * Кэшируемые данные:
-     * - upcomingEvents: предстоящие события семьи (ключ: familyId_days_zoneId)
-     * - userEvents: события пользователя (ключ: userId_ACTIVE)
      *
      * @return настроенный CacheManager
      */
     @Bean
     public CacheManager cacheManager() {
-        log.info("Инициализация Caffeine Cache Manager");
         log.info("Настройки кэша: maximumSize={}, expireAfterWrite={}min, expireAfterAccess={}min, recordStats={}", 
                 maximumSize, expireAfterWriteMinutes, expireAfterAccessMinutes, recordStats);
+
         log.info("Создаваемые кэши: {}", names);
 
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
@@ -86,7 +77,7 @@ public class CacheConfig {
      *
      * @return настроенный Caffeine builder
      */
-    private Caffeine<Object, Object> caffeineCacheBuilder() {
+    private @NonNull Caffeine<?, ?> caffeineCacheBuilder() {
         Caffeine<Object, Object> builder = Caffeine.newBuilder()
                 .maximumSize(maximumSize)
                 .expireAfterWrite(expireAfterWriteMinutes, TimeUnit.MINUTES)

@@ -1,11 +1,11 @@
-package ru.golubyatnikov.family.calendar.bot.service.infrastructure.help;
+package ru.golubyatnikov.family.calendar.bot.service.presentation.help;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import ru.golubyatnikov.family.calendar.bot.handler.command.CommandHandler;
-
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.help.CommandMetadata;
 import java.util.Optional;
 
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;

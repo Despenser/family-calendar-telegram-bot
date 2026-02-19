@@ -26,13 +26,11 @@ public class DefaultReminderConfig {
     
     /**
      * Флаг глобального включения/отключения автоматических напоминаний.
-     * По умолчанию: true (включено)
      */
     private boolean enabled = true;
     
     /**
      * Список типов напоминаний, создаваемых автоматически при создании события.
-     * По умолчанию: [ EVENING_BEFORE, ONE_HOUR_BEFORE, FIFTEEN_MINUTES_BEFORE ]
      */
     private List<ReminderType> types = new ArrayList<>(List.of(
         ReminderType.EVENING_BEFORE,
@@ -42,7 +40,6 @@ public class DefaultReminderConfig {
     
     /**
      * Инициализация конфигурации после загрузки свойств.
-     * Логирует состояние автоматических напоминаний при старте приложения.
      */
     @PostConstruct
     public void init() {

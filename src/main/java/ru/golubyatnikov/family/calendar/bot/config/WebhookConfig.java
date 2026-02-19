@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Configuration;
 public class WebhookConfig {
 
     /**
-     * Длина секретного токена для webhook (по умолчанию: 64)
+     * Длина секретного токена для webhook
      */
     private int secretTokenLength = 64;
 }

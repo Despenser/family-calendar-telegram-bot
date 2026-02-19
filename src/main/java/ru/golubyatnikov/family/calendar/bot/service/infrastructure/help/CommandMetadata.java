@@ -1,6 +1,7 @@
 package ru.golubyatnikov.family.calendar.bot.service.infrastructure.help;
 
 import org.springframework.stereotype.Component;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CommandCategory;
 import java.util.Map;
 
 /**

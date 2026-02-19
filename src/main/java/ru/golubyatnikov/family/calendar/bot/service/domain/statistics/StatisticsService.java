@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.golubyatnikov.family.calendar.bot.model.context.EventStatistics;
+import ru.golubyatnikov.family.calendar.bot.model.dto.EventStatistics;
 import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import java.time.LocalDate;
