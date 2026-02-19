@@ -281,8 +281,10 @@ public class CalendarKeyboardBuilder {
         }
         
         String dayText = buildDayText(date, context, eventsByDate, eventCountByDate);
+        
+        String prefix = context.isViewingCalendar() ? CALENDAR_PREFIX : CallbackPrefix.DATE.getPrefix();
         String callbackData = String.format("%s%d-%02d-%02d", 
-            CALENDAR_PREFIX, date.getYear(), date.getMonthValue(), date.getDayOfMonth());
+            prefix, date.getYear(), date.getMonthValue(), date.getDayOfMonth());
         
         return keyboardFactory.createButton(dayText, callbackData);
     }
