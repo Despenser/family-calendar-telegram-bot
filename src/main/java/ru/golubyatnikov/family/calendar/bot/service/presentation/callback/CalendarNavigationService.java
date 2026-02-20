@@ -38,15 +38,15 @@ public class CalendarNavigationService {
     private final TelegramMessageService messageService;
     
     /**
-     * Обрабатывает возврат из создания события.
-     * Определяет правильный экран для возврата на основе контекста.
+     * Обрабатывает возврат из выбора времени к выбору даты.
+     * Не отменяет создание события, только возвращает к календарю выбора даты.
      * 
-     * @param user пользователь, который возвращается из создания события
+     * @param user пользователь, который возвращается к выбору даты
      * @param chatId идентификатор чата Telegram
      * @param messageId идентификатор сообщения для редактирования
      * @param callbackQueryId идентификатор callback query для ответа
      *
-     * @throws RuntimeException если произошла ошибка при возврате из создания события
+     * @throws RuntimeException если произошла ошибка при возврате к выбору даты
      */
     public void handleBackFromEventCreation(User user,
                                             Long chatId,
@@ -61,16 +61,58 @@ public class CalendarNavigationService {
                 return;
             }
             
-            DateSelectionContext context = buildContext(user, draft.getEventDate(), false, false);
-            conversationService.cancelEventCreation(user.getId());
-            
-            navigateBasedOnContext(context, chatId, messageId, callbackQueryId);
+            // Возвращаемся к календарю выбора даты, не отменяя создание события
+            LocalDate draftDate = draft.getEventDate();
+            returnToDateSelectionCalendar(user, draftDate, chatId, messageId, callbackQueryId);
             
         } catch (Exception e) {
             log.error("Ошибка при возврате из создания события: userId={}, error={}", 
                      user.getId(), e.getMessage());
 
             throw new RuntimeException("Ошибка при возврате из создания события", e);
+        }
+    }
+    
+    /**
+     * Обрабатывает отмену создания события.
+     * Отменяет черновик, удаляет сообщение с календарем и отправляет уведомление об отмене.
+     * 
+     * @param user пользователь, который отменяет создание события
+     * @param chatId идентификатор чата Telegram
+     * @param messageId идентификатор сообщения для удаления
+     * @param callbackQueryId идентификатор callback query для ответа
+     *
+     * @throws RuntimeException если произошла ошибка при отмене создания события
+     */
+    public void handleCancelEventCreation(User user,
+                                         Long chatId,
+                                         Integer messageId,
+                                         String callbackQueryId) {
+
+        try {
+            conversationService.cancelEventCreation(user.getId());
+            
+            // Удаляем сообщение с календарем
+            messageService.deleteMessage(chatId, messageId);
+            
+            // Отправляем сообщение об отмене
+            String cancelMessage = "❌ Создание события было отменено";
+            messageService.sendMessage(chatId, cancelMessage);
+            
+            // Отвечаем на callback query
+            try {
+                messageService.answerCallbackQuery(callbackQueryId, "");
+                
+            } catch (TelegramApiException e) {
+                log.warn("Не удалось ответить на callback query: callbackQueryId={}, error={}", 
+                        callbackQueryId, e.getMessage());
+            }
+            
+        } catch (Exception e) {
+            log.error("Ошибка при отмене создания события: userId={}, error={}", 
+                     user.getId(), e.getMessage());
+
+            throw new RuntimeException("Ошибка при отмене создания события", e);
         }
     }
     
@@ -172,6 +214,7 @@ public class CalendarNavigationService {
     
     /**
      * Возвращает к календарю текущего месяца.
+     * Не отменяет создание события - это должен делать вызывающий код при необходимости.
      * 
      * @param user пользователь
      * @param chatId идентификатор чата Telegram
@@ -189,7 +232,29 @@ public class CalendarNavigationService {
 
         String message = botMessageFormattingService.buildCalendarViewMessage();
         
-        conversationService.cancelEventCreation(user.getId());
+        updateMessage(chatId, messageId, message, keyboard, callbackQueryId);
+    }
+    
+    /**
+     * Возвращает к календарю выбора даты для создания события.
+     * 
+     * @param user пользователь
+     * @param date дата, месяц которой нужно показать
+     * @param chatId идентификатор чата Telegram
+     * @param messageId идентификатор сообщения для редактирования
+     * @param callbackQueryId идентификатор callback query для ответа
+     */
+    private void returnToDateSelectionCalendar(@NonNull User user,
+                                               @NonNull LocalDate date,
+                                               Long chatId,
+                                               Integer messageId,
+                                               String callbackQueryId) {
+
+        InlineKeyboardMarkup keyboard = keyboardService.createCalendarKeyboard(
+            date.getYear(), date.getMonthValue(), user, null);
+
+        String message = botMessageFormattingService.buildSelectDateMessageWithHeader();
+        
         updateMessage(chatId, messageId, message, keyboard, callbackQueryId);
     }
     

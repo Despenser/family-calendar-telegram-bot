@@ -433,7 +433,7 @@ public class CalendarKeyboardBuilder {
      */
     private InlineKeyboardRow createCancelRow() {
         return keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", CANCEL_CALLBACK)
+            keyboardFactory.createButton("❌ Отмена", CANCEL_CALLBACK)
         );
     }
 }

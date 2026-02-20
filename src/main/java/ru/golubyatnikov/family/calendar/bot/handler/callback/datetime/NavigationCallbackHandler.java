@@ -318,7 +318,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
             handleCancelEventEditing(ctx);
 
         } else {
-            navigationService.handleBackFromEventCreation(ctx.user(), ctx.chatId(), ctx.messageId(), ctx.callbackQueryId());
+            navigationService.handleCancelEventCreation(ctx.user(), ctx.chatId(), ctx.messageId(), ctx.callbackQueryId());
         }
     }
     
