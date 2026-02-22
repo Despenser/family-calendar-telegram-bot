@@ -1,7 +1,6 @@
 package ru.golubyatnikov.family.calendar.bot.model.context;
 
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
-
 import java.time.LocalDate;
 import java.time.YearMonth;
 
@@ -18,6 +17,7 @@ public record CalendarContext(
         User user,
         boolean allowPastDates,
         Long editingEventId,
+        boolean isFromAddEventCommand,
         LocalDate today,
         LocalDate firstDay,
         int year,
@@ -27,24 +27,40 @@ public record CalendarContext(
     /**
      * Создает контекст календаря с вычисленными полями.
      *
-     * @param yearMonth      год и месяц для отображения
-     * @param user           пользователь, для которого строится календарь
+     * @param yearMonth год и месяц для отображения
+     * @param user пользователь, для которого строится календарь
      * @param allowPastDates разрешить ли выбор прошлых дат
      * @param editingEventId ID редактируемого события (null если создается новое)
+     * @param isFromAddEventCommand true если календарь вызван из команды /add_event
      */
-    public CalendarContext(YearMonth yearMonth, User user, boolean allowPastDates, Long editingEventId) {
+    public CalendarContext(YearMonth yearMonth, User user, boolean allowPastDates, 
+                          Long editingEventId, boolean isFromAddEventCommand) {
         this(
                 yearMonth,
                 YearMonth.now(user.getZoneId()),
                 user,
                 allowPastDates,
                 editingEventId,
+                isFromAddEventCommand,
                 user.getCurrentDate(),
                 yearMonth.atDay(1),
                 yearMonth.getYear(),
                 yearMonth.getMonthValue(),
                 yearMonth.lengthOfMonth()
         );
+    }
+    
+    /**
+     * Создает контекст календаря с вычисленными полями (без флага isFromAddEventCommand).
+     * По умолчанию isFromAddEventCommand = false.
+     *
+     * @param yearMonth год и месяц для отображения
+     * @param user пользователь, для которого строится календарь
+     * @param allowPastDates разрешить ли выбор прошлых дат
+     * @param editingEventId ID редактируемого события (null если создается новое)
+     */
+    public CalendarContext(YearMonth yearMonth, User user, boolean allowPastDates, Long editingEventId) {
+        this(yearMonth, user, allowPastDates, editingEventId, false);
     }
 
     /**
@@ -62,7 +78,7 @@ public record CalendarContext(
      * @return true, если создается новое событие
      */
     public boolean isCreatingEvent() {
-        return editingEventId == null && !allowPastDates;
+        return editingEventId == null && !allowPastDates && isFromAddEventCommand;
     }
 
     /**

@@ -84,6 +84,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                CallbackPrefix.HOUR.matches(callbackData) ||
                isTimeWithMinutes(callbackData) ||
                CallbackPrefix.TIME_BACK.matches(callbackData) ||
+               CallbackPrefix.TIME_TO_CALENDAR.matches(callbackData) ||
                CallbackPrefix.TIME_CANCEL.matches(callbackData);
     }
     
@@ -123,6 +124,9 @@ public class DateTimeCallbackHandler implements CallbackHandler {
 
         } else if (CallbackPrefix.TIME_BACK.matches(callbackData)) {
             handleTimeBack(context);
+
+        } else if (CallbackPrefix.TIME_TO_CALENDAR.matches(callbackData)) {
+            handleTimeToCalendar(context);
 
         } else if (CallbackPrefix.TIME_CANCEL.matches(callbackData)) {
             handleTimeCancel(context);
@@ -166,7 +170,11 @@ public class DateTimeCallbackHandler implements CallbackHandler {
 
         conversationService.updateEventDate(context.getUserId(), date);
         
-        InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(date, user);
+        // Проверяем, началось ли создание из /add_event по флагу в description
+        Event draft = conversationService.getActiveDraft(context.getUserId());
+        boolean isFromAddEventCommand = Boolean.TRUE.equals(draft.getIsFromAddEventCommand());
+        
+        InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(date, user, isFromAddEventCommand);
         
         // Проверяем наличие доступных часов
         if (keyboard.getKeyboard().size() <= 2) {
@@ -228,8 +236,22 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         
         HourSelectionContext hourContext = buildHourSelectionContext(context.getUserId());
         
-        InlineKeyboardMarkup keyboard = keyboardService.createFilteredMinuteSelectionKeyboard(
-            hour, hourContext.eventDate(), user, hourContext.editingEventId());
+        // Проверяем, началось ли создание из /add_event
+        boolean isFromAddEventCommand = false;
+        if (!hourContext.isEditingEvent()) {
+            Event draft = conversationService.getActiveDraft(context.getUserId());
+            isFromAddEventCommand = Boolean.TRUE.equals(draft.getIsFromAddEventCommand());
+        }
+        
+        InlineKeyboardMarkup keyboard;
+        if (hourContext.isEditingEvent()) {
+            keyboard = keyboardService.createFilteredMinuteSelectionKeyboard(
+                hour, hourContext.eventDate(), user, hourContext.editingEventId());
+
+        } else {
+            keyboard = keyboardService.createFilteredMinuteSelectionKeyboard(
+                hour, hourContext.eventDate(), user, isFromAddEventCommand);
+        }
         
         // Проверяем наличие доступных минут
         if (keyboard.getKeyboard().size() <= 2) {
@@ -298,11 +320,23 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                 .orElseThrow(() -> new UserNotFoundException("Пользователь не найден: " + context.getUserId()));
         
         try {
-            InlineKeyboardMarkup filteredHourSelectionKeyboard = keyboardService.createFilteredHourSelectionKeyboard(
-                    hourContext.eventDate(),
-                    user,
-                    hourContext.editingEventId()
-            );
+            InlineKeyboardMarkup filteredHourSelectionKeyboard;
+            if (hourContext.isEditingEvent()) {
+                filteredHourSelectionKeyboard = keyboardService.createFilteredHourSelectionKeyboard(
+                        hourContext.eventDate(),
+                        user,
+                        hourContext.editingEventId()
+                );
+
+            } else {
+                Event draft = conversationService.getActiveDraft(context.getUserId());
+                boolean isFromAddEventCommand = Boolean.TRUE.equals(draft.getIsFromAddEventCommand());
+                filteredHourSelectionKeyboard = keyboardService.createFilteredHourSelectionKeyboard(
+                        hourContext.eventDate(),
+                        user,
+                        isFromAddEventCommand
+                );
+            }
 
             callbackQueryService.editMessageAndAnswer(context, message, filteredHourSelectionKeyboard,
                     CallbackMessages.SELECT_NEXT_HOUR);
@@ -413,8 +447,17 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         
         HourSelectionContext hourContext = buildHourSelectionContext(context.getUserId());
         
-        InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(
-            hourContext.eventDate(), user, hourContext.editingEventId());
+        InlineKeyboardMarkup keyboard;
+        if (hourContext.isEditingEvent()) {
+            keyboard = keyboardService.createFilteredHourSelectionKeyboard(
+                hourContext.eventDate(), user, hourContext.editingEventId());
+                
+        } else {
+            Event draft = conversationService.getActiveDraft(context.getUserId());
+            boolean isFromAddEventCommand = Boolean.TRUE.equals(draft.getIsFromAddEventCommand());
+            keyboard = keyboardService.createFilteredHourSelectionKeyboard(
+                hourContext.eventDate(), user, isFromAddEventCommand);
+        }
         
         String message = hourContext.isEditingEvent() 
             ? botMessageFormattingService.buildEditTimeSelectHourMessage()
@@ -431,6 +474,18 @@ public class DateTimeCallbackHandler implements CallbackHandler {
     }
     
     /**
+     * Обрабатывает возврат к календарю выбора даты.
+     * Не отменяет создание события, только возвращает к выбору даты.
+     */
+    private void handleTimeToCalendar(@NonNull CallbackQueryContext context) {
+        User user = userService.findById(context.getUserId())
+                .orElseThrow(() -> new UserNotFoundException("Пользователь не найден: " + context.getUserId()));
+        
+        navigationService.handleBackFromEventCreation(user, context.chatId(),
+                context.messageId(), context.callbackQueryId());
+    }
+    
+    /**
      * Обрабатывает отмену выбора времени.
      * Поведение зависит от контекста: создание нового события или редактирование существующего.
      */
@@ -440,7 +495,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
 
         } else {
             User user = userService.findById(context.getUserId()).orElseThrow();
-            navigationService.handleBackFromEventCreation(user, context.chatId(),
+            navigationService.handleCancelEventCreation(user, context.chatId(),
                     context.messageId(), context.callbackQueryId());
         }
     }

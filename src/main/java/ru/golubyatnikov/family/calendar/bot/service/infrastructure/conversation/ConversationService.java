@@ -43,6 +43,21 @@ public class ConversationService {
      * @throws UserNotFoundException если пользователь не найден
      */
     public Event startEventCreation(Long userId) {
+        return startEventCreation(userId, false);
+    }
+    
+    /**
+     * Начинает новый диалог создания события.
+     * Создает черновик события в БД со статусом DRAFT.
+     * Автоматически удаляет предыдущие незавершенные черновики пользователя.
+     * 
+     * @param userId идентификатор пользователя
+     * @param isFromAddEventCommand true если создание началось из команды /add_event
+     *
+     * @return созданный черновик события
+     * @throws UserNotFoundException если пользователь не найден
+     */
+    public Event startEventCreation(Long userId, boolean isFromAddEventCommand) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException(userId));
         
@@ -52,6 +67,7 @@ public class ConversationService {
             .family(user.getFamily())
             .status(EventStatus.DRAFT)
             .notified(false)
+            .isFromAddEventCommand(isFromAddEventCommand)
             .build();
 
         return eventRepository.save(draft);

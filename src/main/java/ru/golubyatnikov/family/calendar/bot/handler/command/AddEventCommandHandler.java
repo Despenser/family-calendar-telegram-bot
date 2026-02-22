@@ -80,7 +80,7 @@ public class AddEventCommandHandler implements CommandHandler {
     }
 
     private void startEventCreationFlow(Long chatId, @NonNull User user) throws TelegramApiException {
-        conversationService.startEventCreation(user.getId());
+        conversationService.startEventCreation(user.getId(), true);
         
         LocalDate currentDate = user.getCurrentDate();
         InlineKeyboardMarkup calendar = keyboardService.createCalendarKeyboard(

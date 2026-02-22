@@ -79,6 +79,7 @@ CREATE TABLE events (
     message_id BIGINT,
     is_my_events_header BOOLEAN NOT NULL DEFAULT FALSE,
     is_trash_header BOOLEAN NOT NULL DEFAULT FALSE,
+    is_from_add_event_command BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
     -- Ограничения
@@ -125,6 +126,7 @@ COMMENT ON COLUMN events.notified IS 'Флаг отправки уведомле
 COMMENT ON COLUMN events.message_id IS 'Идентификатор сообщения Telegram для обновления при редактировании события';
 COMMENT ON COLUMN events.is_my_events_header IS 'Флаг шапки списка "Мои события" для корректного обновления первого события';
 COMMENT ON COLUMN events.is_trash_header IS 'Флаг шапки корзины для корректного обновления первого события в корзине';
+COMMENT ON COLUMN events.is_from_add_event_command IS 'Флаг, указывающий что создание события началось из команды /add_event (используется для различения флоу создания)';
 COMMENT ON COLUMN events.created_at IS 'Дата и время создания записи о событии';
 
 -- ============================================================================

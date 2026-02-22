@@ -84,10 +84,8 @@ public class KeyboardLayoutService {
      * @return настроенная InlineKeyboardMarkup
      * @throws IllegalArgumentException если параметры некорректны
      */
-    public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate,
-                                                                    User user) {
-
-        return timeKeyboardBuilder.createFilteredHourSelection(selectedDate, user, null);
+    public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate, User user) {
+        return timeKeyboardBuilder.createFilteredHourSelection(selectedDate, user, null, false);
     }
 
     /**
@@ -104,7 +102,24 @@ public class KeyboardLayoutService {
                                                                     User user,
                                                                     Long editingEventId) {
 
-        return timeKeyboardBuilder.createFilteredHourSelection(selectedDate, user, editingEventId);
+        return timeKeyboardBuilder.createFilteredHourSelection(selectedDate, user, editingEventId, false);
+    }
+    
+    /**
+     * Создает inline-клавиатуру для выбора часа с фильтрацией прошедших часов для создания нового события.
+     * 
+     * @param selectedDate выбранная дата события
+     * @param user пользователь (для определения timezone)
+     * @param isFromAddEventCommand true если создание началось из команды /add_event
+     *
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если параметры некорректны
+     */
+    public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate,
+                                                                    User user,
+                                                                    boolean isFromAddEventCommand) {
+
+        return timeKeyboardBuilder.createFilteredHourSelection(selectedDate, user, null, isFromAddEventCommand);
     }
 
     /**
@@ -123,6 +138,25 @@ public class KeyboardLayoutService {
                                                                       User user,
                                                                       Long editingEventId) {
 
-        return timeKeyboardBuilder.createFilteredMinuteSelection(selectedHour, selectedDate, user, editingEventId);
+        return timeKeyboardBuilder.createFilteredMinuteSelection(selectedHour, selectedDate, user, editingEventId, false);
+    }
+    
+    /**
+     * Создает inline-клавиатуру для выбора минут с фильтрацией прошедших минут для создания нового события.
+     * 
+     * @param selectedHour выбранный час (0-23)
+     * @param selectedDate выбранная дата события
+     * @param user пользователь (для определения timezone)
+     * @param isFromAddEventCommand true если создание началось из команды /add_event
+     *
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если параметры некорректны
+     */
+    public InlineKeyboardMarkup createFilteredMinuteSelectionKeyboard(int selectedHour,
+                                                                      LocalDate selectedDate,
+                                                                      User user,
+                                                                      boolean isFromAddEventCommand) {
+                                                                        
+        return timeKeyboardBuilder.createFilteredMinuteSelection(selectedHour, selectedDate, user, null, isFromAddEventCommand);
     }
 }

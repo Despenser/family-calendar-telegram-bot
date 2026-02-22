@@ -27,6 +27,7 @@ import java.util.List;
 public class TimeKeyboardBuilder {
 
     private static final String TIME_IGNORE = "time_ignore";
+    private static final String TIME_TO_CALENDAR = "time_to_calendar";
     private static final String TIME_CANCEL = "time_cancel";
     private static final String TIME_BACK = "time_back";
     private static final String HOUR_PREFIX = "hour_";
@@ -38,8 +39,19 @@ public class TimeKeyboardBuilder {
 
     /**
      * Создает клавиатуру выбора часа с фильтрацией прошедших часов.
+     * 
+     * @param selectedDate выбранная дата
+     * @param user пользователь
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     * @param isFromAddEventCommand true если создание началось из команды /add_event
+     * 
+     * @return клавиатура выбора часа
      */
-    public InlineKeyboardMarkup createFilteredHourSelection(LocalDate selectedDate, User user, Long editingEventId) {
+    public InlineKeyboardMarkup createFilteredHourSelection(LocalDate selectedDate, 
+                                                            User user, 
+                                                            Long editingEventId, 
+                                                            boolean isFromAddEventCommand) {
+
         validateParameters(selectedDate, user);
         
         List<Integer> availableHours = timeAvailabilityService.getAvailableHours(selectedDate, user);
@@ -51,18 +63,27 @@ public class TimeKeyboardBuilder {
             rows.addAll(createHourButtons(availableHours));
         }
         
-        rows.add(createBackRow(editingEventId));
+        rows.add(createBackRow(editingEventId, isFromAddEventCommand));
         
         return buildKeyboard(rows);
     }
 
     /**
      * Создает клавиатуру выбора минут с фильтрацией прошедших интервалов.
+     * 
+     * @param selectedHour выбранный час
+     * @param selectedDate выбранная дата
+     * @param user пользователь
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     * @param isFromAddEventCommand true если создание началось из команды /add_event
+     * 
+     * @return клавиатура выбора минут
      */
     public InlineKeyboardMarkup createFilteredMinuteSelection(int selectedHour,
                                                               LocalDate selectedDate,
                                                               User user,
-                                                              Long editingEventId) {
+                                                              Long editingEventId,
+                                                              boolean isFromAddEventCommand) {
 
         validateHour(selectedHour);
         validateParameters(selectedDate, user);
@@ -77,7 +98,7 @@ public class TimeKeyboardBuilder {
             rows.add(createMinuteButtons(selectedHour, availableMinutes));
         }
         
-        rows.add(createNavigationRow(editingEventId == null));
+        rows.add(createNavigationRow(editingEventId == null, isFromAddEventCommand));
         
         return buildKeyboard(rows);
     }
@@ -121,23 +142,36 @@ public class TimeKeyboardBuilder {
         return keyboardFactory.createRow(buttons);
     }
 
-    private InlineKeyboardRow createBackRow(Long editingEventId) {
-        String callbackData = editingEventId != null 
-            ? CallbackPrefix.EDIT_BACK.withPayload(editingEventId.toString())
-            : TIME_CANCEL;
-        
-        return keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", callbackData)
-        );
+    private InlineKeyboardRow createBackRow(Long editingEventId, boolean isFromAddEventCommand) {
+        if (editingEventId != null) {
+            // При редактировании - только кнопка "Назад" к меню редактирования
+            String callbackData = CallbackPrefix.EDIT_BACK.withPayload(editingEventId.toString());
+            return keyboardFactory.createRow(
+                keyboardFactory.createButton("🔙 Назад", callbackData)
+            );
+
+        } else if (isFromAddEventCommand) {
+            // При создании из /add_event - две кнопки: "Назад к календарю" и "Отменить создание"
+            return keyboardFactory.createRow(
+                keyboardFactory.createButton("🔙 Назад", TIME_TO_CALENDAR),
+                keyboardFactory.createButton("✖️ Отменить создание", TIME_CANCEL)
+            );
+
+        } else {
+            // При создании из /calendar → "Добавить" - только кнопка "Назад к календарю"
+            return keyboardFactory.createRow(
+                keyboardFactory.createButton("🔙 Назад", TIME_TO_CALENDAR)
+            );
+        }
     }
 
-    private InlineKeyboardRow createNavigationRow(boolean showCancel) {
+    private InlineKeyboardRow createNavigationRow(boolean isCreatingNewEvent, boolean isFromAddEventCommand) {
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         
         buttons.add(keyboardFactory.createButton("🔙 Назад", TIME_BACK));
         
-        if (showCancel) {
-            buttons.add(keyboardFactory.createButton("🔙 Назад", TIME_CANCEL));
+        if (isCreatingNewEvent && isFromAddEventCommand) {
+            buttons.add(keyboardFactory.createButton("✖️ Отменить создание", TIME_CANCEL));
         }
         
         return keyboardFactory.createRow(buttons);

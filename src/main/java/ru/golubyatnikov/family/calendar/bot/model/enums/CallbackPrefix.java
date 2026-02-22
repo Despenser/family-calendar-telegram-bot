@@ -31,7 +31,10 @@ public enum CallbackPrefix {
     /** Возврат к выбору часа */
     TIME_BACK("time_back"),
     
-    /** Возврат к списку полей для редактирования */
+    /** Возврат к календарю выбора даты */
+    TIME_TO_CALENDAR("time_to_calendar"),
+    
+    /** Отмена создания события */
     TIME_CANCEL("time_cancel"),
     
     // ===== События =====
@@ -238,6 +241,7 @@ public enum CallbackPrefix {
      */
     private boolean isExactMatchPrefix() {
         return this == TIME_BACK || 
+               this == TIME_TO_CALENDAR ||
                this == TIME_CANCEL || 
                this == SKIP_DESCRIPTION || 
                this == SKIP_COMPLETION_NOTE ||

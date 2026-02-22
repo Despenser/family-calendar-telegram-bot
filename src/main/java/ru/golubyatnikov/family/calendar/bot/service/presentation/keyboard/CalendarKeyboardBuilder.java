@@ -54,7 +54,7 @@ public class CalendarKeyboardBuilder {
      * @return разметка inline-клавиатуры с календарем
      */
     public InlineKeyboardMarkup createForNewEvent(int year, int month, User user) {
-        return createCalendar(year, month, user, false, null);
+        return createCalendar(year, month, user, false, null, true);
     }
 
     /**
@@ -69,7 +69,7 @@ public class CalendarKeyboardBuilder {
      * @return разметка inline-клавиатуры с календарем
      */
     public InlineKeyboardMarkup createForEventEdit(int year, int month, User user, Long eventId) {
-        return createCalendar(year, month, user, false, eventId);
+        return createCalendar(year, month, user, false, eventId, false);
     }
 
     /**
@@ -83,7 +83,7 @@ public class CalendarKeyboardBuilder {
      * @return разметка inline-клавиатуры с календарем
      */
     public InlineKeyboardMarkup createForEventView(int year, int month, User user) {
-        return createCalendar(year, month, user, true, null);
+        return createCalendar(year, month, user, true, null, false);
     }
 
     /**
@@ -95,16 +95,19 @@ public class CalendarKeyboardBuilder {
      * @param user пользователь, для которого создается календарь
      * @param allowPastDates разрешить ли выбор прошлых дат
      * @param editingEventId ID редактируемого события (null для создания нового)
+     * @param isFromAddEventCommand true если календарь вызван из команды /add_event
      *
      * @return разметка inline-клавиатуры с календарем
      */
     private InlineKeyboardMarkup createCalendar(int year, int month, @NonNull User user,
-                                                boolean allowPastDates, Long editingEventId) {
+                                                boolean allowPastDates, Long editingEventId,
+                                                boolean isFromAddEventCommand) {
 
         validateMonth(month);
 
         YearMonth yearMonth = YearMonth.of(year, month);
-        CalendarContext context = new CalendarContext(yearMonth, user, allowPastDates, editingEventId);
+        CalendarContext context = new CalendarContext(yearMonth, user, allowPastDates, 
+                                                     editingEventId, isFromAddEventCommand);
         
         List<InlineKeyboardRow> rows = new ArrayList<>();
         rows.add(createHeaderRow(context));
@@ -433,7 +436,7 @@ public class CalendarKeyboardBuilder {
      */
     private InlineKeyboardRow createCancelRow() {
         return keyboardFactory.createRow(
-            keyboardFactory.createButton("❌ Отмена", CANCEL_CALLBACK)
+            keyboardFactory.createButton("✖️ Отменить создание", CANCEL_CALLBACK)
         );
     }
 }

@@ -87,9 +87,10 @@ public class EventViewService {
     public void createEventOnDate(LocalDate selectedDate, User user, Long chatId, 
                                   Integer messageId, String callbackQueryId) {
         try {
-            if (!conversationService.hasActiveDraft(user.getId())) {
-                conversationService.startEventCreation(user.getId());
-            }
+            // Всегда отменяем предыдущий черновик и создаем новый для флоу /calendar
+            // Это гарантирует, что флаг isFromAddEventCommand будет false
+            conversationService.cancelEventCreation(user.getId());
+            conversationService.startEventCreation(user.getId(), false);
             
             showTimeSelectionForDate(selectedDate, user, chatId, messageId, callbackQueryId);
             
@@ -120,7 +121,12 @@ public class EventViewService {
             conversationService.updateEventDate(user.getId(), selectedDate);
             conversationService.setCreationMessageId(user.getId(), messageId.longValue());
             
-            InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(selectedDate, user);
+            // Получаем черновик и проверяем флаг isFromAddEventCommand
+            Event draft = conversationService.getActiveDraft(user.getId());
+            boolean isFromAddEventCommand = Boolean.TRUE.equals(draft.getIsFromAddEventCommand());
+            
+            InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(
+                    selectedDate, user, isFromAddEventCommand);
             String message = botMessageFormattingService.buildSelectTimeMessage(selectedDate);
             
             messageService.safeEditMessageAndAnswer(chatId, messageId, message, keyboard, callbackQueryId, "Дата выбрана");

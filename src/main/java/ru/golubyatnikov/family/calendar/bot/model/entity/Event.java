@@ -164,6 +164,14 @@ public class Event {
     @Column(name = "is_trash_header")
     @Builder.Default
     private Boolean isTrashHeader = false;
+    
+    /**
+     * Флаг, указывающий, что создание события началось из команды /add_event.
+     * Используется для различения флоу создания события.
+     */
+    @Column(name = "is_from_add_event_command")
+    @Builder.Default
+    private Boolean isFromAddEventCommand = false;
 
     /**
      * Дата и время создания записи о событии.

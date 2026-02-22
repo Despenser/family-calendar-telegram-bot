@@ -39,7 +39,8 @@ public class CalendarNavigationService {
     
     /**
      * Обрабатывает возврат из выбора времени к выбору даты.
-     * Не отменяет создание события, только возвращает к календарю выбора даты.
+     * Если создание началось из /calendar, отменяет черновик и возвращает к календарю просмотра.
+     * Если создание началось из /add_event, возвращает к календарю выбора даты.
      * 
      * @param user пользователь, который возвращается к выбору даты
      * @param chatId идентификатор чата Telegram
@@ -56,14 +57,30 @@ public class CalendarNavigationService {
         try {
             Event draft = conversationService.getActiveDraft(user.getId());
             
-            if (draft == null || draft.getEventDate() == null) {
+            if (draft == null) {
                 returnToCurrentMonthCalendar(user, chatId, messageId, callbackQueryId);
                 return;
             }
             
-            // Возвращаемся к календарю выбора даты, не отменяя создание события
-            LocalDate draftDate = draft.getEventDate();
-            returnToDateSelectionCalendar(user, draftDate, chatId, messageId, callbackQueryId);
+            // Проверяем, началось ли создание из /add_event по флагу
+            boolean isFromAddEventCommand = Boolean.TRUE.equals(draft.getIsFromAddEventCommand());
+            LocalDate draftDate = draft.getEventDate() != null 
+                ? draft.getEventDate() 
+                : user.getCurrentDate();
+            
+            if (isFromAddEventCommand) {
+                // Возвращаемся к календарю выбора даты для /add_event
+                returnToDateSelectionCalendar(user, draftDate, chatId, messageId, callbackQueryId, true);
+
+            } else {
+                // Создание началось из /calendar → "Добавить"
+                // Отменяем черновик и возвращаемся к экрану управления событиями на эту дату
+                conversationService.cancelEventCreation(user.getId());
+                
+                // Проверяем, есть ли события на эту дату
+                DateSelectionContext context = buildContext(user, draftDate, false, false);
+                navigateBasedOnContext(context, chatId, messageId, callbackQueryId);
+            }
             
         } catch (Exception e) {
             log.error("Ошибка при возврате из создания события: userId={}, error={}", 
@@ -243,17 +260,49 @@ public class CalendarNavigationService {
      * @param chatId идентификатор чата Telegram
      * @param messageId идентификатор сообщения для редактирования
      * @param callbackQueryId идентификатор callback query для ответа
+     * @param isFromAddEventCommand флаг, указывающий на флоу /add_event
      */
     private void returnToDateSelectionCalendar(@NonNull User user,
                                                @NonNull LocalDate date,
                                                Long chatId,
                                                Integer messageId,
-                                               String callbackQueryId) {
-
-        InlineKeyboardMarkup keyboard = keyboardService.createCalendarKeyboard(
-            date.getYear(), date.getMonthValue(), user, null);
+                                               String callbackQueryId,
+                                               boolean isFromAddEventCommand) {
+        
+        InlineKeyboardMarkup keyboard;
+        if (isFromAddEventCommand) {
+            keyboard = keyboardService.createCalendarKeyboard(
+                date.getYear(), date.getMonthValue(), user);
+                
+        } else {
+            keyboard = keyboardService.createCalendarKeyboard(
+                date.getYear(), date.getMonthValue(), user, null);
+        }
 
         String message = botMessageFormattingService.buildSelectDateMessageWithHeader();
+        
+        updateMessage(chatId, messageId, message, keyboard, callbackQueryId);
+    }
+    
+    /**
+     * Возвращает к календарю просмотра событий.
+     * 
+     * @param user пользователь
+     * @param date дата, месяц которой нужно показать
+     * @param chatId идентификатор чата Telegram
+     * @param messageId идентификатор сообщения для редактирования
+     * @param callbackQueryId идентификатор callback query для ответа
+     */
+    private void returnToViewCalendar(@NonNull User user,
+                                      @NonNull LocalDate date,
+                                      Long chatId,
+                                      Integer messageId,
+                                      String callbackQueryId) {
+
+        InlineKeyboardMarkup keyboard = keyboardService.createViewCalendarKeyboard(
+            date.getYear(), date.getMonthValue(), user);
+
+        String message = botMessageFormattingService.buildCalendarViewMessage();
         
         updateMessage(chatId, messageId, message, keyboard, callbackQueryId);
     }
