@@ -97,7 +97,7 @@ public class BotMessageFormattingService {
      */
     public String buildTimeSelectedMessage(String formattedTime) {
         return bold(EVENT_CREATION_HEADER) + "\n\n" +
-                formatMessage("✅ Время выбрано: %s\n\nТеперь отправьте название события:", 
+                formatMessage("✅ Время выбрано: %s\n\nВыберите тип события:", 
                 formattedTime);
     }
     

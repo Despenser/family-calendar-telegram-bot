@@ -459,9 +459,15 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                 hourContext.eventDate(), user, isFromAddEventCommand);
         }
         
-        String message = hourContext.isEditingEvent() 
-            ? botMessageFormattingService.buildEditTimeSelectHourMessage()
-            : botMessageFormattingService.buildSelectHourMessage();
+        String message;
+        if (hourContext.isEditingEvent()) {
+            message = botMessageFormattingService.buildEditTimeSelectHourMessage();
+            
+        } else {
+            // Для создания нового события показываем сообщение с выбранной датой
+            String formattedDate = dateTimeFormattingService.formatDate(hourContext.eventDate());
+            message = botMessageFormattingService.buildDateSelectedMessage(formattedDate);
+        }
         
         try {
             messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
