@@ -45,7 +45,7 @@ public class EventEditKeyboardFactory {
                                                               LocalDate date) {
 
         List<InlineKeyboardRow> rows = keyboardFactory.createEventButtonRows(events,
-                event -> "delete_event_" + event.getId());
+                event -> CallbackPrefix.DELETE_EVENT.withPayload(event.getId().toString()));
 
         rows.add(keyboardFactory.createRow(
             keyboardFactory.createButton("🔙 Назад", CallbackPrefix.CALENDAR.withPayload(date.toString()))

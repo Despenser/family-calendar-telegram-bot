@@ -11,6 +11,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import ru.golubyatnikov.family.calendar.bot.model.enums.ActionType;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventHistoryService;
@@ -146,7 +147,7 @@ public class EventCompletionScheduler {
      */
     private @NonNull InlineKeyboardMarkup createCompletionKeyboard(Long eventId) {
         InlineKeyboardButton button = keyboardFactory.createButton("📝 Добавить заметку",
-                "add_completion_note_" + eventId);
+                CallbackPrefix.ADD_COMPLETION_NOTE.withPayload(eventId.toString()));
 
         InlineKeyboardRow row = keyboardFactory.createRow(button);
         return keyboardFactory.createMarkup(row);

@@ -304,7 +304,7 @@ public class InlineKeyboardService {
                                                              @NonNull List<Event> myEvents) {
 
         List<InlineKeyboardRow> rows = keyboardFactory.createEventButtonRows(myEvents,
-                event -> "delete_event_" + event.getId());
+                event -> CallbackPrefix.DELETE_EVENT.withPayload(event.getId().toString()));
 
         rows.add(keyboardFactory.createRow(
             keyboardFactory.createButton("🔙 Назад", CallbackPrefix.CALENDAR.withPayload(selectedDate.toString()))

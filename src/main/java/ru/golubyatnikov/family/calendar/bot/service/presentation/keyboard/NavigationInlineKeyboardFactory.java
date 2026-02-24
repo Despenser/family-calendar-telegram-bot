@@ -41,7 +41,7 @@ public class NavigationInlineKeyboardFactory {
     public InlineKeyboardMarkup createSkipDescriptionKeyboard() {
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("⏭️ Пропустить", "skip_description")
+                keyboardFactory.createButton("⏭️ Пропустить", CallbackPrefix.SKIP_DESCRIPTION.withPayload(""))
             ),
             keyboardFactory.createRow(
                 keyboardFactory.createButton("🔙 Назад", CallbackPrefix.DESC_BACK_TO_TITLE.withPayload("")),
