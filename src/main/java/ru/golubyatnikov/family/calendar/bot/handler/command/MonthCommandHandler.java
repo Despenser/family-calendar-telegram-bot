@@ -131,7 +131,7 @@ public class MonthCommandHandler implements CommandHandler {
 
         String dateRange = formatDateRange(startDate, endDate);
         return eventFormattingService.formatNoEventsMessage(
-                "🗓️",
+                "📆",
                 "События на месяц",
                 "На период " + dateRange + " событий не запланировано."
         );
@@ -153,7 +153,7 @@ public class MonthCommandHandler implements CommandHandler {
                                                    @NonNull LocalDate endDate) {
 
         String dateRange = formatDateRange(startDate, endDate);
-        String header = eventFormattingService.formatCommandHeader("🗓️", "События на месяц", dateRange);
+        String header = eventFormattingService.formatCommandHeader("📆", "События на месяц", dateRange);
         
         // Группировка событий по датам
         Map<LocalDate, List<Event>> eventsByDate = filteredEvents.stream()

@@ -15,6 +15,7 @@ public enum CommandCategory {
     MANAGE_EVENTS("Управление событиями"),
     SEARCH_FILTER("Поиск и фильтрация"),
     STATS_TRASH("Статистика и корзина"),
+    CALENDAR("Календарь событий"),
     HELP("Справка");
 
     private final String displayName;

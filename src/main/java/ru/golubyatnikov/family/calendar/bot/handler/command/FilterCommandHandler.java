@@ -40,7 +40,7 @@ public class FilterCommandHandler implements CommandHandler {
         try {
             InlineKeyboardMarkup keyboard = keyboardService.createFilterKeyboard();
 
-            String messageText = "🔍 " + bold("Выберите тип событий для отображения") + "\n\n" +
+            String messageText = "🫧 " + bold("Выберите тип событий для отображения") + "\n\n" +
                     escape("Используйте кнопки ниже для фильтрации событий по категориям.");
 
             messageService.sendMessage(message.getChatId(), messageText, keyboard);

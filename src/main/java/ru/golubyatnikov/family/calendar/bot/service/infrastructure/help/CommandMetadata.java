@@ -23,6 +23,7 @@ public class CommandMetadata {
             Map.entry("/filter", CommandCategory.SEARCH_FILTER),
             Map.entry("/stats", CommandCategory.STATS_TRASH),
             Map.entry("/trash", CommandCategory.STATS_TRASH),
+            Map.entry("/calendar", CommandCategory.CALENDAR),
             Map.entry("/help", CommandCategory.HELP),
             Map.entry("/start", CommandCategory.HELP)
     );
@@ -30,11 +31,12 @@ public class CommandMetadata {
     private static final Map<String, String> COMMAND_EMOJIS = Map.ofEntries(
             Map.entry("/start", "🚀"),
             Map.entry("/help", "📚"),
+            Map.entry("/calendar", "🗓️"),
             Map.entry("/add_event", "➕"),
-            Map.entry("/my_events", "📝"),
-            Map.entry("/month", "🗓️"),
-            Map.entry("/today", "📅"),
-            Map.entry("/week", "📆"),
+            Map.entry("/my_events", "📋"),
+            Map.entry("/month", "📆"),
+            Map.entry("/today", "📍"),
+            Map.entry("/week", "📅"),
             Map.entry("/search", "🔍"),
             Map.entry("/filter", "🫧"),
             Map.entry("/stats", "📊"),

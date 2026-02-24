@@ -400,7 +400,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение с шапкой
      */
     public String buildCalendarViewMessage() {
-        return "📅 " + bold("Календарь событий") + "\n\n" +
+        return "🗓️ " + bold("Календарь событий") + "\n\n" +
                escape("Выберите дату для просмотра, создания или редактирования событий:");
     }
 }

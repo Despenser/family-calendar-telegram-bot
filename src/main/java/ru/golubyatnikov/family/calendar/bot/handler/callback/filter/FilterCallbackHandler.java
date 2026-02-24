@@ -90,7 +90,7 @@ public class FilterCallbackHandler implements CallbackHandler {
         StringBuilder sb = new StringBuilder();
         
         // Заголовок с типом фильтра
-        sb.append(MarkdownFormatter.escapeMarkdownV2("🔍 Фильтр: "))
+        sb.append(MarkdownFormatter.escapeMarkdownV2("🫧 Фильтр: "))
           .append("*")
           .append(MarkdownFormatter.escapeMarkdownV2(filter.getDisplayName()))
           .append("*\n\n");

@@ -20,17 +20,17 @@ public class ReplyKeyboardService {
 
     // Константы для текста кнопок
     private static final String BTN_START = "🚀 Начать";
-    private static final String BTN_MONTH = "🗓️ Месяц";
+    private static final String BTN_MONTH = "📆 Месяц";
     private static final String BTN_ADD = "➕ Добавить";
-    private static final String BTN_MY = "📝 Мои события";
-    private static final String BTN_HELP = "❓ Помощь";
-    private static final String BTN_TODAY = "📅 Сегодня";
-    private static final String BTN_WEEK = "📆 Неделя";
+    private static final String BTN_MY = "📋 Мои события";
+    private static final String BTN_HELP = "📚 Помощь";
+    private static final String BTN_TODAY = "📍 Сегодня";
+    private static final String BTN_WEEK = "📅 Неделя";
     private static final String BTN_TRASH = "🗑️ Корзина";
     private static final String BTN_STATS = "📊 Статистика";
     private static final String BTN_SEARCH = "🔍 Поиск";
-    private static final String BTN_FILTER = "🎯 Фильтр";
-    private static final String BTN_CALENDAR = "📅 Календарь";
+    private static final String BTN_FILTER = "🫧 Фильтр";
+    private static final String BTN_CALENDAR = "🗓️ Календарь";
 
     /**
      * Создает клавиатуру для авторизованного пользователя с полным набором команд.

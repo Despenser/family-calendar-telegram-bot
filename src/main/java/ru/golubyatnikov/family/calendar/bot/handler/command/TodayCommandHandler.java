@@ -59,7 +59,7 @@ public class TodayCommandHandler implements CommandHandler {
             
             if (filteredEvents.isEmpty()) {
                 return eventFormattingService.formatNoEventsMessage(
-                    "📅",
+                    "📍",
                     "События на сегодня",
                     "На сегодня событий не запланировано."
                 );
@@ -68,7 +68,7 @@ public class TodayCommandHandler implements CommandHandler {
             // Формирование сообщения с событиями
             StringBuilder messageBuilder = new StringBuilder();
             messageBuilder.append(eventFormattingService.formatCommandHeader(
-                "📅",
+                "📍",
                 "События на сегодня",
                 dateTimeFormattingService.formatDateWithDayOfWeek(today)
             ));

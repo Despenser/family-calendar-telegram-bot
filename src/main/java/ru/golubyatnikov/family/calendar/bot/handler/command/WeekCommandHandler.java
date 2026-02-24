@@ -53,7 +53,7 @@ public class WeekCommandHandler implements CommandHandler {
             
             if (filteredEvents.isEmpty()) {
                 return eventFormattingService.formatNoEventsMessage(
-                    "📆",
+                    "📅",
                     "События на неделю",
                     "На ближайшую неделю событий не запланировано."
                 );
@@ -70,7 +70,7 @@ public class WeekCommandHandler implements CommandHandler {
             LocalDate startDate = user.getCurrentDate();
             LocalDate endDate = startDate.plusDays(6);
             String dateRange = dateTimeFormattingService.formatDate(startDate) + " - " + dateTimeFormattingService.formatDate(endDate);
-            messageBuilder.append(eventFormattingService.formatCommandHeader("📆", "События на неделю", dateRange));
+            messageBuilder.append(eventFormattingService.formatCommandHeader("📅", "События на неделю", dateRange));
             messageBuilder.append(escape("\n\n"));
             
             // Сортировка дат и вывод событий по дням

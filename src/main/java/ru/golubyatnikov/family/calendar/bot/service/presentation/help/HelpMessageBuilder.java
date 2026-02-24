@@ -23,6 +23,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape
 public class HelpMessageBuilder {
 
     private static final CommandCategory[] CATEGORY_ORDER = {
+            CommandCategory.CALENDAR,
             CommandCategory.MANAGE_EVENTS,
             CommandCategory.VIEW_EVENTS,
             CommandCategory.SEARCH_FILTER,
