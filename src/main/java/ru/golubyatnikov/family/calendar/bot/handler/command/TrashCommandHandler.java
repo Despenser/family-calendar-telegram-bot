@@ -16,6 +16,8 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotM
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.TRASH;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -97,7 +99,7 @@ public class TrashCommandHandler implements CommandHandler {
             
         } catch (Exception e) {
             log.error("Ошибка при обработке команды /trash для пользователя ID={}", user.getId(), e);
-            return "❌ Произошла ошибка при получении корзины. Попробуйте позже.";
+            return ERROR + " Произошла ошибка при получении корзины. Попробуйте позже.";
         }
     }
     
@@ -107,7 +109,7 @@ public class TrashCommandHandler implements CommandHandler {
      * @return отформатированное сообщение о пустой корзине
      */
     private @NonNull String buildEmptyTrashMessage() {
-        return "🗑️ " + bold("Корзина") + "\n\n" +
+        return TRASH + " " + bold("Корзина") + "\n\n" +
                 escape("Корзина пуста.") + "\n\n" +
                 italic("Удаленные события хранятся здесь 30 дней, после чего автоматически удаляются навсегда.");
     }

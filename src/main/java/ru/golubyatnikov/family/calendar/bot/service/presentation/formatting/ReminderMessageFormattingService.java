@@ -13,6 +13,11 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.Date
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.EventType.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Reminders.ENABLED;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Time.CLOCK;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
 
@@ -91,10 +96,10 @@ public class ReminderMessageFormattingService {
 
         StringBuilder message = new StringBuilder();
         
-        message.append("🔔 ").append(bold("Напоминание о событии")).append("\n\n");
-        message.append(formatMessage("📌 Событие: %s\n", event.getTitle()));
-        message.append(formatMessage("📅 Дата: %s\n", dateTimeFormattingService.formatDate(eventTime.toLocalDate())));
-        message.append(formatMessage("🕐 Время: %s\n", dateTimeFormattingService.formatTime(eventTime.toLocalTime())));
+        message.append(ENABLED + " ").append(bold("Напоминание о событии")).append("\n\n");
+        message.append(formatMessage(TITLE + " Событие: %s\n", event.getTitle()));
+        message.append(formatMessage(DATE + " Дата: %s\n", dateTimeFormattingService.formatDate(eventTime.toLocalDate())));
+        message.append(formatMessage(TIME + " Время: %s\n", dateTimeFormattingService.formatTime(eventTime.toLocalTime())));
         
         appendEventType(message, event);
         appendDescription(message, event);
@@ -105,9 +110,9 @@ public class ReminderMessageFormattingService {
     
     private @NonNull String getReminderPrefix(@NonNull ReminderType type, String formattedTime) {
         return switch (type) {
-            case EVENING_BEFORE -> "🌙 " + bold("Напоминание: завтра в " + formattedTime + " у вас событие - ");
-            case ONE_HOUR_BEFORE -> "⚡ " + bold("Напоминание: через 1 час начнется событие - ");
-            case FIFTEEN_MINUTES_BEFORE -> "🔥 " + bold("Напоминание: через 15 минут начнется событие - ");
+            case EVENING_BEFORE -> MOON + " " + bold("Напоминание: завтра в " + formattedTime + " у вас событие - ");
+            case ONE_HOUR_BEFORE -> LIGHTNING + " " + bold("Напоминание: через 1 час начнется событие - ");
+            case FIFTEEN_MINUTES_BEFORE -> FIRE + " " + bold("Напоминание: через 15 минут начнется событие - ");
         };
     }
     
@@ -117,21 +122,21 @@ public class ReminderMessageFormattingService {
     
     private void appendEventType(StringBuilder message, @NonNull Event event) {
         if (event.getIsPersonal()) {
-            message.append("👤 Тип: Персональное\n");
+            message.append(PERSONAL + " Тип: Персональное\n");
         } else {
-            message.append("👨‍👩‍👧‍👦 Тип: Семейное\n");
+            message.append(FAMILY + " Тип: Семейное\n");
         }
     }
     
     private void appendDescription(StringBuilder message, @NonNull Event event) {
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            message.append(formatMessage("📝 Описание: %s\n", event.getDescription()));
+            message.append(formatMessage(DESCRIPTION + " Описание: %s\n", event.getDescription()));
         }
     }
     
     private void appendReminderType(@NonNull StringBuilder message, @NonNull Reminder reminder) {
         String reminderTypeText = getReminderTypeText(reminder.getReminderType());
-        message.append(formatMessage("\n⏰ Напоминание: %s", reminderTypeText));
+        message.append(formatMessage("\n" + CLOCK + " Напоминание: %s", reminderTypeText));
     }
     
     private @NonNull String getReminderTypeText(@NonNull ReminderType type) {
@@ -151,7 +156,7 @@ public class ReminderMessageFormattingService {
                  reminder.getId(), timezone, e.getMessage(), e);
         
         if (dateTimeFormattingService.getUtc().equals(timezone)) {
-            return "🔔 " + bold("Напоминание о событии - " + reminder.getEvent().getTitle());
+            return ENABLED + " " + bold("Напоминание о событии - " + reminder.getEvent().getTitle());
         }
         
         return builder.build(reminder, dateTimeFormattingService.getUtc());

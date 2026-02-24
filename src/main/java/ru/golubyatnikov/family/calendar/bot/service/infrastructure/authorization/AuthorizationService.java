@@ -12,6 +12,8 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.Unau
 
 import java.util.Optional;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.WARNING;
+
 /**
  * Сервис для централизованной проверки авторизации пользователей.
  *
@@ -92,7 +94,7 @@ public class AuthorizationService {
      */
     private void sendTemporaryUnavailableMessage(Long chatId) {
         try {
-            String message = "⚠️ Временные технические проблемы\\. Пожалуйста, попробуйте позже\\.";
+            String message = WARNING + " Временные технические проблемы\\. Пожалуйста, попробуйте позже\\.";
             telegramMessageService.sendMessage(chatId, message);
             
         } catch (Exception e) {

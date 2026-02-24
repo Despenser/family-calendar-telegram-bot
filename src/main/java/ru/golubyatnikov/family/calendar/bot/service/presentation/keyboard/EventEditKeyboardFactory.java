@@ -10,6 +10,8 @@ import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import java.time.LocalDate;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.BACK;
+
 /**
  * Фабрика для создания клавиатур редактирования событий.
  *
@@ -32,7 +34,7 @@ public class EventEditKeyboardFactory {
                 event -> CallbackPrefix.EDIT_EVENT_FROM_CALENDAR.withPayload(event.getId() + "_" + date.toString()));
 
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", CallbackPrefix.CALENDAR.withPayload(date.toString()))
+            keyboardFactory.createButton(BACK + " Назад", CallbackPrefix.CALENDAR.withPayload(date.toString()))
         ));
 
         return keyboardFactory.createMarkup(rows);
@@ -48,7 +50,7 @@ public class EventEditKeyboardFactory {
                 event -> CallbackPrefix.DELETE_EVENT.withPayload(event.getId().toString()));
 
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", CallbackPrefix.CALENDAR.withPayload(date.toString()))
+            keyboardFactory.createButton(BACK + " Назад", CallbackPrefix.CALENDAR.withPayload(date.toString()))
         ));
 
         return keyboardFactory.createMarkup(rows);

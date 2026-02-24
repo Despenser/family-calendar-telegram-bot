@@ -7,6 +7,7 @@ import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.*;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -49,7 +50,7 @@ public class SearchResultFormattingService {
      * Добавляет заголовок результатов поиска.
      */
     private void appendSearchHeader(@NonNull StringBuilder builder, @NonNull String query) {
-        builder.append("🔍 ").append(bold("Результаты поиска")).append("\n\n");
+        builder.append(SEARCH + " ").append(bold("Результаты поиска")).append("\n\n");
         builder.append(italic("Запрос: \"" + query + "\"")).append("\n\n");
     }
     
@@ -64,14 +65,6 @@ public class SearchResultFormattingService {
         
         builder.append(italic("Попробуйте изменить запрос или использовать другие ключевые слова."))
                .append("\n\n");
-        
-        builder.append(escape("Вы можете использовать "))
-               .append("📅 ")
-               .append(escape("/today"))
-               .append(escape(" или "))
-               .append("📆 ")
-               .append(escape("/week"))
-               .append(escape(" для просмотра событий."));
     }
     
     /**

@@ -8,6 +8,10 @@ import org.telegram.telegrambots.meta.api.objects.message.Message;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.service.domain.user.UserService;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.EventType.FAMILY;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Reminders.ENABLED;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
 
@@ -62,19 +66,19 @@ public class StartCommandHandler implements CommandHandler {
     private @NonNull String buildWelcomeMessageForRegisteredUser(String firstName) {
 
         String greetingText = firstName != null && !firstName.isBlank() 
-                ? escape("Добро пожаловать, " + firstName + "! 👋")
-                : escape("Добро пожаловать! 👋");
+                ? escape("Добро пожаловать, " + firstName + "! " + WAVE)
+                : escape("Добро пожаловать! " + WAVE);
 
         return greetingText + "\n\n" +
                 bold("Семейный Календарь") + escape(" - это ваш персональный бот-помощник для управления семейными событиями и планами.") + "\n\n" +
                 escape("Вы уже зарегистрированы в системе и можете пользоваться всеми возможностями бота:") + "\n\n" +
                 bold("Основной функционал:") + "\n" +
-                escape("📅 Создание и управление событиями") + "\n" +
-                escape("🔔 Получение напоминаний о важных датах") + "\n" +
-                escape("👥 Совместное планирование с семьей") + "\n" +
-                escape("📊 Просмотр статистики и аналитики") + "\n" +
-                escape("🔍 Поиск и фильтрация событий") + "\n\n" +
-                escape("Используйте 📚 /help для получения подробной информации о доступных командах.");
+                escape(CALENDAR + " Создание и управление событиями") + "\n" +
+                escape(ENABLED + " Получение напоминаний о важных датах") + "\n" +
+                escape(FAMILY + " Совместное планирование с семьей") + "\n" +
+                escape(STATS + " Просмотр статистики и аналитики") + "\n" +
+                escape(SEARCH + " Поиск и фильтрация событий") + "\n\n" +
+                escape("Используйте " + HELP + " /help для получения подробной информации о доступных командах.");
     }
 
     /**
@@ -86,25 +90,25 @@ public class StartCommandHandler implements CommandHandler {
     private @NonNull String buildWelcomeMessageForUnregisteredUser(String firstName) {
 
         String greetingText = firstName != null && !firstName.isBlank() 
-                ? escape("Добро пожаловать, " + firstName + "! 👋")
-                : escape("Добро пожаловать! 👋");
+                ? escape("Добро пожаловать, " + firstName + "! " + WAVE)
+                : escape("Добро пожаловать! " + WAVE);
 
         return greetingText + "\n\n" +
                 bold("Семейный Календарь") + escape(" - это ваш персональный бот-помощник для управления семейными событиями и планами.") + "\n\n" +
                 escape("С помощью этого бота вы сможете:") + "\n" +
-                escape("📅 Создавать и управлять событиями") + "\n" +
-                escape("🔔 Получать напоминания о важных датах") + "\n" +
-                escape("👥 Совместно планировать с семьей") + "\n" +
-                escape("🔍 Искать и фильтровать события по типу") + "\n" +
-                escape("📊 Просматривать статистику и аналитику") + "\n\n" +
-                escape("🔒 ") + bold("Для доступа к функционалу требуется регистрация") + "\n\n" +
+                escape(CALENDAR + " Создавать и управлять событиями") + "\n" +
+                escape(ENABLED + " Получать напоминания о важных датах") + "\n" +
+                escape(FAMILY + " Совместно планировать с семьей") + "\n" +
+                escape(SEARCH + " Искать и фильтровать события по типу") + "\n" +
+                escape(STATS + " Просматривать статистику и аналитику") + "\n\n" +
+                escape(LOCK + " ") + bold("Для доступа к функционалу требуется регистрация") + "\n\n" +
                 escape("К сожалению, вы еще не зарегистрированы в системе. " +
                 "Для получения доступа к боту обратитесь к администратору вашей семьи.") + "\n\n" +
                 bold("Как получить доступ:") + "\n" +
-                escape("1️⃣ Свяжитесь с администратором вашей семьи") + "\n" +
-                escape("2️⃣ Сообщите ему ваш Telegram ID или username") + "\n" +
-                escape("3️⃣ Дождитесь подтверждения регистрации") + "\n" +
-                escape("4️⃣ После регистрации отправьте /start снова") + "\n\n" +
+                escape(NUMBER_1 + " Свяжитесь с администратором вашей семьи") + "\n" +
+                escape(NUMBER_2 + " Сообщите ему ваш Telegram ID или username") + "\n" +
+                escape(NUMBER_3 + " Дождитесь подтверждения регистрации") + "\n" +
+                escape(NUMBER_4 + " После регистрации отправьте /start снова") + "\n\n" +
                 escape("После регистрации вам станут доступны все возможности бота для управления семейным календарем!");
     }
 

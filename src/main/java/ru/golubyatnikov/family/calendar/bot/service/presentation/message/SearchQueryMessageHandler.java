@@ -11,6 +11,7 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.italic;
 
@@ -59,7 +60,7 @@ public class SearchQueryMessageHandler {
         try {
             conversationStateService.clearAwaitingSearchQuery(user.getId());
             
-            String response = "❌ " + bold("Произошла ошибка при обработке поискового запроса") + "\\. " +
+            String response = ERROR + " " + bold("Произошла ошибка при обработке поискового запроса") + "\\. " +
                             italic("Попробуйте еще раз\\.");
 
             ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();

@@ -18,6 +18,10 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotM
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.ADD_EVENT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.SUCCESS;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -86,8 +90,8 @@ public class ConversationMessageHandler {
         conversationService.updateEventTitle(userId, text);
 
         // 3. Обновляем сообщение создания
-        String response = bold("📋 Создание нового события") + "\n\n" +
-            "✅ Название: " + escape(text) + "\n\n" +
+        String response = bold(ADD_EVENT + " Создание нового события") + "\n\n" +
+            SUCCESS + " Название: " + escape(text) + "\n\n" +
             "Теперь отправьте описание события или нажмите кнопку 'Пропустить':";
         
         InlineKeyboardMarkup skipKeyboard = keyboardService.createSkipDescriptionKeyboard();
@@ -179,11 +183,10 @@ public class ConversationMessageHandler {
      */
     private void sendLastFallbackMessage(Long chatId, Event event, String description) {
         try {
-            String response = bold("✅ Событие успешно создано!") + "\n\n" +
-                "📅 Дата: " + escape(dateTimeFormattingService.formatDate(event.getEventDate())) + "\n" +
-                "🕐 Время: " + escape(dateTimeFormattingService.formatTime(event.getEventTime())) + "\n" +
-                "📝 Название: " + escape(event.getTitle()) + "\n" +
-                (description != null ? "📄 Описание: " + escape(description) : "");
+            String response = DATE + " Дата: " + escape(dateTimeFormattingService.formatDate(event.getEventDate())) + "\n" +
+                TIME + " Время: " + escape(dateTimeFormattingService.formatTime(event.getEventTime())) + "\n" +
+                DESCRIPTION + " Название: " + escape(event.getTitle()) + "\n" +
+                (description != null ? NOTE + " Описание: " + escape(description) : "");
 
             ReplyKeyboardMarkup fallbackKeyboard = keyboardService.createAuthorizedUserKeyboard();
             messageService.sendMessage(chatId, response, fallbackKeyboard);
@@ -222,8 +225,8 @@ public class ConversationMessageHandler {
      */
     private void sendErrorMessage(Long chatId) {
         try {
-            String response = "❌ " + bold("Произошла ошибка") + "\\. " + 
-                            italic("Попробуйте начать заново с команды ➕ /add_event");
+            String response = ERROR + " " + bold("Произошла ошибка") + "\\. " + 
+                            italic("Попробуйте начать заново с команды " + ADD_EVENT + " /add_event");
 
             ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
             messageService.sendMessage(chatId, response, keyboard);

@@ -27,6 +27,10 @@ import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 import java.time.LocalDate;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.BACK;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
+
 /**
  * Обработчик редактирования конкретного поля события.
  *
@@ -105,7 +109,7 @@ public class EventFieldEditHandler implements CallbackHandler {
      */
     private void handleInvalidFormat(@NonNull CallbackQueryContext context) throws TelegramApiException {
         messageService.editMessageText(context.chatId(), context.messageId(),
-                "❌ Произошла ошибка при обработке запроса", null);
+                ERROR + " Произошла ошибка при обработке запроса", null);
 
         callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
     }
@@ -155,11 +159,11 @@ public class EventFieldEditHandler implements CallbackHandler {
      */
     private @NonNull String buildMessageForField(@NonNull String field, User user) {
         return switch (field) {
-            case "date" -> "📅 Редактирование даты\n\nВыберите новую дату из календаря:";
-            case "time" -> "🕐 Редактирование времени\n\nВыберите новое время:";
-            case "title" -> "📝 Редактирование названия\n\nОтправьте новое название события:";
-            case "description" -> "📄 Редактирование описания\n\nОтправьте новое описание события:";
-            default -> "❌ Неизвестное поле для редактирования";
+            case "date" -> DATE + " Редактирование даты\n\nВыберите новую дату из календаря:";
+            case "time" -> TIME + " Редактирование времени\n\nВыберите новое время:";
+            case "title" -> DESCRIPTION + " Редактирование названия\n\nОтправьте новое название события:";
+            case "description" -> NOTE + " Редактирование описания\n\nОтправьте новое описание события:";
+            default -> ERROR + " Неизвестное поле для редактирования";
         };
     }
     
@@ -193,7 +197,7 @@ public class EventFieldEditHandler implements CallbackHandler {
      * Создает клавиатуру только с кнопкой "Назад".
      */
     private @NonNull InlineKeyboardMarkup createCancelOnlyKeyboard(@NonNull Long eventId) {
-        InlineKeyboardButton button = keyboardFactory.createButton("🔙 Назад",
+        InlineKeyboardButton button = keyboardFactory.createButton(BACK + " Назад",
                 CallbackPrefix.EDIT_BACK.withPayload(eventId.toString()));
 
         InlineKeyboardRow row = keyboardFactory.createRow(button);

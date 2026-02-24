@@ -15,6 +15,8 @@ import ru.golubyatnikov.family.calendar.bot.util.TelegramExceptionUtil;
 import java.util.List;
 import java.util.Optional;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.START;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
 
 /**
@@ -116,7 +118,7 @@ public class CallbackQueryDispatcher {
      * @param callbackQuery callback query от неавторизованного пользователя
      */
     private void handleUnauthorizedUser(@NonNull CallbackQuery callbackQuery) {
-        String message = "❌ Пользователь не найден. Используйте 🚀 " + escape("/start") + " для регистрации.";
+        String message = ERROR + " Пользователь не найден. Используйте " + START + " " + escape("/start") + " для регистрации.";
         answerCallbackQuerySafely(callbackQuery.getId(), message);
     }
     
@@ -135,7 +137,7 @@ public class CallbackQueryDispatcher {
                 callbackQuery.getFrom().getId(),
                 callbackQuery.getFrom().getUserName());
 
-        answerCallbackQuerySafely(callbackQuery.getId(), "❌ Неизвестная команда");
+        answerCallbackQuerySafely(callbackQuery.getId(), ERROR + " Неизвестная команда");
     }
     
     /**

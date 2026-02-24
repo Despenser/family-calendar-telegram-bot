@@ -29,6 +29,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.EDIT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.DESCRIPTION;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 
 /**
@@ -181,7 +183,7 @@ public class EventEditHandler implements CallbackHandler {
                     .filter(e -> e.getUser().getId().equals(context.getUserId()))
                     .collect(Collectors.toList());
             
-            String message = "✏️ Выберите событие для редактирования:";
+            String message = EDIT + " Выберите событие для редактирования:";
             InlineKeyboardMarkup keyboard = keyboardFactory.createEventListKeyboard(myEvents, sourceDate);
             
             messageService.editMessageText(context.chatId(), messageId, message, keyboard);
@@ -221,7 +223,7 @@ public class EventEditHandler implements CallbackHandler {
      * Формирует сообщение с текущими данными события для выбора поля редактирования.
      */
     private @NonNull String buildEditFieldSelectionMessage(@NonNull Event event) {
-        return "📝 " + bold("Редактирование события") + "\n\n" +
+        return DESCRIPTION + " " + bold("Редактирование события") + "\n\n" +
                 botMessageFormattingService.buildEventMessage(event) +
                 "\n\n" + "Выберите поле для редактирования:";
     }

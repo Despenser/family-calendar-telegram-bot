@@ -23,6 +23,9 @@ import ru.golubyatnikov.family.calendar.bot.util.CorrelationIdUtil;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.DATE;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.DESCRIPTION;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.SUCCESS;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -100,17 +103,17 @@ public class EventCompletionScheduler {
 
             // Формируем сообщение
             StringBuilder message = new StringBuilder();
-            message.append("✅ ")
+            message.append(SUCCESS + " ")
                     .append(bold("Событие завершено"))
                     .append("\n\n");
 
             // Название события
-            message.append("📝 ")
+            message.append(DESCRIPTION + " ")
                     .append(bold(event.getTitle()))
                     .append("\n");
 
             // Дата события
-            message.append("📅 ")
+            message.append(DATE + " ")
                     .append(escape(dateTimeFormattingService.formatDate(event.getEventDate())));
 
             // Время события
@@ -145,8 +148,8 @@ public class EventCompletionScheduler {
      * @param eventId идентификатор события
      * @return объект InlineKeyboardMarkup с кнопкой
      */
-    private @NonNull InlineKeyboardMarkup createCompletionKeyboard(Long eventId) {
-        InlineKeyboardButton button = keyboardFactory.createButton("📝 Добавить заметку",
+    private @NonNull InlineKeyboardMarkup createCompletionKeyboard(@NonNull Long eventId) {
+        InlineKeyboardButton button = keyboardFactory.createButton(DESCRIPTION + " Добавить заметку",
                 CallbackPrefix.ADD_COMPLETION_NOTE.withPayload(eventId.toString()));
 
         InlineKeyboardRow row = keyboardFactory.createRow(button);

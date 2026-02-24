@@ -14,6 +14,8 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import java.time.LocalDate;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.ADD_EVENT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
 
@@ -74,7 +76,7 @@ public class AddEventCommandHandler implements CommandHandler {
     }
 
     private @NonNull String buildNoFamilyMessage() {
-        return "❌ " + escape("Вы не принадлежите ни одной семье.") + "\n\n" +
+        return ERROR + " " + escape("Вы не принадлежите ни одной семье.") + "\n\n" +
                escape("Для создания событий необходимо быть членом семьи. ") +
                escape("Обратитесь к администратору для добавления в семью.");
     }
@@ -88,7 +90,7 @@ public class AddEventCommandHandler implements CommandHandler {
         
         Message sentMessage = messageService.sendMessageWithInlineKeyboardAndGet(
                 chatId, 
-                bold("📋 Создание нового события") + "\n\nВыберите дату события:", 
+                bold(ADD_EVENT + " Создание нового события") + "\n\nВыберите дату события:", 
                 calendar);
         
         conversationService.setCreationMessageId(user.getId(), sentMessage.getMessageId().longValue());
@@ -106,7 +108,7 @@ public class AddEventCommandHandler implements CommandHandler {
     }
 
     private @NonNull String buildErrorMessage(@NonNull Exception e) {
-        return String.format("❌ %s: %s\n\n%s", 
+        return String.format(ERROR + " %s: %s\n\n%s", 
                 bold("Произошла ошибка при создании события"),
                 escape(e.getMessage()),
                 escape("Попробуйте снова, используя команду /add_event"));

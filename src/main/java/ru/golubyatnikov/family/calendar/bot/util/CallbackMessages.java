@@ -1,5 +1,8 @@
 package ru.golubyatnikov.family.calendar.bot.util;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.CANCEL;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.*;
+
 /**
  * Централизованное хранилище всплывающих сообщений для callback queries.
  *
@@ -7,6 +10,10 @@ package ru.golubyatnikov.family.calendar.bot.util;
  * @since 2026-02-04
  */
 public final class CallbackMessages {
+
+    // Константы для использования в статических полях
+    private static final String SUCCESS_EMOJI = EmojiConstants.Status.SUCCESS;
+    private static final String ERROR_EMOJI = EmojiConstants.Status.ERROR;
 
     /**
      * Приватный конструктор для предотвращения создания экземпляров.
@@ -23,31 +30,31 @@ public final class CallbackMessages {
      * Универсальное сообщение об успехе.
      * Используется для подтверждения успешного выполнения операции.
      */
-    public static final String SUCCESS = "✅ Готово";
+    public static final String SUCCESS = SUCCESS_EMOJI + " Готово";
 
     /**
      * Подтверждение выбора.
      * Используется для подтверждения того, что выбор пользователя принят.
      */
-    public static final String SELECTED = "✅ Выбрано";
+    public static final String SELECTED = SUCCESS_EMOJI + " Выбрано";
 
     /**
      * Успешное создание.
      * Используется для подтверждения создания новой сущности.
      */
-    public static final String CREATED = "✅ Создано";
+    public static final String CREATED = SUCCESS_EMOJI + " Создано";
 
     /**
      * Успешное удаление.
      * Используется для подтверждения удаления сущности.
      */
-    public static final String DELETED = "✅ Удалено";
+    public static final String DELETED = SUCCESS_EMOJI + " Удалено";
 
     /**
      * Успешное изменение.
      * Используется для подтверждения обновления сущности.
      */
-    public static final String UPDATED = "✅ Обновлено";
+    public static final String UPDATED = SUCCESS_EMOJI + " Обновлено";
 
     // ============ ОШИБКИ ============
 
@@ -55,35 +62,35 @@ public final class CallbackMessages {
      * Общая ошибка.
      * Используется, когда произошла непредвиденная ошибка.
      */
-    public static final String ERROR = "❌ Произошла ошибка";
+    public static final String ERROR = ERROR_EMOJI + " Произошла ошибка";
 
     /**
      * Ошибка доступа.
      * Используется, когда у пользователя нет прав для выполнения операции.
      */
-    public static final String NO_ACCESS = "❌ Нет прав доступа";
+    public static final String NO_ACCESS = ERROR_EMOJI + " Нет прав доступа";
 
     /**
      * Сущность не найдена.
      */
-    public static final String NOT_FOUND = "❌ %s не найдено";
+    public static final String NOT_FOUND = ERROR_EMOJI + " %s не найдено";
 
     /**
      * Ошибка валидации.
      */
-    public static final String VALIDATION_ERROR = "❌ Ошибка: %s";
+    public static final String VALIDATION_ERROR = ERROR_EMOJI + " Ошибка: %s";
 
     /**
      * Неизвестное действие.
-     * Используется когда получен callback с неизвестным действием.
+     * Используется, когда получен callback с неизвестным действием.
      */
-    public static final String UNKNOWN_ACTION = "❌ Неизвестное действие";
+    public static final String UNKNOWN_ACTION = ERROR_EMOJI + " Неизвестное действие";
 
     /**
      * Некорректный запрос.
-     * Используется когда получен некорректный callback запрос.
+     * Используется, когда получен некорректный callback запрос.
      */
-    public static final String INVALID_REQUEST = "❌ Некорректный запрос";
+    public static final String INVALID_REQUEST = ERROR_EMOJI + " Некорректный запрос";
 
     // ============ ОТМЕНЫ ============
 
@@ -91,32 +98,19 @@ public final class CallbackMessages {
      * Универсальная отмена.
      * Используется для подтверждения отмены операции.
      */
-    public static final String CANCELLED = "🚫 Отменено";
+    public static final String CANCELLED = CANCEL + " Отменено";
 
     /**
      * Отмена конкретного действия.
      */
-    public static final String ACTION_CANCELLED = "🚫 %s отменено";
-
-    // ============ ИНФОРМАЦИОННЫЕ ============
-
-    /**
-     * Запрос выбора.
-     */
-    public static final String SELECT_PROMPT = "Выберите %s";
-
-    /**
-     * Требование валидации.
-     * Шаблон для форматирования с указанием минимального требования.
-     */
-    public static final String VALIDATION_REQUIRED = "Выберите хотя бы %s";
+    public static final String ACTION_CANCELLED = CANCEL + " %s отменено";
 
     // ============ ПОДТВЕРЖДЕНИЯ ============
 
     /**
      * Подтверждение выбора элемента.
      */
-    public static final String ITEM_SELECTED = "✅ %s выбрано";
+    public static final String ITEM_SELECTED = SUCCESS_EMOJI + " %s выбрано";
 
     // ============ ПУСТЫЕ ОТВЕТЫ ============
 
@@ -135,9 +129,9 @@ public final class CallbackMessages {
 
     /**
      * Для напоминаний - событие слишком близко.
-     * Используется когда событие происходит слишком скоро для создания напоминаний.
+     * Используется, когда событие происходит слишком скоро для создания напоминаний.
      */
-    public static final String REMINDER_TOO_SOON = "ℹ️ Событие уже скоро, напоминания не созданы";
+    public static final String REMINDER_TOO_SOON = INFO + " Событие уже скоро, напоминания не созданы";
 
     /**
      * Для выбора следующего часа.
@@ -147,7 +141,7 @@ public final class CallbackMessages {
     
     /**
      * Для календаря - нет событий на выбранную дату.
-     * Используется когда пользователь выбирает дату без событий.
+     * Используется, когда пользователь выбирает дату без событий.
      */
     public static final String NO_EVENTS_ON_DATE = "На эту дату нет событий";
 }

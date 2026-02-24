@@ -18,6 +18,8 @@ import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 import ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
+
 /**
  * Обработчик для просмотра вложений.
  * Отправляет файл пользователю с клавиатурой для возврата к списку.
@@ -69,7 +71,7 @@ public class AttachmentViewHandler {
         } catch (TelegramApiException e) {
             log.error("Ошибка Telegram API при отправке файла: attachmentId={}", attachmentId, e);
             callbackQueryService.answerCallback(context, CallbackMessages.ERROR);
-            messageService.sendMessage(context.chatId(), "❌ Не удалось отправить файл\\. Попробуйте позже\\.");
+            messageService.sendMessage(context.chatId(), ERROR + " Не удалось отправить файл\\. Попробуйте позже\\.");
         }
     }
     

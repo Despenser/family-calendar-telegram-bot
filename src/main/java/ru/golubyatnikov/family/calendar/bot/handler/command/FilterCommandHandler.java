@@ -10,6 +10,8 @@ import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.FILTER;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
 
@@ -40,7 +42,7 @@ public class FilterCommandHandler implements CommandHandler {
         try {
             InlineKeyboardMarkup keyboard = keyboardService.createFilterKeyboard();
 
-            String messageText = "🫧 " + bold("Выберите тип событий для отображения") + "\n\n" +
+            String messageText = FILTER + " " + bold("Выберите тип событий для отображения") + "\n\n" +
                     escape("Используйте кнопки ниже для фильтрации событий по категориям.");
 
             messageService.sendMessage(message.getChatId(), messageText, keyboard);
@@ -49,7 +51,7 @@ public class FilterCommandHandler implements CommandHandler {
             
         } catch (Exception e) {
             log.error("Ошибка при отправке меню фильтрации пользователю ID={}", user.getId(), e);
-            return "❌ " + escape("Произошла ошибка при отображении меню фильтрации");
+            return ERROR + " " + escape("Произошла ошибка при отображении меню фильтрации");
         }
     }
     

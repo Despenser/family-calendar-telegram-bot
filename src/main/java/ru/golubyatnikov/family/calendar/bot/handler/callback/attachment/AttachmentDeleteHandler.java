@@ -20,6 +20,8 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.message.Attachm
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
+
 /**
  * Обработчик для удаления вложений.
  * Управляет процессом удаления файлов с подтверждением и проверкой прав доступа.
@@ -98,7 +100,7 @@ public class AttachmentDeleteHandler {
         } catch (UnauthorizedAccessException e) {
             log.warn("Попытка удаления чужого вложения: userId={}, attachmentId={}", context.getUserId(), attachmentId);
             callbackQueryService.answerCallback(context, CallbackMessages.NO_ACCESS);
-            messageService.sendMessage(context.chatId(), "❌ Только создатель события может удалять вложения\\.");
+            messageService.sendMessage(context.chatId(), ERROR + " Только создатель события может удалять вложения\\.");
         }
     }
     

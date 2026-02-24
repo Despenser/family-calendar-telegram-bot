@@ -33,6 +33,8 @@ import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.SUCCESS;
+
 /**
  * Обработчик callback queries для выбора даты и времени события.
  *
@@ -391,7 +393,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         
         try {
             callbackQueryService.editMessageAndAnswer(context, eventMessage,
-                    eventKeyboard, "✅ Событие создано");
+                    eventKeyboard, SUCCESS + " Событие создано");
             
         } catch (Exception e) {
             log.error("Ошибка при завершении повторения события: userId={}, error={}", context.getUserId(), e.getMessage());

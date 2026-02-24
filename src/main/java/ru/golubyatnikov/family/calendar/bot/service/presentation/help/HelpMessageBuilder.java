@@ -9,6 +9,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.HELP;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.LOCK;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.WARNING;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
 
@@ -59,7 +62,7 @@ public class HelpMessageBuilder {
      * Добавляет заголовок справки.
      */
     private void appendHeader(@NonNull StringBuilder message) {
-        message.append("📚 ")
+        message.append(HELP).append(" ")
                 .append(bold("Справка по командам Семейного Календаря"))
                 .append("\n\n");
     }
@@ -77,8 +80,8 @@ public class HelpMessageBuilder {
      * Добавляет предупреждение о необходимости авторизации.
      */
     private void appendAuthorizationWarning(@NonNull StringBuilder message) {
-        message.append(escape("⚠️ Вы не зарегистрированы в семейном календаре.")).append("\n")
-                .append(escape("Некоторые команды требуют регистрации (отмечены 🔒).")).append("\n")
+        message.append(escape(WARNING + " Вы не зарегистрированы в семейном календаре.")).append("\n")
+                .append(escape("Некоторые команды требуют регистрации (отмечены " + LOCK + ").")).append("\n")
                 .append(escape("Для получения доступа к полному функционалу обратитесь к администратору вашей семьи."))
                 .append("\n\n");
     }

@@ -8,6 +8,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import java.util.ArrayList;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.*;
+
 /**
  * Сервис для создания обычных клавиатур (ReplyKeyboardMarkup) в Telegram.
  *
@@ -19,18 +21,18 @@ import java.util.List;
 public class ReplyKeyboardService {
 
     // Константы для текста кнопок
-    private static final String BTN_START = "🚀 Начать";
-    private static final String BTN_MONTH = "📆 Месяц";
-    private static final String BTN_ADD = "➕ Добавить";
-    private static final String BTN_MY = "📋 Мои события";
-    private static final String BTN_HELP = "📚 Помощь";
-    private static final String BTN_TODAY = "📍 Сегодня";
-    private static final String BTN_WEEK = "📅 Неделя";
-    private static final String BTN_TRASH = "🗑️ Корзина";
-    private static final String BTN_STATS = "📊 Статистика";
-    private static final String BTN_SEARCH = "🔍 Поиск";
-    private static final String BTN_FILTER = "🫧 Фильтр";
-    private static final String BTN_CALENDAR = "🗓️ Календарь";
+    private static final String BTN_START = START + " Начать";
+    private static final String BTN_MONTH = MONTH + " Месяц";
+    private static final String BTN_ADD = ADD_EVENT + " Добавить";
+    private static final String BTN_MY = MY_EVENTS + " Мои события";
+    private static final String BTN_HELP = HELP + " Помощь";
+    private static final String BTN_TODAY = TODAY + " Сегодня";
+    private static final String BTN_WEEK = WEEK + " Неделя";
+    private static final String BTN_TRASH = TRASH + " Корзина";
+    private static final String BTN_STATS = STATS + " Статистика";
+    private static final String BTN_SEARCH = SEARCH + " Поиск";
+    private static final String BTN_FILTER = FILTER + " Фильтр";
+    private static final String BTN_CALENDAR = CALENDAR + " Календарь";
 
     /**
      * Создает клавиатуру для авторизованного пользователя с полным набором команд.

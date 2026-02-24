@@ -20,6 +20,11 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.CANCEL;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.BACK;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.ARROW_LEFT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.ARROW_RIGHT;
+
 /**
  * Компонент для построения календарных клавиатур.
  * Отвечает за создание inline-клавиатур с календарем для выбора даты.
@@ -378,7 +383,7 @@ public class CalendarKeyboardBuilder {
      * @return кнопка "Назад"
      */
     private InlineKeyboardButton createPrevMonthButton(@NonNull YearMonth month) {
-        return keyboardFactory.createButton("⬅️", 
+        return keyboardFactory.createButton(ARROW_LEFT, 
             CallbackPrefix.CALENDAR.withPayload(String.format("%d-%02d", month.getYear(), month.getMonthValue())));
     }
 
@@ -389,7 +394,7 @@ public class CalendarKeyboardBuilder {
      * @return кнопка "Вперед"
      */
     private InlineKeyboardButton createNextMonthButton(@NonNull YearMonth month) {
-        return keyboardFactory.createButton("➡️", 
+        return keyboardFactory.createButton(ARROW_RIGHT, 
             CallbackPrefix.CALENDAR.withPayload(String.format("%d-%02d", month.getYear(), month.getMonthValue())));
     }
 
@@ -404,7 +409,7 @@ public class CalendarKeyboardBuilder {
     private InlineKeyboardButton createCenterButton(@NonNull CalendarContext context) {
         if (context.isEditingEvent()) {
             // При редактировании - кнопка "Назад"
-            return keyboardFactory.createButton("🔙 Назад", 
+            return keyboardFactory.createButton(BACK + " Назад", 
                 CallbackPrefix.EDIT_BACK.withPayload(context.editingEventId().toString()));
 
         } else {
@@ -433,7 +438,7 @@ public class CalendarKeyboardBuilder {
      */
     private InlineKeyboardRow createCancelRow() {
         return keyboardFactory.createRow(
-            keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.CALENDAR_CANCEL.withPayload(""))
+            keyboardFactory.createButton(CANCEL + " Отменить создание", CallbackPrefix.CALENDAR_CANCEL.withPayload(""))
         );
     }
 }

@@ -14,6 +14,8 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.Even
 import java.time.LocalDate;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.TODAY;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
 
 /**
@@ -59,7 +61,7 @@ public class TodayCommandHandler implements CommandHandler {
             
             if (filteredEvents.isEmpty()) {
                 return eventFormattingService.formatNoEventsMessage(
-                    "📍",
+                    TODAY,
                     "События на сегодня",
                     "На сегодня событий не запланировано."
                 );
@@ -68,7 +70,7 @@ public class TodayCommandHandler implements CommandHandler {
             // Формирование сообщения с событиями
             StringBuilder messageBuilder = new StringBuilder();
             messageBuilder.append(eventFormattingService.formatCommandHeader(
-                "📍",
+                TODAY,
                 "События на сегодня",
                 dateTimeFormattingService.formatDateWithDayOfWeek(today)
             ));
@@ -86,7 +88,7 @@ public class TodayCommandHandler implements CommandHandler {
             
         } catch (Exception e) {
             log.error("Ошибка при обработке команды /today для пользователя ID={}", user.getId(), e);
-            return escape("❌ Произошла ошибка при получении событий на сегодня. Попробуйте позже.");
+            return escape(ERROR + " Произошла ошибка при получении событий на сегодня. Попробуйте позже.");
         }
     }
     

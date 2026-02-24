@@ -11,6 +11,8 @@ import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import java.util.Arrays;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
+
 /**
  * AOP-аспект для централизованной обработки ошибок в callback handlers.
  *
@@ -134,7 +136,7 @@ public class CallbackErrorHandlingAspect {
         try {
             messageService.answerCallbackQuery(
                 callbackQuery.getId(), 
-                "❌ Произошла ошибка. Попробуйте еще раз."
+                ERROR + " Произошла ошибка. Попробуйте еще раз."
             );
 
         } catch (Exception ex) {

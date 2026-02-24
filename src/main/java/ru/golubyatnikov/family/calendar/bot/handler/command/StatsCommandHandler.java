@@ -11,6 +11,12 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.Date
 import ru.golubyatnikov.family.calendar.bot.service.domain.statistics.StatisticsService;
 import java.time.YearMonth;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.TITLE;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.EventType.FAMILY;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.BULLET;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.PARTY;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.*;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -50,7 +56,7 @@ public class StatsCommandHandler implements CommandHandler {
             // Формирование сообщения со статистикой
             String monthName = dateTimeFormattingService.formatMonth(currentMonth.atDay(1));
             StringBuilder messageBuilder = new StringBuilder();
-            messageBuilder.append(escape("📊 "))
+            messageBuilder.append(escape(STATS + " "))
                           .append(bold("Статистика событий"))
                           .append(escape(" ("))
                           .append(escape(monthName))
@@ -58,24 +64,24 @@ public class StatsCommandHandler implements CommandHandler {
                           .append(escape("\n\n"));
             
             // Общая статистика
-            messageBuilder.append(escape("📋 "))
+            messageBuilder.append(escape(MY_EVENTS + " "))
                           .append(bold("Общая статистика:"))
                           .append(escape("\n"));
-            messageBuilder.append(escape("• Всего событий: "))
+            messageBuilder.append(BULLET + " Всего событий: ")
                           .append(bold(String.valueOf(stats.getTotalEvents())))
                           .append(escape("\n"));
-            messageBuilder.append(escape("• Завершено: "))
+            messageBuilder.append(BULLET + " Завершено: ")
                           .append(bold(String.valueOf(stats.getCompletedEvents())))
                           .append(escape("\n"));
-            messageBuilder.append(escape("• Активных: "))
+            messageBuilder.append(BULLET + " Активных: ")
                           .append(bold(String.valueOf(stats.getActiveEvents())))
                           .append(escape("\n\n"));
 
             // Статистика по типам
-            messageBuilder.append(escape("👨‍👩‍👧‍👦 "))
+            messageBuilder.append(escape(FAMILY + " "))
                           .append(bold("По типам событий:"))
                           .append(escape("\n"));
-            messageBuilder.append(escape("• Семейные: "))
+            messageBuilder.append(BULLET + " Семейные: ")
                           .append(bold(String.valueOf(stats.getFamilyEvents())));
             
             if (stats.getTotalEvents() > 0) {
@@ -85,7 +91,7 @@ public class StatsCommandHandler implements CommandHandler {
             }
             messageBuilder.append(escape("\n"));
             
-            messageBuilder.append(escape("• Персональные: "))
+            messageBuilder.append(BULLET + " Персональные: ")
                           .append(bold(String.valueOf(stats.getPersonalEvents())));
             
             if (stats.getTotalEvents() > 0) {
@@ -97,7 +103,7 @@ public class StatsCommandHandler implements CommandHandler {
             
             // Процент завершенных событий
             if (stats.getTotalEvents() > 0) {
-                messageBuilder.append(escape("✅ "))
+                messageBuilder.append(escape(SUCCESS + " "))
                               .append("Процент завершения:")
                               .append(escape(" "))
                               .append(bold(String.format("%.1f%%", stats.getCompletionRate())))
@@ -108,19 +114,19 @@ public class StatsCommandHandler implements CommandHandler {
             if (stats.getTotalEvents() == 0) {
                 messageBuilder.append(italic("В этом месяце нет событий. Создайте первое событие с помощью /add_event"));
             } else if (stats.getActiveEvents() > 0) {
-                messageBuilder.append(escape("📌 "))
+                messageBuilder.append(escape(TITLE + " "))
                               .append("Активных событий в этом месяце:")
                               .append(escape(" "))
                               .append(bold(String.valueOf(stats.getActiveEvents())));
             } else {
-                messageBuilder.append(italic("Все события этого месяца завершены! 🎉"));
+                messageBuilder.append(italic("Все события этого месяца завершены! " + PARTY));
             }
 
             return messageBuilder.toString();
             
         } catch (Exception e) {
             log.error("Ошибка при обработке команды /stats для пользователя ID={}", user.getId(), e);
-            return "❌ Произошла ошибка при получении статистики. Попробуйте позже.";
+            return ERROR + " Произошла ошибка при получении статистики. Попробуйте позже.";
         }
     }
 

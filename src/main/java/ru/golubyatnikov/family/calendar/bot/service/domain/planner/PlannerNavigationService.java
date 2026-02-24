@@ -13,6 +13,11 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.Tele
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.DATE;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.DESCRIPTION;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.TIME;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.TITLE;
+
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.stream.IntStream;
@@ -141,12 +146,12 @@ public class PlannerNavigationService {
     private @NonNull String buildPlainEventText(@NonNull Event event) {
         StringBuilder plainText = new StringBuilder();
         
-        plainText.append("📌 ").append(event.getTitle()).append("\n");
-        plainText.append("📅 Дата: ").append(dateTimeFormattingService.formatDate(event.getEventDate())).append("\n");
-        plainText.append("🕐 Время: ").append(dateTimeFormattingService.formatTime(event.getEventTime()));
+        plainText.append(TITLE + " ").append(event.getTitle()).append("\n");
+        plainText.append(DATE + " Дата: ").append(dateTimeFormattingService.formatDate(event.getEventDate())).append("\n");
+        plainText.append(TIME + " Время: ").append(dateTimeFormattingService.formatTime(event.getEventTime()));
         
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            plainText.append("\n📝 Описание: ").append(event.getDescription());
+            plainText.append("\n" + DESCRIPTION + " Описание: ").append(event.getDescription());
         }
         
         return plainText.toString();

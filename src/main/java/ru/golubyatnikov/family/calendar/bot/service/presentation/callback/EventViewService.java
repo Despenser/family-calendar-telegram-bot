@@ -21,6 +21,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.REPEAT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.BACK;
+
 /**
  * Сервис для просмотра и управления событиями из календаря.
  * Обрабатывает просмотр событий, создание новых и повторение существующих.
@@ -186,13 +189,13 @@ public class EventViewService {
         
         if (event.isCompleted()) {
             rows.add(keyboardFactory.createRow(
-                keyboardFactory.createButton("🔄 Повторить событие",
+                keyboardFactory.createButton(REPEAT + " Повторить событие",
                         CallbackPrefix.REPEAT_EVENT.withPayload(event.getId().toString()))
             ));
         }
         
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад к списку",
+            keyboardFactory.createButton(BACK + " Назад к списку",
                     CallbackPrefix.VIEW_EVENTS_ON_DATE.withPayload(eventDate.toString()))
         ));
         

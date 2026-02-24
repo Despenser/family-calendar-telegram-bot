@@ -9,6 +9,14 @@ import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import java.util.ArrayList;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.FileTypes.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.ATTACHMENT;
+
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.ADD_EVENT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.BACK;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.*;
+
 /**
  * Фабрика для создания inline клавиатур, связанных с вложениями.
  *
@@ -45,10 +53,10 @@ public class AttachmentInlineKeyboardFactory {
         if (attachments != null && !attachments.isEmpty()) {
             for (Attachment attachment : attachments) {
                 String emoji = switch (attachment.getFileType()) {
-                    case "photo" -> "🖼️";
-                    case "video" -> "🎥";
-                    case "audio" -> "🎵";
-                    default -> "📄";
+                    case "photo" -> PHOTO;
+                    case "video" -> VIDEO;
+                    case "audio" -> AUDIO;
+                    default -> DOCUMENT;
                 };
                 
                 String buttonText = emoji + " " + (attachment.getFileName() != null ? attachment.getFileName() : "Файл");
@@ -56,7 +64,7 @@ public class AttachmentInlineKeyboardFactory {
                 if (isCreator) {
                     rows.add(keyboardFactory.createRow(
                         keyboardFactory.createButton(buttonText, CallbackPrefix.ATTACH_FILE.withPayload("view_" + eventId + "_" + attachment.getId())),
-                        keyboardFactory.createButton("🗑️", CallbackPrefix.ATTACH_FILE.withPayload("delete_" + eventId + "_" + attachment.getId()))
+                        keyboardFactory.createButton(DELETE, CallbackPrefix.ATTACH_FILE.withPayload("delete_" + eventId + "_" + attachment.getId()))
                     ));
                 } else {
                     rows.add(keyboardFactory.createRow(
@@ -68,12 +76,12 @@ public class AttachmentInlineKeyboardFactory {
         
         if (isCreator) {
             rows.add(keyboardFactory.createRow(
-                keyboardFactory.createButton("➕ Добавить файл", CallbackPrefix.ATTACH_FILE.withPayload("add_" + eventId))
+                keyboardFactory.createButton(ADD_EVENT + " Добавить файл", CallbackPrefix.ATTACH_FILE.withPayload("add_" + eventId))
             ));
         }
         
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад к событию", CallbackPrefix.ATTACH_FILE.withPayload("back_" + eventId))
+            keyboardFactory.createButton(BACK + " Назад к событию", CallbackPrefix.ATTACH_FILE.withPayload("back_" + eventId))
         ));
         
         return keyboardFactory.createMarkup(rows);
@@ -99,8 +107,8 @@ public class AttachmentInlineKeyboardFactory {
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("✅ Да, удалить", CallbackPrefix.ATTACH_FILE.withPayload("confirm_delete_" + eventId + "_" + attachmentId)),
-                keyboardFactory.createButton("❌ Отмена", CallbackPrefix.ATTACH_FILE.withPayload("cancel_delete_" + eventId))
+                keyboardFactory.createButton(SUCCESS + " Да, удалить", CallbackPrefix.ATTACH_FILE.withPayload("confirm_delete_" + eventId + "_" + attachmentId)),
+                keyboardFactory.createButton(CANCELLED + " Отмена", CallbackPrefix.ATTACH_FILE.withPayload("cancel_delete_" + eventId))
             )
         );
     }
@@ -120,7 +128,7 @@ public class AttachmentInlineKeyboardFactory {
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("🔙 Назад к вложениям", CallbackPrefix.ATTACH_FILE.withPayload("list_" + eventId))
+                keyboardFactory.createButton(BACK + " Назад к вложениям", CallbackPrefix.ATTACH_FILE.withPayload("list_" + eventId))
             )
         );
     }
@@ -140,7 +148,7 @@ public class AttachmentInlineKeyboardFactory {
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("❌ Отмена", CallbackPrefix.ATTACH_FILE.withPayload("cancel_add_" + eventId))
+                keyboardFactory.createButton(CANCELLED + " Отмена", CallbackPrefix.ATTACH_FILE.withPayload("cancel_add_" + eventId))
             )
         );
     }

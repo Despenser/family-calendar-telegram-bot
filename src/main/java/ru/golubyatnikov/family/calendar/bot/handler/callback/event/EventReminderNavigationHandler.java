@@ -30,6 +30,8 @@ import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 import java.time.ZoneId;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.BACK;
+
 /**
  * Обработчик навигации между событием и напоминанием.
  *
@@ -213,7 +215,7 @@ public class EventReminderNavigationHandler implements CallbackHandler {
      */
     private @NonNull InlineKeyboardMarkup createDetailsKeyboard(Long eventId, Long reminderId) {
         InlineKeyboardButton button = keyboardFactory.createButton(
-                "🔙 Скрыть детали",
+                BACK + " Скрыть детали",
                 CallbackPrefix.BACK_TO_REMINDER.withPayload(eventId + "_" + reminderId)
         );
         InlineKeyboardRow row = keyboardFactory.createRow(button);

@@ -33,6 +33,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Predicate;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.DESCRIPTION;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 
 /**
@@ -299,8 +301,8 @@ public class NavigationCallbackHandler implements CallbackHandler {
         String payload = CallbackPrefix.DATE_ACTIONS.extractPayload(callbackData);
         
         String message = switch (payload) {
-            case "view" -> "📅 Просмотр событий на дату";
-            case "create" -> "➕ Создание нового события";
+            case "view" -> CALENDAR + " Просмотр событий на дату";
+            case "create" -> ADD_EVENT + " Создание нового события";
             default -> "Неизвестное действие";
         };
         
@@ -457,7 +459,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @return отформатированное сообщение
      */
     private @NonNull String buildEditFieldSelectionMessage(@NonNull Event event) {
-        return "📝 " + bold("Редактирование события") + "\n\n"
+        return DESCRIPTION + " " + bold("Редактирование события") + "\n\n"
                 + botMessageFormattingService.buildEventMessage(event) + "\n\n"
                 + "Выберите поле для редактирования:";
     }

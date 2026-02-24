@@ -15,6 +15,12 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.DELETE;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.EDIT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.ADD_EVENT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.BACK;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.EYE;
+
 /**
  * Фасад для создания inline клавиатур (InlineKeyboardMarkup) в Telegram.
  *
@@ -212,7 +218,7 @@ public class InlineKeyboardService {
                 event -> CallbackPrefix.VIEW_EVENT.withPayload(event.getId().toString()));
 
         rows.add(keyboardFactory.createRow(
-                keyboardFactory.createButton("🔙 Назад к календарю",
+                keyboardFactory.createButton(BACK + " Назад к календарю",
                         CallbackPrefix.CALENDAR.withPayload(String.format("%d-%02d", date.getYear(), date.getMonthValue()))
                 )
         ));
@@ -229,10 +235,10 @@ public class InlineKeyboardService {
     public InlineKeyboardMarkup createCreateEventOnDateKeyboard(@NonNull LocalDate date) {
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("➕ Создать событие", CallbackPrefix.CREATE_EVENT_ON_DATE.withPayload(date.toString()))
+                keyboardFactory.createButton(ADD_EVENT + " Создать событие", CallbackPrefix.CREATE_EVENT_ON_DATE.withPayload(date.toString()))
             ),
             keyboardFactory.createRow(
-                keyboardFactory.createButton("🔙 Назад к календарю",
+                keyboardFactory.createButton(BACK + " Назад к календарю",
                         CallbackPrefix.CALENDAR.withPayload(String.format("%d-%02d", date.getYear(), date.getMonthValue()))
                 )
             )
@@ -260,21 +266,21 @@ public class InlineKeyboardService {
         
         // Первый ряд: Добавить | Просмотреть
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("➕ Добавить", CallbackPrefix.CREATE_EVENT_ON_DATE.withPayload(date.toString())),
-            keyboardFactory.createButton("👁 Просмотреть", CallbackPrefix.VIEW_EVENTS_ON_DATE.withPayload(date.toString()))
+            keyboardFactory.createButton(ADD_EVENT + " Добавить", CallbackPrefix.CREATE_EVENT_ON_DATE.withPayload(date.toString())),
+            keyboardFactory.createButton(EYE + " Просмотреть", CallbackPrefix.VIEW_EVENTS_ON_DATE.withPayload(date.toString()))
         ));
         
         // Второй ряд: Редактировать | Удалить (только если есть активные события)
         if (hasActiveOwnEvents) {
             rows.add(keyboardFactory.createRow(
-                keyboardFactory.createButton("✏️ Редактировать", CallbackPrefix.EDIT_MY_EVENTS_ON_DATE.withPayload(date.toString())),
-                keyboardFactory.createButton("🗑 Удалить", CallbackPrefix.DELETE_MY_EVENTS_ON_DATE.withPayload(date.toString()))
+                keyboardFactory.createButton(EDIT + " Редактировать", CallbackPrefix.EDIT_MY_EVENTS_ON_DATE.withPayload(date.toString())),
+                keyboardFactory.createButton(DELETE + " Удалить", CallbackPrefix.DELETE_MY_EVENTS_ON_DATE.withPayload(date.toString()))
             ));
         }
         
         // Третий ряд: Назад - возвращаемся к календарю месяца
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", CallbackPrefix.BACK_TO_CALENDAR.withPayload(
+            keyboardFactory.createButton(BACK + " Назад", CallbackPrefix.BACK_TO_CALENDAR.withPayload(
                     String.format("%d-%02d", date.getYear(), date.getMonthValue())))
         ));
         
@@ -291,7 +297,7 @@ public class InlineKeyboardService {
                 event -> CallbackPrefix.EDIT_EVENT_FROM_CALENDAR.withPayload(event.getId() + "_" + selectedDate));
 
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", CallbackPrefix.CALENDAR.withPayload(selectedDate.toString()))
+            keyboardFactory.createButton(BACK + " Назад", CallbackPrefix.CALENDAR.withPayload(selectedDate.toString()))
         ));
 
         return keyboardFactory.createMarkup(rows);
@@ -307,7 +313,7 @@ public class InlineKeyboardService {
                 event -> CallbackPrefix.DELETE_EVENT.withPayload(event.getId().toString()));
 
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", CallbackPrefix.CALENDAR.withPayload(selectedDate.toString()))
+            keyboardFactory.createButton(BACK + " Назад", CallbackPrefix.CALENDAR.withPayload(selectedDate.toString()))
         ));
 
         return keyboardFactory.createMarkup(rows);

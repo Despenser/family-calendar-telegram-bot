@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.MONTH;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -109,13 +111,13 @@ public class MonthCommandHandler implements CommandHandler {
      */
     private @NonNull String buildNoFamilyMessage() {
         return String.format("""
-                        ❌ %s
+                        %s %s
                         
                         Вы не принадлежите ни одной семье.
                         
                         Для просмотра событий необходимо быть членом семьи. \
                         Обратитесь к администратору для добавления в семью.""",
-               bold("Ошибка"));
+               ERROR, bold("Ошибка"));
     }
 
     /**
@@ -131,7 +133,7 @@ public class MonthCommandHandler implements CommandHandler {
 
         String dateRange = formatDateRange(startDate, endDate);
         return eventFormattingService.formatNoEventsMessage(
-                "📆",
+                MONTH,
                 "События на месяц",
                 "На период " + dateRange + " событий не запланировано."
         );
@@ -153,7 +155,7 @@ public class MonthCommandHandler implements CommandHandler {
                                                    @NonNull LocalDate endDate) {
 
         String dateRange = formatDateRange(startDate, endDate);
-        String header = eventFormattingService.formatCommandHeader("📆", "События на месяц", dateRange);
+        String header = eventFormattingService.formatCommandHeader(MONTH, "События на месяц", dateRange);
         
         // Группировка событий по датам
         Map<LocalDate, List<Event>> eventsByDate = filteredEvents.stream()

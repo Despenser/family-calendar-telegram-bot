@@ -14,6 +14,13 @@ import ru.golubyatnikov.family.calendar.bot.service.domain.reminder.ReminderSche
 import java.util.ArrayList;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.EventType.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.ALL_EVENTS;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Reminders.*;
+
 /**
  * Фабрика для создания inline клавиатур, связанных с событиями.
  *
@@ -44,13 +51,13 @@ public class EventInlineKeyboardFactory {
         
         long attachmentsCount = attachmentService.countEventAttachments(eventId);
         String attachmentsButtonText = attachmentsCount > 0 
-            ? "📎 Вложения (" + attachmentsCount + ")" 
-            : "📎 Вложения";
+            ? ATTACHMENT + " Вложения (" + attachmentsCount + ")" 
+            : ATTACHMENT + " Вложения";
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("✏️ Редактировать", CallbackPrefix.EDIT_EVENT.withPayload(eventId.toString())),
-                keyboardFactory.createButton("🗑️ Удалить", CallbackPrefix.DELETE_EVENT.withPayload(eventId.toString()))
+                keyboardFactory.createButton(EDIT + " Редактировать", CallbackPrefix.EDIT_EVENT.withPayload(eventId.toString())),
+                keyboardFactory.createButton(DELETE + " Удалить", CallbackPrefix.DELETE_EVENT.withPayload(eventId.toString()))
             ),
             keyboardFactory.createRow(
                 keyboardFactory.createButton(attachmentsButtonText, CallbackPrefix.ATTACH_FILE.withPayload("list_" + eventId))
@@ -81,8 +88,8 @@ public class EventInlineKeyboardFactory {
         
         // Первый ряд: кнопки редактирования и удаления
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("✏️ Редактировать", CallbackPrefix.EDIT_EVENT.withPayload(eventId.toString())),
-            keyboardFactory.createButton("🗑️ Удалить", CallbackPrefix.DELETE_EVENT.withPayload(eventId.toString()))
+            keyboardFactory.createButton(EDIT + " Редактировать", CallbackPrefix.EDIT_EVENT.withPayload(eventId.toString())),
+            keyboardFactory.createButton(DELETE + " Удалить", CallbackPrefix.DELETE_EVENT.withPayload(eventId.toString()))
         ));
         
         boolean isActive = event.getStatus() == EventStatus.ACTIVE;
@@ -91,19 +98,19 @@ public class EventInlineKeyboardFactory {
         // Второй ряд: кнопка вложений и кнопка управления напоминаниями
         long attachmentsCount = attachmentService.countEventAttachments(event.getId());
         String attachmentsButtonText = attachmentsCount > 0 
-            ? "📎 Вложения (" + attachmentsCount + ")" 
-            : "📎 Вложения";
+            ? ATTACHMENT + " Вложения (" + attachmentsCount + ")" 
+            : ATTACHMENT + " Вложения";
         
         if (isActive && isOwner) {
             boolean hasReminders = reminderSchedulingService.hasActiveReminders(eventId);
             
             InlineKeyboardButton remindersBtn;
             if (hasReminders) {
-                remindersBtn = keyboardFactory.createButton("🔕 Откл. напоминания", 
+                remindersBtn = keyboardFactory.createButton(DISABLED + " Откл. напоминания", 
                     CallbackPrefix.DISABLE_REMINDERS.withPayload(eventId.toString()));
 
             } else {
-                remindersBtn = keyboardFactory.createButton("🔔 Вкл. напоминания", 
+                remindersBtn = keyboardFactory.createButton(ENABLED + " Вкл. напоминания", 
                     CallbackPrefix.ENABLE_REMINDERS.withPayload(eventId.toString()));
             }
             
@@ -121,7 +128,7 @@ public class EventInlineKeyboardFactory {
         // Третий ряд: кнопка завершения (только для активных событий создателя)
         if (isActive && isOwner) {
             rows.add(keyboardFactory.createRow(
-                keyboardFactory.createButton("✅ Завершить", CallbackPrefix.COMPLETE_EVENT.withPayload(eventId.toString()))
+                keyboardFactory.createButton(COMPLETE + " Завершить", CallbackPrefix.COMPLETE_EVENT.withPayload(eventId.toString()))
             ));
         }
 
@@ -136,14 +143,14 @@ public class EventInlineKeyboardFactory {
     public InlineKeyboardMarkup createEventTypeSelectionKeyboard() {
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("👨‍👩‍👧‍👦 Семейное событие", CallbackPrefix.EVENT_TYPE.withPayload("family"))
+                keyboardFactory.createButton(FAMILY + " Семейное событие", CallbackPrefix.EVENT_TYPE.withPayload("family"))
             ),
             keyboardFactory.createRow(
-                keyboardFactory.createButton("👤 Персональное событие", CallbackPrefix.EVENT_TYPE.withPayload("personal"))
+                keyboardFactory.createButton(PERSONAL + " Персональное событие", CallbackPrefix.EVENT_TYPE.withPayload("personal"))
             ),
             keyboardFactory.createRow(
-                keyboardFactory.createButton("🔙 Назад", CallbackPrefix.TYPE_BACK_TO_TIME.withPayload("")),
-                keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.TYPE_CANCEL.withPayload(""))
+                keyboardFactory.createButton(BACK + " Назад", CallbackPrefix.TYPE_BACK_TO_TIME.withPayload("")),
+                keyboardFactory.createButton(CANCEL + " Отменить создание", CallbackPrefix.TYPE_CANCEL.withPayload(""))
             )
         );
     }
@@ -163,8 +170,8 @@ public class EventInlineKeyboardFactory {
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("♻️ Восстановить", CallbackPrefix.TRASH_RESTORE.withPayload(eventId.toString())),
-                keyboardFactory.createButton("❌ Удалить навсегда", CallbackPrefix.TRASH_DELETE.withPayload(eventId.toString()))
+                keyboardFactory.createButton(RESTORE + " Восстановить", CallbackPrefix.TRASH_RESTORE.withPayload(eventId.toString())),
+                keyboardFactory.createButton(CANCEL + " Удалить навсегда", CallbackPrefix.TRASH_DELETE.withPayload(eventId.toString()))
             )
         );
     }
@@ -184,10 +191,10 @@ public class EventInlineKeyboardFactory {
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("📝 Добавить заметку", CallbackPrefix.ADD_COMPLETION_NOTE.withPayload(eventId.toString()))
+                keyboardFactory.createButton(DESCRIPTION + " Добавить заметку", CallbackPrefix.ADD_COMPLETION_NOTE.withPayload(eventId.toString()))
             ),
             keyboardFactory.createRow(
-                keyboardFactory.createButton("⏭️ Пропустить", CallbackPrefix.SKIP_COMPLETION_NOTE.withPayload(""))
+                keyboardFactory.createButton(SKIP + " Пропустить", CallbackPrefix.SKIP_COMPLETION_NOTE.withPayload(""))
             )
         );
     }
@@ -218,17 +225,17 @@ public class EventInlineKeyboardFactory {
             throw new IllegalArgumentException("EventId должен быть положительным числом");
         }
 
-        InlineKeyboardButton cancelBtn = keyboardFactory.createButton("🔙 Назад", 
+        InlineKeyboardButton cancelBtn = keyboardFactory.createButton(BACK + " Назад", 
             CallbackPrefix.EDIT_CANCEL.withPayload(eventId.toString()));
 
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("📝 Название", CallbackPrefix.EDIT_FIELD.withPayload("title_" + eventId)),
-                keyboardFactory.createButton("📅 Дата", CallbackPrefix.EDIT_FIELD.withPayload("date_" + eventId))
+                keyboardFactory.createButton(DESCRIPTION + " Название", CallbackPrefix.EDIT_FIELD.withPayload("title_" + eventId)),
+                keyboardFactory.createButton(DATE + " Дата", CallbackPrefix.EDIT_FIELD.withPayload("date_" + eventId))
             ),
             keyboardFactory.createRow(
-                keyboardFactory.createButton("🕐 Время", CallbackPrefix.EDIT_FIELD.withPayload("time_" + eventId)),
-                keyboardFactory.createButton("📄 Описание", CallbackPrefix.EDIT_FIELD.withPayload("description_" + eventId))
+                keyboardFactory.createButton(TIME + " Время", CallbackPrefix.EDIT_FIELD.withPayload("time_" + eventId)),
+                keyboardFactory.createButton(NOTE + " Описание", CallbackPrefix.EDIT_FIELD.withPayload("description_" + eventId))
             ),
             keyboardFactory.createRow(cancelBtn)
         );
@@ -242,11 +249,11 @@ public class EventInlineKeyboardFactory {
     public InlineKeyboardMarkup createFilterKeyboard() {
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("📋 Все события", CallbackPrefix.FILTER.withPayload("all"))
+                keyboardFactory.createButton(ALL_EVENTS + " Все события", CallbackPrefix.FILTER.withPayload("all"))
             ),
             keyboardFactory.createRow(
-                keyboardFactory.createButton("👨‍👩‍👧‍👦 Семейные", CallbackPrefix.FILTER.withPayload("family")),
-                keyboardFactory.createButton("👤 Личные", CallbackPrefix.FILTER.withPayload("personal"))
+                keyboardFactory.createButton(FAMILY + " Семейные", CallbackPrefix.FILTER.withPayload("family")),
+                keyboardFactory.createButton(PERSONAL + " Личные", CallbackPrefix.FILTER.withPayload("personal"))
             )
         );
     }

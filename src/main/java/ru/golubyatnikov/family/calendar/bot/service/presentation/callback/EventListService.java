@@ -16,6 +16,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.DELETE;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.EDIT;
+
 /**
  * Сервис для работы со списками событий на дату.
  * Обрабатывает просмотр, редактирование и удаление событий.
@@ -92,7 +95,7 @@ public class EventListService {
                 .collect(Collectors.toList());
             
             InlineKeyboardMarkup keyboard = keyboardService.createMyEventsEditKeyboard(selectedDate, myEvents);
-            String message = "✏️ Выберите событие для редактирования:";
+            String message = EDIT + " Выберите событие для редактирования:";
             
             messageService.safeEditMessageAndAnswer(chatId, messageId, message, keyboard, callbackQueryId, "");
 
@@ -126,7 +129,7 @@ public class EventListService {
                 .collect(Collectors.toList());
             
             InlineKeyboardMarkup keyboard = keyboardService.createMyEventsDeleteKeyboard(selectedDate, myEvents);
-            String message = "🗑 Выберите событие для удаления:";
+            String message = DELETE + " Выберите событие для удаления:";
             
             messageService.safeEditMessageAndAnswer(chatId, messageId, message, keyboard, callbackQueryId, "");
 

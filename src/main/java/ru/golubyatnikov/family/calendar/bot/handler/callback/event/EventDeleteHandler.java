@@ -26,6 +26,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.DELETE;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
+
 /**
  * Обработчик удаления события.
  *
@@ -80,17 +83,17 @@ public class EventDeleteHandler implements CallbackHandler {
             
         } catch (EventNotFoundException e) {
             log.error("Событие не найдено: eventId={}, userId={}", eventId, context.getUserId(), e);
-            callbackQueryService.answerCallback(context, "❌ Событие не найдено");
+            callbackQueryService.answerCallback(context, ERROR + " Событие не найдено");
 
         } catch (UnauthorizedAccessException e) {
             log.error("Нет прав на удаление события: eventId={}, userId={}", eventId, context.getUserId(), e);
-            callbackQueryService.answerCallback(context, "❌ Нет прав на удаление");
+            callbackQueryService.answerCallback(context, ERROR + " Нет прав на удаление");
 
         } catch (Exception e) {
             log.error("Ошибка при удалении события: eventId={}, userId={}, error={}", 
                      eventId, context.getUserId(), e.getMessage(), e);
 
-            callbackQueryService.answerCallback(context, "❌ Ошибка при удалении");
+            callbackQueryService.answerCallback(context, ERROR + " Ошибка при удалении");
         }
     }
     
@@ -166,7 +169,7 @@ public class EventDeleteHandler implements CallbackHandler {
                                            LocalDate eventDate,
                                            @NonNull List<Event> myRemainingEvents) throws TelegramApiException {
 
-        String message = "🗑 Выберите событие для удаления:";
+        String message = DELETE + " Выберите событие для удаления:";
         InlineKeyboardMarkup keyboard = keyboardFactory.createDeleteEventListKeyboard(myRemainingEvents, eventDate);
         
         messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);

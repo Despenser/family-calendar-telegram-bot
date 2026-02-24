@@ -32,6 +32,13 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.Keyboa
 
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.ATTACHMENT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.ADD_EVENT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.DATE;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.FileTypes.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.CHART;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.SEPARATOR;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.*;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -60,7 +67,7 @@ public class FileMessageHandler {
     public void handleAwaitingFileHint(@NonNull Message message, User user) {
         Long chatId = message.getChatId();
         String hintMessage = formatMessage(
-            "📎 Пожалуйста, отправьте файл " + escape("(документ, фото, видео или аудио)") + "\n\n" +
+            ATTACHMENT + " Пожалуйста, отправьте файл " + escape("(документ, фото, видео или аудио)") + "\n\n" +
             "_Для отмены нажмите кнопку 'Отмена' в списке вложений_"
         );
         sendMessage(chatId, hintMessage);
@@ -79,7 +86,7 @@ public class FileMessageHandler {
             
             if (context == null) {
                 conversationStateService.clearAwaitingFile(userId);
-                messageService.sendMessage(chatId, "❌ Произошла ошибка. Попробуйте добавить файл заново.");
+                messageService.sendMessage(chatId, ERROR + " Произошла ошибка. Попробуйте добавить файл заново.");
                 return;
             }
             
@@ -90,7 +97,7 @@ public class FileMessageHandler {
             if (fileInfo == null) {
                 conversationStateService.clearAwaitingFile(userId);
                 messageService.sendMessage(chatId,
-                        "❌ Неподдерживаемый тип файла. Отправьте документ, фото, видео или аудио.");
+                        ERROR + " Неподдерживаемый тип файла. Отправьте документ, фото, видео или аудио.");
 
                 return;
             }
@@ -128,14 +135,14 @@ public class FileMessageHandler {
         
         if (!conversationService.hasActiveDraft(user.getId())) {
             sendMessage(chatId, 
-                "❌ Для прикрепления файлов сначала создайте событие с помощью ➕ " + escape("/add_event"));
+                ERROR + " Для прикрепления файлов сначала создайте событие с помощью " + ADD_EVENT + " " + escape("/add_event"));
             return;
         }
         
         Event draft = conversationService.getActiveDraft(user.getId());
         
         if (draft.getEventDate() == null || draft.getEventTime() == null) {
-            sendMessage(chatId, "❌ Сначала завершите создание события, затем вы сможете прикрепить файлы");
+            sendMessage(chatId, ERROR + " Сначала завершите создание события, затем вы сможете прикрепить файлы");
             return;
         }
         
@@ -164,10 +171,8 @@ public class FileMessageHandler {
                     fileInfo.fileSize(), fileConfig.getMaxSizeBytes(), telegramId);
 
             sendMessage(chatId,
-                    formatMessage("""
-                        ❌ Размер файла превышает максимально допустимый (%.0f МБ).
-                        
-                        Размер вашего файла: %.2f МБ""", 
+                    formatMessage(ERROR + " Размер файла превышает максимально допустимый (%.0f МБ).\n\n" +
+                        "Размер вашего файла: %.2f МБ", 
                         fileConfig.getMaxSizeBytes() / (1024.0 * 1024.0),
                         fileInfo.fileSize() / (1024.0 * 1024.0))
             );
@@ -185,9 +190,9 @@ public class FileMessageHandler {
      * Отправляет сообщение об успешном прикреплении файла.
      */
     private void sendSuccessfulAttachmentMessage(Long chatId, @NonNull FileInfo fileInfo) {
-        String response = bold("✅ Файл успешно прикреплен!") + "\n\n" +
-            "📎 Название: " + escape(fileInfo.fileName()) + "\n" +
-            formatMessage("📊 Размер: %.2f МБ\n\n", fileInfo.fileSize() / (1024.0 * 1024.0)) +
+        String response = bold(SUCCESS + " Файл успешно прикреплен!") + "\n\n" +
+            ATTACHMENT + " Название: " + escape(fileInfo.fileName()) + "\n" +
+            formatMessage(CHART + " Размер: %.2f МБ\n\n", fileInfo.fileSize() / (1024.0 * 1024.0)) +
             "Вы можете продолжить прикреплять файлы или завершить создание события.";
         
         ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
@@ -208,7 +213,7 @@ public class FileMessageHandler {
                                                       @NonNull FileSizeExceededException e) {
 
         log.warn("Размер файла превышает лимит: error={}, telegramId={}", e.getMessage(), telegramId);
-        sendMessage(chatId, "❌ " + e.getMessage());
+        sendMessage(chatId, ERROR + " " + e.getMessage());
     }
 
     /**
@@ -223,7 +228,7 @@ public class FileMessageHandler {
                  draft.getId(), telegramId, e.getMessage(), e);
         
         sendMessage(chatId, 
-            "❌ " + bold("Произошла ошибка при сохранении файла") + "\\. " + 
+            ERROR + " " + bold("Произошла ошибка при сохранении файла") + "\\. " + 
             italic("Попробуйте еще раз\\."));
     }
 
@@ -274,7 +279,7 @@ public class FileMessageHandler {
             boolean isCreator = event.belongsToUser(userId);
             
             StringBuilder messageBuilder = new StringBuilder();
-            messageBuilder.append(bold("📎 Вложения события")).append("\n\n");
+            messageBuilder.append(bold(ATTACHMENT + " Вложения события")).append("\n\n");
             messageBuilder.append(bold(event.getTitle())).append("\n\n");
             
             if (attachments.isEmpty()) {
@@ -285,10 +290,10 @@ public class FileMessageHandler {
                     Attachment att = attachments.get(i);
                     
                     String emoji = switch (att.getFileType()) {
-                        case "photo" -> "🖼️";
-                        case "video" -> "🎥";
-                        case "audio" -> "🎵";
-                        default -> "📄";
+                        case "photo" -> PHOTO;
+                        case "video" -> VIDEO;
+                        case "audio" -> AUDIO;
+                        default -> DOCUMENT;
                     };
                     
                     String sizeStr;
@@ -303,11 +308,11 @@ public class FileMessageHandler {
                     
                     messageBuilder.append(emoji).append(" ")
                                  .append(bold(att.getFileName())).append("\n")
-                                 .append("📊 Размер: ").append(escape(sizeStr)).append("\n")
-                                 .append("📅 Загружено: ").append(escape(dateStr));
+                                 .append(CHART).append(" Размер: ").append(escape(sizeStr)).append("\n")
+                                 .append(DATE).append(" Загружено: ").append(escape(dateStr));
                     
                     if (i < attachments.size() - 1) {
-                        messageBuilder.append("\n\n━━━━━━━━━━━━━━━━━━━━\n\n");
+                        messageBuilder.append("\n\n").append(SEPARATOR).append("\n\n");
                     }
                 }
             }
@@ -357,17 +362,17 @@ public class FileMessageHandler {
     }
 
     private void handleFileSizeError(Long chatId, Long userId, Long telegramId) {
-        String errorMessage = formatMessage("❌ Размер файла превышает максимально допустимый.");
+        String errorMessage = formatMessage(ERROR + " Размер файла превышает максимально допустимый.");
         sendErrorMessageAndClearState(chatId, userId, telegramId, errorMessage);
     }
 
     private void handleEventNotFoundError(Long chatId, Long userId, Long telegramId) {
-        String errorMessage = "❌ Событие не найдено. Возможно, оно было удалено.";
+        String errorMessage = ERROR + " Событие не найдено. Возможно, оно было удалено.";
         sendErrorMessageAndClearState(chatId, userId, telegramId, errorMessage);
     }
 
     private void handleUnauthorizedError(Long chatId, Long userId, Long telegramId) {
-        String errorMessage = "❌ У вас нет прав для добавления вложений к этому событию.";
+        String errorMessage = ERROR + " У вас нет прав для добавления вложений к этому событию.";
         sendErrorMessageAndClearState(chatId, userId, telegramId, errorMessage);
     }
 
@@ -375,7 +380,7 @@ public class FileMessageHandler {
         log.error("Ошибка при обработке загрузки файла для вложения: userId={}, telegramId={}, error={}", 
                 userId, telegramId, e.getMessage(), e);
 
-        String errorMessage = "❌ "
+        String errorMessage = ERROR + " "
                 + bold("Произошла ошибка при сохранении файла") + "\\. "
                 + italic("Попробуйте еще раз\\.");
 

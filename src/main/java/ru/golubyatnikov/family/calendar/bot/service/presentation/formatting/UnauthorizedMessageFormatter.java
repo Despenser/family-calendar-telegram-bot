@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 import ru.golubyatnikov.family.calendar.bot.config.UnauthorizedMessagesConfig;
 import ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.LOCK;
+
 /**
  * Компонент для форматирования финальных сообщений с префиксом и инструкциями.
  * Применяет экранирование для MarkdownV2.
@@ -19,11 +21,8 @@ import ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter;
 public class UnauthorizedMessageFormatter {
     
     private static final String FALLBACK_MESSAGE =
-            """
-                    🔒 Эта функция доступна только зарегистрированным пользователям\\.
-            
-                    Для получения доступа обратитесь к администратору\\.
-            """;
+            LOCK + " Эта функция доступна только зарегистрированным пользователям\\.\n\n" +
+            "Для получения доступа обратитесь к администратору\\.";
     
     private final UnauthorizedMessagesConfig config;
     
@@ -38,9 +37,9 @@ public class UnauthorizedMessageFormatter {
         try {
             return MarkdownFormatter.formatMessage(
                 "%s %s\n\n%s",
-                config.getPrefix(),
-                mainText,
-                config.getContactAdmin()
+                    LOCK,
+                    mainText,
+                    config.getContactAdmin()
             );
 
         } catch (Exception e) {

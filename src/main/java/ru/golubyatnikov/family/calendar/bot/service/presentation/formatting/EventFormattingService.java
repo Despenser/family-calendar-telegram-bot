@@ -8,6 +8,12 @@ import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import java.time.LocalDate;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.EventType.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.SEPARATOR;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Reminders.ENABLED;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Time.*;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -54,7 +60,7 @@ public class EventFormattingService {
 
         // Активированы напоминания (на новой строке без отступа)
         if (hasReminders) {
-            sb.append(escape("\n")).append(escape("🔔 Напоминания включены"));
+            sb.append(escape("\n")).append(escape(ENABLED + " Напоминания включены"));
         }
         
         // Описание события (на новой строке без отступа)
@@ -156,15 +162,15 @@ public class EventFormattingService {
         StringBuilder sb = new StringBuilder();
         
         if (date.equals(today)) {
-            sb.append(escape("📍 "));
+            sb.append(escape(PIN + " "));
             sb.append(escape(formatDateWithDayOfWeek(date, "сегодня")));
 
         } else if (date.equals(today.plusDays(1))) {
-            sb.append(escape("🔜 "));
+            sb.append(escape(UPCOMING + " "));
             sb.append(escape(formatDateWithDayOfWeek(date, "завтра")));
 
         } else {
-            sb.append(escape("📆 "));
+            sb.append(escape(MONTH + " "));
             sb.append(escape(dateTimeFormattingService.formatShortDate(date)));
         }
         
@@ -193,7 +199,7 @@ public class EventFormattingService {
      * @return отформатированный разделитель дней
      */
     public String formatDaySeparator() {
-        return escape("─────────────────────");
+        return escape(SEPARATOR);
     }
     
     /**
@@ -209,19 +215,19 @@ public class EventFormattingService {
         
         StringBuilder sb = new StringBuilder();
         
-        // Эмодзи 📌 и название события
-        sb.append(escape("📌 "));
+        // Эмодзи и название события
+        sb.append(escape(TITLE + " "));
         sb.append(bold(event.getTitle()));
         sb.append(escape("\n"));
         
         // Дата события
-        sb.append(escape("📅 Дата: "));
+        sb.append(escape(DATE + " Дата: "));
         sb.append(escape(dateTimeFormattingService.formatDate(event.getEventDate())));
         sb.append(escape("\n"));
         
         // Время события (если есть)
         if (event.getEventTime() != null) {
-            sb.append(escape("🕐 Время: "));
+            sb.append(escape(TIME + " Время: "));
             if (event.getEndTime() != null) {
                 sb.append(escape(dateTimeFormattingService.formatTime(event.getEventTime()) + " - " + 
                                 dateTimeFormattingService.formatTime(event.getEndTime())));
@@ -233,22 +239,22 @@ public class EventFormattingService {
         
         // Тип события
         if (event.getIsPersonal()) {
-            sb.append(escape("👤 Тип: Личное"));
+            sb.append(escape(PERSONAL + " Тип: Личное"));
         } else {
-            sb.append(escape("👨‍👩‍👧‍👦 Тип: Семейное"));
+            sb.append(escape(FAMILY + " Тип: Семейное"));
         }
         sb.append(escape("\n"));
         
         // Описание события (если есть)
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            sb.append(escape("📝 Описание: "));
+            sb.append(escape(DESCRIPTION + " Описание: "));
             sb.append(escape(event.getDescription()));
             sb.append(escape("\n"));
         }
         
         // Создатель события (если не текущий пользователь)
         if (!event.belongsToUser(currentUser.getId())) {
-            sb.append(escape("👤 Создал: " + event.getUser().getFirstName()));
+            sb.append(escape(CREATOR + " Создал: " + event.getUser().getFirstName()));
             sb.append(escape("\n"));
         }
         
@@ -262,7 +268,7 @@ public class EventFormattingService {
      * @return иконка типа события
      */
     private @NonNull String getEventTypeIcon(@NonNull Event event) {
-        return event.getIsPersonal() ? "👤 " : "👨‍👩‍👧‍👦 ";
+        return event.getIsPersonal() ? PERSONAL + " " : FAMILY + " ";
     }
     
     /**
@@ -277,7 +283,7 @@ public class EventFormattingService {
         }
         
         StringBuilder sb = new StringBuilder();
-        sb.append(escape("🕐 Время: "));
+        sb.append(escape(TIME + " Время: "));
         
         if (event.getEndTime() != null) {
             sb.append(escape(dateTimeFormattingService.formatTime(event.getEventTime()) + " - " + 
@@ -300,7 +306,7 @@ public class EventFormattingService {
             return null;
         }
         
-        return escape("📝 Описание: ") + escape(event.getDescription());
+        return escape(DESCRIPTION + " Описание: ") + escape(event.getDescription());
     }
     
     /**
@@ -317,6 +323,6 @@ public class EventFormattingService {
         if (event.belongsToUser(currentUser.getId())) {
             return "";
         }
-        return escape("👤 Создал: " + event.getUser().getFirstName());
+        return escape(CREATOR + " Создал: " + event.getUser().getFirstName());
     }
 }

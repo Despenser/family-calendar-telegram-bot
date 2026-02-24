@@ -25,6 +25,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Base64;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.*;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 //TODO подключить разбор от GigaChat и формировать данные для команды
@@ -162,20 +164,24 @@ public class TextEventCallbackHandler implements CallbackHandler {
 
                     String response = formatMessage(
                             """
-                                    ✅ *Событие успешно создано!*
+                                    %s *Событие успешно создано!*
                                     
-                                    📅 Дата: %s
-                                    🕐 Время: %s
-                                    📝 Название: %s""",
+                                    %s Дата: %s
+                                    %s Время: %s
+                                    %s Название: %s""",
+                        SUCCESS,
+                        DATE,
                         dateTimeFormattingService.formatDate(createdEvent.getEventDate()),
+                        TIME,
                         dateTimeFormattingService.formatTime(createdEvent.getEventTime()),
+                        DESCRIPTION,
                         createdEvent.getTitle()
                     );
                     messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(),
                             response, null, context.callbackQueryId(), CallbackMessages.CREATED);
                 }
             } else {
-                String response = "❌ " + bold("Произошла ошибка при создании события") + "\\.\n\n" +
+                String response = ERROR + " " + bold("Произошла ошибка при создании события") + "\\.\n\n" +
                                 italic("Попробуйте использовать команду /add_event для пошагового создания.") + "\n\n" +
                                 "Детали ошибки: " + escape(errorMessage);
                 

@@ -6,6 +6,10 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.CANCEL;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.SKIP;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.BACK;
+
 /**
  * Фабрика для создания inline клавиатур навигации.
  *
@@ -27,8 +31,8 @@ public class NavigationInlineKeyboardFactory {
     public InlineKeyboardMarkup createCancelCreationKeyboard() {
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("🔙 Назад", CallbackPrefix.TITLE_BACK.withPayload("")),
-                keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.TYPE_CANCEL.withPayload(""))
+                keyboardFactory.createButton(BACK + " Назад", CallbackPrefix.TITLE_BACK.withPayload("")),
+                keyboardFactory.createButton(CANCEL + " Отменить создание", CallbackPrefix.TYPE_CANCEL.withPayload(""))
             )
         );
     }
@@ -41,11 +45,11 @@ public class NavigationInlineKeyboardFactory {
     public InlineKeyboardMarkup createSkipDescriptionKeyboard() {
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("⏭️ Пропустить", CallbackPrefix.SKIP_DESCRIPTION.withPayload(""))
+                keyboardFactory.createButton(SKIP + " Пропустить", CallbackPrefix.SKIP_DESCRIPTION.withPayload(""))
             ),
             keyboardFactory.createRow(
-                keyboardFactory.createButton("🔙 Назад", CallbackPrefix.DESC_BACK_TO_TITLE.withPayload("")),
-                keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.TYPE_CANCEL.withPayload(""))
+                keyboardFactory.createButton(BACK + " Назад", CallbackPrefix.DESC_BACK_TO_TITLE.withPayload("")),
+                keyboardFactory.createButton(CANCEL + " Отменить создание", CallbackPrefix.TYPE_CANCEL.withPayload(""))
             )
         );
     }

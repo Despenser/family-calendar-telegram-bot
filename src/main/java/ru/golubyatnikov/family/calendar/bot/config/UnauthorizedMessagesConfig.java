@@ -22,11 +22,6 @@ import java.util.Map;
 public class UnauthorizedMessagesConfig {
     
     /**
-     * Префикс для всех сообщений
-     */
-    private String prefix = "🔒";
-    
-    /**
      * Текст инструкции по получению доступа
      */
     private String contactAdmin = "Для получения доступа обратитесь к администратору вашей семьи.";

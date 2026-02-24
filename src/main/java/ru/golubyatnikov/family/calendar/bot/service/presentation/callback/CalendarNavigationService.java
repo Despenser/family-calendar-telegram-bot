@@ -19,6 +19,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
+
 /**
  * Сервис для обработки навигации по календарю и возврата из создания событий.
  * Централизует логику принятия решений о том, куда вернуть пользователя.
@@ -73,7 +75,7 @@ public class CalendarNavigationService {
                 returnToDateSelectionCalendar(user, draftDate, chatId, messageId, callbackQueryId);
 
             } else {
-                // Создание началось из /calendar → "Добавить"
+                // Создание началось из /calendar - кнопка "Добавить"
                 // Отменяем черновик и возвращаемся к экрану управления событиями на эту дату
                 conversationService.cancelEventCreation(user.getId());
                 
@@ -117,7 +119,7 @@ public class CalendarNavigationService {
             if (isFromAddEvent) {
                 // Если создание началось из /add_event, показываем сообщение об отмене
                 messageService.deleteMessage(chatId, messageId);
-                String cancelMessage = "❌ Создание события было отменено";
+                String cancelMessage = ERROR + " Создание события было отменено";
                 messageService.sendMessage(chatId, cancelMessage);
 
             } else {

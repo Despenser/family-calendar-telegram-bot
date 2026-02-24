@@ -23,6 +23,8 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.Tele
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.DESCRIPTION;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
 
 /**
@@ -121,11 +123,8 @@ public class EventCompletionHandler implements CallbackHandler {
         Long eventId = extractEventId(context.callbackData(), CallbackPrefix.ADD_COMPLETION_NOTE);
         
         String message = formatMessage(
-                """
-                        📝 Напишите заметку о том, как прошло событие.
-                        
-                        Например, что было сделано, какие были результаты или впечатления.
-                        """
+                DESCRIPTION + " Напишите заметку о том, как прошло событие.\n\n" +
+                "Например, что было сделано, какие были результаты или впечатления."
         );
         
         try {
@@ -188,7 +187,7 @@ public class EventCompletionHandler implements CallbackHandler {
      */
     private void handleExpiredContext(@NonNull CallbackQueryContext context) throws TelegramApiException {
         conversationStateService.clearAwaitingCompletionNote(context.getUserId());
-        messageService.sendMessage(context.chatId(), formatMessage("❌ Время ожидания истекло. Попробуйте снова."));
+        messageService.sendMessage(context.chatId(), formatMessage(ERROR + " Время ожидания истекло. Попробуйте снова."));
         callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
     }
 

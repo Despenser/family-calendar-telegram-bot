@@ -22,6 +22,9 @@ import ru.golubyatnikov.family.calendar.bot.util.CorrelationIdUtil;
 
 import java.util.Optional;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.HELP;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.START;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
 
@@ -135,7 +138,7 @@ public class UpdateProcessor {
         if (userOpt.isEmpty()) {
             log.warn("Неавторизованный пользователь пытается отправить файл: telegramId={}", telegramId);
             sendErrorMessage(chatId, 
-                "❌ Для отправки файлов необходимо авторизоваться. Используйте 🚀 " + escape("/start"));
+                ERROR + " Для отправки файлов необходимо авторизоваться. Используйте " + START + " " + escape("/start"));
             return;
         }
         
@@ -159,7 +162,7 @@ public class UpdateProcessor {
             // Неавторизованный пользователь отправил не команду
             ReplyKeyboardMarkup keyboard = keyboardService.createUnauthorizedUserKeyboard();
             String response = formatMessage(
-                "Для использования бота необходимо авторизоваться. Используйте 🚀 " + escape("/start"));
+                "Для использования бота необходимо авторизоваться. Используйте " + START + " " + escape("/start"));
 
             sendMessageWithKeyboard(chatId, response, keyboard);
         }
@@ -209,7 +212,7 @@ public class UpdateProcessor {
     private void handleInvalidCommand(Long chatId, Long telegramId) {
         ReplyKeyboardMarkup keyboard = getUserKeyboard(telegramId);
         String response = formatMessage(
-                "Команда должна начинаться с символа '/'. Используйте 📚 " + escape("/help") + 
+                "Команда должна начинаться с символа '/'. Используйте " + HELP + " " + escape("/help") + 
                 " для списка доступных команд.");
 
         sendMessageWithKeyboard(chatId, response, keyboard);
@@ -220,7 +223,7 @@ public class UpdateProcessor {
      */
     private void handleUnknownCommand(Long chatId, Long telegramId, String commandText) {
         ReplyKeyboardMarkup keyboard = getUserKeyboard(telegramId);
-        String response = formatMessage("Неизвестная команда: %s\n\nИспользуйте 📚 %s для списка доступных команд.", 
+        String response = formatMessage("Неизвестная команда: %s\n\nИспользуйте " + HELP + " %s для списка доступных команд.", 
                                       commandText, escape("/help"));
 
         sendMessageWithKeyboard(chatId, response, keyboard);

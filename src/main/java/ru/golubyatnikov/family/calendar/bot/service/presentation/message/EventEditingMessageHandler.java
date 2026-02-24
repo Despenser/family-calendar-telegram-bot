@@ -19,6 +19,8 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.Tele
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
+
 /**
  * Обработчик редактирования полей события.
  *
@@ -200,7 +202,7 @@ public class EventEditingMessageHandler {
      * Обрабатывает ошибку отсутствия прав.
      */
     private void handleUnauthorizedError(Long userId, Long chatId) {
-        String errorMessage = "❌ У вас нет прав для редактирования этого события.";
+        String errorMessage = ERROR + " У вас нет прав для редактирования этого события.";
         sendErrorMessageAndClearState(userId, chatId, errorMessage);
     }
 
@@ -208,7 +210,7 @@ public class EventEditingMessageHandler {
      * Обрабатывает ошибку отсутствия события.
      */
     private void handleEventNotFoundError(Long userId, Long chatId) {
-        String errorMessage = "❌ Событие не найдено. Возможно, оно было удалено.";
+        String errorMessage = ERROR + " Событие не найдено. Возможно, оно было удалено.";
         sendErrorMessageAndClearState(userId, chatId, errorMessage);
     }
 
@@ -216,7 +218,7 @@ public class EventEditingMessageHandler {
      * Обрабатывает общую ошибку.
      */
     private void handleGeneralError(Long userId, Long chatId, EditField field) {
-        String errorMessage = "❌ Произошла ошибка при обновлении " + 
+        String errorMessage = ERROR + " Произошла ошибка при обновлении " + 
                             (field == EditField.TITLE ? "названия" : "описания") + 
                             " события. Попробуйте еще раз.";
 

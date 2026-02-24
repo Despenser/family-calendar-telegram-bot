@@ -17,6 +17,7 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.Tele
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.TRASH;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -195,7 +196,7 @@ public class TrashHeaderFormattingService {
      * Формирует сообщение о пустой корзине.
      */
     private @NonNull String buildEmptyTrashMessage() {
-        return "🗑️ " + bold("Корзина") + "\n\n" +
+        return TRASH + " " + bold("Корзина") + "\n\n" +
                 escape("Корзина пуста.\n\n") +
                 italic("Удаленные события хранятся здесь " +
                     trashConfig.getRetentionDays() + " дней, после чего автоматически удаляются навсегда.");

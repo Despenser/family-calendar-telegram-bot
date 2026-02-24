@@ -7,7 +7,15 @@ import ru.golubyatnikov.family.calendar.bot.model.entity.Attachment;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.ATTACHMENT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.DATE;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.FileTypes.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.CHART;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.SEPARATOR;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.WARNING;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escapeMarkdownV2;
+import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.italic;
 
 /**
  * Сервис для форматирования информации о вложениях.
@@ -28,16 +36,16 @@ public class AttachmentFormattingService {
      * @return отформатированное сообщение
      */
     public String formatAttachmentList(@NonNull List<Attachment> attachments) {
-        StringBuilder message = new StringBuilder("📎 *Вложения события*\n\n");
+        StringBuilder message = new StringBuilder(bold(ATTACHMENT + " Вложения события") + "\n\n");
         
         if (attachments.isEmpty()) {
-            message.append("_У этого события пока нет вложений_");
+            message.append(italic("У этого события пока нет вложений"));
             return message.toString();
         }
 
         IntStream.range(0, attachments.size()).forEach(i -> {
             if (i > 0) {
-                message.append("\n━━━━━━━━━━━━━━━━━━━━\n\n");
+                message.append("\n").append(SEPARATOR).append("\n\n");
             }
             message.append(formatAttachment(attachments.get(i)));
         });
@@ -60,10 +68,12 @@ public class AttachmentFormattingService {
 
         String formattedDate = dateTimeFormattingService.formatDateTime(attachment.getUploadedAt());
         
-        return String.format("%s *%s*\n📊 Размер: %s\n📅 Загружено: %s",
+        return String.format("%s %s\n%s Размер: %s\n%s Загружено: %s",
                 emoji,
-                escapeMarkdownV2(fileName),
+                bold(fileName),
+                CHART,
                 escapeMarkdownV2(formatFileSize(attachment.getFileSize())),
+                DATE,
                 escapeMarkdownV2(formattedDate));
     }
     
@@ -75,14 +85,14 @@ public class AttachmentFormattingService {
      */
     private @NonNull String getFileTypeEmoji(String fileType) {
         if (fileType == null) {
-            return "📄";
+            return DOCUMENT;
         }
         
         return switch (fileType.toLowerCase()) {
-            case "photo" -> "🖼️";
-            case "video" -> "🎥";
-            case "audio" -> "🎵";
-            default -> "📄";
+            case "photo" -> PHOTO;
+            case "video" -> VIDEO;
+            case "audio" -> AUDIO;
+            default -> DOCUMENT;
         };
     }
     
@@ -112,17 +122,13 @@ public class AttachmentFormattingService {
      * @return отформатированная инструкция
      */
     public String formatUploadInstruction() {
-        return """
-                📎 *Отправьте файл для прикрепления к событию*
-                
-                _Максимальный размер: 20 МБ_
-                
-                Поддерживаемые типы файлов:
-                📄 Документы
-                🖼️ Фотографии
-                🎥 Видео
-                🎵 Аудио
-                """;
+        return bold(ATTACHMENT + " Отправьте файл для прикрепления к событию") + "\n\n" +
+                italic("Максимальный размер: 20 МБ") + "\n\n" +
+                "Поддерживаемые типы файлов:\n" +
+                DOCUMENT + " Документы\n" +
+                PHOTO + " Фотографии\n" +
+                VIDEO + " Видео\n" +
+                AUDIO + " Аудио\n";
     }
     
     /**
@@ -133,12 +139,8 @@ public class AttachmentFormattingService {
      */
     public String formatDeleteConfirmation(String fileName) {
         String displayName = fileName != null ? fileName : "Без названия";
-        return String.format("""
-                ⚠️ *Подтверждение удаления*
-                
-                Вы действительно хотите удалить вложение?
-                
-                📎 %s
-                """, escapeMarkdownV2(displayName));
+        return WARNING + " " + bold("Подтверждение удаления") + "\n\n" +
+                "Вы действительно хотите удалить вложение?\n\n" +
+                ATTACHMENT + " " + escapeMarkdownV2(displayName) + "\n";
     }
 }

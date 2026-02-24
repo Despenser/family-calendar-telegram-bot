@@ -5,6 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.ADD_EVENT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.DESCRIPTION;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -57,9 +60,9 @@ public class PlannerFormattingService {
      * @return отформатированное сообщение
      */
     public String buildNoEventsMessage() {
-        return "📝 " + bold("Мои события") + "\n\n" +
+        return DESCRIPTION + " " + bold("Мои события") + "\n\n" +
                 escape("У вас пока нет созданных событий.\n\n") +
-                escape("Используйте ") + escape("➕ /add_event") + escape(" для добавления нового события.");
+                escape("Используйте ") + escape(ADD_EVENT + " /add_event") + escape(" для добавления нового события.");
     }
 
     /**
@@ -69,6 +72,6 @@ public class PlannerFormattingService {
      * @return отформатированное сообщение
      */
     public String buildErrorMessage(String message) {
-        return formatMessage("❌ %s\n\n%s", bold("Ошибка"), message);
+        return formatMessage(ERROR + " %s\n\n%s", bold("Ошибка"), message);
     }
 }

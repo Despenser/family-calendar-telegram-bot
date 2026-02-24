@@ -38,7 +38,6 @@ public class WebhookSecurityService {
         SECURE_RANDOM.nextBytes(randomBytes);
 
         this.secretToken = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
-        
         return this.secretToken;
     }
 

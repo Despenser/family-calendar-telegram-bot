@@ -4,6 +4,9 @@ import org.springframework.stereotype.Component;
 import ru.golubyatnikov.family.calendar.bot.model.enums.CommandCategory;
 import java.util.Map;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.LOCK;
+
 /**
  * Метаданные команд: категории и эмодзи.
  *
@@ -29,21 +32,19 @@ public class CommandMetadata {
     );
 
     private static final Map<String, String> COMMAND_EMOJIS = Map.ofEntries(
-            Map.entry("/start", "🚀"),
-            Map.entry("/help", "📚"),
-            Map.entry("/calendar", "🗓️"),
-            Map.entry("/add_event", "➕"),
-            Map.entry("/my_events", "📋"),
-            Map.entry("/month", "📆"),
-            Map.entry("/today", "📍"),
-            Map.entry("/week", "📅"),
-            Map.entry("/search", "🔍"),
-            Map.entry("/filter", "🫧"),
-            Map.entry("/stats", "📊"),
-            Map.entry("/trash", "🗑️")
+            Map.entry("/start", START),
+            Map.entry("/help", HELP),
+            Map.entry("/calendar", CALENDAR),
+            Map.entry("/add_event", ADD_EVENT),
+            Map.entry("/my_events", MY_EVENTS),
+            Map.entry("/month", MONTH),
+            Map.entry("/today", TODAY),
+            Map.entry("/week", WEEK),
+            Map.entry("/search", SEARCH),
+            Map.entry("/filter", FILTER),
+            Map.entry("/stats", STATS),
+            Map.entry("/trash", TRASH)
     );
-
-    private static final String LOCK_EMOJI = "🔒";
 
     /**
      * Возвращает категорию для команды.
@@ -63,6 +64,6 @@ public class CommandMetadata {
      * Возвращает эмодзи замка для заблокированных команд.
      */
     public String getLockEmoji() {
-        return LOCK_EMOJI;
+        return LOCK;
     }
 }

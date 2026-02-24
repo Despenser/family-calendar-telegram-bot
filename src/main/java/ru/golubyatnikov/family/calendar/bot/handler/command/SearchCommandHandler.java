@@ -8,19 +8,23 @@ import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
-import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
-import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.message.SearchMessageService;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.service.domain.search.SearchQueryValidator;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.SearchResultFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.domain.search.SearchService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.SearchResultFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.message.SearchMessageService;
+
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.SEARCH;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -53,7 +57,7 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
     public String handle(Message message, @NonNull User user) {
         try {
             Long chatId = message.getChatId();
-            String responseMessage = "🔍 " + bold("Поиск событий") + "\n\n" +
+            String responseMessage = SEARCH + " " + bold("Поиск событий") + "\n\n" +
                                    escape("Введите текст для поиска в названии или описании событий.") + "\n\n" +
                                    italic("Например: день рождения, встреча, поездка");
             
@@ -70,7 +74,7 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
             
         } catch (Exception e) {
             log.error("Ошибка при отправке запроса на поиск пользователю ID={}", user.getId(), e);
-            return "❌ " + escape("Произошла ошибка при отображении формы поиска");
+            return ERROR + " " + escape("Произошла ошибка при отображении формы поиска");
         }
     }
     
@@ -133,7 +137,7 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
      */
     private void handleSearchError(@NonNull Long userId, @NonNull Long chatId) {
         try {
-            String errorMessage = "❌ " + escape("Произошла ошибка при поиске событий. Попробуйте позже.");
+            String errorMessage = ERROR + " " + escape("Произошла ошибка при поиске событий. Попробуйте позже.");
             searchMessageService.sendOrEditSearchMessage(userId, chatId, errorMessage, null, false);
 
         } catch (Exception ex) {
@@ -148,12 +152,12 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
      */
     private @NonNull InlineKeyboardMarkup createSearchAgainKeyboard() {
         InlineKeyboardButton searchAgainButton = InlineKeyboardButton.builder()
-                .text("🔍 Найти заново")
+                .text(SEARCH + " Найти заново")
                 .callbackData(CallbackPrefix.SEARCH_AGAIN.getPrefix())
                 .build();
         
         return InlineKeyboardMarkup.builder()
-                .keyboardRow(new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow(
+                .keyboardRow(new InlineKeyboardRow(
                         searchAgainButton))
                 .build();
     }
@@ -184,7 +188,7 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
             Integer messageId = callbackQuery.getMessage().getMessageId();
             
             // Формируем сообщение с запросом текста для поиска
-            String searchPromptMessage = "🔍 " + bold("Поиск событий") + "\n\n" +
+            String searchPromptMessage = SEARCH + " " + bold("Поиск событий") + "\n\n" +
                                        escape("Введите текст для поиска в названии или описании событий.") + "\n\n" +
                                        italic("Например: день рождения, встреча, поездка");
             
@@ -203,7 +207,7 @@ public class SearchCommandHandler implements CommandHandler, CallbackHandler {
             try {
                 messageService.answerCallbackQuery(
                     callbackQuery.getId(), 
-                    "❌ Произошла ошибка. Попробуйте использовать команду 🔍 " + escape("/search") + " заново."
+                    ERROR + " Произошла ошибка. Попробуйте использовать команду " + SEARCH + " " + escape("/search") + " заново."
                 );
             } catch (Exception ex) {
                 log.error("Ошибка при отправке ответа на callback query: {}", ex.getMessage(), ex);

@@ -19,6 +19,7 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.Tele
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
 
 /**
@@ -102,7 +103,7 @@ public class CompletionNoteMessageHandler {
         conversationStateService.clearAwaitingCompletionNote(userId);
         
         try {
-            String response = formatMessage("❌ Время ожидания истекло. Попробуйте завершить событие заново.");
+            String response = formatMessage(ERROR + " Время ожидания истекло. Попробуйте завершить событие заново.");
             ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
             messageService.sendMessage(chatId, response, keyboard);
 
@@ -153,22 +154,22 @@ public class CompletionNoteMessageHandler {
     }
 
     private void handleEventNotFoundError(@NonNull User user, Long chatId) {
-        String errorMessage = "❌ Событие не найдено. Возможно, оно было удалено.";
+        String errorMessage = ERROR + " Событие не найдено. Возможно, оно было удалено.";
         sendErrorResponse(user, chatId, errorMessage);
     }
 
     private void handleUnauthorizedError(@NonNull User user, Long chatId) {
-        String errorMessage = "❌ У вас нет прав для добавления заметки к этому событию.";
+        String errorMessage = ERROR + " У вас нет прав для добавления заметки к этому событию.";
         sendErrorResponse(user, chatId, errorMessage);
     }
 
     private void handleIllegalStateError(@NonNull User user, Long chatId) {
-        String errorMessage = "❌ Заметку можно добавить только к завершенному событию.";
+        String errorMessage = ERROR + " Заметку можно добавить только к завершенному событию.";
         sendErrorResponse(user, chatId, errorMessage);
     }
 
     private void handleGeneralError(@NonNull User user, Long chatId) {
-        String errorMessage = "❌ Произошла ошибка при добавлении заметки. Попробуйте еще раз.";
+        String errorMessage = ERROR + " Произошла ошибка при добавлении заметки. Попробуйте еще раз.";
         sendErrorResponse(user, chatId, errorMessage);
     }
 

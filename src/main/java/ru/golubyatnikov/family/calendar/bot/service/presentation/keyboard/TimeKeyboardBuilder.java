@@ -14,6 +14,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.CANCEL;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.BACK;
+
 /**
  * Компонент для построения клавиатур выбора времени.
  * Отвечает за создание inline-клавиатур для выбора часов и минут.
@@ -136,14 +139,14 @@ public class TimeKeyboardBuilder {
             // При редактировании - только кнопка "Назад" к меню редактирования
             String callbackData = CallbackPrefix.EDIT_BACK.withPayload(editingEventId.toString());
             return keyboardFactory.createRow(
-                keyboardFactory.createButton("🔙 Назад", callbackData)
+                keyboardFactory.createButton(BACK + " Назад", callbackData)
             );
 
         } else {
             // При создании нового события - всегда две кнопки: "Назад к календарю" и "Отменить создание"
             return keyboardFactory.createRow(
-                keyboardFactory.createButton("🔙 Назад", CallbackPrefix.TIME_TO_CALENDAR.withPayload("")),
-                keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.TIME_CANCEL.withPayload(""))
+                keyboardFactory.createButton(BACK + " Назад", CallbackPrefix.TIME_TO_CALENDAR.withPayload("")),
+                keyboardFactory.createButton(CANCEL + " Отменить создание", CallbackPrefix.TIME_CANCEL.withPayload(""))
             );
         }
     }
@@ -151,11 +154,11 @@ public class TimeKeyboardBuilder {
     private InlineKeyboardRow createNavigationRow(boolean isCreatingNewEvent) {
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         
-        buttons.add(keyboardFactory.createButton("🔙 Назад", CallbackPrefix.TIME_BACK.withPayload("")));
+        buttons.add(keyboardFactory.createButton(BACK + " Назад", CallbackPrefix.TIME_BACK.withPayload("")));
         
         // При создании нового события всегда показываем кнопку "Отменить создание"
         if (isCreatingNewEvent) {
-            buttons.add(keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.TIME_CANCEL.withPayload("")));
+            buttons.add(keyboardFactory.createButton(CANCEL + " Отменить создание", CallbackPrefix.TIME_CANCEL.withPayload("")));
         }
         
         return keyboardFactory.createRow(buttons);

@@ -9,6 +9,12 @@ import java.time.LocalTime;
 import java.util.List;
 
 import static ru.golubyatnikov.family.calendar.bot.util.CallbackMessages.NO_EVENTS_ON_DATE;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.EventType.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Time.*;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -21,9 +27,9 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 @RequiredArgsConstructor
 public class BotMessageFormattingService {
     
-    private static final String EVENT_CREATION_HEADER = "📋 Создание нового события";
-    private static final String FAMILY_EVENT_TYPE = "👨‍👩‍👧‍👦 Тип: Семейное";
-    private static final String PERSONAL_EVENT_TYPE = "👤 Тип: Персональное";
+    private static final String EVENT_CREATION_HEADER = CREATION + " Создание нового события";
+    private static final String FAMILY_EVENT_TYPE = FAMILY + " Тип: Семейное";
+    private static final String PERSONAL_EVENT_TYPE = PERSONAL + " Тип: Персональное";
 
     private final DateTimeFormattingService dateTimeFormattingService;
     
@@ -35,13 +41,13 @@ public class BotMessageFormattingService {
      */
     public String buildEventCreatedMessage(@NonNull Event event) {
         StringBuilder sb = new StringBuilder();
-        sb.append("✅ ").append(bold("Событие успешно создано!")).append("\n\n");
-        sb.append("📅 Дата: ").append(escape(formatDate(event.getEventDate()))).append("\n");
-        sb.append("🕐 Время: ").append(escape(formatTime(event.getEventTime()))).append("\n");
-        sb.append("📝 Название: ").append(escape(event.getTitle()));
+        sb.append(SUCCESS).append(" ").append(bold("Событие успешно создано!")).append("\n\n");
+        sb.append(DATE).append(" Дата: ").append(escape(formatDate(event.getEventDate()))).append("\n");
+        sb.append(TIME).append(" Время: ").append(escape(formatTime(event.getEventTime()))).append("\n");
+        sb.append(DESCRIPTION).append(" Название: ").append(escape(event.getTitle()));
         
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            sb.append("\n📄 Описание: ").append(escape(event.getDescription()));
+            sb.append("\n").append(NOTE).append(" Описание: ").append(escape(event.getDescription()));
         }
         
         return sb.toString();
@@ -53,7 +59,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение
      */
     public String buildEventCancelledMessage() {
-        return "❌ Создание события отменено";
+        return CANCELLED + " Создание события отменено";
     }
     
     /**
@@ -64,7 +70,7 @@ public class BotMessageFormattingService {
      */
     public String buildDateSelectedMessage(String formattedDate) {
         return bold(EVENT_CREATION_HEADER) + "\n\n" +
-               formatMessage("✅ Дата выбрана: %s\n\nТеперь выберите час:", formattedDate);
+               formatMessage(SUCCESS + " Дата выбрана: %s\n\nТеперь выберите час:", formattedDate);
     }
     
     /**
@@ -75,7 +81,7 @@ public class BotMessageFormattingService {
      */
     public String buildHourSelectedMessage(int hour) {
         return bold(EVENT_CREATION_HEADER) + "\n\n" +
-               formatMessage("✅ Час выбран: %02d:00\n\nТеперь выберите минуты:", hour);
+               formatMessage(SUCCESS + " Час выбран: %02d:00\n\nТеперь выберите минуты:", hour);
     }
     
     /**
@@ -85,8 +91,8 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение с шапкой
      */
     public String buildEditTimeHourSelectedMessage(int hour) {
-        return "🕐 Редактирование времени\n\n" +
-               formatMessage("✅ Час выбран: %02d:00\n\nТеперь выберите минуты:", hour);
+        return TIME + " Редактирование времени\n\n" +
+               formatMessage(SUCCESS + " Час выбран: %02d:00\n\nТеперь выберите минуты:", hour);
     }
     
     /**
@@ -97,7 +103,7 @@ public class BotMessageFormattingService {
      */
     public String buildTimeSelectedMessage(String formattedTime) {
         return bold(EVENT_CREATION_HEADER) + "\n\n" +
-                formatMessage("✅ Время выбрано: %s\n\nВыберите тип события:", 
+                formatMessage(SUCCESS + " Время выбрано: %s\n\nВыберите тип события:", 
                 formattedTime);
     }
     
@@ -107,7 +113,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение
      */
     public String buildSelectHourMessage() {
-        return "🕐 Выберите час:";
+        return TIME + " Выберите час:";
     }
     
     /**
@@ -116,12 +122,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение с шапкой
      */
     public String buildEditTimeSelectHourMessage() {
-        return """
-                🕐 Редактирование времени
-                
-                
-                Выберите новое время:
-                """;
+        return TIME + " Редактирование времени\n\n\nВыберите новое время:\n";
     }
 
     /**
@@ -141,14 +142,14 @@ public class BotMessageFormattingService {
      */
     public String buildRepeatEventSelectDateMessage(@NonNull Event originalEvent) {
         StringBuilder sb = new StringBuilder();
-        sb.append("🔄 ").append(bold("Повторение события")).append("\n\n");
-        sb.append("📝 ").append(bold("Название: ")).append(escape(originalEvent.getTitle())).append("\n");
+        sb.append(REPEAT).append(" ").append(bold("Повторение события")).append("\n\n");
+        sb.append(DESCRIPTION).append(" ").append(bold("Название: ")).append(escape(originalEvent.getTitle())).append("\n");
         
         if (originalEvent.getDescription() != null && !originalEvent.getDescription().isBlank()) {
-            sb.append("📄 ").append(bold("Описание: ")).append(escape(originalEvent.getDescription())).append("\n");
+            sb.append(NOTE).append(" ").append(bold("Описание: ")).append(escape(originalEvent.getDescription())).append("\n");
         }
         
-        sb.append("👤 ").append(bold("Тип: "))
+        sb.append(CREATOR).append(" ").append(bold("Тип: "))
           .append(originalEvent.getIsPersonal() ? "Персональное" : "Семейное").append("\n\n");
         sb.append("Выберите новую дату для события:");
         
@@ -161,7 +162,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение
      */
     public String buildTooLateForTodayMessage() {
-        return "⏰ " + bold("Слишком поздно создавать события на сегодня") + "\n\n" +
+        return CLOCK + " " + bold("Слишком поздно создавать события на сегодня") + "\n\n" +
                escape("Выберите завтрашний день или другую дату.");
     }
     
@@ -172,7 +173,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение
      */
     public String buildSelectNextHourMessage(int currentHour) {
-        return "⏰ " + bold("Все минуты для этого часа уже прошли") + "\n\n" +
+        return CLOCK + " " + bold("Все минуты для этого часа уже прошли") + "\n\n" +
                formatMessage("Час %02d:XX недоступен. Выберите следующий час:", currentHour);
     }
     
@@ -185,12 +186,12 @@ public class BotMessageFormattingService {
     public String buildEventTypeSelectedMessage(boolean isPersonal) {
         if (isPersonal) {
             return bold(EVENT_CREATION_HEADER) + "\n\n" +
-                   "✅ " + escape("Выбрано: Персональное событие") + "\n\n" +
+                   SUCCESS + " " + escape("Выбрано: Персональное событие") + "\n\n" +
                    italic("Только вы будете видеть это событие.");
 
         } else {
             return bold(EVENT_CREATION_HEADER) + "\n\n" +
-                   "✅ " + escape("Выбрано: Семейное событие") + "\n\n" +
+                   SUCCESS + " " + escape("Выбрано: Семейное событие") + "\n\n" +
                    italic("Все члены семьи будут видеть это событие.");
         }
     }
@@ -202,7 +203,7 @@ public class BotMessageFormattingService {
      * @return отформатированный заголовок с использованием MarkdownV2
      */
     public String buildMyEventsHeader(int eventCount) {
-        return "📋 " + bold("Мои события") + "\n\n" +
+        return MY_EVENTS + " " + bold("Мои события") + "\n\n" +
                 escape("Всего событий: ") + escape(String.valueOf(eventCount)) + "\n";
     }
     
@@ -212,9 +213,9 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение о пустом состоянии
      */
     public String buildEmptyMyEventsMessage() {
-        return "📝 " + bold("Мои события") + "\n\n" +
+        return DESCRIPTION + " " + bold("Мои события") + "\n\n" +
                 escape("У вас пока нет созданных событий.\n\n") +
-                escape("Используйте ") + escape("➕ /add_event") + escape(" для добавления нового события.");
+                escape("Используйте ") + escape(ADD_EVENT + " /add_event") + escape(" для добавления нового события.");
     }
     
     /**
@@ -224,7 +225,7 @@ public class BotMessageFormattingService {
      * @return отформатированный заголовок с использованием MarkdownV2
      */
     public String buildTrashHeader(int eventCount) {
-        return "🗑️ " + bold("Корзина") + "\n\n" +
+        return TRASH + " " + bold("Корзина") + "\n\n" +
                 italic("Удаленные события хранятся 30 дней") + "\n\n" +
                 escape("Всего событий: ") + escape(String.valueOf(eventCount)) + escape("\n");
     }
@@ -244,9 +245,9 @@ public class BotMessageFormattingService {
         
         StringBuilder sb = new StringBuilder();
 
-        sb.append(escape("📌 ")).append(bold(event.getTitle())).append(escape("\n"));
-        sb.append(escape("📅 Дата: ")).append(escape(formatDate(event.getEventDate()))).append(escape("\n"));
-        sb.append(escape("🕐 Время: ")).append(escape(formatTime(event.getEventTime())));
+        sb.append(escape(TITLE + " ")).append(bold(event.getTitle())).append(escape("\n"));
+        sb.append(escape(DATE + " Дата: ")).append(escape(formatDate(event.getEventDate()))).append(escape("\n"));
+        sb.append(escape(TIME + " Время: ")).append(escape(formatTime(event.getEventTime())));
         
         // Добавляем тип события
         sb.append(escape("\n"));
@@ -259,7 +260,7 @@ public class BotMessageFormattingService {
         }
         
         if (event.getDescription() != null && !event.getDescription().isBlank()) {
-            sb.append(escape("\n📝 Описание: ")).append(escape(event.getDescription()));
+            sb.append(escape("\n" + DESCRIPTION + " Описание: ")).append(escape(event.getDescription()));
         }
         
         return sb.toString();
@@ -304,12 +305,12 @@ public class BotMessageFormattingService {
         }
         
         StringBuilder message = new StringBuilder();
-        message.append("✅ ").append(bold("Событие завершено")).append("\n\n");
+        message.append(COMPLETED).append(" ").append(bold("Событие завершено")).append("\n\n");
         message.append(buildEventMessage(event));
         
         // Добавляем секцию заметки, если она присутствует
         if (event.getCompletionNote() != null && !event.getCompletionNote().isBlank()) {
-            message.append("\n\n📝 ").append(bold("Заметка:")).append("\n");
+            message.append("\n\n").append(DESCRIPTION).append(" ").append(bold("Заметка:")).append("\n");
             message.append(escape(event.getCompletionNote()));
         }
         
@@ -351,7 +352,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение
      */
     public String buildDateEventsListMessage(LocalDate date, @NonNull List<Event> events) {
-        return escape("📅 События на ") + bold(formatDate(date)) + "\n\n" +
+        return escape(DATE + " События на ") + bold(formatDate(date)) + "\n\n" +
                 escape("Всего событий: ") + bold(String.valueOf(events.size())) + "\n\n" +
                 escape("Выберите событие для просмотра:");
     }
@@ -363,7 +364,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение
      */
     public String buildCreateEventOnDateMessage(LocalDate date) {
-        return escape("📅 ") + bold(formatDate(date)) + "\n\n" +
+        return escape(DATE + " ") + bold(formatDate(date)) + "\n\n" +
                 escape(NO_EVENTS_ON_DATE + ".") + "\n\n" +
                 escape("Хотите создать событие?");
     }
@@ -377,7 +378,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение
      */
     public String buildDateEventsManagementMessage(LocalDate date, @NonNull List<Event> events) {
-        return escape("📅 События на ") + bold(formatDate(date)) + "\n\n" +
+        return escape(DATE + " События на ") + bold(formatDate(date)) + "\n\n" +
                 escape("Всего событий: ") + bold(String.valueOf(events.size())) + "\n\n" +
                 escape("Выберите действие:");
     }
@@ -389,8 +390,8 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение
      */
     public String buildSelectTimeMessage(LocalDate date) {
-        return escape("📋 Создание нового события") + "\n\n" +
-               escape("✅ Дата: ") + bold(formatDate(date)) + "\n\n" +
+        return escape(CREATION + " Создание нового события") + "\n\n" +
+               escape(SUCCESS + " Дата: ") + bold(formatDate(date)) + "\n\n" +
                escape("Выберите время события:");
     }
     
@@ -400,7 +401,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение с шапкой
      */
     public String buildCalendarViewMessage() {
-        return "🗓️ " + bold("Календарь событий") + "\n\n" +
+        return CALENDAR + " " + bold("Календарь событий") + "\n\n" +
                escape("Выберите дату для просмотра, создания или редактирования событий:");
     }
 }

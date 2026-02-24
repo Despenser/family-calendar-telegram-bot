@@ -18,6 +18,8 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.Tele
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.ReminderMessageFormattingService;
 import java.time.ZoneId;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.EYE;
+
 /**
  * Отправитель напоминаний.
  * Отвечает за отправку уведомлений пользователям.
@@ -61,7 +63,7 @@ public class ReminderSender {
      * @return inline-клавиатура
      */
     public InlineKeyboardMarkup createKeyboard(@NonNull Event event, Long reminderId) {
-        InlineKeyboardButton button = keyboardFactory.createButton("👁 Посмотреть детали",
+        InlineKeyboardButton button = keyboardFactory.createButton(EYE + " Посмотреть детали",
                 CallbackPrefix.VIEW_EVENT_FROM_REMINDER.withPayload(event.getId() + "_" + reminderId)
         );
         InlineKeyboardRow row = keyboardFactory.createRow(button);

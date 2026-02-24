@@ -27,6 +27,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.*;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
@@ -154,13 +156,17 @@ public class EventTypeCallbackHandler implements CallbackHandler {
         try {
             String response = formatMessage(
                     """
-                            ✅ *Событие успешно создано!*
+                            %s *Событие успешно создано!*
                             
-                            📅 Дата: %s
-                            🕐 Время: %s
-                            📝 Название: %s""",
+                            %s Дата: %s
+                            %s Время: %s
+                            %s Название: %s""",
+                SUCCESS,
+                DATE,
                 dateTimeFormattingService.formatDate(event.getEventDate()),
+                TIME,
                 dateTimeFormattingService.formatTime(event.getEventTime()),
+                DESCRIPTION,
                 event.getTitle()
             );
 
@@ -186,7 +192,7 @@ public class EventTypeCallbackHandler implements CallbackHandler {
             
             if (draft.getEventTime() == null) {
                 log.warn("Попытка вернуться к выбору времени, но время не было выбрано: userId={}", context.getUserId());
-                callbackQueryService.answerCallback(context.callbackQueryId(), "❌ Ошибка: время не было выбрано");
+                callbackQueryService.answerCallback(context.callbackQueryId(), ERROR + " Ошибка: время не было выбрано");
                 return;
             }
             
@@ -225,7 +231,7 @@ public class EventTypeCallbackHandler implements CallbackHandler {
             
             if (isFromAddEvent) {
                 // Если создание началось из /add_event, показываем сообщение об отмене
-                String message = escape("❌ Создание события было отменено");
+                String message = escape(ERROR + " Создание события было отменено");
                 messageService.editMessageText(context.chatId(), context.messageId(), message, null);
                 callbackQueryService.answerCallback(context.callbackQueryId(), "Создание отменено");
                 

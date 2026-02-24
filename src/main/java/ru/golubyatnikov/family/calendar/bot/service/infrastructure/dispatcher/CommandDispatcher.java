@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.HELP;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.formatMessage;
 
 /**
@@ -61,7 +62,7 @@ public class CommandDispatcher {
         
         if (!message.hasText()) {
             return formatMessage("Пожалуйста, отправьте текстовую команду. " +
-                    "Используйте 📚 /help для списка доступных команд.");
+                    "Используйте " + HELP + " /help для списка доступных команд.");
         }
         
         String messageText = message.getText().trim();
@@ -72,17 +73,14 @@ public class CommandDispatcher {
         
         if (command == null) {
             return formatMessage("Команда должна начинаться с символа '/'. " +
-                    "Используйте 📚 /help для списка доступных команд.");
+                    "Используйте " + HELP + " /help для списка доступных команд.");
         }
         
         // Ищем обработчик для команды
         CommandHandler handler = commandHandlers.get(command);
         
         if (handler == null) {
-            return formatMessage("""
-                    Неизвестная команда: %s
-                    
-                    Используйте 📚 /help для списка доступных команд.""", command);
+            return formatMessage("Неизвестная команда: %s\n\nИспользуйте " + HELP + " /help для списка доступных команд.", command);
         }
         
         // Загружаем пользователя из БД (всегда, независимо от требования авторизации)

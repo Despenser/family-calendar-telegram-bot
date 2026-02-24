@@ -22,6 +22,9 @@ import ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.FILTER;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.SEPARATOR;
+
 /**
  * Обработчик callback queries для фильтрации событий.
  *
@@ -90,7 +93,7 @@ public class FilterCallbackHandler implements CallbackHandler {
         StringBuilder sb = new StringBuilder();
         
         // Заголовок с типом фильтра
-        sb.append(MarkdownFormatter.escapeMarkdownV2("🫧 Фильтр: "))
+        sb.append(MarkdownFormatter.escapeMarkdownV2(FILTER + " Фильтр: "))
           .append("*")
           .append(MarkdownFormatter.escapeMarkdownV2(filter.getDisplayName()))
           .append("*\n\n");
@@ -109,7 +112,7 @@ public class FilterCallbackHandler implements CallbackHandler {
                 sb.append(botMessageFormattingService.buildEventMessage(event));
                 if (i < events.size() - 1) {
                     sb.append("\n\n")
-                            .append(MarkdownFormatter.escapeMarkdownV2("─────────────────────"))
+                            .append(MarkdownFormatter.escapeMarkdownV2(SEPARATOR))
                             .append("\n\n");
                 }
             });
