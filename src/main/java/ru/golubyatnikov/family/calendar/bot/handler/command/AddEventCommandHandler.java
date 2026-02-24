@@ -14,7 +14,7 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import java.time.LocalDate;
 
-import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.ADD_EVENT;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.MY_EVENTS;
 import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.bold;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.escape;
@@ -90,7 +90,7 @@ public class AddEventCommandHandler implements CommandHandler {
         
         Message sentMessage = messageService.sendMessageWithInlineKeyboardAndGet(
                 chatId, 
-                bold(ADD_EVENT + " Создание нового события") + "\n\nВыберите дату события:", 
+                bold(MY_EVENTS + " Создание нового события") + "\n\nВыберите дату для создания нового события в вашем семейном календаре:", 
                 calendar);
         
         conversationService.setCreationMessageId(user.getId(), sentMessage.getMessageId().longValue());

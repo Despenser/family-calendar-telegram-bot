@@ -106,16 +106,7 @@ public class BotMessageFormattingService {
                 formatMessage(SUCCESS + " Время выбрано: %s\n\nВыберите тип события:", 
                 formattedTime);
     }
-    
-    /**
-     * Формирует сообщение для выбора часа.
-     * 
-     * @return отформатированное сообщение
-     */
-    public String buildSelectHourMessage() {
-        return TIME + " Выберите час:";
-    }
-    
+
     /**
      * Формирует сообщение для выбора часа при редактировании времени события.
      * 
@@ -131,7 +122,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение с шапкой
      */
     public String buildSelectDateMessageWithHeader() {
-        return bold(EVENT_CREATION_HEADER) + "\n\nВыберите дату события:";
+        return bold(EVENT_CREATION_HEADER) + "\n\nВыберите дату для создания нового события в вашем семейном календаре:";
     }
     
     /**

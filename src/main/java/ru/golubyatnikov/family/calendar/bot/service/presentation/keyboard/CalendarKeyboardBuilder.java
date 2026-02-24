@@ -87,6 +87,21 @@ public class CalendarKeyboardBuilder {
     public InlineKeyboardMarkup createForEventView(int year, int month, User user) {
         return createCalendar(year, month, user, true, null, false);
     }
+    /**
+     * Создает календарь для создания или редактирования события с учетом флага isFromAddEventCommand.
+     *
+     * @param year год для отображения
+     * @param month месяц для отображения (1-12)
+     * @param user пользователь
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     * @param isFromAddEventCommand true если создание началось из команды /add_event
+     *
+     * @return разметка inline-клавиатуры с календарем
+     */
+    public InlineKeyboardMarkup createForEventCreationOrEdit(int year, int month, User user,
+                                                             Long editingEventId, boolean isFromAddEventCommand) {
+        return createCalendar(year, month, user, false, editingEventId, isFromAddEventCommand);
+    }
 
     /**
      * Основной метод создания календаря.

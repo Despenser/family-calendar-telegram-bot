@@ -74,6 +74,26 @@ public class KeyboardLayoutService {
 
         return calendarKeyboardBuilder.createForEventView(year, month, user);
     }
+    /**
+     * Создает inline-календарь для создания или редактирования события с учетом флага isFromAddEventCommand.
+     *
+     * @param year год для отображения
+     * @param month месяц для отображения (1-12)
+     * @param user пользователь для определения timezone и семьи
+     * @param editingEventId ID редактируемого события (null для создания нового)
+     * @param isFromAddEventCommand true если создание началось из команды /add_event
+     *
+     * @return настроенная InlineKeyboardMarkup с календарем
+     * @throws IllegalArgumentException если month не в диапазоне 1-12
+     */
+    public InlineKeyboardMarkup createCalendarKeyboard(int year,
+                                                       int month,
+                                                       User user,
+                                                       Long editingEventId,
+                                                       boolean isFromAddEventCommand) {
+
+        return calendarKeyboardBuilder.createForEventCreationOrEdit(year, month, user, editingEventId, isFromAddEventCommand);
+    }
 
     /**
      * Создает inline-клавиатуру для выбора часа с фильтрацией прошедших часов.

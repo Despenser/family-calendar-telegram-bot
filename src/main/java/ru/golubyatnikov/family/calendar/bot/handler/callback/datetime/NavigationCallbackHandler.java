@@ -400,15 +400,26 @@ public class NavigationCallbackHandler implements CallbackHandler {
         boolean isCreatingEvent = conversationService.hasActiveDraft(ctx.getUserId());
         boolean isEditingEvent = conversationStateService.isEditingEvent(ctx.getUserId());
         Long editingEventId = null;
+        boolean isFromAddEventCommand = false;
         
         if (isEditingEvent) {
             EditingContext context = conversationStateService.getEditingContext(ctx.getUserId());
             editingEventId = context != null ? context.getEventId() : null;
         }
         
+        // Проверяем флаг isFromAddEventCommand из черновика
+        if (isCreatingEvent) {
+            try {
+                Event draft = conversationService.getActiveDraft(ctx.getUserId());
+                isFromAddEventCommand = draft.getIsFromAddEventCommand() != null && draft.getIsFromAddEventCommand();
+            } catch (Exception e) {
+                log.warn("Не удалось получить черновик для проверки флага isFromAddEventCommand: {}", e.getMessage());
+            }
+        }
+        
         InlineKeyboardMarkup keyboard;
         if (isCreatingEvent || isEditingEvent) {
-            keyboard = keyboardService.createCalendarKeyboard(year, month, ctx.user(), editingEventId);
+            keyboard = keyboardService.createCalendarKeyboard(year, month, ctx.user(), editingEventId, isFromAddEventCommand);
 
         } else {
             keyboard = keyboardService.createViewCalendarKeyboard(year, month, ctx.user());
