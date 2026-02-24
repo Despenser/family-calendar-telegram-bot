@@ -91,7 +91,7 @@ public class CallbackQueryDispatcher {
         }
         
         // Проверяем FilterCallbackHandler первым для callback с префиксом "filter_"
-        if (callbackData.startsWith("filter_") && filterCallbackHandler.canHandle(callbackData)) {
+        if (CallbackPrefix.FILTER.matches(callbackData) && filterCallbackHandler.canHandle(callbackData)) {
             return Optional.of(filterCallbackHandler);
         }
         

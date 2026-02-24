@@ -52,50 +52,17 @@ public class TrashCallbackHandler implements CallbackHandler {
     public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
         CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        if (context.callbackData().startsWith("trash_restore_")) {
-            Long eventId = extractEventId(context.callbackData());
+        if (CallbackPrefix.TRASH_RESTORE.matches(context.callbackData())) {
+            Long eventId = Long.parseLong(CallbackPrefix.TRASH_RESTORE.extractPayload(context.callbackData()));
             handleRestore(context, eventId);
 
-        } else if (context.callbackData().startsWith("trash_delete_")) {
-            Long eventId = extractEventId(context.callbackData());
+        } else if (CallbackPrefix.TRASH_DELETE.matches(context.callbackData())) {
+            Long eventId = Long.parseLong(CallbackPrefix.TRASH_DELETE.extractPayload(context.callbackData()));
             handlePermanentDelete(context, eventId);
 
         } else {
             log.warn("Неизвестный формат callback data корзины: data='{}', userId={}",
                     context.callbackData(), user.getId());
-        }
-    }
-    
-    /**
-     * Извлекает ID события из callback data.
-     *
-     * @param callbackData строка callback data
-     *
-     * @return ID события
-     * @throws NumberFormatException если eventId не является числом
-     * @throws IllegalArgumentException если формат callback data неизвестен
-     */
-    private @NonNull Long extractEventId(@NonNull String callbackData) {
-        String prefix;
-        
-        if (callbackData.startsWith("trash_restore_")) {
-            prefix = "trash_restore_";
-
-        } else if (callbackData.startsWith("trash_delete_")) {
-            prefix = "trash_delete_";
-
-        } else {
-            throw new IllegalArgumentException("Неизвестный формат callback data: " + callbackData);
-        }
-        
-        String eventIdStr = callbackData.substring(prefix.length());
-        
-        try {
-            return Long.parseLong(eventIdStr);
-
-        } catch (NumberFormatException e) {
-            log.error("Ошибка парсинга eventId: callbackData='{}', eventIdStr='{}'", callbackData, eventIdStr, e);
-            throw e;
         }
     }
     

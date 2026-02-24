@@ -152,7 +152,9 @@ public class TextEventCallbackHandler implements CallbackHandler {
                 try {
                     String eventMessage = botMessageFormattingService.buildEventCreatedMessage(createdEvent);
                     InlineKeyboardMarkup eventKeyboard = keyboardService.createEventActionsKeyboard(createdEvent.getId());
-                    messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(), eventMessage, eventKeyboard, context.callbackQueryId(), CallbackMessages.CREATED);
+                    messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(),
+                            eventMessage, eventKeyboard, context.callbackQueryId(), CallbackMessages.CREATED
+                    );
 
                 } catch (TelegramApiException e) {
                     log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
@@ -191,7 +193,9 @@ public class TextEventCallbackHandler implements CallbackHandler {
     private void handleCancelTextEvent(@NonNull CallbackQueryContext context) {
         String message = botMessageFormattingService.buildEventCancelledMessage();
         try {
-            messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(), message, null, context.callbackQueryId(), CallbackMessages.CANCELLED);
+            messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(), message,
+                    null, context.callbackQueryId(), CallbackMessages.CANCELLED
+            );
 
         } catch (TelegramApiException e) {
             log.error("Ошибка при отмене создания события из текста: chatId={}, error={}", 

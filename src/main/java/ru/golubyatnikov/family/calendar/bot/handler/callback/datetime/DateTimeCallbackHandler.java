@@ -95,7 +95,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
      * @return true, если это выбор времени с минутами
      */
     private boolean isTimeWithMinutes(@NonNull String callbackData) {
-        return callbackData.startsWith("time_") && callbackData.contains(":");
+        return CallbackPrefix.TIME.matches(callbackData) && callbackData.contains(":");
     }
     
     /**
@@ -343,7 +343,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
      * @throws RuntimeException если произошла ошибка при выборе времени
      */
     private void handleTimeSelection(@NonNull CallbackQueryContext context) {
-        String timeStr = context.callbackData().substring(5); // Убираем "time_"
+        String timeStr = CallbackPrefix.TIME.extractPayload(context.callbackData());
         LocalTime time = LocalTime.parse(timeStr);
         
         if (conversationStateService.isEditingEvent(context.getUserId())) {

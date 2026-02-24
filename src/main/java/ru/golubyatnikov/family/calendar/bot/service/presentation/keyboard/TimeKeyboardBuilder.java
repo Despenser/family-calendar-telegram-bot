@@ -26,13 +26,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TimeKeyboardBuilder {
 
-    private static final String TIME_IGNORE = "time_ignore";
-    private static final String TIME_TO_CALENDAR = "time_to_calendar";
-    private static final String TIME_CANCEL = "time_cancel";
-    private static final String TIME_BACK = "time_back";
-    private static final String HOUR_PREFIX = "hour_";
-    private static final String TIME_PREFIX = "time_";
-
     private final TimeAvailabilityService timeAvailabilityService;
     private final KeyboardFactory keyboardFactory;
     private final TimeSelectionConfig timeSelectionConfig;
@@ -101,7 +94,7 @@ public class TimeKeyboardBuilder {
 
     private InlineKeyboardRow createHeaderRow(String text) {
         return keyboardFactory.createRow(
-            keyboardFactory.createButton(text, TIME_IGNORE)
+            keyboardFactory.createButton(text, CallbackPrefix.TIME_IGNORE.withPayload(""))
         );
     }
 
@@ -113,7 +106,7 @@ public class TimeKeyboardBuilder {
             int hour = hours.get(i);
             currentRow.add(keyboardFactory.createButton(
                 String.format("%02d:00", hour),
-                HOUR_PREFIX + String.format("%02d", hour)
+                CallbackPrefix.HOUR.withPayload(String.format("%02d", hour))
             ));
             
             if ((i + 1) % timeSelectionConfig.getHoursPerRow() == 0 || i == hours.size() - 1) {
@@ -131,7 +124,7 @@ public class TimeKeyboardBuilder {
         for (int minute : minutes) {
             buttons.add(keyboardFactory.createButton(
                 String.format("%02d:%02d", selectedHour, minute),
-                TIME_PREFIX + String.format("%02d:%02d", selectedHour, minute)
+                CallbackPrefix.TIME.withPayload(String.format("%02d:%02d", selectedHour, minute))
             ));
         }
 
@@ -149,8 +142,8 @@ public class TimeKeyboardBuilder {
         } else {
             // При создании нового события - всегда две кнопки: "Назад к календарю" и "Отменить создание"
             return keyboardFactory.createRow(
-                keyboardFactory.createButton("🔙 Назад", TIME_TO_CALENDAR),
-                keyboardFactory.createButton("✖️ Отменить создание", TIME_CANCEL)
+                keyboardFactory.createButton("🔙 Назад", CallbackPrefix.TIME_TO_CALENDAR.withPayload("")),
+                keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.TIME_CANCEL.withPayload(""))
             );
         }
     }
@@ -158,11 +151,11 @@ public class TimeKeyboardBuilder {
     private InlineKeyboardRow createNavigationRow(boolean isCreatingNewEvent) {
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         
-        buttons.add(keyboardFactory.createButton("🔙 Назад", TIME_BACK));
+        buttons.add(keyboardFactory.createButton("🔙 Назад", CallbackPrefix.TIME_BACK.withPayload("")));
         
         // При создании нового события всегда показываем кнопку "Отменить создание"
         if (isCreatingNewEvent) {
-            buttons.add(keyboardFactory.createButton("✖️ Отменить создание", TIME_CANCEL));
+            buttons.add(keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.TIME_CANCEL.withPayload("")));
         }
         
         return keyboardFactory.createRow(buttons);

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Attachment;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -54,12 +55,12 @@ public class AttachmentInlineKeyboardFactory {
                 
                 if (isCreator) {
                     rows.add(keyboardFactory.createRow(
-                        keyboardFactory.createButton(buttonText, "attach_file_view_" + eventId + "_" + attachment.getId()),
-                        keyboardFactory.createButton("🗑️", "attach_file_delete_" + eventId + "_" + attachment.getId())
+                        keyboardFactory.createButton(buttonText, CallbackPrefix.ATTACH_FILE.withPayload("view_" + eventId + "_" + attachment.getId())),
+                        keyboardFactory.createButton("🗑️", CallbackPrefix.ATTACH_FILE.withPayload("delete_" + eventId + "_" + attachment.getId()))
                     ));
                 } else {
                     rows.add(keyboardFactory.createRow(
-                        keyboardFactory.createButton(buttonText, "attach_file_view_" + eventId + "_" + attachment.getId())
+                        keyboardFactory.createButton(buttonText, CallbackPrefix.ATTACH_FILE.withPayload("view_" + eventId + "_" + attachment.getId()))
                     ));
                 }
             }
@@ -67,12 +68,12 @@ public class AttachmentInlineKeyboardFactory {
         
         if (isCreator) {
             rows.add(keyboardFactory.createRow(
-                keyboardFactory.createButton("➕ Добавить файл", "attach_file_add_" + eventId)
+                keyboardFactory.createButton("➕ Добавить файл", CallbackPrefix.ATTACH_FILE.withPayload("add_" + eventId))
             ));
         }
         
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад к событию", "attach_file_back_" + eventId)
+            keyboardFactory.createButton("🔙 Назад к событию", CallbackPrefix.ATTACH_FILE.withPayload("back_" + eventId))
         ));
         
         return keyboardFactory.createMarkup(rows);
@@ -98,8 +99,8 @@ public class AttachmentInlineKeyboardFactory {
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("✅ Да, удалить", "attach_file_confirm_delete_" + eventId + "_" + attachmentId),
-                keyboardFactory.createButton("❌ Отмена", "attach_file_cancel_delete_" + eventId)
+                keyboardFactory.createButton("✅ Да, удалить", CallbackPrefix.ATTACH_FILE.withPayload("confirm_delete_" + eventId + "_" + attachmentId)),
+                keyboardFactory.createButton("❌ Отмена", CallbackPrefix.ATTACH_FILE.withPayload("cancel_delete_" + eventId))
             )
         );
     }
@@ -119,7 +120,7 @@ public class AttachmentInlineKeyboardFactory {
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("🔙 Назад к вложениям", "attach_file_list_" + eventId)
+                keyboardFactory.createButton("🔙 Назад к вложениям", CallbackPrefix.ATTACH_FILE.withPayload("list_" + eventId))
             )
         );
     }
@@ -139,7 +140,7 @@ public class AttachmentInlineKeyboardFactory {
         
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton("❌ Отмена", "attach_file_cancel_add_" + eventId)
+                keyboardFactory.createButton("❌ Отмена", CallbackPrefix.ATTACH_FILE.withPayload("cancel_add_" + eventId))
             )
         );
     }

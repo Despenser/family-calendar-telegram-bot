@@ -138,6 +138,35 @@ public enum CallbackPrefix {
     /** Повторение события с новой датой и временем (формат: repeat_event_{eventId}) */
     REPEAT_EVENT("repeat_event_"),
     
+    // ===== Навигация по календарю =====
+    
+    /** Возврат к календарю с указанием года и месяца (формат: back_to_calendar_YYYY-MM) */
+    BACK_TO_CALENDAR("back_to_calendar_"),
+    
+    /** Создание события на конкретную дату (формат: create_event_on_date_YYYY-MM-DD) */
+    CREATE_EVENT_ON_DATE("create_event_on_date_"),
+    
+    /** Просмотр событий на конкретную дату (формат: view_events_on_date_YYYY-MM-DD) */
+    VIEW_EVENTS_ON_DATE("view_events_on_date_"),
+    
+    /** Редактирование события из календаря (формат: edit_event_from_calendar_{eventId}_{date}) */
+    EDIT_EVENT_FROM_CALENDAR("edit_event_from_calendar_"),
+    
+    /** Редактирование своих событий на дату (формат: edit_my_events_on_date_YYYY-MM-DD) */
+    EDIT_MY_EVENTS_ON_DATE("edit_my_events_on_date_"),
+    
+    /** Удаление своих событий на дату (формат: delete_my_events_on_date_YYYY-MM-DD) */
+    DELETE_MY_EVENTS_ON_DATE("delete_my_events_on_date_"),
+    
+    /** Отмена навигации по календарю */
+    CALENDAR_CANCEL("calendar_cancel"),
+    
+    /** Восстановление события из корзины (формат: trash_restore_{eventId}) */
+    TRASH_RESTORE("trash_restore_"),
+    
+    /** Окончательное удаление события из корзины (формат: trash_delete_{eventId}) */
+    TRASH_DELETE("trash_delete_"),
+    
     // ===== Поиск =====
     
     /** Повторный поиск событий (формат: search_again:) */
@@ -262,6 +291,7 @@ public enum CallbackPrefix {
                this == SKIP_DESCRIPTION || 
                this == SKIP_COMPLETION_NOTE ||
                this == CANCEL_TEXT_EVENT ||
+               this == CALENDAR_CANCEL ||
                this == CALENDAR_IGNORE ||
                this == TIME_IGNORE;
     }

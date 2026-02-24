@@ -32,9 +32,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CalendarKeyboardBuilder {
 
-    private static final String CALENDAR_PREFIX = "calendar_";
-    private static final String IGNORE_CALLBACK = "calendar_ignore";
-    private static final String CANCEL_CALLBACK = "calendar_cancel";
     private static final int DAYS_IN_WEEK = 7;
     private static final String[] WEEK_DAYS = {"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"};
 
@@ -144,7 +141,7 @@ public class CalendarKeyboardBuilder {
         return keyboardFactory.createRow(
             keyboardFactory.createButton(
                 dateTimeFormattingService.formatMonth(context.yearMonth().atDay(1)),
-                IGNORE_CALLBACK
+                CallbackPrefix.CALENDAR_IGNORE.withPayload("")
             )
         );
     }
@@ -157,7 +154,7 @@ public class CalendarKeyboardBuilder {
     private InlineKeyboardRow createWeekDaysRow() {
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         for (String day : WEEK_DAYS) {
-            buttons.add(keyboardFactory.createButton(day, IGNORE_CALLBACK));
+            buttons.add(keyboardFactory.createButton(day, CallbackPrefix.CALENDAR_IGNORE.withPayload("")));
         }
         return keyboardFactory.createRow(buttons);
     }
@@ -260,7 +257,7 @@ public class CalendarKeyboardBuilder {
      * @return пустая кнопка
      */
     private InlineKeyboardButton createEmptyButton() {
-        return keyboardFactory.createButton(" ", IGNORE_CALLBACK);
+        return keyboardFactory.createButton(" ", CallbackPrefix.CALENDAR_IGNORE.withPayload(""));
     }
 
     /**
@@ -285,7 +282,7 @@ public class CalendarKeyboardBuilder {
         
         String dayText = buildDayText(date, context, eventsByDate, eventCountByDate);
         
-        String prefix = context.isViewingCalendar() ? CALENDAR_PREFIX : CallbackPrefix.DATE.getPrefix();
+        String prefix = context.isViewingCalendar() ? CallbackPrefix.CALENDAR.getPrefix() : CallbackPrefix.DATE.getPrefix();
         String callbackData = String.format("%s%d-%02d-%02d", 
             prefix, date.getYear(), date.getMonthValue(), date.getDayOfMonth());
         
@@ -371,7 +368,7 @@ public class CalendarKeyboardBuilder {
      * @return неактивная кнопка
      */
     private InlineKeyboardButton createDisabledNavigationButton() {
-        return keyboardFactory.createButton("   ", IGNORE_CALLBACK);
+        return keyboardFactory.createButton("   ", CallbackPrefix.CALENDAR_IGNORE.withPayload(""));
     }
 
     /**
@@ -382,7 +379,7 @@ public class CalendarKeyboardBuilder {
      */
     private InlineKeyboardButton createPrevMonthButton(@NonNull YearMonth month) {
         return keyboardFactory.createButton("⬅️", 
-            String.format("%s%d-%02d", CALENDAR_PREFIX, month.getYear(), month.getMonthValue()));
+            CallbackPrefix.CALENDAR.withPayload(String.format("%d-%02d", month.getYear(), month.getMonthValue())));
     }
 
     /**
@@ -393,7 +390,7 @@ public class CalendarKeyboardBuilder {
      */
     private InlineKeyboardButton createNextMonthButton(@NonNull YearMonth month) {
         return keyboardFactory.createButton("➡️", 
-            String.format("%s%d-%02d", CALENDAR_PREFIX, month.getYear(), month.getMonthValue()));
+            CallbackPrefix.CALENDAR.withPayload(String.format("%d-%02d", month.getYear(), month.getMonthValue())));
     }
 
     /**
@@ -413,8 +410,8 @@ public class CalendarKeyboardBuilder {
         } else {
             // При создании или просмотре - кнопка "Сегодня"
             return keyboardFactory.createButton("Сегодня", 
-                String.format("%s%d-%02d", CALENDAR_PREFIX, 
-                    context.currentYearMonth().getYear(), context.currentYearMonth().getMonthValue()));
+                CallbackPrefix.CALENDAR.withPayload(String.format("%d-%02d", 
+                    context.currentYearMonth().getYear(), context.currentYearMonth().getMonthValue())));
         }
     }
 
@@ -436,7 +433,7 @@ public class CalendarKeyboardBuilder {
      */
     private InlineKeyboardRow createCancelRow() {
         return keyboardFactory.createRow(
-            keyboardFactory.createButton("✖️ Отменить создание", CANCEL_CALLBACK)
+            keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.CALENDAR_CANCEL.withPayload(""))
         );
     }
 }

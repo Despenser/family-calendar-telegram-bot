@@ -70,14 +70,14 @@ public class NavigationCallbackHandler implements CallbackHandler {
         routes = new LinkedHashMap<>();
         
         // Порядок важен - более специфичные паттерны должны быть первыми
-        routes.put(data -> data.startsWith("back_to_calendar_"), this::handleBackToCalendar);
-        routes.put(data -> data.startsWith("view_event_"), this::handleViewEvent);
-        routes.put(data -> data.startsWith("repeat_event_"), this::handleRepeatEvent);
-        routes.put(data -> data.startsWith("create_event_on_date_"), this::handleCreateEventOnDate);
-        routes.put(data -> data.startsWith("view_events_on_date_"), this::handleViewEventsOnDate);
-        routes.put(data -> data.startsWith("edit_event_from_calendar_"), this::handleEditEventFromCalendar);
-        routes.put(data -> data.startsWith("edit_my_events_on_date_"), this::handleEditMyEventsOnDate);
-        routes.put(data -> data.startsWith("delete_my_events_on_date_"), this::handleDeleteMyEventsOnDate);
+        routes.put(CallbackPrefix.BACK_TO_CALENDAR::matches, this::handleBackToCalendar);
+        routes.put(CallbackPrefix.VIEW_EVENT::matches, this::handleViewEvent);
+        routes.put(CallbackPrefix.REPEAT_EVENT::matches, this::handleRepeatEvent);
+        routes.put(CallbackPrefix.CREATE_EVENT_ON_DATE::matches, this::handleCreateEventOnDate);
+        routes.put(CallbackPrefix.VIEW_EVENTS_ON_DATE::matches, this::handleViewEventsOnDate);
+        routes.put(CallbackPrefix.EDIT_EVENT_FROM_CALENDAR::matches, this::handleEditEventFromCalendar);
+        routes.put(CallbackPrefix.EDIT_MY_EVENTS_ON_DATE::matches, this::handleEditMyEventsOnDate);
+        routes.put(CallbackPrefix.DELETE_MY_EVENTS_ON_DATE::matches, this::handleDeleteMyEventsOnDate);
         routes.put(CallbackPrefix.CALENDAR::matches, this::handleCalendarNavigation);
         routes.put(CallbackPrefix.DATE_ACTIONS::matches, this::handleDateActions);
     }
@@ -121,7 +121,8 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @return true, если callback от напоминания
      */
     private boolean isReminderCallback(@NonNull String callbackData) {
-        return callbackData.startsWith("view_event_from_reminder_") || callbackData.startsWith("back_to_reminder_");
+        return CallbackPrefix.VIEW_EVENT_FROM_REMINDER.matches(callbackData) || 
+               CallbackPrefix.BACK_TO_REMINDER.matches(callbackData);
     }
     
     /**
@@ -151,7 +152,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @param ctx контекст обработки callback
      */
     private void handleBackToCalendar(@NonNull String callbackData, @NonNull CallbackQueryContext ctx) {
-        String yearMonthStr = callbackData.substring("back_to_calendar_".length());
+        String yearMonthStr = CallbackPrefix.BACK_TO_CALENDAR.extractPayload(callbackData);
         String[] parts = yearMonthStr.split("-");
         int year = Integer.parseInt(parts[0]);
         int month = Integer.parseInt(parts[1]);
@@ -169,7 +170,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @param ctx контекст обработки callback
      */
     private void handleViewEvent(String callbackData, @NonNull CallbackQueryContext ctx) {
-        Long eventId = ctx.extractId("view_event_");
+        Long eventId = Long.parseLong(CallbackPrefix.VIEW_EVENT.extractPayload(callbackData));
         eventViewService.viewEvent(eventId, ctx.user(), ctx.chatId(), ctx.messageId(), ctx.callbackQueryId());
     }
     
@@ -180,7 +181,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @param ctx контекст обработки callback
      */
     private void handleRepeatEvent(String callbackData, @NonNull CallbackQueryContext ctx) {
-        Long eventId = ctx.extractId("repeat_event_");
+        Long eventId = Long.parseLong(CallbackPrefix.REPEAT_EVENT.extractPayload(callbackData));
         eventViewService.repeatEvent(eventId, ctx.user(), ctx.chatId(), ctx.messageId(), ctx.callbackQueryId());
     }
     
@@ -191,7 +192,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @param ctx контекст обработки callback
      */
     private void handleCreateEventOnDate(String callbackData, @NonNull CallbackQueryContext ctx) {
-        LocalDate date = ctx.extractDate("create_event_on_date_");
+        LocalDate date = LocalDate.parse(CallbackPrefix.CREATE_EVENT_ON_DATE.extractPayload(callbackData));
         eventViewService.createEventOnDate(date, ctx.user(), ctx.chatId(), ctx.messageId(), ctx.callbackQueryId());
     }
     
@@ -202,7 +203,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @param ctx контекст обработки callback
      */
     private void handleViewEventsOnDate(String callbackData, @NonNull CallbackQueryContext ctx) {
-        LocalDate date = ctx.extractDate("view_events_on_date_");
+        LocalDate date = LocalDate.parse(CallbackPrefix.VIEW_EVENTS_ON_DATE.extractPayload(callbackData));
         eventListService.viewEventsOnDate(date, ctx.user(), ctx.chatId(), ctx.messageId(), ctx.callbackQueryId());
     }
     
@@ -213,7 +214,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @param ctx контекст обработки callback
      */
     private void handleEditMyEventsOnDate(String callbackData, @NonNull CallbackQueryContext ctx) {
-        LocalDate date = ctx.extractDate("edit_my_events_on_date_");
+        LocalDate date = LocalDate.parse(CallbackPrefix.EDIT_MY_EVENTS_ON_DATE.extractPayload(callbackData));
         eventListService.showMyEventsForEdit(date, ctx.user(), ctx.chatId(), ctx.messageId(), ctx.callbackQueryId());
     }
     
@@ -224,7 +225,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @param ctx контекст обработки callback
      */
     private void handleDeleteMyEventsOnDate(String callbackData, @NonNull CallbackQueryContext ctx) {
-        LocalDate date = ctx.extractDate("delete_my_events_on_date_");
+        LocalDate date = LocalDate.parse(CallbackPrefix.DELETE_MY_EVENTS_ON_DATE.extractPayload(callbackData));
         eventListService.showMyEventsForDelete(date, ctx.user(), ctx.chatId(), ctx.messageId(), ctx.callbackQueryId());
     }
     
@@ -235,7 +236,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @param ctx контекст обработки callback
      */
     private void handleEditEventFromCalendar(@NonNull String callbackData, @NonNull CallbackQueryContext ctx) {
-        String payload = callbackData.substring("edit_event_from_calendar_".length());
+        String payload = CallbackPrefix.EDIT_EVENT_FROM_CALENDAR.extractPayload(callbackData);
         String[] parts = payload.split("_", 2);
         
         if (parts.length != 2) {
@@ -269,7 +270,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
      * @param ctx контекст обработки callback
      */
     private void handleCalendarNavigation(@NonNull String callbackData, CallbackQueryContext ctx) {
-        if (callbackData.equals("calendar_cancel")) {
+        if (CallbackPrefix.CALENDAR_CANCEL.matches(callbackData)) {
             handleCalendarCancel(ctx);
             return;
         }

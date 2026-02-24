@@ -11,6 +11,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import ru.golubyatnikov.family.calendar.bot.model.dto.ParsedEvent;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.TextEventParsingService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
@@ -124,12 +125,12 @@ public class TextEventMessageHandler {
         
         InlineKeyboardButton confirmButton = InlineKeyboardButton.builder()
                 .text("✅ Создать событие")
-                .callbackData("confirm_text_event:" + encodedData)
+                .callbackData(CallbackPrefix.CONFIRM_TEXT_EVENT.withPayload(encodedData))
                 .build();
         
         InlineKeyboardButton cancelButton = InlineKeyboardButton.builder()
-                .text("❌ Отмена")
-                .callbackData("cancel_text_event")
+                .text("✖️ Отменить создание")
+                .callbackData(CallbackPrefix.CANCEL_TEXT_EVENT.withPayload(""))
                 .build();
         
         return InlineKeyboardMarkup.builder()

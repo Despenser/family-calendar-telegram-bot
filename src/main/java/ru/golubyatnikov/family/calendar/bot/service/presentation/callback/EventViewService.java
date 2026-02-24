@@ -9,6 +9,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardFactory;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
@@ -87,8 +88,6 @@ public class EventViewService {
     public void createEventOnDate(LocalDate selectedDate, User user, Long chatId, 
                                   Integer messageId, String callbackQueryId) {
         try {
-            // Всегда отменяем предыдущий черновик и создаем новый для флоу /calendar
-            // Это гарантирует, что флаг isFromAddEventCommand будет false
             conversationService.cancelEventCreation(user.getId());
             conversationService.startEventCreation(user.getId(), false);
             
@@ -188,13 +187,13 @@ public class EventViewService {
         if (event.isCompleted()) {
             rows.add(keyboardFactory.createRow(
                 keyboardFactory.createButton("🔄 Повторить событие",
-                        "repeat_event_" + event.getId())
+                        CallbackPrefix.REPEAT_EVENT.withPayload(event.getId().toString()))
             ));
         }
         
         rows.add(keyboardFactory.createRow(
             keyboardFactory.createButton("🔙 Назад к списку",
-                    "view_events_on_date_" + eventDate.toString())
+                    CallbackPrefix.VIEW_EVENTS_ON_DATE.withPayload(eventDate.toString()))
         ));
         
         return keyboardFactory.createMarkup(rows);

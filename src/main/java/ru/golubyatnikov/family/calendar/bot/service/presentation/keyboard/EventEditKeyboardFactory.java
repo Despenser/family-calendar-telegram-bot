@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -28,10 +29,10 @@ public class EventEditKeyboardFactory {
                                                         LocalDate date) {
 
         List<InlineKeyboardRow> rows = keyboardFactory.createEventButtonRows(events,
-                event -> "edit_event_from_calendar_" + event.getId() + "_" + date.toString());
+                event -> CallbackPrefix.EDIT_EVENT_FROM_CALENDAR.withPayload(event.getId() + "_" + date.toString()));
 
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", "calendar_" + date)
+            keyboardFactory.createButton("🔙 Назад", CallbackPrefix.CALENDAR.withPayload(date.toString()))
         ));
 
         return keyboardFactory.createMarkup(rows);
@@ -47,7 +48,7 @@ public class EventEditKeyboardFactory {
                 event -> "delete_event_" + event.getId());
 
         rows.add(keyboardFactory.createRow(
-            keyboardFactory.createButton("🔙 Назад", "calendar_" + date)
+            keyboardFactory.createButton("🔙 Назад", CallbackPrefix.CALENDAR.withPayload(date.toString()))
         ));
 
         return keyboardFactory.createMarkup(rows);

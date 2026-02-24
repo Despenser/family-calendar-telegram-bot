@@ -165,7 +165,7 @@ public class EventReminderNavigationHandler implements CallbackHandler {
      * Извлекает ID события и напоминания из callback data.
      */
     private @Nullable ReminderEventIds extractReminderEventIds(@NonNull CallbackQueryContext context) {
-        CallbackPrefix prefix = context.callbackData().startsWith("view_event_from_reminder_") 
+        CallbackPrefix prefix = CallbackPrefix.VIEW_EVENT_FROM_REMINDER.matches(context.callbackData())
             ? CallbackPrefix.VIEW_EVENT_FROM_REMINDER 
             : CallbackPrefix.BACK_TO_REMINDER;
             
