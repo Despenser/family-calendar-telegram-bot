@@ -120,13 +120,9 @@ public class EventViewService {
         try {
             conversationService.updateEventDate(user.getId(), selectedDate);
             conversationService.setCreationMessageId(user.getId(), messageId.longValue());
-            
-            // Получаем черновик и проверяем флаг isFromAddEventCommand
-            Event draft = conversationService.getActiveDraft(user.getId());
-            boolean isFromAddEventCommand = Boolean.TRUE.equals(draft.getIsFromAddEventCommand());
-            
+
             InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(
-                    selectedDate, user, isFromAddEventCommand);
+                    selectedDate, user);
             String message = botMessageFormattingService.buildSelectTimeMessage(selectedDate);
             
             messageService.safeEditMessageAndAnswer(chatId, messageId, message, keyboard, callbackQueryId, "Дата выбрана");

@@ -212,6 +212,15 @@ public class KeyboardService {
     }
 
     /**
+     * Создает inline клавиатуру с кнопкой "Отменить создание" для этапа ввода названия.
+     *
+     * @return настроенная InlineKeyboardMarkup с кнопкой отмены
+     */
+    public InlineKeyboardMarkup createCancelCreationKeyboard() {
+        return inlineKeyboardService.createCancelCreationKeyboard();
+    }
+
+    /**
      * Создает календарь для выбора даты при создании события.
      *
      * @param year год для отображения
@@ -259,18 +268,6 @@ public class KeyboardService {
     }
 
     /**
-     * Создает фильтрованную клавиатуру для выбора часа.
-     *
-     * @param selectedDate выбранная дата события
-     * @param user пользователь (для определения timezone)
-     *
-     * @return настроенная InlineKeyboardMarkup с доступными часами
-     */
-    public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate, User user) {
-        return keyboardLayoutService.createFilteredHourSelectionKeyboard(selectedDate, user);
-    }
-
-    /**
      * Создает фильтрованную клавиатуру для выбора часа с учетом редактирования.
      *
      * @param selectedDate выбранная дата события
@@ -282,23 +279,22 @@ public class KeyboardService {
     public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate,
                                                                     User user,
                                                                     Long editingEventId) {
+
         return keyboardLayoutService.createFilteredHourSelectionKeyboard(selectedDate, user, editingEventId);
     }
-    
+
     /**
      * Создает фильтрованную клавиатуру для выбора часа для создания нового события.
      *
      * @param selectedDate выбранная дата события
      * @param user пользователь (для определения timezone)
-     * @param isFromAddEventCommand true если создание началось из команды /add_event
      *
      * @return настроенная InlineKeyboardMarkup с доступными часами
      */
     public InlineKeyboardMarkup createFilteredHourSelectionKeyboard(LocalDate selectedDate,
-                                                                    User user,
-                                                                    boolean isFromAddEventCommand) {
+                                                                    User user) {
 
-        return keyboardLayoutService.createFilteredHourSelectionKeyboard(selectedDate, user, isFromAddEventCommand);
+        return keyboardLayoutService.createFilteredHourSelectionKeyboard(selectedDate, user);
     }
 
     /**
@@ -315,6 +311,7 @@ public class KeyboardService {
                                                                       LocalDate selectedDate,
                                                                       User user,
                                                                       Long editingEventId) {
+
         return keyboardLayoutService.createFilteredMinuteSelectionKeyboard(selectedHour, selectedDate, user, editingEventId);
     }
     
@@ -324,16 +321,14 @@ public class KeyboardService {
      * @param selectedHour выбранный час
      * @param selectedDate выбранная дата события
      * @param user пользователь (для определения timezone)
-     * @param isFromAddEventCommand true если создание началось из команды /add_event
      *
      * @return настроенная InlineKeyboardMarkup с доступными минутами
      */
     public InlineKeyboardMarkup createFilteredMinuteSelectionKeyboard(int selectedHour,
                                                                       LocalDate selectedDate,
-                                                                      User user,
-                                                                      boolean isFromAddEventCommand) {
+                                                                      User user) {
                                                                         
-        return keyboardLayoutService.createFilteredMinuteSelectionKeyboard(selectedHour, selectedDate, user, isFromAddEventCommand);
+        return keyboardLayoutService.createFilteredMinuteSelectionKeyboard(selectedHour, selectedDate, user);
     }
     
     /**

@@ -56,16 +56,6 @@ public class InlineKeyboardService {
     }
 
     /**
-     * Создает inline клавиатуру для подтверждения удаления события.
-     * 
-     * @param eventId идентификатор события
-     * @return настроенная InlineKeyboardMarkup
-     */
-    public InlineKeyboardMarkup createDeleteConfirmationKeyboard(Long eventId) {
-        return eventFactory.createDeleteConfirmationKeyboard(eventId);
-    }
-
-    /**
      * Создает inline клавиатуру для выбора типа события.
      * 
      * @return настроенная InlineKeyboardMarkup
@@ -158,7 +148,9 @@ public class InlineKeyboardService {
      * @return настроенная InlineKeyboardMarkup
      * @throws IllegalArgumentException если параметры некорректны
      */
-    public InlineKeyboardMarkup createDeleteAttachmentConfirmationKeyboard(Long eventId, Long attachmentId) {
+    public InlineKeyboardMarkup createDeleteAttachmentConfirmationKeyboard(Long eventId,
+                                                                           Long attachmentId) {
+
         return attachmentFactory.createDeleteAttachmentConfirmationKeyboard(eventId, attachmentId);
     }
 
@@ -193,6 +185,15 @@ public class InlineKeyboardService {
      */
     public InlineKeyboardMarkup createSkipDescriptionKeyboard() {
         return navigationFactory.createSkipDescriptionKeyboard();
+    }
+    
+    /**
+     * Создает inline клавиатуру с кнопкой "Отменить создание" для этапа ввода названия.
+     * 
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createCancelCreationKeyboard() {
+        return navigationFactory.createCancelCreationKeyboard();
     }
     
     /**

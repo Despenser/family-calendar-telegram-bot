@@ -1,5 +1,6 @@
 package ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -31,6 +32,7 @@ public class ConversationService {
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
     private final EventService eventService;
+    private final EntityManager entityManager;
     
     /**
      * Начинает новый диалог создания события.
@@ -128,6 +130,23 @@ public class ConversationService {
         Event draft = getActiveDraft(userId);
         draft.setTitle(title);
         eventRepository.save(draft);
+    }
+    
+    /**
+     * Очищает название и описание в черновике события.
+     * Используется при возврате к вводу названия с этапа ввода описания.
+     *
+     * @param userId идентификатор пользователя
+     *
+     * @throws IllegalStateException если активный черновик не найден
+     */
+    @Transactional
+    public void clearTitleAndDescription(Long userId) {
+        Event draft = getActiveDraft(userId);
+        draft.setTitle(null);
+        draft.setDescription(null);
+        eventRepository.saveAndFlush(draft);
+        entityManager.clear();
     }
     
     /**

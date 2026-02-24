@@ -4,8 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 
 /**
  * Фабрика для создания inline клавиатур навигации.
@@ -21,13 +20,33 @@ public class NavigationInlineKeyboardFactory {
     private final KeyboardFactory keyboardFactory;
 
     /**
+     * Создает inline клавиатуру с кнопкой "Отменить создание" для этапа ввода названия.
+     * 
+     * @return настроенная InlineKeyboardMarkup
+     */
+    public InlineKeyboardMarkup createCancelCreationKeyboard() {
+        return keyboardFactory.createMarkup(
+            keyboardFactory.createRow(
+                keyboardFactory.createButton("🔙 Назад", CallbackPrefix.TITLE_BACK.withPayload("")),
+                keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.TYPE_CANCEL.withPayload(""))
+            )
+        );
+    }
+    
+    /**
      * Создает inline клавиатуру с кнопкой "Пропустить" для описания события.
      * 
      * @return настроенная InlineKeyboardMarkup
      */
     public InlineKeyboardMarkup createSkipDescriptionKeyboard() {
-        InlineKeyboardButton button = keyboardFactory.createButton("⏭️ Пропустить", "skip_description");
-        InlineKeyboardRow row = keyboardFactory.createRow(button);
-        return keyboardFactory.createMarkup(row);
+        return keyboardFactory.createMarkup(
+            keyboardFactory.createRow(
+                keyboardFactory.createButton("⏭️ Пропустить", "skip_description")
+            ),
+            keyboardFactory.createRow(
+                keyboardFactory.createButton("🔙 Назад", CallbackPrefix.DESC_BACK_TO_TITLE.withPayload("")),
+                keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.TYPE_CANCEL.withPayload(""))
+            )
+        );
     }
 }

@@ -37,6 +37,18 @@ public enum CallbackPrefix {
     /** Отмена создания события */
     TIME_CANCEL("time_cancel"),
     
+    /** Возврат к выбору времени (с этапа выбора типа) */
+    TYPE_BACK_TO_TIME("type_back_to_time"),
+    
+    /** Возврат к выбору типа события (с этапа ввода названия) */
+    TITLE_BACK("title_back"),
+    
+    /** Возврат к вводу названия (с этапа ввода описания) */
+    DESC_BACK_TO_TITLE("desc_back_to_title"),
+    
+    /** Отмена создания на этапе выбора типа */
+    TYPE_CANCEL("type_cancel"),
+    
     // ===== События =====
     
     /** Просмотр деталей события (формат: view_event_{eventId}) */
@@ -243,6 +255,10 @@ public enum CallbackPrefix {
         return this == TIME_BACK || 
                this == TIME_TO_CALENDAR ||
                this == TIME_CANCEL || 
+               this == TYPE_BACK_TO_TIME ||
+               this == TITLE_BACK ||
+               this == DESC_BACK_TO_TITLE ||
+               this == TYPE_CANCEL ||
                this == SKIP_DESCRIPTION || 
                this == SKIP_COMPLETION_NOTE ||
                this == CANCEL_TEXT_EVENT ||

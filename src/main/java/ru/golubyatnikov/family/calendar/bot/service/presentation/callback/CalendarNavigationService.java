@@ -70,7 +70,7 @@ public class CalendarNavigationService {
             
             if (isFromAddEventCommand) {
                 // Возвращаемся к календарю выбора даты для /add_event
-                returnToDateSelectionCalendar(user, draftDate, chatId, messageId, callbackQueryId, true);
+                returnToDateSelectionCalendar(user, draftDate, chatId, messageId, callbackQueryId);
 
             } else {
                 // Создание началось из /calendar → "Добавить"
@@ -89,14 +89,15 @@ public class CalendarNavigationService {
             throw new RuntimeException("Ошибка при возврате из создания события", e);
         }
     }
-    
+
     /**
      * Обрабатывает отмену создания события.
-     * Отменяет черновик, удаляет сообщение с календарем и отправляет уведомление об отмене.
+     * Удаляет черновик и либо показывает сообщение об отмене (если создание из /add_event),
+     * либо возвращает к календарю или экрану с событиями (если создание из /calendar).
      * 
      * @param user пользователь, который отменяет создание события
      * @param chatId идентификатор чата Telegram
-     * @param messageId идентификатор сообщения для удаления
+     * @param messageId идентификатор сообщения для редактирования
      * @param callbackQueryId идентификатор callback query для ответа
      *
      * @throws RuntimeException если произошла ошибка при отмене создания события
@@ -107,24 +108,67 @@ public class CalendarNavigationService {
                                          String callbackQueryId) {
 
         try {
+            Event draft = conversationService.getActiveDraft(user.getId());
+            boolean isFromAddEvent = draft.getIsFromAddEventCommand() != null && draft.getIsFromAddEventCommand();
+            LocalDate selectedDate = draft.getEventDate();
+
             conversationService.cancelEventCreation(user.getId());
-            
-            // Удаляем сообщение с календарем
-            messageService.deleteMessage(chatId, messageId);
-            
-            // Отправляем сообщение об отмене
-            String cancelMessage = "❌ Создание события было отменено";
-            messageService.sendMessage(chatId, cancelMessage);
-            
+
+            if (isFromAddEvent) {
+                // Если создание началось из /add_event, показываем сообщение об отмене
+                messageService.deleteMessage(chatId, messageId);
+                String cancelMessage = "❌ Создание события было отменено";
+                messageService.sendMessage(chatId, cancelMessage);
+
+            } else {
+                // Если создание началось из /calendar
+                if (selectedDate != null) {
+                    // Проверяем, есть ли события на выбранную дату
+                    List<Event> eventsOnDate = eventService.getEventsByDateIncludingCompleted(
+                        user.getFamily().getId(), 
+                        selectedDate
+                    );
+
+                    // Фильтруем персональные события других пользователей
+                    eventsOnDate = eventsOnDate.stream()
+                        .filter(e -> !e.getIsPersonal() || e.getUser().getId().equals(user.getId()))
+                        .collect(Collectors.toList());
+
+                    if (!eventsOnDate.isEmpty()) {
+                        // Если есть события, показываем экран с действиями для даты
+                        String message = botMessageFormattingService.buildDateEventsManagementMessage(
+                            selectedDate, eventsOnDate);
+
+                        InlineKeyboardMarkup keyboard = keyboardService.createDateEventsManagementKeyboard(
+                            selectedDate, eventsOnDate, user);
+
+                        messageService.editMessageText(chatId, messageId, message, keyboard);
+                        messageService.answerCallbackQuery(callbackQueryId, "Создание отменено");
+                        return;
+                    }
+                }
+
+                // Если событий нет или дата не выбрана, возвращаем к календарю
+                LocalDate today = LocalDate.now(user.getZoneId());
+                InlineKeyboardMarkup calendarKeyboard = keyboardService.createViewCalendarKeyboard(
+                    today.getYear(), 
+                    today.getMonthValue(), 
+                    user
+                );
+                String message = botMessageFormattingService.buildCalendarViewMessage();
+
+                messageService.editMessageText(chatId, messageId, message, calendarKeyboard);
+            }
+
             // Отвечаем на callback query
             try {
-                messageService.answerCallbackQuery(callbackQueryId, "");
-                
+                messageService.answerCallbackQuery(callbackQueryId, "Создание отменено");
+
             } catch (TelegramApiException e) {
                 log.warn("Не удалось ответить на callback query: callbackQueryId={}, error={}", 
                         callbackQueryId, e.getMessage());
             }
-            
+
         } catch (Exception e) {
             log.error("Ошибка при отмене создания события: userId={}, error={}", 
                      user.getId(), e.getMessage());
@@ -260,50 +304,17 @@ public class CalendarNavigationService {
      * @param chatId идентификатор чата Telegram
      * @param messageId идентификатор сообщения для редактирования
      * @param callbackQueryId идентификатор callback query для ответа
-     * @param isFromAddEventCommand флаг, указывающий на флоу /add_event
      */
     private void returnToDateSelectionCalendar(@NonNull User user,
                                                @NonNull LocalDate date,
                                                Long chatId,
                                                Integer messageId,
-                                               String callbackQueryId,
-                                               boolean isFromAddEventCommand) {
+                                               String callbackQueryId) {
         
-        InlineKeyboardMarkup keyboard;
-        if (isFromAddEventCommand) {
-            keyboard = keyboardService.createCalendarKeyboard(
+        InlineKeyboardMarkup keyboard = keyboardService.createCalendarKeyboard(
                 date.getYear(), date.getMonthValue(), user);
-                
-        } else {
-            keyboard = keyboardService.createCalendarKeyboard(
-                date.getYear(), date.getMonthValue(), user, null);
-        }
 
         String message = botMessageFormattingService.buildSelectDateMessageWithHeader();
-        
-        updateMessage(chatId, messageId, message, keyboard, callbackQueryId);
-    }
-    
-    /**
-     * Возвращает к календарю просмотра событий.
-     * 
-     * @param user пользователь
-     * @param date дата, месяц которой нужно показать
-     * @param chatId идентификатор чата Telegram
-     * @param messageId идентификатор сообщения для редактирования
-     * @param callbackQueryId идентификатор callback query для ответа
-     */
-    private void returnToViewCalendar(@NonNull User user,
-                                      @NonNull LocalDate date,
-                                      Long chatId,
-                                      Integer messageId,
-                                      String callbackQueryId) {
-
-        InlineKeyboardMarkup keyboard = keyboardService.createViewCalendarKeyboard(
-            date.getYear(), date.getMonthValue(), user);
-
-        String message = botMessageFormattingService.buildCalendarViewMessage();
-        
         updateMessage(chatId, messageId, message, keyboard, callbackQueryId);
     }
     

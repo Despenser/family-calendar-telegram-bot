@@ -6,13 +6,11 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
-import ru.golubyatnikov.family.calendar.bot.model.context.EditingContext;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.service.domain.attachment.AttachmentService;
 import ru.golubyatnikov.family.calendar.bot.service.domain.reminder.ReminderSchedulingService;
-import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,7 +27,6 @@ public class EventInlineKeyboardFactory {
 
     private final AttachmentService attachmentService;
     private final ReminderSchedulingService reminderSchedulingService;
-    private final ConversationStateService conversationStateService;
     private final KeyboardFactory keyboardFactory;
 
     /**
@@ -130,21 +127,6 @@ public class EventInlineKeyboardFactory {
     }
 
     /**
-     * Создает inline клавиатуру для подтверждения удаления события.
-     * 
-     * @param eventId идентификатор события
-     * @return настроенная InlineKeyboardMarkup
-     */
-    public InlineKeyboardMarkup createDeleteConfirmationKeyboard(Long eventId) {
-        return keyboardFactory.createMarkup(
-            keyboardFactory.createRow(
-                keyboardFactory.createButton("✅ Да, удалить", "confirm_delete_" + eventId),
-                keyboardFactory.createButton("❌ Отмена", "cancel_delete_" + eventId)
-            )
-        );
-    }
-
-    /**
      * Создает inline клавиатуру для выбора типа события.
      * 
      * @return настроенная InlineKeyboardMarkup
@@ -156,6 +138,10 @@ public class EventInlineKeyboardFactory {
             ),
             keyboardFactory.createRow(
                 keyboardFactory.createButton("👤 Персональное событие", "event_type_personal")
+            ),
+            keyboardFactory.createRow(
+                keyboardFactory.createButton("🔙 Назад", CallbackPrefix.TYPE_BACK_TO_TIME.withPayload("")),
+                keyboardFactory.createButton("✖️ Отменить создание", CallbackPrefix.TYPE_CANCEL.withPayload(""))
             )
         );
     }
@@ -228,13 +214,6 @@ public class EventInlineKeyboardFactory {
     public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId, Long userId) {
         if (eventId == null || eventId <= 0) {
             throw new IllegalArgumentException("EventId должен быть положительным числом");
-        }
-        
-        // Проверяем, редактируется ли событие из календаря
-        boolean isFromCalendar = false;
-        if (userId != null) {
-            EditingContext context = conversationStateService.getEditingContext(userId);
-            isFromCalendar = context != null && context.getSourceDate() != null;
         }
 
         InlineKeyboardButton cancelBtn = keyboardFactory.createButton("🔙 Назад", "edit_cancel_" + eventId);

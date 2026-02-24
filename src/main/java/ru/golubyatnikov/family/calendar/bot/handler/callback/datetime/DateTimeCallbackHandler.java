@@ -169,12 +169,8 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                                                 @NonNull CallbackQueryContext context) {
 
         conversationService.updateEventDate(context.getUserId(), date);
-        
-        // Проверяем, началось ли создание из /add_event по флагу в description
-        Event draft = conversationService.getActiveDraft(context.getUserId());
-        boolean isFromAddEventCommand = Boolean.TRUE.equals(draft.getIsFromAddEventCommand());
-        
-        InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(date, user, isFromAddEventCommand);
+
+        InlineKeyboardMarkup keyboard = keyboardService.createFilteredHourSelectionKeyboard(date, user);
         
         // Проверяем наличие доступных часов
         if (keyboard.getKeyboard().size() <= 2) {
@@ -236,13 +232,6 @@ public class DateTimeCallbackHandler implements CallbackHandler {
         
         HourSelectionContext hourContext = buildHourSelectionContext(context.getUserId());
         
-        // Проверяем, началось ли создание из /add_event
-        boolean isFromAddEventCommand = false;
-        if (!hourContext.isEditingEvent()) {
-            Event draft = conversationService.getActiveDraft(context.getUserId());
-            isFromAddEventCommand = Boolean.TRUE.equals(draft.getIsFromAddEventCommand());
-        }
-        
         InlineKeyboardMarkup keyboard;
         if (hourContext.isEditingEvent()) {
             keyboard = keyboardService.createFilteredMinuteSelectionKeyboard(
@@ -250,7 +239,7 @@ public class DateTimeCallbackHandler implements CallbackHandler {
 
         } else {
             keyboard = keyboardService.createFilteredMinuteSelectionKeyboard(
-                hour, hourContext.eventDate(), user, isFromAddEventCommand);
+                hour, hourContext.eventDate(), user);
         }
         
         // Проверяем наличие доступных минут
@@ -329,13 +318,9 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                 );
 
             } else {
-                Event draft = conversationService.getActiveDraft(context.getUserId());
-                boolean isFromAddEventCommand = Boolean.TRUE.equals(draft.getIsFromAddEventCommand());
                 filteredHourSelectionKeyboard = keyboardService.createFilteredHourSelectionKeyboard(
                         hourContext.eventDate(),
-                        user,
-                        isFromAddEventCommand
-                );
+                        user);
             }
 
             callbackQueryService.editMessageAndAnswer(context, message, filteredHourSelectionKeyboard,
@@ -453,10 +438,8 @@ public class DateTimeCallbackHandler implements CallbackHandler {
                 hourContext.eventDate(), user, hourContext.editingEventId());
                 
         } else {
-            Event draft = conversationService.getActiveDraft(context.getUserId());
-            boolean isFromAddEventCommand = Boolean.TRUE.equals(draft.getIsFromAddEventCommand());
             keyboard = keyboardService.createFilteredHourSelectionKeyboard(
-                hourContext.eventDate(), user, isFromAddEventCommand);
+                hourContext.eventDate(), user);
         }
         
         String message;
