@@ -43,7 +43,7 @@ fi
 
 # Проверка SSL сертификатов для prod
 if [ "$PROFILE" = "prod" ]; then
-    if [ ! -f nginx/ssl/server.crt ] || [ ! -f nginx/ssl/server.key ]; then
+    if [ ! -f nginx/ssl/cert.pem ] || [ ! -f nginx/ssl/key.pem ]; then
         echo "⚠️  SSL сертификаты не найдены!"
         echo "📝 Сгенерируйте сертификаты командой:"
         echo "  ./scripts/unix/ssl.sh <ВАШ_IP>"

@@ -48,7 +48,7 @@ if errorlevel 1 (
 
 REM Проверка SSL сертификатов для prod
 if "%PROFILE%"=="prod" (
-    if not exist nginx\ssl\server.crt (
+    if not exist nginx\ssl\cert.pem (
         echo [ПРЕДУПРЕЖДЕНИЕ] SSL сертификаты не найдены!
         echo [ИНФО] Сгенерируйте сертификаты командой:
         echo   ssl.bat [ВАШ_IP]
