@@ -9,26 +9,28 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
+import ru.golubyatnikov.family.calendar.bot.model.dto.EventParsingResponse;
+import ru.golubyatnikov.family.calendar.bot.model.dto.EventParsingSession;
 import ru.golubyatnikov.family.calendar.bot.model.dto.ParsedEvent;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
-import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.TextEventParsingService;
+import ru.golubyatnikov.family.calendar.bot.model.enums.EventParsingState;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.ai.EventParsingSessionService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.ai.GigaChatEventParsingService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 
-import java.util.Base64;
-import java.util.Optional;
-
 import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Actions.CANCEL;
 import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.ADD_EVENT;
 import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.*;
-import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.BULLET;
-import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Misc.AI;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.SUCCESS;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
- * Обработчик распознавания событий из текстовых сообщений.
+ * Обработчик распознавания событий из текстовых сообщений с использованием GigaChat AI.
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-02-02
@@ -38,13 +40,14 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 @Slf4j
 public class TextEventMessageHandler {
 
-    private final TextEventParsingService textEventParsingService;
+    private final GigaChatEventParsingService gigaChatEventParsingService;
+    private final EventParsingSessionService sessionService;
     private final TelegramMessageService messageService;
     private final KeyboardService keyboardService;
     private final DateTimeFormattingService dateTimeFormattingService;
 
     /**
-     * Обрабатывает распознавание события из текстового сообщения.
+     * Обрабатывает распознавание события из текстового сообщения с использованием AI.
      * 
      * @param message исходное сообщение от пользователя
      * @param user авторизованный пользователь
@@ -53,21 +56,34 @@ public class TextEventMessageHandler {
     public void handle(Message message, User user, String text) {
         try {
             Long chatId = message.getChatId();
+            Long userId = user.getId();
             
-            Optional<ParsedEvent> parsedEventOpt = textEventParsingService.parseEvent(text);
+            // Получаем или создаем сессию парсинга
+            EventParsingSession session = sessionService.getOrCreateSession(userId);
             
-            if (parsedEventOpt.isEmpty()) {
-                return;
+            // Используем userId как conversationId для сохранения контекста
+            String conversationId = String.valueOf(userId);
+            
+            // Парсим текст через GigaChat с использованием Agent-as-a-Judge
+            EventParsingResponse response = gigaChatEventParsingService.parseEventFromText(
+                    text, 
+                    conversationId
+            );
+            
+            if (response.success() && response.parsedEvent() != null) {
+                // Событие успешно распознано
+                handleSuccessfulParsing(chatId, session, response.parsedEvent());
+                
+            } else if (response.clarificationQuestion() != null) {
+                // Нужно уточнение от пользователя
+                handleClarificationNeeded(chatId, session, response.clarificationQuestion());
+                
+            } else {
+                // Ошибка парсинга
+                handleParsingError(chatId, user, response.errorMessage());
             }
             
-            ParsedEvent parsedEvent = parsedEventOpt.get();
-            
-            if (!parsedEvent.isValid()) {
-                handleInvalidEvent(chatId, parsedEvent);
-                return;
-            }
-            
-            sendEventPreview(chatId, parsedEvent, user);
+            sessionService.updateSession(session);
             
         } catch (Exception e) {
             log.error("Ошибка при обработке распознавания события из текста: userId={}, telegramId={}, error={}", 
@@ -78,38 +94,50 @@ public class TextEventMessageHandler {
     }
 
     /**
-     * Обрабатывает невалидное распознанное событие.
+     * Обрабатывает успешное распознавание события.
      */
-    private void handleInvalidEvent(Long chatId, @NonNull ParsedEvent parsedEvent) {
+    private void handleSuccessfulParsing(Long chatId, @NonNull EventParsingSession session, 
+                                        @NonNull ParsedEvent parsedEvent) {
+        session.setParsedEvent(parsedEvent);
+        session.updateState(EventParsingState.AWAITING_CONFIRMATION);
         
-        StringBuilder responseBuilder = new StringBuilder();
-        responseBuilder.append(ERROR + " *Не удалось создать событие*\n\n");
+        sendEventPreview(chatId, parsedEvent);
+    }
+
+    /**
+     * Обрабатывает необходимость уточнения данных.
+     */
+    private void handleClarificationNeeded(Long chatId, @NonNull EventParsingSession session, 
+                                          @NonNull String question) {
+        session.updateState(EventParsingState.AWAITING_CLARIFICATION);
         
-        if (parsedEvent.title() == null || parsedEvent.title().trim().isEmpty()) {
-            responseBuilder.append("Название события не может быть пустым.\n\n");
-        }
-        
-        if (parsedEvent.date() != null &&
-            parsedEvent.date().isBefore(java.time.LocalDate.now())) {
-            responseBuilder.append("Дата события не может быть в прошлом.\n\n");
-        }
-        
-        responseBuilder.append("Попробуйте использовать один из форматов:\n")
-                      .append(BULLET + " `Событие: Встреча Дата: 15.01.2026 Время: 14:30`\n")
-                      .append(BULLET + " `Встреча 15.01.2026 14:30`\n")
-                      .append(BULLET + " `Встреча завтра в 14:30`\n\n")
-                      .append("Или используйте команду " + ADD_EVENT + " /add_event для пошагового создания.");
-        
-        String response = formatMessage(responseBuilder.toString());
+        String message = AI + " " + escape(question);
         ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
-        sendMessage(chatId, response, keyboard);
+        sendMessage(chatId, message, keyboard);
+    }
+
+    /**
+     * Обрабатывает ошибку парсинга.
+     */
+    private void handleParsingError(Long chatId, @NonNull User user, String errorMessage) {
+        sessionService.cancelSession(user.getId());
+        
+        String message = ERROR + " " + bold("Не удалось распознать событие") + "\n\n";
+        if (errorMessage != null) {
+            message += escape(errorMessage) + "\n\n";
+        }
+        message += italic("Попробуйте переформулировать запрос или используйте команду " + 
+                         ADD_EVENT + " /add_event для пошагового создания.");
+        
+        ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
+        sendMessage(chatId, message, keyboard);
     }
 
     /**
      * Отправляет предпросмотр распознанного события.
      */
-    private void sendEventPreview(Long chatId, @NonNull ParsedEvent parsedEvent, User user) {
-        String preview = bold(SUCCESS + " Распознано событие из текста:") + "\n\n" +
+    private void sendEventPreview(Long chatId, @NonNull ParsedEvent parsedEvent) {
+        String preview = bold(SUCCESS + " Распознано событие:") + "\n\n" +
             DESCRIPTION + " Название: " + escape(parsedEvent.title()) + "\n" +
             DATE + " Дата: " + escape(dateTimeFormattingService.formatDate(parsedEvent.date())) + "\n" +
             TIME + " Время: " + escape(dateTimeFormattingService.formatTime(parsedEvent.time())) + "\n\n" +
@@ -122,19 +150,14 @@ public class TextEventMessageHandler {
      * Создает inline-клавиатуру для подтверждения создания события из текста.
      */
     private InlineKeyboardMarkup createEventConfirmationKeyboard(@NonNull ParsedEvent parsedEvent) {
-        String eventData = parsedEvent.title() + "|" +
-                          parsedEvent.date().toString() + "|" +
-                          parsedEvent.time().toString();
-
-        String encodedData = Base64.getEncoder().encodeToString(eventData.getBytes());
-        
+        // Не передаем данные в callback_data, так как они уже сохранены в сессии
         InlineKeyboardButton confirmButton = InlineKeyboardButton.builder()
                 .text(SUCCESS + " Создать событие")
-                .callbackData(CallbackPrefix.CONFIRM_TEXT_EVENT.withPayload(encodedData))
+                .callbackData(CallbackPrefix.CONFIRM_TEXT_EVENT.withPayload(""))
                 .build();
         
         InlineKeyboardButton cancelButton = InlineKeyboardButton.builder()
-                .text(CANCEL + " Отменить создание")
+                .text(CANCEL + " Отменить")
                 .callbackData(CallbackPrefix.CANCEL_TEXT_EVENT.withPayload(""))
                 .build();
         
@@ -150,6 +173,7 @@ public class TextEventMessageHandler {
         try {
             String response = bold(ERROR + " Произошла ошибка при распознавании события") + ".\n\n" +
                     italic("Используйте команду " + ADD_EVENT + " /add_event для пошагового создания.");
+
             ReplyKeyboardMarkup keyboard = keyboardService.createAuthorizedUserKeyboard();
             messageService.sendMessage(chatId, response, keyboard);
 

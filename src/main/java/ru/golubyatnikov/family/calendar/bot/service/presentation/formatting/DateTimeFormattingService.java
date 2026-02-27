@@ -1,5 +1,6 @@
 package ru.golubyatnikov.family.calendar.bot.service.presentation.formatting;
 
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +46,7 @@ public class DateTimeFormattingService {
     @Getter
     private DateTimeFormatter[] timeParseFormatters;
 
-    @jakarta.annotation.PostConstruct
+    @PostConstruct
     public void init() {
         Locale locale = Locale.forLanguageTag(config.getLocale());
         

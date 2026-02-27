@@ -11,25 +11,22 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.annotation.HandleCallbackErrors;
 import ru.golubyatnikov.family.calendar.bot.handler.callback.CallbackHandler;
 import ru.golubyatnikov.family.calendar.bot.model.context.CallbackQueryContext;
-import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
+import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.ai.EventParsingSessionService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.DateTimeFormattingService;
-import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Base64;
 
-import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.*;
-import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.*;
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
-//TODO подключить разбор от GigaChat и формировать данные для команды
 /**
  * Обработчик callback queries для создания событий из текста.
  *
@@ -42,11 +39,11 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 public class TextEventCallbackHandler implements CallbackHandler {
     
     private final ConversationService conversationService;
+    private final EventParsingSessionService sessionService;
     private final TelegramMessageService messageService;
     private final BotMessageFormattingService botMessageFormattingService;
     private final KeyboardService keyboardService;
     private final CallbackDataExtractionService callbackDataExtractionService;
-    private final DateTimeFormattingService dateTimeFormattingService;
     
     @Override
     public CallbackPrefix getPrefix() {
@@ -84,19 +81,23 @@ public class TextEventCallbackHandler implements CallbackHandler {
         String errorMessage = null;
         
         try {
-            String encodedData = CallbackPrefix.CONFIRM_TEXT_EVENT.extractPayload(context.callbackData());
-            String decodedData = new String(Base64.getDecoder().decode(encodedData));
+            // Получаем данные из сессии вместо callback_data
+            var session = sessionService.getSession(context.getUserId())
+                    .orElseThrow(() -> new IllegalStateException("Сессия парсинга не найдена"));
             
-            String[] parts = decodedData.split("\\|");
-            if (parts.length != 3) {
-                throw new IllegalArgumentException("Неверный формат данных события");
+            var parsedEvent = session.getParsedEvent();
+            if (parsedEvent == null) {
+                throw new IllegalStateException("Данные события не найдены в сессии");
             }
             
-            String title = parts[0];
-            LocalDate date = LocalDate.parse(parts[1]);
-            LocalTime time = LocalTime.parse(parts[2]);
+            String title = parsedEvent.title();
+            LocalDate date = parsedEvent.date();
+            LocalTime time = parsedEvent.time();
             
             createdEvent = createEventInTransaction(context.getUserId(), title, date, time);
+            
+            // Завершаем сессию парсинга после успешного создания
+            sessionService.completeSession(context.getUserId());
             
         } catch (Exception e) {
             log.error("Ошибка при подтверждении создания события из текста: userId={}, " +
@@ -104,7 +105,9 @@ public class TextEventCallbackHandler implements CallbackHandler {
                      context.getUserId(), e.getClass().getSimpleName(), e.getMessage(), e);
             
             cleanupDraftOnError(context.getUserId());
-            errorMessage = e.getMessage() != null ? e.getMessage() : "Неизвестная ошибка";
+            errorMessage = e.getMessage() != null
+                    ? e.getMessage()
+                    : "Неизвестная ошибка";
         }
 
         sendTelegramResponse(createdEvent, errorMessage, context);
@@ -151,41 +154,33 @@ public class TextEventCallbackHandler implements CallbackHandler {
     private void sendTelegramResponse(Event createdEvent, String errorMessage, CallbackQueryContext context) {
         try {
             if (createdEvent != null) {
+                String eventMessage = botMessageFormattingService.buildEventCreatedMessage(createdEvent);
+                InlineKeyboardMarkup eventKeyboard = keyboardService.createEventActionsKeyboard(createdEvent.getId());
+                
                 try {
-                    String eventMessage = botMessageFormattingService.buildEventCreatedMessage(createdEvent);
-                    InlineKeyboardMarkup eventKeyboard = keyboardService.createEventActionsKeyboard(createdEvent.getId());
                     messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(),
-                            eventMessage, eventKeyboard, context.callbackQueryId(), CallbackMessages.CREATED
-                    );
+                            eventMessage, eventKeyboard, context.callbackQueryId(), CallbackMessages.CREATED);
 
                 } catch (TelegramApiException e) {
-                    log.error("Ошибка при отправке сообщения о созданном событии: eventId={}, error={}", 
+                    log.error("Ошибка при редактировании сообщения о созданном событии: eventId={}, error={}", 
                             createdEvent.getId(), e.getMessage());
+                    
+                    // Пытаемся отправить новое сообщение с кнопками
+                    try {
+                        messageService.sendMessageWithInlineKeyboard(context.chatId(), eventMessage, eventKeyboard);
+                        messageService.answerCallbackQuery(context.callbackQueryId(), CallbackMessages.CREATED);
 
-                    String response = formatMessage(
-                            """
-                                    %s *Событие успешно создано!*
-                                    
-                                    %s Дата: %s
-                                    %s Время: %s
-                                    %s Название: %s""",
-                        SUCCESS,
-                        DATE,
-                        dateTimeFormattingService.formatDate(createdEvent.getEventDate()),
-                        TIME,
-                        dateTimeFormattingService.formatTime(createdEvent.getEventTime()),
-                        DESCRIPTION,
-                        createdEvent.getTitle()
-                    );
-                    messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(),
-                            response, null, context.callbackQueryId(), CallbackMessages.CREATED);
+                    } catch (Exception sendEx) {
+                        log.error("Ошибка при отправке нового сообщения: {}", sendEx.getMessage());
+                    }
                 }
             } else {
                 String response = ERROR + " " + bold("Произошла ошибка при создании события") + "\\.\n\n" +
                                 italic("Попробуйте использовать команду /add_event для пошагового создания.") + "\n\n" +
                                 "Детали ошибки: " + escape(errorMessage);
                 
-                messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(), response, null, context.callbackQueryId(), CallbackMessages.ERROR);
+                messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(),
+                        response, null, context.callbackQueryId(), CallbackMessages.ERROR);
             }
         } catch (Exception ex) {
             log.error("Ошибка при отправке сообщения через Telegram API: chatId={}, error={}", 
@@ -197,6 +192,9 @@ public class TextEventCallbackHandler implements CallbackHandler {
      * Обрабатывает отмену создания события из текста.
      */
     private void handleCancelTextEvent(@NonNull CallbackQueryContext context) {
+        // Отменяем сессию парсинга
+        sessionService.cancelSession(context.getUserId());
+        
         String message = botMessageFormattingService.buildEventCancelledMessage();
         try {
             messageService.safeEditMessageAndAnswer(context.chatId(), context.messageId(), message,
@@ -206,6 +204,7 @@ public class TextEventCallbackHandler implements CallbackHandler {
         } catch (TelegramApiException e) {
             log.error("Ошибка при отмене создания события из текста: chatId={}, error={}", 
                      context.chatId(), e.getMessage());
+
             throw new RuntimeException("Ошибка при отмене создания события", e);
         }
     }

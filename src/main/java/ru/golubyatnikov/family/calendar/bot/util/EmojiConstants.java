@@ -136,6 +136,7 @@ public final class EmojiConstants {
         public static final String SEPARATOR = "─────────────────────";
         public static final String ALL_EVENTS = "📋";
         public static final String WAVE = "👋";
+        public static final String AI = "🤖";
         public static final String NUMBER_1 = "1️⃣";
         public static final String NUMBER_2 = "2️⃣";
         public static final String NUMBER_3 = "3️⃣";

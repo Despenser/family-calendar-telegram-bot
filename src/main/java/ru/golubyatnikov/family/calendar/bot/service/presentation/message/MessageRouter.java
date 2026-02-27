@@ -6,9 +6,9 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.ai.EventParsingSessionService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
-import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.TextEventParsingService;
 
 /**
  * Маршрутизатор входящих сообщений.
@@ -23,7 +23,7 @@ public class MessageRouter {
 
     private final ConversationStateService conversationStateService;
     private final ConversationService conversationService;
-    private final TextEventParsingService textEventParsingService;
+    private final EventParsingSessionService eventParsingSessionService;
     private final EventEditingMessageHandler eventEditingMessageHandler;
     private final FileMessageHandler fileMessageHandler;
     private final CompletionNoteMessageHandler completionNoteMessageHandler;
@@ -78,11 +78,17 @@ public class MessageRouter {
             return true;
         }
         
+        // Приоритет 6: Активная сессия парсинга через AI
+        if (eventParsingSessionService.hasActiveSession(userId)) {
+            textEventMessageHandler.handle(message, user, originalText);
+            return true;
+        }
+        
         // Проверяем, является ли текст командой
         boolean isCommand = commandText != null && commandText.startsWith("/");
         
-        // Приоритет 6: Текстовое событие (если не команда)
-        if (!isCommand && originalText != null && textEventParsingService.looksLikeEvent(originalText)) {
+        // Приоритет 7: Попытка распознать событие из произвольного текста (если не команда)
+        if (!isCommand && originalText != null && !originalText.trim().isEmpty()) {
             textEventMessageHandler.handle(message, user, originalText);
             return true;
         }
