@@ -4,12 +4,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.golubyatnikov.family.calendar.bot.config.WebhookConfig;
+
 import java.security.SecureRandom;
 import java.util.Base64;
 
 /**
  * Сервис для управления безопасностью webhook.
- * Генерирует и хранит secret token для валидации webhook запросов от Telegram.
+ * Использует secret token из конфигурации или генерирует новый.
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-01-31
@@ -24,20 +25,30 @@ public class WebhookSecurityService {
     private final WebhookConfig webhookConfig;
 
     /**
-     * Текущий secret token или null если не инициализирован
+     * Текущий secret token
      */
     private volatile String secretToken;
 
     /**
-     * Генерирует новый secret token для webhook.
+     * Получает secret token из конфигурации или генерирует новый.
      *
-     * @return сгенерированный secret token
+     * @return secret token
      */
     public String generateSecretToken() {
+        // Если токен задан в конфигурации, используем его
+        if (webhookConfig.getSecretToken() != null && !webhookConfig.getSecretToken().isEmpty()) {
+            this.secretToken = webhookConfig.getSecretToken();
+            log.info("Используется secret token из конфигурации");
+            return this.secretToken;
+        }
+
+        // Иначе генерируем новый токен
         byte[] randomBytes = new byte[webhookConfig.getSecretTokenLength()];
         SECURE_RANDOM.nextBytes(randomBytes);
 
         this.secretToken = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+        log.warn("Secret token не задан в конфигурации, сгенерирован новый. Рекомендуется задать app.webhook.secret-token в переменных окружения");
+        
         return this.secretToken;
     }
 

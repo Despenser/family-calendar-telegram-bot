@@ -41,20 +41,11 @@ public class TelegramWebhookController {
     @PostMapping
     public ResponseEntity<Void> onUpdateReceived(
             @RequestHeader(value = "X-Telegram-Bot-Api-Secret-Token", required = false) String secretToken,
-            @RequestHeader Map<String, String> headers,
             @NonNull @RequestBody Update update) {
 
-        // Отладочное логирование всех заголовков
-        log.debug("Получены заголовки: {}", headers);
-        log.debug("Secret token из заголовка: '{}'", secretToken);
-
-        // ВРЕМЕННО: пропускаем проверку secret token для отладки
-        // TODO: Вернуть проверку после решения проблемы с передачей заголовка
-        /*
         if (!webhookSecurityService.validateSecretToken(secretToken)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        */
 
         logUpdate(update);
         updateProcessor.processUpdate(update);
