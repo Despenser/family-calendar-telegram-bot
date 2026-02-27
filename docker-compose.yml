@@ -93,10 +93,8 @@ services:
       # Логи nginx
       - nginx_logs:/var/log/nginx
     ports:
-      # HTTP (редирект на HTTPS)
-      - "80:80"
       # HTTPS для Telegram webhook
-      - "443:443"
+      - "8443:443"
     networks:
       - family-calendar-network
     healthcheck:

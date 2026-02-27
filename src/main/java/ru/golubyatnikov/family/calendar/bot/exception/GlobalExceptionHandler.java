@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -168,6 +169,29 @@ public class GlobalExceptionHandler {
         );
         
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(errorResponse);
+    }
+    
+    /**
+     * Обрабатывает исключение NoResourceFoundException (запросы к несуществующим статическим ресурсам).
+     * Логирует на уровне DEBUG, так как это не критичная ошибка.
+     * 
+     * @param ex исключение NoResourceFoundException
+     * @return ResponseEntity с информацией об ошибке
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNoResourceFoundException(NoResourceFoundException ex) {
+
+        // Логируем на уровне DEBUG, так как это обычно запросы к favicon, robots.txt и т.д.
+        log.debug("Запрос к несуществующему статическому ресурсу: {}", ex.getMessage());
+        
+        Map<String, Object> errorResponse = createErrorResponse(
+            HttpStatus.NOT_FOUND,
+            "Ресурс не найден",
+            "Запрашиваемый ресурс не существует"
+        );
+        
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(errorResponse);
     }
     
