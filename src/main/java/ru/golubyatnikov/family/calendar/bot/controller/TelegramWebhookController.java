@@ -11,6 +11,8 @@ import ru.golubyatnikov.family.calendar.bot.config.TelegramApiConfig;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.UpdateProcessor;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.authorization.WebhookSecurityService;
 
+import java.util.Map;
+
 /**
  * REST контроллер для приема webhook обновлений от Telegram Bot API.
  * Валидирует входящие запросы с помощью secret token.
@@ -39,7 +41,12 @@ public class TelegramWebhookController {
     @PostMapping
     public ResponseEntity<Void> onUpdateReceived(
             @RequestHeader(value = "X-Telegram-Bot-Api-Secret-Token", required = false) String secretToken,
+            @RequestHeader Map<String, String> headers,
             @NonNull @RequestBody Update update) {
+
+        // Отладочное логирование всех заголовков
+        log.debug("Получены заголовки: {}", headers);
+        log.debug("Secret token из заголовка: '{}'", secretToken);
 
         if (!webhookSecurityService.validateSecretToken(secretToken)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();

@@ -55,6 +55,8 @@ logging:
   level:
     root: WARN
     ru.golubyatnikov.family.calendar.bot: INFO
+    # Временно включаем DEBUG для контроллера webhook для отладки
+    ru.golubyatnikov.family.calendar.bot.controller.TelegramWebhookController: DEBUG
     # Отключаем DEBUG для всех библиотек
     org.springframework: WARN
     org.springframework.web: WARN
