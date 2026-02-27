@@ -61,8 +61,8 @@ services:
       
       # JPA и Flyway настройки
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
-      SPRING_FLYWAY_ENABLED: true
-      SPRING_FLYWAY_BASELINE_ON_MIGRATE: true
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
     ports:
       # В dev режиме пробрасываем порт для ngrok, в prod доступ через nginx
       - "${SERVER_PORT:-8080}:8080"
