@@ -120,31 +120,43 @@ public class AttachmentCallbackRouter implements CallbackHandler {
 
         validatePartsLength(parts, 2, context, "не указан ID события");
         Long eventId = Long.parseLong(parts[1]);
+        Integer page = parts.length > 2
+                ? Integer.parseInt(parts[2])
+                : null;
 
-        navigationHandler.handleBackToAttachments(eventId, context, callbackQuery);
+        navigationHandler.handleBackToAttachments(eventId, context, callbackQuery, page);
     }
     
     private void handleAdd(String[] parts, CallbackQueryContext context) throws Exception {
         validatePartsLength(parts, 2, context, "не указан ID события");
         Long eventId = Long.parseLong(parts[1]);
+        Integer page = parts.length > 2
+                ? Integer.parseInt(parts[2])
+                : null;
 
-        uploadHandler.handleAddFile(eventId, context);
+        uploadHandler.handleAddFile(eventId, context, page);
     }
     
     private void handleView(String[] parts, CallbackQueryContext context) throws Exception {
         validatePartsLength(parts, 3, context, "не указан ID вложения");
         Long eventId = Long.parseLong(parts[1]);
         Long attachmentId = Long.parseLong(parts[2]);
+        Integer page = parts.length > 3
+                ? Integer.parseInt(parts[3])
+                : null;
 
-        viewHandler.handleViewFile(attachmentId, eventId, context);
+        viewHandler.handleViewFile(attachmentId, eventId, context, page);
     }
     
     private void handleDelete(String[] parts, CallbackQueryContext context) throws Exception {
         validatePartsLength(parts, 3, context, "не указан ID вложения");
         Long eventId = Long.parseLong(parts[1]);
         Long attachmentId = Long.parseLong(parts[2]);
+        Integer page = parts.length > 3
+                ? Integer.parseInt(parts[3])
+                : null;
 
-        deleteHandler.handleDeleteFile(attachmentId, eventId, context);
+        deleteHandler.handleDeleteFile(attachmentId, eventId, context, page);
     }
     
     private void handleConfirm(String[] parts, CallbackQueryContext context) throws Exception {
@@ -157,7 +169,8 @@ public class AttachmentCallbackRouter implements CallbackHandler {
         
         Long eventId = Long.parseLong(parts[2]);
         Long attachmentId = Long.parseLong(parts[3]);
-        deleteHandler.handleConfirmDelete(attachmentId, eventId, context);
+        Integer page = parts.length > 4 ? Integer.parseInt(parts[4]) : null;
+        deleteHandler.handleConfirmDelete(attachmentId, eventId, context, page);
     }
     
     private void handleCancel(String[] parts, CallbackQueryContext context) throws Exception {
@@ -165,12 +178,13 @@ public class AttachmentCallbackRouter implements CallbackHandler {
         
         String subAction = parts[1];
         Long eventId = Long.parseLong(parts[2]);
+        Integer page = parts.length > 3 ? Integer.parseInt(parts[3]) : null;
         
         if ("delete".equals(subAction)) {
-            deleteHandler.handleCancelDelete(eventId, context);
+            deleteHandler.handleCancelDelete(eventId, context, page);
 
         } else if ("add".equals(subAction)) {
-            uploadHandler.handleCancelAddFile(eventId, context);
+            uploadHandler.handleCancelAddFile(eventId, context, page);
 
         } else {
             sendValidationError(context, "неподдерживаемое действие");
@@ -180,7 +194,8 @@ public class AttachmentCallbackRouter implements CallbackHandler {
     private void handleBack(String[] parts, CallbackQueryContext context) throws Exception {
         validatePartsLength(parts, 2, context, "не указан ID события");
         Long eventId = Long.parseLong(parts[1]);
-        navigationHandler.handleBackToEvent(eventId, context);
+        Integer page = parts.length > 2 ? Integer.parseInt(parts[2]) : null;
+        navigationHandler.handleBackToEvent(eventId, context, page);
     }
     
     /**

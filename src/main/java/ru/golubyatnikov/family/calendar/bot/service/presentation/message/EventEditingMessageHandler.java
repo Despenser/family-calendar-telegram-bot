@@ -5,19 +5,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
 import ru.golubyatnikov.family.calendar.bot.exception.UnauthorizedAccessException;
 import ru.golubyatnikov.family.calendar.bot.model.context.EditingContext;
+import ru.golubyatnikov.family.calendar.bot.model.dto.EventMessageData;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.model.enums.EditField;
+import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventNotificationService;
 import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 
 import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 
@@ -35,8 +34,7 @@ public class EventEditingMessageHandler {
     private final ConversationStateService conversationStateService;
     private final EventService eventService;
     private final TelegramMessageService messageService;
-    private final KeyboardService keyboardService;
-    private final BotMessageFormattingService botMessageFormattingService;
+    private final EventNotificationService eventNotificationService;
 
     /**
      * Обрабатывает ввод текста при редактировании поля события.
@@ -142,12 +140,15 @@ public class EventEditingMessageHandler {
      */
     private void restoreEventCard(Long userId, Long chatId, Event event, Long eventId, Integer editingMessageId) {
         if (editingMessageId != null) {
-            int eventCount = eventService.getActiveEventsCount(event.getUser().getId());
-            String eventMessage = botMessageFormattingService.buildEventMessageWithHeader(event, eventCount);
-            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
+            // Извлекаем контекст страницы из EditingContext
+            EditingContext context = conversationStateService.getEditingContext(userId);
+            Integer myEventsPage = context != null ? context.getMyEventsPage() : null;
+            
+            // Подготавливаем данные сообщения через EventNotificationService
+            EventMessageData messageData = eventNotificationService.prepareEventMessageData(event, userId, myEventsPage);
             
             try {
-                messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
+                messageService.editMessageText(chatId, editingMessageId, messageData.messageText(), messageData.keyboard());
 
             } catch (TelegramApiException e) {
                 log.warn("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 
@@ -184,10 +185,14 @@ public class EventEditingMessageHandler {
 
         if (editingMessageId != null) {
             try {
-                int eventCount = eventService.getActiveEventsCount(updatedEvent.getUser().getId());
-                String eventMessage = botMessageFormattingService.buildEventMessageWithHeader(updatedEvent, eventCount);
-                InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(updatedEvent, userId);
-                messageService.editMessageText(chatId, editingMessageId, eventMessage, keyboard);
+                // Извлекаем контекст страницы из EditingContext
+                EditingContext context = conversationStateService.getEditingContext(userId);
+                Integer myEventsPage = context != null ? context.getMyEventsPage() : null;
+                
+                // Подготавливаем данные сообщения через EventNotificationService
+                EventMessageData messageData = eventNotificationService.prepareEventMessageData(updatedEvent, userId, myEventsPage);
+                    
+                messageService.editMessageText(chatId, editingMessageId, messageData.messageText(), messageData.keyboard());
                 
             } catch (TelegramApiException e) {
                 log.error("Не удалось обновить сообщение о событии: eventId={}, messageId={}, error={}", 

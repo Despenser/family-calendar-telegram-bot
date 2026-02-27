@@ -24,7 +24,6 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.EventE
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
-
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -86,11 +85,15 @@ public class EventEditHandler implements CallbackHandler {
     
     /**
      * Обрабатывает редактирование события.
+     * Поддерживает контекст постраничного списка /my_events.
      */
     private void handleEditEvent(@NonNull CallbackQueryContext context) {
-        Long eventId = extractEventId(context.callbackData());
+        String payload = CallbackPrefix.EDIT_EVENT.extractPayload(context.callbackData());
+        String[] parts = payload.split("_");
+        Long eventId = Long.parseLong(parts[0]);
+        Integer page = parts.length > 1 ? Integer.parseInt(parts[1]) : null;
         
-        log.info("Редактирование события ID={} пользователем ID={}", eventId, context.getUserId());
+        log.info("Редактирование события ID={} пользователем ID={}, page={}", eventId, context.getUserId(), page);
         
         try {
             Event event = eventService.getEventById(eventId);
@@ -100,10 +103,11 @@ public class EventEditHandler implements CallbackHandler {
                 return;
             }
             
-            conversationStateService.startEventEditing(context.getUserId(), eventId, context.chatId(), context.messageId());
+            conversationStateService.startEventEditing(context.getUserId(), eventId,
+                    context.chatId(), context.messageId(), page);
             
             String message = buildEditFieldSelectionMessage(event);
-            InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId, context.getUserId());
+            InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId, page);
             
             messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
@@ -118,16 +122,22 @@ public class EventEditHandler implements CallbackHandler {
     
     /**
      * Обрабатывает возврат к меню выбора поля редактирования.
+     * Поддерживает контекст постраничного списка /my_events.
      */
     private void handleEditBack(@NonNull CallbackQueryContext context) {
-        String eventIdStr = CallbackPrefix.EDIT_BACK.extractPayload(context.callbackData());
-        Long eventId = Long.parseLong(eventIdStr);
+        String payload = CallbackPrefix.EDIT_BACK.extractPayload(context.callbackData());
+
+        String[] parts = payload.split("_");
+        Long eventId = Long.parseLong(parts[0]);
+        Integer page = parts.length > 1
+                ? Integer.parseInt(parts[1])
+                : null;
         
         try {
             Event event = eventService.getEventById(eventId);
             
             String message = buildEditFieldSelectionMessage(event);
-            InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId, context.getUserId());
+            InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId, page);
             
             messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
@@ -142,15 +152,29 @@ public class EventEditHandler implements CallbackHandler {
     
     /**
      * Обрабатывает отмену редактирования события.
+     * Поддерживает контекст постраничного списка /my_events.
      */
     private void handleEditCancel(@NonNull CallbackQueryContext context) {
-        String eventIdStr = CallbackPrefix.EDIT_CANCEL.extractPayload(context.callbackData());
-        Long eventId = Long.parseLong(eventIdStr);
+        String payload = CallbackPrefix.EDIT_CANCEL.extractPayload(context.callbackData());
+        String[] parts = payload.split("_");
+        Long eventId = Long.parseLong(parts[0]);
+        Integer page = parts.length > 1
+                ? Integer.parseInt(parts[1])
+                : null;
         
         try {
             EditingContext editingContext = conversationStateService.getEditingContext(context.getUserId());
-            Integer messageId = editingContext != null ? editingContext.getMessageId() : null;
-            LocalDate sourceDate = editingContext != null ? editingContext.getSourceDate() : null;
+            Integer messageId = editingContext != null
+                    ? editingContext.getMessageId()
+                    : null;
+
+            LocalDate sourceDate = editingContext != null
+                    ? editingContext.getSourceDate()
+                    : null;
+
+            Integer myEventsPage = editingContext != null
+                    ? editingContext.getMyEventsPage()
+                    : page;
             
             conversationStateService.clearEventEditing(context.getUserId());
             
@@ -158,8 +182,9 @@ public class EventEditHandler implements CallbackHandler {
             
             if (sourceDate != null) {
                 handleCancelFromCalendar(event, context, messageId, sourceDate);
+
             } else {
-                handleCancelFromEvent(event, context, messageId);
+                handleCancelFromEvent(event, context, messageId, myEventsPage);
             }
             
         } catch (TelegramApiException e) {
@@ -198,15 +223,25 @@ public class EventEditHandler implements CallbackHandler {
     
     /**
      * Обрабатывает отмену редактирования из карточки события.
+     * Поддерживает контекст постраничного списка /my_events.
      */
     private void handleCancelFromEvent(Event event,
                                        CallbackQueryContext context,
-                                       Integer messageId) throws TelegramApiException {
+                                       Integer messageId,
+                                       Integer page) throws TelegramApiException {
 
         if (messageId != null) {
             int eventCount = eventService.getActiveEventsCount(event.getUser().getId());
             String eventMessage = botMessageFormattingService.buildEventMessageWithHeader(event, eventCount);
-            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, context.getUserId());
+            
+            // Используем клавиатуру с контекстом страницы, если он есть
+            InlineKeyboardMarkup keyboard;
+            if (page != null) {
+                keyboard = keyboardService.createEventActionsKeyboardWithContext(event, context.getUserId(), page);
+            } else {
+                keyboard = keyboardService.createEventActionsKeyboard(event, context.getUserId());
+            }
+            
             messageService.editMessageText(context.chatId(), messageId, eventMessage, keyboard);
             
         } else {
@@ -224,15 +259,7 @@ public class EventEditHandler implements CallbackHandler {
      */
     private @NonNull String buildEditFieldSelectionMessage(@NonNull Event event) {
         return DESCRIPTION + " " + bold("Редактирование события") + "\n\n" +
-                botMessageFormattingService.buildEventMessage(event) +
-                "\n\n" + "Выберите поле для редактирования:";
-    }
-    
-    /**
-     * Извлекает ID события из callback data.
-     */
-    private @NonNull Long extractEventId(String callbackData) {
-        String payload = CallbackPrefix.EDIT_EVENT.extractPayload(callbackData);
-        return Long.parseLong(payload);
+                botMessageFormattingService.buildEventMessage(event) + "\n\n" +
+                "Выберите поле для редактирования:";
     }
 }

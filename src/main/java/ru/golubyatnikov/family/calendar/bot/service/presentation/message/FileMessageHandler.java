@@ -64,7 +64,7 @@ public class FileMessageHandler {
     /**
      * Обрабатывает подсказку при ожидании файла (текстовое сообщение).
      */
-    public void handleAwaitingFileHint(@NonNull Message message, User user) {
+    public void handleAwaitingFileHint(@NonNull Message message) {
         Long chatId = message.getChatId();
         String hintMessage = formatMessage(
             ATTACHMENT + " Пожалуйста, отправьте файл " + escape("(документ, фото, видео или аудио)") + "\n\n" +
@@ -92,6 +92,7 @@ public class FileMessageHandler {
             
             Long eventId = context.getEventId();
             Integer messageId = context.getMessageId();
+            Integer myEventsPage = context.getMyEventsPage();
             
             FileInfo fileInfo = extractFileInfo(message);
             if (fileInfo == null) {
@@ -107,7 +108,7 @@ public class FileMessageHandler {
             );
             
             messageService.deleteMessageSilently(chatId, message.getMessageId());
-            updateAttachmentsList(chatId, messageId, eventId, userId);
+            updateAttachmentsList(chatId, messageId, eventId, userId, myEventsPage);
             
             conversationStateService.clearAwaitingFile(userId);
 
@@ -271,7 +272,7 @@ public class FileMessageHandler {
     /**
      * Обновляет список вложений события.
      */
-    private void updateAttachmentsList(Long chatId, Integer messageId, Long eventId, Long userId) {
+    private void updateAttachmentsList(Long chatId, Integer messageId, Long eventId, Long userId, Integer myEventsPage) {
         try {
             Event event = eventService.getEventById(eventId);
             List<Attachment> attachments = attachmentService.getEventAttachments(eventId);
@@ -317,8 +318,10 @@ public class FileMessageHandler {
                 }
             }
             
-            InlineKeyboardMarkup keyboard = keyboardService.createAttachmentsListKeyboard(
-                eventId, attachments, isCreator);
+            // Используем клавиатуру с контекстом страницы, если он есть
+            InlineKeyboardMarkup keyboard = myEventsPage != null
+                ? keyboardService.createAttachmentsListKeyboard(eventId, attachments, isCreator, myEventsPage)
+                : keyboardService.createAttachmentsListKeyboard(eventId, attachments, isCreator);
             
             String fullText = messageBuilder.toString();
             

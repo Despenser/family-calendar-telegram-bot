@@ -38,15 +38,16 @@ public class AttachmentContextManager {
     private final Map<Long, AwaitingFileContext> usersAwaitingFile = new ConcurrentHashMap<>();
     
     /**
-     * Устанавливает состояние ожидания файла для пользователя.
+     * Устанавливает состояние ожидания файла для пользователя с контекстом страницы /my_events.
      * 
      * @param userId идентификатор пользователя
      * @param eventId идентификатор события
      * @param chatId идентификатор чата
      * @param messageId идентификатор сообщения со списком вложений
+     * @param myEventsPage номер страницы /my_events (null если не из /my_events)
      */
-    public void setAwaitingFile(Long userId, Long eventId, Long chatId, Integer messageId) {
-        AwaitingFileContext context = new AwaitingFileContext(eventId, chatId, messageId);
+    public void setAwaitingFile(Long userId, Long eventId, Long chatId, Integer messageId, Integer myEventsPage) {
+        AwaitingFileContext context = new AwaitingFileContext(eventId, chatId, messageId, myEventsPage);
         usersAwaitingFile.put(userId, context);
     }
     
@@ -109,6 +110,7 @@ public class AttachmentContextManager {
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
                             .orElseThrow(() -> new IllegalArgumentException("Пользователь с ID=" + userId + " не найден"));
+
                     return ConversationState.builder().user(user).build();
                 });
         

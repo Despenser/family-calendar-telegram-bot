@@ -18,7 +18,6 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.Keyboa
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessageFormatter;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 import ru.golubyatnikov.family.calendar.bot.util.TelegramExceptionUtil;
-
 import java.util.List;
 
 /**
@@ -41,17 +40,23 @@ public class ReminderCallbackHandler {
     
     /**
      * Обрабатывает отключение всех автоматических напоминаний для события.
+     * Поддерживает контекст постраничного списка /my_events.
      */
-    public void handleDisableReminders(Long eventId, CallbackQueryContext context) {
+    public void handleDisableReminders(String payload, CallbackQueryContext context) {
         try {
+            // Извлекаем eventId и опциональный page из payload
+            String[] parts = payload.split("_");
+            Long eventId = Long.parseLong(parts[0]);
+            Integer page = parts.length > 1 ? Integer.parseInt(parts[1]) : null;
+            
             reminderCreationService.disableRemindersForEvent(eventId);
             answerCallbackQuery(context, CallbackMessages.SUCCESS);
 
-            updateEventMessage(eventId, context.chatId(), context.messageId());
+            updateEventMessage(eventId, context.chatId(), context.messageId(), page);
 
         } catch (Exception e) {
-            log.error("Ошибка при отключении напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
-                    eventId, context.chatId(), e.getMessage(), TelegramExceptionUtil.getStackTraceString(e), e);
+            log.error("Ошибка при отключении напоминаний: payload={}, chatId={}, error={}, stackTrace={}", 
+                    payload, context.chatId(), e.getMessage(), TelegramExceptionUtil.getStackTraceString(e), e);
 
             answerCallbackQuery(context, CallbackMessages.ERROR);
         }
@@ -59,9 +64,15 @@ public class ReminderCallbackHandler {
     
     /**
      * Обрабатывает включение автоматических напоминаний для события.
+     * Поддерживает контекст постраничного списка /my_events.
      */
-    public void handleEnableReminders(Long eventId, CallbackQueryContext context) {
+    public void handleEnableReminders(String payload, CallbackQueryContext context) {
         try {
+            // Извлекаем eventId и опциональный page из payload
+            String[] parts = payload.split("_");
+            Long eventId = Long.parseLong(parts[0]);
+            Integer page = parts.length > 1 ? Integer.parseInt(parts[1]) : null;
+            
             Event event = eventRepository.findByIdWithUser(eventId)
                 .orElseThrow(() -> new EventNotFoundException(eventId));
             
@@ -79,11 +90,11 @@ public class ReminderCallbackHandler {
             
             answerCallbackQuery(context, responseMessage);
 
-            updateEventMessage(eventId, context.chatId(), context.messageId());
+            updateEventMessage(eventId, context.chatId(), context.messageId(), page);
 
         } catch (Exception e) {
-            log.error("Ошибка при включении напоминаний: eventId={}, chatId={}, error={}, stackTrace={}", 
-                    eventId, context.chatId(), e.getMessage(), TelegramExceptionUtil.getStackTraceString(e), e);
+            log.error("Ошибка при включении напоминаний: payload={}, chatId={}, error={}, stackTrace={}", 
+                    payload, context.chatId(), e.getMessage(), TelegramExceptionUtil.getStackTraceString(e), e);
 
             answerCallbackQuery(context, CallbackMessages.ERROR);
         }
@@ -91,19 +102,29 @@ public class ReminderCallbackHandler {
     
     /**
      * Обновляет сообщение события с новой клавиатурой.
+     * Поддерживает контекст постраничного списка /my_events.
      * 
      * @param eventId идентификатор события
      * @param chatId идентификатор чата
      * @param messageId идентификатор сообщения
+     * @param page номер страницы (null если не из /my_events)
      */
-    private void updateEventMessage(Long eventId, Long chatId, Integer messageId) {
+    private void updateEventMessage(Long eventId, Long chatId, Integer messageId, Integer page) {
         try {
             Event event = eventRepository.findById(eventId).orElseThrow(() -> new EventNotFoundException(eventId));
             User user = event.getUser();
             
             int eventCount = eventService.getActiveEventsCount(user.getId());
             String messageText = botMessageFormattingService.buildEventMessageWithHeader(event, eventCount);
-            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, user.getId());
+            
+            // Используем клавиатуру с контекстом страницы если он есть
+            InlineKeyboardMarkup keyboard;
+            if (page != null) {
+                keyboard = keyboardService.createEventActionsKeyboardWithContext(event, user.getId(), page);
+
+            } else {
+                keyboard = keyboardService.createEventActionsKeyboard(event, user.getId());
+            }
             
             messageService.editMessageText(chatId, messageId, messageText, keyboard);
             

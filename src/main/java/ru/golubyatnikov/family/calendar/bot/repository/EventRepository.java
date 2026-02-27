@@ -1,5 +1,7 @@
 package ru.golubyatnikov.family.calendar.bot.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -68,6 +70,20 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      */
     @EntityGraph(attributePaths = {"user", "family"})
     List<Event> findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(Long userId, EventStatus status);
+    
+    /**
+     * Находит события пользователя с определенным статусом с поддержкой пагинации.
+     * Используется для постраничного отображения списка событий.
+     * 
+     * @param userId идентификатор пользователя
+     * @param status статус события (ACTIVE, DELETED, COMPLETED, DRAFT)
+     * @param pageable параметры пагинации (номер страницы, размер, сортировка)
+     *
+     * @return страница событий пользователя с указанным статусом
+     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
+     */
+    @EntityGraph(attributePaths = {"user", "family"})
+    Page<Event> findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(Long userId, EventStatus status, Pageable pageable);
 
     /**
      * Находит черновик события пользователя по статусу.
@@ -290,19 +306,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @EntityGraph(attributePaths = {"user"})
     @Query("SELECT e FROM Event e WHERE e.id = :id")
     Optional<Event> findByIdWithUser(@Param("id") Long id);
-    
-    /**
-     * Находит событие по ID с загрузкой напоминаний.
-     * 
-     * @param id идентификатор события
-     *
-     * @return Optional с событием и инициализированной коллекцией reminders, или empty если событие не найдено
-     * @throws org.springframework.dao.DataAccessException если возникла ошибка доступа к БД
-     */
-    @Query("SELECT e FROM Event e WHERE e.id = :id")
-    @EntityGraph(attributePaths = {"reminders"})
-    Optional<Event> findByIdWithReminders(@Param("id") Long id);
-    
+
     /**
      * Находит активные события семьи на указанную дату, отсортированные по времени.
      * Используется для просмотра событий на конкретную дату в календаре.

@@ -28,4 +28,11 @@ public final class CompletionNoteContext {
      * Используется для обновления того же сообщения на всех этапах добавления заметки.
      */
     private Integer messageId;
+    
+    /**
+     * Номер страницы в постраничном списке /my_events.
+     * Используется для возврата к списку после завершения операции.
+     * Может быть null, если событие не из /my_events.
+     */
+    private Integer myEventsPage;
 }

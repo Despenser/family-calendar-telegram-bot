@@ -50,11 +50,11 @@ public record DateSelectionContext(User user,
     }
 
     /**
-     * Проверяет наличие событий на выбранную дату.
+     * Проверяет отсутствие событий на выбранную дату.
      *
-     * @return true, если есть хотя бы одно событие
+     * @return true, если событий нет (список пустой или null)
      */
-    public boolean hasEvents() {
-        return events != null && !events.isEmpty();
+    public boolean isEmpty() {
+        return events == null || events.isEmpty();
     }
 }

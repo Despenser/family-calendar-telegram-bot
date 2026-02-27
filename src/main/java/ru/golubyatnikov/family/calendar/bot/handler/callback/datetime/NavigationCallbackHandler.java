@@ -260,7 +260,7 @@ public class NavigationCallbackHandler implements CallbackHandler {
                 ctx.chatId(), ctx.messageId(), sourceDate);
         
         String message = buildEditFieldSelectionMessage(event);
-        InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId, ctx.getUserId());
+        InlineKeyboardMarkup keyboard = keyboardService.createEditFieldSelectionKeyboard(eventId);
         
         callbackQueryService.editMessageAndAnswer(ctx, message, keyboard, "");
     }

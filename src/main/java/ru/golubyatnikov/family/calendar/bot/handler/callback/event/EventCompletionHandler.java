@@ -2,6 +2,7 @@ package ru.golubyatnikov.family.calendar.bot.handler.callback.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -14,13 +15,14 @@ import ru.golubyatnikov.family.calendar.bot.model.context.CompletionNoteContext;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
-import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventNotificationService;
 import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.domain.myevents.MyEventsPageService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.CallbackQueryService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.myevents.MyEventsPageDisplayService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 
 import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Event.DESCRIPTION;
@@ -39,10 +41,11 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.format
 public class EventCompletionHandler implements CallbackHandler {
     
     private final EventService eventService;
+    private final MyEventsPageService myEventsPageService;
     private final TelegramMessageService messageService;
     private final ConversationStateService conversationStateService;
-    private final EventNotificationService eventNotificationService;
     private final BotMessageFormattingService botMessageFormattingService;
+    private final MyEventsPageDisplayService pageDisplayService;
     private final CallbackDataExtractionService callbackDataExtractionService;
     private final CallbackQueryService callbackQueryService;
     
@@ -78,25 +81,26 @@ public class EventCompletionHandler implements CallbackHandler {
     
     /**
      * Обрабатывает завершение события с переупорядочиванием списка.
+     * Поддерживает контекст постраничного списка /my_events.
      */
     private void handleCompleteEvent(@NonNull CallbackQueryContext context) {
-        Long eventId = extractEventId(context.callbackData(), CallbackPrefix.COMPLETE_EVENT);
+        String payload = CallbackPrefix.COMPLETE_EVENT.extractPayload(context.callbackData());
+        String[] parts = payload.split("_");
+        Long eventId = Long.parseLong(parts[0]);
+        Integer page = parts.length > 1 ? Integer.parseInt(parts[1]) : null;
         
         try {
-            Event completedEvent = eventService.completeEventWithReordering(eventId, context.getUserId());
-            
-            log.info("Событие ID={} успешно завершено с переупорядочиванием пользователем ID={}", 
-                    eventId, context.getUserId());
+            eventService.completeEventWithReordering(eventId, context.getUserId(), context.messageId());
 
-            Integer updatedMessageId = completedEvent.getMessageId() != null 
-                ? completedEvent.getMessageId().intValue() 
-                : context.messageId();
-            
+            log.info("Событие ID={} успешно завершено пользователем ID={}, page={}", 
+                    eventId, context.getUserId(), page);
+
             conversationStateService.setAwaitingCompletionNote(
                 context.getUserId(), 
                 eventId, 
                 context.chatId(), 
-                updatedMessageId
+                context.messageId(),
+                page
             );
             
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
@@ -122,6 +126,10 @@ public class EventCompletionHandler implements CallbackHandler {
     private void handleAddCompletionNote(@NonNull CallbackQueryContext context) throws TelegramApiException {
         Long eventId = extractEventId(context.callbackData(), CallbackPrefix.ADD_COMPLETION_NOTE);
         
+        // Получаем текущий контекст, чтобы сохранить номер страницы
+        CompletionNoteContext currentContext = conversationStateService.getCompletionNoteContext(context.getUserId());
+        Integer myEventsPage = currentContext != null ? currentContext.getMyEventsPage() : null;
+        
         String message = formatMessage(
                 DESCRIPTION + " Напишите заметку о том, как прошло событие.\n\n" +
                 "Например, что было сделано, какие были результаты или впечатления."
@@ -130,14 +138,15 @@ public class EventCompletionHandler implements CallbackHandler {
         try {
             messageService.editMessageText(context.chatId(), context.messageId(), message, null);
             conversationStateService.setAwaitingCompletionNote(context.getUserId(), eventId,
-                    context.chatId(), context.messageId());
+                    context.chatId(), context.messageId(), myEventsPage);
 
         } catch (TelegramApiException e) {
             log.warn("Не удалось отредактировать сообщение, отправка нового: eventId={}, error={}",
                     eventId, e.getMessage());
 
             messageService.sendMessage(context.chatId(), message);
-            conversationStateService.setAwaitingCompletionNote(context.getUserId(), eventId, context.chatId(), null);
+            conversationStateService.setAwaitingCompletionNote(context.getUserId(), eventId,
+                    context.chatId(), null, myEventsPage);
         }
 
         callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
@@ -155,14 +164,17 @@ public class EventCompletionHandler implements CallbackHandler {
         }
 
         Long eventId = completionContext.getEventId();
+        Integer myEventsPage = completionContext.getMyEventsPage();
         Event event = eventService.getEventById(eventId);
-        boolean wasPartOfMyEventsList = (event.getMessageId() != null);
-
-        sendCompletedEventMessage(context, completionContext, event);
+        
         conversationStateService.clearAwaitingCompletionNote(context.getUserId());
 
-        if (wasPartOfMyEventsList) {
-            eventNotificationService.updateMyEventsHeaderAfterRemoval(context.getUserId());
+        // Показываем карточку завершенного события
+        sendCompletedEventMessage(context, completionContext, event);
+        
+        // Если событие было из /my_events - отправляем список новым сообщением
+        if (myEventsPage != null) {
+            returnToMyEventsList(context, myEventsPage);
         }
 
         callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
@@ -222,6 +234,20 @@ public class EventCompletionHandler implements CallbackHandler {
             }
         } else {
             messageService.sendMessage(chatId, text);
+        }
+    }
+    
+    /**
+     * Возвращает пользователя к постраничному списку /my_events.
+     * Отправляет список новым сообщением.
+     */
+    private void returnToMyEventsList(@NonNull CallbackQueryContext context, int page) {
+        try {
+            Page<Event> eventsPage = myEventsPageService.getEventsPage(context.getUserId(), page);
+            pageDisplayService.sendEventsPage(context.chatId(), eventsPage);
+            
+        } catch (Exception e) {
+            log.error("Ошибка при возврате к списку /my_events после завершения события: {}", e.getMessage(), e);
         }
     }
 

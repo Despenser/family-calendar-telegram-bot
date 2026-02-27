@@ -255,19 +255,19 @@ public class CalendarNavigationService {
                                         Integer messageId,
                                         String callbackQueryId) {
 
-        if (context.isPastDate() && !context.hasEvents()) {
+        if (context.isPastDate() && context.isEmpty()) {
             returnToMonthCalendar(context, chatId, messageId, callbackQueryId);
 
         } else if (context.isPastDate()) {
             showEventsList(context, chatId, messageId, callbackQueryId);
 
-        } else if (context.isToday() && !context.hasEvents()) {
+        } else if (context.isToday() && context.isEmpty()) {
             showCreateEventPrompt(context, chatId, messageId, callbackQueryId);
 
         } else if (context.isToday()) {
             showEventsManagement(context, chatId, messageId, callbackQueryId);
 
-        } else if (context.isFutureDate() && !context.hasEvents()) {
+        } else if (context.isFutureDate() && context.isEmpty()) {
             showCreateEventPrompt(context, chatId, messageId, callbackQueryId);
 
         } else {

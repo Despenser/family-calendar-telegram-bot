@@ -2,21 +2,22 @@ package ru.golubyatnikov.family.calendar.bot.handler.command;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
+import ru.golubyatnikov.family.calendar.bot.service.domain.myevents.MyEventsPageService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.service.domain.planner.MyEventsHeaderUpdater;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.PlannerFormattingService;
-import ru.golubyatnikov.family.calendar.bot.service.domain.planner.PlannerNavigationService;
-import ru.golubyatnikov.family.calendar.bot.service.domain.planner.PlannerQueryService;
-import java.util.List;
-import java.util.stream.IntStream;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.MyEventsPageFormattingService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.MyEventsPageKeyboardService;
+
+import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ERROR;
 
 /**
  * Координатор команды /my_events для Telegram бота семейного календаря.
- * Отвечает за обработку команды отображения списка событий пользователя.
+ * Отвечает за обработку команды отображения постраничного списка событий пользователя.
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-01-08
@@ -24,15 +25,16 @@ import java.util.stream.IntStream;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class PlannerCommandHandler implements CommandHandler, MyEventsHeaderUpdater {
+public class PlannerCommandHandler implements CommandHandler {
 
-    private final PlannerQueryService queryService;
-    private final PlannerFormattingService formattingService;
-    private final PlannerNavigationService navigationService;
+    private final MyEventsPageService pageService;
+    private final MyEventsPageFormattingService formattingService;
+    private final MyEventsPageKeyboardService keyboardService;
     private final TelegramMessageService messageService;
 
     /**
      * Обрабатывает команду /my_events от пользователя.
+     * Отображает первую страницу списка событий.
      *
      * @param message входящее сообщение от Telegram
      * @param user пользователь из базы данных
@@ -47,13 +49,15 @@ public class PlannerCommandHandler implements CommandHandler, MyEventsHeaderUpda
 
         Long chatId = message.getChatId();
         try {
-            List<Event> userEvents = queryService.getUserEvents(user.getId());
-            if (queryService.isEmpty(userEvents)) {
+            // Получаем первую страницу событий
+            Page<Event> eventsPage = pageService.getEventsPage(user.getId(), 0);
+            
+            if (eventsPage.isEmpty()) {
                 sendNoEventsMessage(chatId);
                 return null;
             }
 
-            sendUserEvents(chatId, user.getId(), userEvents);
+            sendEventsPage(chatId, eventsPage);
             return null;
 
         } catch (Exception e) {
@@ -62,37 +66,6 @@ public class PlannerCommandHandler implements CommandHandler, MyEventsHeaderUpda
 
             sendErrorMessage(chatId);
             return null;
-        }
-    }
-
-    /**
-     * Обновляет счетчик событий в шапке первого сообщения.
-     * Вызывается при изменении количества событий пользователя.
-     * 
-     * @param userId идентификатор пользователя
-     */
-    @Override
-    public void updateMyEventsHeaderCount(Long userId) {
-        if (userId == null) {
-            return;
-        }
-        
-        try {
-            List<Event> userEvents = queryService.getUserEvents(userId);
-            
-            if (queryService.isEmpty(userEvents)) {
-                return;
-            }
-            
-            String header = formattingService.buildMyEventsHeader(userEvents.size());
-            Event firstEvent = queryService.getFirstEvent(userEvents);
-            String eventText = formattingService.buildEventMessage(firstEvent);
-            
-            navigationService.updateHeaderCount(userId, userEvents, header, eventText);
-            
-        } catch (Exception e) {
-            log.error("Ошибка при обновлении счетчика событий в шапке для пользователя ID={}: {}", 
-                    userId, e.getMessage(), e);
         }
     }
 
@@ -122,36 +95,30 @@ public class PlannerCommandHandler implements CommandHandler, MyEventsHeaderUpda
     }
 
     /**
-     * Отправляет список событий пользователю.
+     * Отправляет страницу со списком событий.
      * 
      * @param chatId идентификатор чата
-     * @param userId идентификатор пользователя
-     * @param userEvents список событий
+     * @param eventsPage страница событий
      */
-    private void sendUserEvents(Long chatId, Long userId, List<Event> userEvents) {
-        navigationService.manageHeaderFlags(userEvents);
+    private void sendEventsPage(Long chatId, Page<Event> eventsPage) {
+        try {
+            String headerMessage = formattingService.buildPageHeader(
+                eventsPage.getTotalElements(),
+                eventsPage.getNumber() + 1,
+                eventsPage.getTotalPages()
+            );
+            
+            InlineKeyboardMarkup keyboard = keyboardService.createEventsPageKeyboard(
+                eventsPage.getContent(),
+                eventsPage.getNumber(),
+                eventsPage.getTotalPages()
+            );
+            
+            messageService.sendMessage(chatId, headerMessage, keyboard);
 
-        String header = formattingService.buildMyEventsHeader(userEvents.size());
-        Event firstEvent = queryService.getFirstEvent(userEvents);
-        String firstEventText = formattingService.buildEventMessage(firstEvent);
-        String combinedMessage = formattingService.buildCombinedMessage(header, firstEventText);
-
-        // Отправляем первое событие с заголовком
-        boolean sent = navigationService.sendCombinedMessageWithFallback(
-                chatId, combinedMessage, header, firstEvent, userId);
-
-        if (sent) {
-            navigationService.saveHeaderContext(userId, userEvents.size());
+        } catch (Exception e) {
+            log.error("Ошибка при отправке страницы событий: {}", e.getMessage(), e);
         }
-
-        // Отправляем остальные события
-        IntStream.range(1, userEvents.size())
-                .mapToObj(userEvents::get)
-                .forEach(event -> {
-                    String eventText = formattingService.buildEventMessage(event);
-                    navigationService.sendEventMessageWithFallback(chatId, eventText, event, userId);
-                });
-
     }
 
     /**
@@ -161,9 +128,7 @@ public class PlannerCommandHandler implements CommandHandler, MyEventsHeaderUpda
      */
     private void sendErrorMessage(Long chatId) {
         try {
-            String errorMessage = formattingService.buildErrorMessage(
-                    "Произошла ошибка при получении списка событий. Попробуйте позже.");
-
+            String errorMessage = ERROR + " Произошла ошибка при получении списка событий. Попробуйте позже.";
             messageService.sendMessage(chatId, errorMessage);
 
         } catch (Exception sendError) {

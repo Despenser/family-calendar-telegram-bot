@@ -167,6 +167,17 @@ public enum CallbackPrefix {
     /** Окончательное удаление события из корзины (формат: trash_delete_{eventId}) */
     TRASH_DELETE("trash_delete_"),
     
+    // ===== Мои события (постраничный список) =====
+    
+    /** Навигация по страницам списка событий (формат: my_events_page_{page}) */
+    MY_EVENTS_PAGE("my_events_page_"),
+    
+    /** Просмотр деталей события из списка (формат: my_events_view_{eventId}_{page}) */
+    MY_EVENTS_VIEW("my_events_view_"),
+    
+    /** Возврат к списку событий (формат: my_events_back_{page}) */
+    MY_EVENTS_BACK("my_events_back_"),
+    
     // ===== Поиск =====
     
     /** Повторный поиск событий (формат: search_again:) */
@@ -245,34 +256,6 @@ public enum CallbackPrefix {
         }
         
         return prefix + (payload != null ? payload : "");
-    }
-    
-    /**
-     * Находит CallbackPrefix по callback data.
-     * 
-     * @param callbackData строка callback data
-     * @return соответствующий CallbackPrefix или null если не найден
-     */
-    public static CallbackPrefix fromCallbackData(String callbackData) {
-        if (callbackData == null) {
-            return null;
-        }
-        
-        // Сначала проверяем точные совпадения (более специфичные)
-        for (CallbackPrefix prefix : values()) {
-            if (prefix.isExactMatchPrefix() && prefix.matches(callbackData)) {
-                return prefix;
-            }
-        }
-        
-        // Затем проверяем префиксы с payload
-        for (CallbackPrefix prefix : values()) {
-            if (!prefix.isExactMatchPrefix() && prefix.matches(callbackData)) {
-                return prefix;
-            }
-        }
-
-        return null;
     }
     
     /**

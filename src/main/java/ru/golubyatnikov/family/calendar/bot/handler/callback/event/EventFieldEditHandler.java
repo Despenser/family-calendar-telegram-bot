@@ -24,7 +24,6 @@ import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.Tele
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardFactory;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
-
 import java.time.LocalDate;
 
 import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.BACK;
@@ -74,24 +73,27 @@ public class EventFieldEditHandler implements CallbackHandler {
         try {
             String payload = CallbackPrefix.EDIT_FIELD.extractPayload(context.callbackData());
             
-            String[] parts = payload.split("_", 2);
+            String[] parts = payload.split("_");
             
-            if (parts.length != 2) {
+            if (parts.length < 2) {
                 handleInvalidFormat(context);
                 return;
             }
             
             String field = parts[0];
             Long eventId = parseEventId(parts[1], context);
+            Integer page = parts.length > 2
+                    ? Integer.parseInt(parts[2])
+                    : null;
             
             if (eventId == null) {
                 return;
             }
             
-            updateEditingContext(userId, eventId, context.chatId(), context.messageId(), field);
+            updateEditingContext(userId, eventId, context.chatId(), context.messageId(), field, page);
             
-            String message = buildMessageForField(field, context.user());
-            InlineKeyboardMarkup keyboard = buildKeyboardForField(field, context.user(), eventId);
+            String message = buildMessageForField(field);
+            InlineKeyboardMarkup keyboard = buildKeyboardForField(field, context.user(), eventId, page);
             
             messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
@@ -142,10 +144,16 @@ public class EventFieldEditHandler implements CallbackHandler {
                                       Long eventId,
                                       Long chatId,
                                       Integer messageId,
-                                      String field) {
+                                      String field,
+                                      Integer page) {
 
         if (!conversationStateService.isEditingEvent(userId)) {
-            conversationStateService.startEventEditing(userId, eventId, chatId, messageId);
+            if (page != null) {
+                conversationStateService.startEventEditing(userId, eventId, chatId, messageId, page);
+
+            } else {
+                conversationStateService.startEventEditing(userId, eventId, chatId, messageId);
+            }
         }
         
         EditField editField = mapToEditField(field);
@@ -157,7 +165,7 @@ public class EventFieldEditHandler implements CallbackHandler {
     /**
      * Формирует сообщение для редактирования поля.
      */
-    private @NonNull String buildMessageForField(@NonNull String field, User user) {
+    private @NonNull String buildMessageForField(@NonNull String field) {
         return switch (field) {
             case "date" -> DATE + " Редактирование даты\n\nВыберите новую дату из календаря:";
             case "time" -> TIME + " Редактирование времени\n\nВыберите новое время:";
@@ -172,7 +180,8 @@ public class EventFieldEditHandler implements CallbackHandler {
      */
     private @Nullable InlineKeyboardMarkup buildKeyboardForField(@NonNull String field,
                                                                  User user,
-                                                                 Long eventId) {
+                                                                 Long eventId,
+                                                                 Integer page) {
         return switch (field) {
             case "date" -> {
                 LocalDate now = user.getCurrentDate();
@@ -188,7 +197,7 @@ public class EventFieldEditHandler implements CallbackHandler {
                 LocalDate eventDate = event.getEventDate();
                 yield keyboardService.createFilteredHourSelectionKeyboard(eventDate, user, eventId);
             }
-            case "title", "description" -> createCancelOnlyKeyboard(eventId);
+            case "title", "description" -> createCancelOnlyKeyboard(eventId, page);
             default -> null;
         };
     }
@@ -196,9 +205,10 @@ public class EventFieldEditHandler implements CallbackHandler {
     /**
      * Создает клавиатуру только с кнопкой "Назад".
      */
-    private @NonNull InlineKeyboardMarkup createCancelOnlyKeyboard(@NonNull Long eventId) {
+    private @NonNull InlineKeyboardMarkup createCancelOnlyKeyboard(@NonNull Long eventId, Integer page) {
+        String payload = page != null ? eventId + "_" + page : eventId.toString();
         InlineKeyboardButton button = keyboardFactory.createButton(BACK + " Назад",
-                CallbackPrefix.EDIT_BACK.withPayload(eventId.toString()));
+                CallbackPrefix.EDIT_BACK.withPayload(payload));
 
         InlineKeyboardRow row = keyboardFactory.createRow(button);
 

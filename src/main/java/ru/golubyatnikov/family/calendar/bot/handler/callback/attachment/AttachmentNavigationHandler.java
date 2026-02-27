@@ -20,7 +20,6 @@ import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotM
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.message.AttachmentMessageService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
-
 import java.util.List;
 
 /**
@@ -47,16 +46,19 @@ public class AttachmentNavigationHandler {
     /**
      * Обрабатывает возврат к списку вложений из просмотра файла.
      * Заменяет медиа-сообщение на текстовое при необходимости.
+     * Поддерживает контекст постраничного списка /my_events.
      * 
      * @param eventId идентификатор события
      * @param context контекст callback query
      * @param callbackQuery объект callback query для доступа к текущему сообщению
+     * @param page номер страницы (null если не из /my_events)
      *
      * @throws Exception если произошла ошибка при возврате к списку вложений
      */
     public void handleBackToAttachments(Long eventId,
                                         CallbackQueryContext context,
-                                        CallbackQuery callbackQuery) throws Exception {
+                                        CallbackQuery callbackQuery,
+                                        Integer page) throws Exception {
 
         try {
             var maybeMessage = callbackQuery.getMessage();
@@ -72,15 +74,15 @@ public class AttachmentNavigationHandler {
             
             String message = attachmentMessageService.buildAttachmentListMessage(attachments);
             boolean isCreator = event.belongsToUser(context.getUserId());
-            var keyboard = keyboardService.createAttachmentsListKeyboard(eventId, attachments, isCreator);
+            var keyboard = keyboardService.createAttachmentsListKeyboard(eventId, attachments, isCreator, page);
             
 
             if (attachmentMessageService.isMediaMessage(currentMessage)) {
-                attachmentMessageService.replaceMediaWithText(
-                        context.chatId(), context.messageId(), message, keyboard, context.getUserId(), eventId);
+                attachmentMessageService.replaceMediaWithText(context.chatId(), context.messageId(),
+                        message, keyboard, context.getUserId(), eventId);
             } else {
-                attachmentMessageService.editOrSendMessage(
-                        context.chatId(), context.messageId(), message, keyboard, context.getUserId(), eventId);
+                attachmentMessageService.editOrSendMessage(context.chatId(), context.messageId(),
+                        message, keyboard, context.getUserId(), eventId);
             }
             
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
@@ -95,17 +97,23 @@ public class AttachmentNavigationHandler {
     /**
      * Обрабатывает возврат к карточке события.
      * Очищает контекст сообщений о вложениях.
+     * Поддерживает контекст постраничного списка /my_events.
      * 
      * @param eventId идентификатор события
      * @param context контекст callback query
+     * @param page номер страницы (null если не из /my_events)
      *
      * @throws Exception если произошла ошибка при возврате к карточке события
      */
-    public void handleBackToEvent(Long eventId, CallbackQueryContext context) throws Exception {
+    public void handleBackToEvent(Long eventId, CallbackQueryContext context, Integer page) throws Exception {
         try {
             Event event = eventService.getEventById(eventId);
             String message = buildEventMessage(event, context.user());
-            var keyboard = keyboardService.createEventActionsKeyboard(event, context.getUserId());
+            
+            // Используем клавиатуру с контекстом страницы, если он есть
+            var keyboard = page != null
+                ? keyboardService.createEventActionsKeyboardWithContext(event, context.getUserId(), page)
+                : keyboardService.createEventActionsKeyboard(event, context.getUserId());
             
             messageService.editMessageText(context.chatId(), context.messageId(), message, keyboard);
             conversationStateService.clearAttachmentMessageContext(context.getUserId());

@@ -45,23 +45,26 @@ public class AttachmentDeleteHandler {
     
     /**
      * Обрабатывает запрос подтверждения удаления файла.
+     * Поддерживает контекст постраничного списка /my_events.
      * 
      * @param attachmentId идентификатор вложения
      * @param eventId идентификатор события
      * @param context контекст callback query
+     * @param page номер страницы (null если не из /my_events)
      *
      * @throws Exception если произошла ошибка при обработке запроса
      */
     public void handleDeleteFile(Long attachmentId,
                                  Long eventId,
-                                 @NonNull CallbackQueryContext context) throws Exception {
+                                 @NonNull CallbackQueryContext context,
+                                 Integer page) throws Exception {
 
         try {
             validateUserAccess(eventId, context.user());
             Attachment attachment = attachmentService.getAttachment(attachmentId);
             
             String message = formattingService.formatDeleteConfirmation(attachment.getFileName());
-            var keyboard = keyboardService.createDeleteAttachmentConfirmationKeyboard(eventId, attachmentId);
+            var keyboard = keyboardService.createDeleteAttachmentConfirmationKeyboard(eventId, attachmentId, page);
             
             attachmentMessageService.editOrSendMessage(context.chatId(), context.messageId(), message, 
                     keyboard, context.getUserId(), eventId);
@@ -76,22 +79,25 @@ public class AttachmentDeleteHandler {
     
     /**
      * Обрабатывает подтверждение удаления файла.
+     * Поддерживает контекст постраничного списка /my_events.
      * 
      * @param attachmentId идентификатор вложения
      * @param eventId идентификатор события
      * @param context контекст callback query
+     * @param page номер страницы (null если не из /my_events)
      *
      * @throws Exception если произошла ошибка при удалении
      */
     public void handleConfirmDelete(Long attachmentId,
                                     Long eventId,
-                                    @NonNull CallbackQueryContext context) throws Exception {
+                                    @NonNull CallbackQueryContext context,
+                                    Integer page) throws Exception {
 
         try {
             attachmentService.deleteAttachment(attachmentId, context.getUserId());
             callbackQueryService.answerCallback(context, CallbackMessages.DELETED);
             
-            showUpdatedAttachmentList(eventId, context);
+            showUpdatedAttachmentList(eventId, context, page);
             
         } catch (AttachmentNotFoundException e) {
             log.error("Вложение не найдено при подтверждении удаления файла: attachmentId={}", attachmentId);
@@ -106,27 +112,41 @@ public class AttachmentDeleteHandler {
     
     /**
      * Обрабатывает отмену удаления файла.
+     * Поддерживает контекст постраничного списка /my_events.
      * 
      * @param eventId идентификатор события
      * @param context контекст callback query
+     * @param page номер страницы (null если не из /my_events)
      *
      * @throws Exception если произошла ошибка при отмене
      */
-    public void handleCancelDelete(Long eventId, CallbackQueryContext context) throws Exception {
+    public void handleCancelDelete(Long eventId, CallbackQueryContext context, Integer page) throws Exception {
         callbackQueryService.answerCallback(context, CallbackMessageFormatter.actionCancelled("Удаление"));
-        listHandler.handleAttachmentList(eventId, context);
+        listHandler.handleAttachmentList(eventId, context, page);
     }
     
     /**
      * Показывает обновленный список вложений после удаления.
+     * Поддерживает контекст постраничного списка /my_events.
      * 
      * @param eventId идентификатор события
      * @param context контекст callback query
+     * @param page номер страницы (null если не из /my_events)
      *
      * @throws Exception если произошла ошибка при отображении списка
      */
-    private void showUpdatedAttachmentList(Long eventId, @NonNull CallbackQueryContext context) throws Exception {
-        attachmentMessageService.showAttachmentList(eventId, context.user(), context.chatId(), context.messageId());
+    private void showUpdatedAttachmentList(Long eventId,
+                                           @NonNull CallbackQueryContext context,
+                                           Integer page) throws Exception {
+
+        if (page != null) {
+            attachmentMessageService.showAttachmentListWithContext(eventId, context.user(),
+                    context.chatId(), context.messageId(), page);
+
+        } else {
+            attachmentMessageService.showAttachmentList(eventId, context.user(),
+                    context.chatId(), context.messageId());
+        }
     }
     
     /**

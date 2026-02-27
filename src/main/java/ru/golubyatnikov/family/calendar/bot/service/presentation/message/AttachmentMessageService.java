@@ -120,13 +120,53 @@ public class AttachmentMessageService {
                                    @NonNull User user,
                                    Long chatId,
                                    Integer messageId) throws TelegramApiException {
+        showAttachmentList(eventId, user, chatId, messageId, null);
+    }
+
+    /**
+     * Формирует и отправляет сообщение со списком вложений события с контекстом страницы.
+     * Централизует логику получения данных, форматирования и отправки.
+     *
+     * @param eventId идентификатор события
+     * @param user пользователь, запросивший список вложений
+     * @param chatId идентификатор чата Telegram
+     * @param messageId идентификатор сообщения для редактирования
+     * @param page номер страницы (null если не из /my_events)
+     *
+     * @throws TelegramApiException если произошла ошибка при отправке сообщения
+     */
+    public void showAttachmentListWithContext(Long eventId,
+                                              @NonNull User user,
+                                              Long chatId,
+                                              Integer messageId,
+                                              Integer page) throws TelegramApiException {
+        showAttachmentList(eventId, user, chatId, messageId, page);
+    }
+
+    /**
+     * Формирует и отправляет сообщение со списком вложений события с контекстом страницы.
+     * Централизует логику получения данных, форматирования и отправки.
+     *
+     * @param eventId идентификатор события
+     * @param user пользователь, запросивший список вложений
+     * @param chatId идентификатор чата Telegram
+     * @param messageId идентификатор сообщения для редактирования
+     * @param page номер страницы (null если не из /my_events)
+     *
+     * @throws TelegramApiException если произошла ошибка при отправке сообщения
+     */
+    public void showAttachmentList(Long eventId,
+                                   @NonNull User user,
+                                   Long chatId,
+                                   Integer messageId,
+                                   Integer page) throws TelegramApiException {
         
         Event event = eventService.getEventById(eventId);
         List<Attachment> attachments = attachmentService.getEventAttachments(eventId);
         
         String message = formattingService.formatAttachmentList(attachments);
         boolean isCreator = event.belongsToUser(user.getId());
-        var keyboard = keyboardService.createAttachmentsListKeyboard(eventId, attachments, isCreator);
+        var keyboard = keyboardService.createAttachmentsListKeyboard(eventId, attachments, isCreator, page);
 
         editOrSendMessage(chatId, messageId, message, keyboard, user.getId(), eventId);
     }

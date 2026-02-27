@@ -50,6 +50,22 @@ public class InlineKeyboardService {
     }
 
     /**
+     * Создает inline клавиатуру для управления событием с контекстом постраничного списка.
+     * Встраивает номер страницы во все callback-действия для сохранения связи с /my_events.
+     *
+     * @param event событие
+     * @param userId идентификатор пользователя
+     * @param page номер страницы для возврата к списку
+     *
+     * @return настроенная InlineKeyboardMarkup с контекстом страницы
+     * @throws IllegalArgumentException если параметры некорректны
+     */
+    public InlineKeyboardMarkup createEventActionsKeyboardWithContext(Event event, Long userId, Integer page) {
+        return eventFactory.createEventActionsKeyboardWithContext(event, userId, page);
+    }
+
+
+    /**
      * Создает inline клавиатуру для управления событием с учетом статуса и прав доступа.
      * 
      * @param event событие
@@ -104,20 +120,19 @@ public class InlineKeyboardService {
      * @throws IllegalArgumentException если eventId некорректен
      */
     public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId) {
-        return eventFactory.createEditFieldSelectionKeyboard(eventId);
+        return eventFactory.createEditFieldSelectionKeyboard(eventId, null);
     }
-    
+
     /**
-     * Создает inline клавиатуру для выбора поля редактирования события.
-     * 
+     * Создает inline клавиатуру для выбора поля редактирования события с контекстом страницы.
+     *
      * @param eventId идентификатор события
-     * @param userId идентификатор пользователя (для проверки контекста редактирования)
+     * @param page номер страницы для возврата к списку (может быть null)
      *
      * @return настроенная InlineKeyboardMarkup
-     * @throws IllegalArgumentException если eventId некорректен
      */
-    public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId, Long userId) {
-        return eventFactory.createEditFieldSelectionKeyboard(eventId, userId);
+    public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId, Integer page) {
+        return eventFactory.createEditFieldSelectionKeyboard(eventId, page);
     }
 
     /**
@@ -147,42 +162,65 @@ public class InlineKeyboardService {
     }
 
     /**
-     * Создает inline клавиатуру для подтверждения удаления вложения.
+     * Создает inline клавиатуру для списка вложений события с контекстом страницы.
+     * 
+     * @param eventId идентификатор события
+     * @param attachments список вложений
+     * @param isCreator является ли пользователь создателем
+     * @param page номер страницы для возврата к списку (может быть null)
+     *
+     * @return настроенная InlineKeyboardMarkup
+     * @throws IllegalArgumentException если eventId некорректен
+     */
+    public InlineKeyboardMarkup createAttachmentsListKeyboard(Long eventId,
+                                                              List<Attachment> attachments,
+                                                              boolean isCreator,
+                                                              Integer page) {
+
+        return attachmentFactory.createAttachmentsListKeyboard(eventId, attachments, isCreator, page);
+    }
+
+    /**
+     * Создает inline клавиатуру для подтверждения удаления вложения с контекстом страницы.
      * 
      * @param eventId идентификатор события
      * @param attachmentId идентификатор вложения
+     * @param page номер страницы для возврата к списку (может быть null)
      *
      * @return настроенная InlineKeyboardMarkup
      * @throws IllegalArgumentException если параметры некорректны
      */
     public InlineKeyboardMarkup createDeleteAttachmentConfirmationKeyboard(Long eventId,
-                                                                           Long attachmentId) {
+                                                                           Long attachmentId,
+                                                                           Integer page) {
 
-        return attachmentFactory.createDeleteAttachmentConfirmationKeyboard(eventId, attachmentId);
+        return attachmentFactory.createDeleteAttachmentConfirmationKeyboard(eventId, attachmentId, page);
     }
 
     /**
-     * Создает inline клавиатуру для просмотра файла вложения.
+     * Создает inline клавиатуру для просмотра файла вложения с контекстом страницы.
      * 
      * @param eventId идентификатор события
+     * @param page номер страницы для возврата к списку (может быть null)
      *
      * @return настроенная InlineKeyboardMarkup
      * @throws IllegalArgumentException если eventId некорректен
      */
-    public InlineKeyboardMarkup createFileViewKeyboard(Long eventId) {
-        return attachmentFactory.createFileViewKeyboard(eventId);
+    public InlineKeyboardMarkup createFileViewKeyboard(Long eventId, Integer page) {
+        return attachmentFactory.createFileViewKeyboard(eventId, page);
     }
 
     /**
-     * Создает inline клавиатуру для режима загрузки вложения.
+     * Создает inline клавиатуру для режима загрузки вложения с контекстом страницы.
      * 
      * @param eventId идентификатор события
+     * @param page номер страницы для возврата к списку (может быть null)
      *
      * @return настроенная InlineKeyboardMarkup
      * @throws IllegalArgumentException если eventId некорректен
      */
-    public InlineKeyboardMarkup createAttachmentUploadKeyboard(Long eventId) {
-        return attachmentFactory.createAttachmentUploadKeyboard(eventId);
+    public InlineKeyboardMarkup createAttachmentUploadKeyboard(Long eventId, Integer page) {
+        return attachmentFactory.createAttachmentUploadKeyboard(eventId, page);
     }
 
     /**

@@ -32,9 +32,15 @@ public class CompletionNoteContextManager {
      * @param eventId идентификатор завершенного события
      * @param chatId идентификатор чата
      * @param messageId идентификатор сообщения для редактирования
+     * @param myEventsPage номер страницы /my_events (может быть null)
      */
-    public void setAwaitingCompletionNote(Long userId, Long eventId, Long chatId, Integer messageId) {
-        CompletionNoteContext context = new CompletionNoteContext(eventId, chatId, messageId);
+    public void setAwaitingCompletionNote(Long userId,
+                                          Long eventId,
+                                          Long chatId,
+                                          Integer messageId,
+                                          Integer myEventsPage) {
+
+        CompletionNoteContext context = new CompletionNoteContext(eventId, chatId, messageId, myEventsPage);
         usersAwaitingCompletionNote.put(userId, context);
     }
     
@@ -65,5 +71,5 @@ public class CompletionNoteContextManager {
      */
     public void clearAwaitingCompletionNote(Long userId) {
         usersAwaitingCompletionNote.remove(userId);
-        }
+    }
 }

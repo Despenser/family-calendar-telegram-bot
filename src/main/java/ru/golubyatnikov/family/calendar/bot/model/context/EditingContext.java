@@ -41,4 +41,10 @@ public class EditingContext {
      * Если null, редактирование началось не из календаря.
      */
     private LocalDate sourceDate;
+    
+    /**
+     * Номер страницы в /my_events, с которой началось редактирование.
+     * Если null, редактирование началось не из /my_events.
+     */
+    private Integer myEventsPage;
 }

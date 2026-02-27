@@ -45,17 +45,13 @@ public class ReminderCallbackRouter implements CallbackHandler {
         // Отключение автоматических напоминаний
         if (CallbackPrefix.DISABLE_REMINDERS.matches(context.callbackData())) {
             String payload = CallbackPrefix.DISABLE_REMINDERS.extractPayload(context.callbackData());
-            Long eventId = Long.parseLong(payload);
-            
-            reminderCallbackHandler.handleDisableReminders(eventId, context);
+            reminderCallbackHandler.handleDisableReminders(payload, context);
         }
         
         // Включение автоматических напоминаний
         else if (CallbackPrefix.ENABLE_REMINDERS.matches(context.callbackData())) {
             String payload = CallbackPrefix.ENABLE_REMINDERS.extractPayload(context.callbackData());
-            Long eventId = Long.parseLong(payload);
-            
-            reminderCallbackHandler.handleEnableReminders(eventId, context);
+            reminderCallbackHandler.handleEnableReminders(payload, context);
         }
     }
 }

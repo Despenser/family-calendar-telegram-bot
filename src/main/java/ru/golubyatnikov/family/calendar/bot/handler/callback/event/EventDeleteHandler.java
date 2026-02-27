@@ -2,6 +2,7 @@ package ru.golubyatnikov.family.calendar.bot.handler.callback.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -15,12 +16,14 @@ import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.model.enums.CallbackPrefix;
 import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.domain.myevents.MyEventsPageService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.parsing.CallbackDataExtractionService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.CallbackQueryService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.EventEditKeyboardFactory;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
+import ru.golubyatnikov.family.calendar.bot.service.presentation.myevents.MyEventsPageDisplayService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 import java.time.LocalDate;
 import java.util.List;
@@ -41,11 +44,13 @@ import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Status.ER
 public class EventDeleteHandler implements CallbackHandler {
     
     private final EventService eventService;
+    private final MyEventsPageService myEventsPageService;
     private final TelegramMessageService messageService;
     private final CallbackQueryService callbackQueryService;
     private final CallbackDataExtractionService callbackDataExtractionService;
     private final KeyboardService keyboardService;
     private final BotMessageFormattingService botMessageFormattingService;
+    private final MyEventsPageDisplayService pageDisplayService;
     private final EventEditKeyboardFactory keyboardFactory;
     
     @Override
@@ -62,9 +67,12 @@ public class EventDeleteHandler implements CallbackHandler {
     public void handle(@NonNull CallbackQuery callbackQuery, @NonNull User user) throws Exception {
         CallbackQueryContext context = callbackDataExtractionService.extractContext(callbackQuery, user);
         
-        Long eventId = extractEventId(context.callbackData());
+        String payload = CallbackPrefix.DELETE_EVENT.extractPayload(context.callbackData());
+        String[] parts = payload.split("_");
+        Long eventId = Long.parseLong(parts[0]);
+        Integer page = parts.length > 1 ? Integer.parseInt(parts[1]) : null;
         
-        log.info("Удаление события ID={} пользователем ID={}", eventId, context.getUserId());
+        log.info("Удаление события ID={} пользователем ID={}, page={}", eventId, context.getUserId(), page);
         
         try {
             Event event = eventService.getEventById(eventId);
@@ -72,6 +80,12 @@ public class EventDeleteHandler implements CallbackHandler {
             Long familyId = user.getFamily().getId();
             
             eventService.deleteEvent(eventId, context.getUserId());
+            
+            // Если удаление из /my_events - возвращаемся к списку
+            if (page != null) {
+                handleDeleteFromMyEvents(context, page);
+                return;
+            }
             
             List<Event> allRemainingEvents = eventService.getEventsByDate(familyId, eventDate);
             List<Event> myRemainingEvents = filterUserEvents(allRemainingEvents, context.getUserId());
@@ -94,6 +108,24 @@ public class EventDeleteHandler implements CallbackHandler {
                      eventId, context.getUserId(), e.getMessage(), e);
 
             callbackQueryService.answerCallback(context, ERROR + " Ошибка при удалении");
+        }
+    }
+    
+    /**
+     * Обрабатывает удаление события из постраничного списка /my_events.
+     * Возвращает пользователя к списку событий.
+     */
+    private void handleDeleteFromMyEvents(CallbackQueryContext context, int page) {
+        callbackQueryService.answerCallback(context, CallbackMessages.DELETED);
+        
+        try {
+            // Получаем обновленный список событий пользователя
+            Page<Event> eventsPage = myEventsPageService.getEventsPage(context.getUserId(), page);
+            pageDisplayService.displayEventsPage(context.chatId(), context.messageId(), eventsPage);
+            
+        } catch (Exception e) {
+            log.error("Ошибка при возврате к списку /my_events после удаления: {}", e.getMessage(), e);
+            messageService.deleteMessageSilently(context.chatId(), context.messageId());
         }
     }
     
@@ -183,13 +215,5 @@ public class EventDeleteHandler implements CallbackHandler {
         return events.stream()
                 .filter(e -> e.getUser().getId().equals(userId))
                 .collect(Collectors.toList());
-    }
-    
-    /**
-     * Извлекает ID события из callback data.
-     */
-    private @NonNull Long extractEventId(String callbackData) {
-        String payload = CallbackPrefix.DELETE_EVENT.extractPayload(callbackData);
-        return Long.parseLong(payload);
     }
 }

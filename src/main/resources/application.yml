@@ -271,3 +271,11 @@ app:
     names:
       - upcomingEvents  # Кэш предстоящих событий семьи (ключ: familyId_days_zoneId)
       - userEvents      # Кэш событий пользователя (ключ: userId_ACTIVE)
+      - myEventsPage    # Кэш постраничного списка событий (ключ: userId_page_size)
+
+  # Конфигурация постраничного списка событий
+  my-events:
+    # Размер страницы по умолчанию
+    page-size: 10
+    # Максимальная длина названия события в кнопке
+    max-title-length: 25

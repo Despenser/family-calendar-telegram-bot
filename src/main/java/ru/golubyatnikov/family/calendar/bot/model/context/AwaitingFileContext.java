@@ -27,4 +27,10 @@ public final class AwaitingFileContext {
      * Идентификатор сообщения со списком вложений для обновления
      */
     private Integer messageId;
+    
+    /**
+     * Номер страницы в /my_events, с которой началось добавление вложения.
+     * Если null, добавление началось не из /my_events.
+     */
+    private Integer myEventsPage;
 }

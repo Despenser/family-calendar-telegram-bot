@@ -8,18 +8,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import ru.golubyatnikov.family.calendar.bot.exception.UserNotFoundException;
+import ru.golubyatnikov.family.calendar.bot.model.dto.EventMessageData;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
 import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
-import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
 import ru.golubyatnikov.family.calendar.bot.service.domain.reminder.ReminderCreationService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
-
-import java.util.List;
 
 /**
  * Сервис для отправки уведомлений о событиях.
@@ -33,7 +30,6 @@ import java.util.List;
 public class EventNotificationService {
     
     private final EventRepository eventRepository;
-    private final UserRepository userRepository;
     private final TelegramMessageService telegramMessageService;
     private final KeyboardService keyboardService;
     private final BotMessageFormattingService botMessageFormattingService;
@@ -51,16 +47,36 @@ public class EventNotificationService {
     }
     
     /**
-     * Отправляет или обновляет сообщение о событии в Telegram.
+     * Подготавливает данные сообщения о событии с учетом контекста страницы.
      * 
-     * @param event событие для отправки/обновления
+     * @param event событие
+     * @param userId идентификатор пользователя
+     * @param myEventsPage номер страницы "Мои события" (может быть null)
+     * @return данные сообщения о событии (текст и клавиатура)
+     */
+    public EventMessageData prepareEventMessageData(@NonNull Event event, 
+                                                     @NonNull Long userId, 
+                                                     Integer myEventsPage) {
+        int eventCount = eventRepository.countByUserIdAndStatus(event.getUser().getId(), EventStatus.ACTIVE);
+        String messageText = botMessageFormattingService.buildEventMessageWithHeader(event, eventCount);
+        
+        InlineKeyboardMarkup keyboard = myEventsPage != null
+            ? keyboardService.createEventActionsKeyboardWithContext(event, userId, myEventsPage)
+            : keyboardService.createEventActionsKeyboard(event, userId);
+        
+        return new EventMessageData(messageText, keyboard);
+    }
+    
+    /**
+     * Отправляет или обновляет сообщение о событии в Telegram.
+     *
+     * @param event  событие для отправки/обновления
      * @param chatId ID чата для отправки
      *
-     * @return обновленное событие с актуальным messageId
      * @throws TelegramApiException при критических ошибках отправки
      */
     @Transactional
-    public Event sendOrUpdateEventMessage(Event event, Long chatId) throws TelegramApiException {
+    public void sendOrUpdateEventMessage(Event event, Long chatId) throws TelegramApiException {
         
         if (event == null) {
             throw new IllegalArgumentException("Event не может быть null");
@@ -94,79 +110,13 @@ public class EventNotificationService {
             );
             
             if (updated) {
-                return event;
+                return;
             }
         }
         
         Message sentMessage = telegramMessageService.sendMessageAndGet(chatId, messageText, keyboard);
         event.setMessageId((long) sentMessage.getMessageId());
 
-        return eventRepository.save(event);
-    }
-    
-    /**
-     * Обновляет шапку /my_events после удаления или завершения события.
-     * 
-     * @param userId идентификатор пользователя
-     */
-    @Transactional
-    public void updateMyEventsHeaderAfterRemoval(Long userId) {
-        List<Event> activeEvents = eventRepository.findByUserIdAndStatusOrderByEventDateAscEventTimeAsc(
-            userId, EventStatus.ACTIVE);
-        
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new UserNotFoundException(userId));
-        
-        Long chatId = user.getTelegramId();
-        
-        if (chatId == null) {
-            return;
-        }
-        
-        if (activeEvents.isEmpty()) {
-            String emptyMessage = buildEmptyStateMessage();
-            try {
-                telegramMessageService.sendMessage(chatId, emptyMessage);
-
-            } catch (Exception e) {
-                log.error("Ошибка при отправке сообщения о пустом состоянии пользователю ID={}: {}", 
-                         userId, e.getMessage(), e);
-            }
-            return;
-        }
-        
-        Event newFirstEvent = activeEvents.getFirst();
-        
-        if (!Boolean.TRUE.equals(newFirstEvent.getIsMyEventsHeader())) {
-            newFirstEvent.setIsMyEventsHeader(true);
-            eventRepository.save(newFirstEvent);
-        }
-        
-        for (int i = 1; i < activeEvents.size(); i++) {
-            Event evt = activeEvents.get(i);
-            if (Boolean.TRUE.equals(evt.getIsMyEventsHeader())) {
-                evt.setIsMyEventsHeader(false);
-                eventRepository.save(evt);
-            }
-        }
-        
-        // Всегда обновляем сообщение первого события, чтобы счетчик был актуальным
-        try {
-            sendOrUpdateEventMessage(newFirstEvent, chatId);
-
-        } catch (Exception e) {
-            log.error("Ошибка при обновлении сообщения с шапкой для события ID={}: {}", 
-                     newFirstEvent.getId(), e.getMessage(), e);
-        }
-        
-    }
-    
-    /**
-     * Формирует сообщение о пустом состоянии /my_events.
-     * 
-     * @return отформатированное сообщение о пустом состоянии
-     */
-    private String buildEmptyStateMessage() {
-        return botMessageFormattingService.buildEmptyMyEventsMessage();
+        eventRepository.save(event);
     }
 }

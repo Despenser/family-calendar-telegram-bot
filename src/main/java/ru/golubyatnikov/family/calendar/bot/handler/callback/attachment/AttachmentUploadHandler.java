@@ -45,21 +45,23 @@ public class AttachmentUploadHandler {
     /**
      * Обрабатывает начало добавления файла.
      * Переводит пользователя в режим ожидания файла.
+     * Поддерживает контекст постраничного списка /my_events.
      *
      * @param eventId идентификатор события
      * @param context контекст callback query
+     * @param page номер страницы (null если не из /my_events)
      *
      * @throws Exception если произошла ошибка при начале добавления файла
      */
-    public void handleAddFile(Long eventId, CallbackQueryContext context) throws Exception {
+    public void handleAddFile(Long eventId, CallbackQueryContext context, Integer page) throws Exception {
         try {
             validateUserAccess(eventId, context.user());
 
             String instruction = formattingService.formatUploadInstruction();
-            InlineKeyboardMarkup keyboard = keyboardService.createAttachmentUploadKeyboard(eventId);
+            InlineKeyboardMarkup keyboard = keyboardService.createAttachmentUploadKeyboard(eventId, page);
 
             Integer resultMessageId = editOrSendInstruction(context.chatId(), context.messageId(), instruction, keyboard);
-            conversationStateService.setAwaitingFile(context.getUserId(), eventId, context.chatId(), resultMessageId);
+            conversationStateService.setAwaitingFile(context.getUserId(), eventId, context.chatId(), resultMessageId, page);
 
             callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
 
@@ -73,19 +75,25 @@ public class AttachmentUploadHandler {
     /**
      * Обрабатывает отмену добавления файла.
      * Возвращает пользователя к карточке события.
+     * Поддерживает контекст постраничного списка /my_events.
      *
      * @param eventId идентификатор события
      * @param context контекст callback query
+     * @param page номер страницы (null если не из /my_events)
      *
      * @throws Exception если произошла ошибка при отмене добавления файла
      */
-    public void handleCancelAddFile(Long eventId, @NonNull CallbackQueryContext context) throws Exception {
+    public void handleCancelAddFile(Long eventId, @NonNull CallbackQueryContext context, Integer page) throws Exception {
         try {
             conversationStateService.clearAwaitingFile(context.getUserId());
 
             Event event = eventService.getEventById(eventId);
             String eventMessage = buildEventMessage(event, context.user());
-            InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, context.getUserId());
+            
+            // Используем клавиатуру с контекстом страницы, если он есть
+            InlineKeyboardMarkup keyboard = page != null
+                ? keyboardService.createEventActionsKeyboardWithContext(event, context.getUserId(), page)
+                : keyboardService.createEventActionsKeyboard(event, context.getUserId());
 
             editOrSendEventCard(context.chatId(), context.messageId(), eventMessage, keyboard);
             callbackQueryService.answerCallback(context, CallbackMessages.CANCELLED);

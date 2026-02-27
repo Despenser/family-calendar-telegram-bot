@@ -12,7 +12,6 @@ import ru.golubyatnikov.family.calendar.bot.model.entity.User;
 import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.repository.UserRepository;
-import ru.golubyatnikov.family.calendar.bot.service.domain.planner.MyEventsHeaderUpdater;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
 import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
 import java.util.List;
@@ -21,7 +20,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.EmojiConstants.Commands.
 import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.*;
 
 /**
- * Сервис для управления шапками корзины и "Мои события".
+ * Сервис для управления шапками корзины.
  *
  * @author Golubyatnikov Aleksey
  * @since 2026-02-12
@@ -36,7 +35,6 @@ public class TrashHeaderFormattingService {
     private final TelegramMessageService messageService;
     private final BotMessageFormattingService botMessageFormattingService;
     private final KeyboardService keyboardService;
-    private final MyEventsHeaderUpdater myEventsHeaderUpdater;
     private final TrashConfig trashConfig;
     
     /**
@@ -103,15 +101,6 @@ public class TrashHeaderFormattingService {
             userId, 
             EventStatus.DELETED
         );
-    }
-    
-    /**
-     * Обновляет счетчик событий в шапке "Мои события".
-     * 
-     * @param userId идентификатор пользователя
-     */
-    public void updateMyEventsHeaderCount(Long userId) {
-        myEventsHeaderUpdater.updateMyEventsHeaderCount(userId);
     }
     
     /**

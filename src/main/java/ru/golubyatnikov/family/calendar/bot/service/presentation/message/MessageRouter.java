@@ -56,7 +56,7 @@ public class MessageRouter {
         
         // Приоритет 2: Ожидание файла
         if (conversationStateService.isAwaitingFile(userId)) {
-            fileMessageHandler.handleAwaitingFileHint(message, user);
+            fileMessageHandler.handleAwaitingFileHint(message);
             return true;
         }
         

@@ -23,17 +23,23 @@ public class AttachmentListHandler {
     
     private final CallbackQueryService callbackQueryService;
     private final AttachmentMessageService attachmentMessageService;
-    
+
     /**
-     * Отображает список вложений события.
+     * Отображает список вложений события с контекстом страницы.
      * 
      * @param eventId идентификатор события
      * @param context контекст callback query
+     * @param page номер страницы (null если не из /my_events)
      *
      * @throws Exception если произошла ошибка при отображении списка
      */
-    public void handleAttachmentList(Long eventId, @NonNull CallbackQueryContext context) throws Exception {
-        attachmentMessageService.showAttachmentList(eventId, context.user(), context.chatId(), context.messageId());
+    public void handleAttachmentList(Long eventId,
+                                     @NonNull CallbackQueryContext context,
+                                     Integer page) throws Exception {
+
+        attachmentMessageService.showAttachmentList(eventId, context.user(),
+                context.chatId(), context.messageId(), page);
+
         callbackQueryService.answerCallback(context, CallbackMessages.EMPTY);
     }
 }

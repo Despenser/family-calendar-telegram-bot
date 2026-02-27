@@ -8,12 +8,12 @@ import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.golubyatnikov.family.calendar.bot.model.context.EditingContext;
+import ru.golubyatnikov.family.calendar.bot.model.dto.EventMessageData;
 import ru.golubyatnikov.family.calendar.bot.model.entity.Event;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.keyboard.KeyboardService;
-import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
+import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventNotificationService;
 import ru.golubyatnikov.family.calendar.bot.service.domain.event.EventService;
+import ru.golubyatnikov.family.calendar.bot.service.infrastructure.conversation.ConversationStateService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
-import ru.golubyatnikov.family.calendar.bot.service.presentation.formatting.BotMessageFormattingService;
 import ru.golubyatnikov.family.calendar.bot.util.CallbackMessages;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -32,9 +32,8 @@ public class EventEditingService {
     
     private final EventService eventService;
     private final ConversationStateService conversationStateService;
-    private final KeyboardService keyboardService;
-    private final BotMessageFormattingService botMessageFormattingService;
     private final TelegramMessageService messageService;
+    private final EventNotificationService eventNotificationService;
     
     /**
      * Обновляет дату события и возвращает к карточке события.
@@ -130,9 +129,11 @@ public class EventEditingService {
      */
     private @Nullable EditingContext getEditingContextOrWarn(Long userId) {
         EditingContext context = conversationStateService.getEditingContext(userId);
+
         if (context == null || context.getEventId() == null) {
             return null;
         }
+
         return context;
     }
     
@@ -186,12 +187,15 @@ public class EventEditingService {
                                    Long chatId,
                                    Integer messageId) {
 
-        int eventCount = eventService.getActiveEventsCount(event.getUser().getId());
-        String eventMessage = botMessageFormattingService.buildEventMessageWithHeader(event, eventCount);
-        InlineKeyboardMarkup keyboard = keyboardService.createEventActionsKeyboard(event, userId);
+        // Извлекаем контекст страницы из EditingContext
+        EditingContext context = conversationStateService.getEditingContext(userId);
+        Integer myEventsPage = context != null ? context.getMyEventsPage() : null;
+        
+        // Подготавливаем данные сообщения через EventNotificationService
+        EventMessageData messageData = eventNotificationService.prepareEventMessageData(event, userId, myEventsPage);
         
         if (messageId != null) {
-            tryEditMessage(event, chatId, messageId, eventMessage, keyboard);
+            tryEditMessage(event, chatId, messageId, messageData.messageText(), messageData.keyboard());
 
         } else {
             sendEventMessage(event, chatId);

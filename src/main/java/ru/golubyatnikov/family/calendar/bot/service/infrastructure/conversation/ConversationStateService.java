@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.golubyatnikov.family.calendar.bot.model.context.*;
 import ru.golubyatnikov.family.calendar.bot.model.enums.EditField;
-
 import java.time.LocalDate;
 
 /**
@@ -83,6 +82,19 @@ public class ConversationStateService {
     }
     
     /**
+     * Начинает процесс редактирования события для пользователя с сохранением messageId и страницы /my_events.
+     * 
+     * @param userId идентификатор пользователя
+     * @param eventId идентификатор редактируемого события
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для редактирования
+     * @param myEventsPage номер страницы /my_events (null если не из /my_events)
+     */
+    public void startEventEditing(Long userId, Long eventId, Long chatId, Integer messageId, Integer myEventsPage) {
+        editingContextManager.startEventEditing(userId, eventId, chatId, messageId, myEventsPage);
+    }
+    
+    /**
      * Начинает процесс редактирования события для пользователя из календаря.
      * 
      * @param userId идентификатор пользователя
@@ -148,13 +160,15 @@ public class ConversationStateService {
      * @param eventId идентификатор завершенного события
      * @param chatId идентификатор чата
      * @param messageId идентификатор сообщения для редактирования
+     * @param myEventsPage номер страницы /my_events (может быть null)
      */
     public void setAwaitingCompletionNote(Long userId,
                                           Long eventId,
                                           Long chatId,
-                                          Integer messageId) {
+                                          Integer messageId,
+                                          Integer myEventsPage) {
 
-        completionNoteContextManager.setAwaitingCompletionNote(userId, eventId, chatId, messageId);
+        completionNoteContextManager.setAwaitingCompletionNote(userId, eventId, chatId, messageId, myEventsPage);
     }
     
     /**
@@ -189,15 +203,16 @@ public class ConversationStateService {
     // ==================== Методы для работы с вложениями ====================
     
     /**
-     * Устанавливает состояние ожидания файла для пользователя.
+     * Устанавливает состояние ожидания файла для пользователя с контекстом страницы /my_events.
      * 
      * @param userId идентификатор пользователя
      * @param eventId идентификатор события
      * @param chatId идентификатор чата
      * @param messageId идентификатор сообщения со списком вложений
+     * @param myEventsPage номер страницы /my_events (null если не из /my_events)
      */
-    public void setAwaitingFile(Long userId, Long eventId, Long chatId, Integer messageId) {
-        attachmentContextManager.setAwaitingFile(userId, eventId, chatId, messageId);
+    public void setAwaitingFile(Long userId, Long eventId, Long chatId, Integer messageId, Integer myEventsPage) {
+        attachmentContextManager.setAwaitingFile(userId, eventId, chatId, messageId, myEventsPage);
     }
     
     /**
@@ -251,17 +266,6 @@ public class ConversationStateService {
     }
     
     // ==================== Методы для работы с шапкой события ====================
-    
-    /**
-     * Сохраняет контекст шапки события для пользователя.
-     *
-     * @param userId идентификатор пользователя
-     * @param hasMyEventsHeader флаг наличия шапки "Мои события"
-     * @param eventCount количество событий пользователя для формирования шапки
-     */
-    public void saveEventHeaderContext(Long userId, boolean hasMyEventsHeader, int eventCount) {
-        eventHeaderContextManager.saveEventHeaderContext(userId, hasMyEventsHeader, eventCount);
-    }
     
     /**
      * Получает сохраненный контекст шапки события для пользователя.

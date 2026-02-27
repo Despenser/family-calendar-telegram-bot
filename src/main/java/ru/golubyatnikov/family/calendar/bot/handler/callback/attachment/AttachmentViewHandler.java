@@ -40,23 +40,26 @@ public class AttachmentViewHandler {
     
     /**
      * Обрабатывает просмотр файла.
+     * Поддерживает контекст постраничного списка /my_events.
      * 
      * @param attachmentId идентификатор вложения
      * @param eventId идентификатор события
      * @param context контекст callback query
+     * @param page номер страницы (null если не из /my_events)
      *
      * @throws Exception если произошла ошибка при просмотре файла
      */
     public void handleViewFile(Long attachmentId,
                                Long eventId,
-                               @NonNull CallbackQueryContext context) throws Exception {
+                               @NonNull CallbackQueryContext context,
+                               Integer page) throws Exception {
 
         try {
             deleteCurrentMessage(context.chatId(), context.messageId());
             
             Attachment attachment = attachmentService.getAttachment(attachmentId);
             String caption = formatCaption(attachment);
-            var keyboard = keyboardService.createFileViewKeyboard(eventId);
+            var keyboard = keyboardService.createFileViewKeyboard(eventId, page);
 
             Message sentMessage = messageService.sendFileWithKeyboardAndGet(
                     context.chatId(), attachment.getFileId(), attachment.getFileType(), caption, keyboard);

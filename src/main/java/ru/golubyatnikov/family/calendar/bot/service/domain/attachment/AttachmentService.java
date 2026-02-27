@@ -35,21 +35,19 @@ public class AttachmentService {
     /**
      * Сохраняет вложение к событию с проверкой размера файла.
      *
-     * @param eventId идентификатор события
-     * @param fileId Telegram file_id для получения файла через Bot API
+     * @param eventId  идентификатор события
+     * @param fileId   Telegram file_id для получения файла через Bot API
      * @param fileName оригинальное имя файла
      * @param fileType тип файла (document, photo, video, audio)
      * @param fileSize размер файла в байтах
-     *
-     * @return сохраненное вложение
-     * @throws EventNotFoundException если событие не найдено
+     * @throws EventNotFoundException    если событие не найдено
      * @throws FileSizeExceededException если размер файла превышает максимально допустимый размер
      */
-    public Attachment saveAttachment(Long eventId,
-                                     String fileId,
-                                     String fileName,
-                                     String fileType,
-                                     Long fileSize) {
+    public void saveAttachment(Long eventId,
+                               String fileId,
+                               String fileName,
+                               String fileType,
+                               Long fileSize) {
 
         Event event = eventRepository.findById(eventId).orElseThrow(() -> new EventNotFoundException(eventId));
 
@@ -71,7 +69,7 @@ public class AttachmentService {
             .fileSize(fileSize)
             .build();
 
-        return attachmentRepository.save(attachment);
+        attachmentRepository.save(attachment);
     }
     
     /**

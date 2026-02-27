@@ -47,7 +47,7 @@ public class CacheConfig {
     /**
      * Список имен кэшей для создания
      */
-    private List<String> names = List.of("upcomingEvents", "userEvents");
+    private List<String> names = List.of("upcomingEvents", "userEvents", "myEventsPage");
 
     /**
      * Создает и настраивает CacheManager с использованием Caffeine.

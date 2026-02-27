@@ -36,7 +36,20 @@ public class EditingContextManager {
      * @param messageId идентификатор сообщения для редактирования
      */
     public void startEventEditing(Long userId, Long eventId, Long chatId, Integer messageId) {
-        EditingContext context = new EditingContext(eventId, chatId, null, messageId, null);
+        startEventEditing(userId, eventId, chatId, messageId, null);
+    }
+    
+    /**
+     * Начинает процесс редактирования события для пользователя с сохранением messageId и страницы /my_events.
+     * 
+     * @param userId идентификатор пользователя
+     * @param eventId идентификатор редактируемого события
+     * @param chatId идентификатор чата
+     * @param messageId идентификатор сообщения для редактирования
+     * @param myEventsPage номер страницы /my_events (null если не из /my_events)
+     */
+    public void startEventEditing(Long userId, Long eventId, Long chatId, Integer messageId, Integer myEventsPage) {
+        EditingContext context = new EditingContext(eventId, chatId, null, messageId, null, myEventsPage);
         usersEditingEvents.put(userId, context);
     }
     
@@ -55,7 +68,7 @@ public class EditingContextManager {
                                               Integer messageId,
                                               LocalDate sourceDate) {
 
-        EditingContext context = new EditingContext(eventId, chatId, null, messageId, sourceDate);
+        EditingContext context = new EditingContext(eventId, chatId, null, messageId, sourceDate, null);
         usersEditingEvents.put(userId, context);
 
     }

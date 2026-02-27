@@ -66,7 +66,7 @@ public class TrashService {
      */
     @Transactional
     public void restoreEvent(Long eventId, Long userId) {
-        validateIds(eventId, userId, "восстановить");
+        validateIds(eventId, userId);
         
         Event event = findEventById(eventId);
         validateEventOwnership(event, userId, "восстановить");
@@ -135,7 +135,6 @@ public class TrashService {
      */
     private void updateHeadersAfterRestore(Long userId) {
         trashHeaderFormattingService.updateTrashHeaderAfterRemoval(userId);
-        trashHeaderFormattingService.updateMyEventsHeaderCount(userId);
     }
     
     /**
@@ -150,7 +149,7 @@ public class TrashService {
      */
     @Transactional
     public void permanentlyDelete(Long eventId, Long userId) {
-        validateIds(eventId, userId, "окончательно удалить");
+        validateIds(eventId, userId);
         
         Event event = findEventById(eventId);
         validateEventOwnership(event, userId, "окончательно удалить");
@@ -171,7 +170,7 @@ public class TrashService {
     /**
      * Валидирует идентификаторы события и пользователя.
      */
-    private void validateIds(Long eventId, Long userId, String action) {
+    private void validateIds(Long eventId, Long userId) {
         if (eventId == null || userId == null) {
             throw new IllegalArgumentException("ID события и пользователя не могут быть null");
         }

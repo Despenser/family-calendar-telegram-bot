@@ -3,6 +3,7 @@ package ru.golubyatnikov.family.calendar.bot.service.domain.event;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.golubyatnikov.family.calendar.bot.exception.EventNotFoundException;
@@ -13,7 +14,6 @@ import ru.golubyatnikov.family.calendar.bot.model.enums.EventStatus;
 import ru.golubyatnikov.family.calendar.bot.repository.EventRepository;
 import ru.golubyatnikov.family.calendar.bot.service.domain.reminder.ReminderSchedulingService;
 import ru.golubyatnikov.family.calendar.bot.service.infrastructure.telegram.TelegramMessageService;
-
 import java.time.LocalDateTime;
 
 /**
@@ -31,19 +31,16 @@ public class EventDeletionService {
     private final EventHistoryService eventHistoryService;
     private final TelegramMessageService telegramMessageService;
     private final ReminderSchedulingService reminderSchedulingService;
-    private final EventNotificationService eventNotificationService;
     
     /**
      * Перемещает событие в корзину.
-     * 
-     * @param eventId идентификатор события
-     * @param userId идентификатор пользователя
      *
-     * @return удаленное событие
+     * @param eventId идентификатор события
+     * @param userId  идентификатор пользователя
      */
     @Transactional
-    @CacheEvict(value = {"upcomingEvents", "userEvents"}, allEntries = true)
-    public Event deleteEvent(Long eventId, Long userId) {
+    @CacheEvict(value = {"upcomingEvents", "userEvents", "myEventsPage"}, allEntries = true)
+    public void deleteEvent(Long eventId, Long userId) {
         Event event = eventRepository.findById(eventId)
             .orElseThrow(() -> new EventNotFoundException(eventId));
         
@@ -69,62 +66,10 @@ public class EventDeletionService {
         event.setMessageId(null);
         event.setIsMyEventsHeader(false);
         
-        Event deletedEvent = eventRepository.save(event);
+        eventRepository.save(event);
         
         eventHistoryService.recordDeletion(eventId, userId);
 
-        eventNotificationService.updateMyEventsHeaderAfterRemoval(userId);
-        
-        return deletedEvent;
-    }
-    
-    /**
-     * Завершает событие вручную.
-     * 
-     * @param eventId идентификатор события
-     * @param userId идентификатор пользователя
-     * @return завершенное событие
-     */
-    @Transactional
-    @CacheEvict(value = {"upcomingEvents", "userEvents"}, allEntries = true)
-    public Event completeEvent(Long eventId, Long userId) {
-        Event event = getEventAndValidateCompletion(eventId, userId);
-
-        if (event.getMessageId() != null) {
-            Long chatId = event.getUser().getTelegramId();
-            if (chatId != null) {
-                try {
-                    telegramMessageService.deleteMessageSilently(chatId, event.getMessageId().intValue());
-
-                } catch (Exception e) {
-                    log.warn("Не удалось удалить сообщение события при завершении: eventId={}, messageId={}, error={}", 
-                             eventId, event.getMessageId(), e.getMessage());
-                }
-            }
-        }
-
-        event.setStatus(EventStatus.COMPLETED);
-        event.setCompletedAt(LocalDateTime.now());
-        event.setMessageId(null);
-        event.setIsMyEventsHeader(false);
-
-        Event completedEvent = eventRepository.save(event);
-        log.info("Событие ID={} успешно завершено вручную пользователем ID={}", eventId, userId);
-
-        eventHistoryService.recordChange(
-            eventId,
-            userId,
-            ActionType.UPDATED,
-            "status",
-            "ACTIVE",
-            "COMPLETED"
-        );
-
-        handleEventCompletion(eventId);
-
-        eventNotificationService.updateMyEventsHeaderAfterRemoval(userId);
-
-        return completedEvent;
     }
     
     /**
@@ -136,7 +81,7 @@ public class EventDeletionService {
      * @return завершенное событие с сохраненным messageId
      */
     @Transactional
-    @CacheEvict(value = {"upcomingEvents", "userEvents"}, allEntries = true)
+    @CacheEvict(value = {"upcomingEvents", "userEvents", "myEventsPage"}, allEntries = true)
     public Event completeEventWithoutHeaderUpdate(Long eventId, Long userId) {
         Event event = getEventAndValidateCompletion(eventId, userId);
 
@@ -170,7 +115,7 @@ public class EventDeletionService {
      * @return обновленное событие с заметкой
      */
     @Transactional
-    @CacheEvict(value = {"upcomingEvents", "userEvents"}, allEntries = true)
+    @CacheEvict(value = {"upcomingEvents", "userEvents", "myEventsPage"}, allEntries = true)
     public Event addCompletionNote(Long eventId, Long userId, String note) {
         if (note == null || note.isBlank()) {
             throw new IllegalArgumentException("Заметка не может быть пустой");
@@ -208,12 +153,13 @@ public class EventDeletionService {
      * 
      * @param eventId идентификатор события
      * @param userId идентификатор пользователя
+     *
      * @return событие, готовое к завершению
      * @throws EventNotFoundException если событие не найдено
      * @throws UnauthorizedAccessException если нет прав на завершение
      * @throws IllegalStateException если событие не в активном статусе
      */
-    private Event getEventAndValidateCompletion(Long eventId, Long userId) {
+    private @NonNull Event getEventAndValidateCompletion(Long eventId, Long userId) {
         Event event = eventRepository.findById(eventId)
             .orElseThrow(() -> new EventNotFoundException(eventId));
         

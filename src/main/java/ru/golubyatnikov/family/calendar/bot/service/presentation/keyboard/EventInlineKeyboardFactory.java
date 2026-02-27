@@ -66,6 +66,90 @@ public class EventInlineKeyboardFactory {
     }
 
     /**
+     * Создает inline клавиатуру для управления событием с контекстом постраничного списка.
+     * Добавляет кнопку возврата к списку и размещает её в одном ряду с кнопкой завершения.
+     *
+     * @param event событие
+     * @param userId идентификатор пользователя
+     * @param page номер страницы для возврата к списку
+     *
+     * @return настроенная InlineKeyboardMarkup с кнопкой возврата к списку
+     * @throws IllegalArgumentException если параметры некорректны
+     */
+    public InlineKeyboardMarkup createEventActionsKeyboardWithContext(Event event, Long userId, Integer page) {
+        validateEventAndUserId(event, userId);
+
+        Long eventId = event.getId();
+        List<InlineKeyboardRow> rows = new ArrayList<>();
+
+        // Первый ряд: кнопки редактирования и удаления
+        rows.add(keyboardFactory.createRow(
+            keyboardFactory.createButton(EDIT + " Редактировать", CallbackPrefix.EDIT_EVENT.withPayload(eventId + "_" + page)),
+            keyboardFactory.createButton(DELETE + " Удалить", CallbackPrefix.DELETE_EVENT.withPayload(eventId + "_" + page))
+        ));
+
+        boolean isActive = event.getStatus() == EventStatus.ACTIVE;
+        boolean isOwner = event.belongsToUser(userId);
+
+        // Второй ряд: кнопка вложений и кнопка управления напоминаниями
+        long attachmentsCount = attachmentService.countEventAttachments(event.getId());
+        String attachmentsButtonText = attachmentsCount > 0
+            ? ATTACHMENT + " Вложения (" + attachmentsCount + ")"
+            : ATTACHMENT + " Вложения";
+
+        if (isActive && isOwner) {
+            boolean hasReminders = reminderSchedulingService.hasActiveReminders(eventId);
+
+            InlineKeyboardButton remindersBtn;
+            if (hasReminders) {
+                remindersBtn = keyboardFactory.createButton(DISABLED + " Откл. напоминания",
+                    CallbackPrefix.DISABLE_REMINDERS.withPayload(eventId + "_" + page));
+
+            } else {
+                remindersBtn = keyboardFactory.createButton(ENABLED + " Вкл. напоминания",
+                    CallbackPrefix.ENABLE_REMINDERS.withPayload(eventId + "_" + page));
+            }
+
+            rows.add(keyboardFactory.createRow(
+                keyboardFactory.createButton(attachmentsButtonText, CallbackPrefix.ATTACH_FILE.withPayload("list_" + eventId + "_" + page)),
+                remindersBtn
+            ));
+
+        } else {
+            rows.add(keyboardFactory.createRow(
+                keyboardFactory.createButton(attachmentsButtonText, CallbackPrefix.ATTACH_FILE.withPayload("list_" + eventId + "_" + page))
+            ));
+        }
+
+        // Третий ряд: кнопка возврата к списку и кнопка завершения (в одном ряду)
+        if (page != null) {
+            InlineKeyboardButton backButton = keyboardFactory.createButton(
+                BACK + " К списку",
+                CallbackPrefix.MY_EVENTS_BACK.withPayload(String.valueOf(page))
+            );
+
+            if (isActive && isOwner) {
+                // Кнопки "К списку" и "Завершить" в одном ряду
+                rows.add(keyboardFactory.createRow(
+                    backButton,
+                    keyboardFactory.createButton(COMPLETE + " Завершить", CallbackPrefix.COMPLETE_EVENT.withPayload(eventId + "_" + page))
+                ));
+            } else {
+                // Только кнопка "К списку"
+                rows.add(keyboardFactory.createRow(backButton));
+            }
+        } else if (isActive && isOwner) {
+            // Если нет контекста страницы, но есть возможность завершить - показываем только кнопку завершения
+            rows.add(keyboardFactory.createRow(
+                keyboardFactory.createButton(COMPLETE + " Завершить", CallbackPrefix.COMPLETE_EVENT.withPayload(eventId.toString()))
+            ));
+        }
+
+        return keyboardFactory.createMarkup(rows);
+    }
+
+
+    /**
      * Создает inline клавиатуру для управления событием с учетом статуса и прав доступа.
      * 
      * @param event событие
@@ -75,13 +159,7 @@ public class EventInlineKeyboardFactory {
      * @throws IllegalArgumentException если параметры некорректны
      */
     public InlineKeyboardMarkup createEventActionsKeyboard(Event event, Long userId) {
-        if (event == null || event.getId() == null) {
-            throw new IllegalArgumentException("Event и Event ID не могут быть null");
-        }
-        
-        if (userId == null || userId <= 0) {
-            throw new IllegalArgumentException("UserId должен быть положительным числом");
-        }
+        validateEventAndUserId(event, userId);
         
         Long eventId = event.getId();
         List<InlineKeyboardRow> rows = new ArrayList<>();
@@ -200,42 +278,37 @@ public class EventInlineKeyboardFactory {
     }
 
     /**
-     * Создает inline клавиатуру для выбора поля редактирования события.
+     * Создает inline клавиатуру для выбора поля редактирования события с контекстом страницы.
      * 
      * @param eventId идентификатор события
+     * @param page номер страницы для возврата к списку (может быть null)
      *
      * @return настроенная InlineKeyboardMarkup
      * @throws IllegalArgumentException если eventId некорректен
      */
-    public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId) {
-        return createEditFieldSelectionKeyboard(eventId, null);
-    }
-
-    /**
-     * Создает inline клавиатуру для выбора поля редактирования события.
-     * 
-     * @param eventId идентификатор события
-     * @param userId идентификатор пользователя (для проверки контекста редактирования)
-     *
-     * @return настроенная InlineKeyboardMarkup
-     * @throws IllegalArgumentException если eventId некорректен
-     */
-    public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId, Long userId) {
+    public InlineKeyboardMarkup createEditFieldSelectionKeyboard(Long eventId, Integer page) {
         if (eventId == null || eventId <= 0) {
             throw new IllegalArgumentException("EventId должен быть положительным числом");
         }
 
+        // Формируем payload для кнопок с учетом контекста страницы
+        String titlePayload = page != null ? "title_" + eventId + "_" + page : "title_" + eventId;
+        String datePayload = page != null ? "date_" + eventId + "_" + page : "date_" + eventId;
+        String timePayload = page != null ? "time_" + eventId + "_" + page : "time_" + eventId;
+        String descPayload = page != null ? "description_" + eventId + "_" + page : "description_" + eventId;
+        String cancelPayload = page != null ? eventId + "_" + page : eventId.toString();
+
         InlineKeyboardButton cancelBtn = keyboardFactory.createButton(BACK + " Назад", 
-            CallbackPrefix.EDIT_CANCEL.withPayload(eventId.toString()));
+            CallbackPrefix.EDIT_CANCEL.withPayload(cancelPayload));
 
         return keyboardFactory.createMarkup(
             keyboardFactory.createRow(
-                keyboardFactory.createButton(DESCRIPTION + " Название", CallbackPrefix.EDIT_FIELD.withPayload("title_" + eventId)),
-                keyboardFactory.createButton(DATE + " Дата", CallbackPrefix.EDIT_FIELD.withPayload("date_" + eventId))
+                keyboardFactory.createButton(DESCRIPTION + " Название", CallbackPrefix.EDIT_FIELD.withPayload(titlePayload)),
+                keyboardFactory.createButton(DATE + " Дата", CallbackPrefix.EDIT_FIELD.withPayload(datePayload))
             ),
             keyboardFactory.createRow(
-                keyboardFactory.createButton(TIME + " Время", CallbackPrefix.EDIT_FIELD.withPayload("time_" + eventId)),
-                keyboardFactory.createButton(NOTE + " Описание", CallbackPrefix.EDIT_FIELD.withPayload("description_" + eventId))
+                keyboardFactory.createButton(TIME + " Время", CallbackPrefix.EDIT_FIELD.withPayload(timePayload)),
+                keyboardFactory.createButton(NOTE + " Описание", CallbackPrefix.EDIT_FIELD.withPayload(descPayload))
             ),
             keyboardFactory.createRow(cancelBtn)
         );
@@ -256,5 +329,22 @@ public class EventInlineKeyboardFactory {
                 keyboardFactory.createButton(PERSONAL + " Личные", CallbackPrefix.FILTER.withPayload("personal"))
             )
         );
+    }
+    
+    /**
+     * Валидирует параметры события и пользователя.
+     * 
+     * @param event событие
+     * @param userId идентификатор пользователя
+     * @throws IllegalArgumentException если параметры некорректны
+     */
+    private void validateEventAndUserId(Event event, Long userId) {
+        if (event == null || event.getId() == null) {
+            throw new IllegalArgumentException("Event и Event ID не могут быть null");
+        }
+        
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("UserId должен быть положительным числом");
+        }
     }
 }
