@@ -38,7 +38,7 @@ public class TelegramWebhookController {
      */
     @PostMapping
     public ResponseEntity<Void> onUpdateReceived(
-            @RequestHeader(value = "#{telegramApiConfig.secretTokenHeader}", required = false) String secretToken,
+            @RequestHeader(value = "X-Telegram-Bot-Api-Secret-Token", required = false) String secretToken,
             @NonNull @RequestBody Update update) {
 
         if (!webhookSecurityService.validateSecretToken(secretToken)) {
