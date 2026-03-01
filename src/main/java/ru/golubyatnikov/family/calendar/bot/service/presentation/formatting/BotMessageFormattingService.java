@@ -204,7 +204,7 @@ public class BotMessageFormattingService {
      * @return отформатированное сообщение о пустом состоянии
      */
     public String buildEmptyMyEventsMessage() {
-        return DESCRIPTION + " " + bold("Мои события") + "\n\n" +
+        return CREATION + " " + bold("Мои события") + "\n\n" +
                 escape("У вас пока нет созданных событий.\n\n") +
                 escape("Используйте ") + escape(ADD_EVENT + " /add_event") + escape(" для добавления нового события.");
     }

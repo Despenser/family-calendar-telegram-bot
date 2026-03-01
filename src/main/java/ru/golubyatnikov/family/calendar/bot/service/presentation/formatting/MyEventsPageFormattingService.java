@@ -22,6 +22,7 @@ import static ru.golubyatnikov.family.calendar.bot.util.MarkdownFormatter.format
 public class MyEventsPageFormattingService {
     
     private final DateTimeFormattingService dateTimeFormattingService;
+    private final BotMessageFormattingService botMessageFormattingService;
     private final MyEventsConfig config;
     
     /**
@@ -74,11 +75,7 @@ public class MyEventsPageFormattingService {
      * @return отформатированное сообщение
      */
     public String buildNoEventsMessage() {
-        return formatMessage(
-                MY_EVENTS + " Мои события\n\n" +
-                "У вас пока нет активных событий.\n\n" +
-                "Используйте команду /add_event для создания нового события."
-        );
+        return botMessageFormattingService.buildEmptyMyEventsMessage();
     }
     
     /**

@@ -36,14 +36,105 @@ public class EventNotificationService {
     private final ReminderCreationService reminderCreationService;
     
     /**
-     * Обрабатывает создание события и автоматически создает напоминания по умолчанию.
+     * Обрабатывает создание события: создает напоминания по умолчанию и отправляет уведомления членам семьи.
      * 
      * @param event созданное событие
      * @param user пользователь, создавший событие
      */
     @Transactional
     public void handleEventCreated(@NonNull Event event, @NonNull User user) {
-        reminderCreationService.createDefaultReminders(event, user);
+        // Для семейных событий создаем напоминания для всех членов семьи
+        if (!event.getIsPersonal() && event.getFamily() != null) {
+            createRemindersForFamilyMembers(event);
+            notifyFamilyMembersAboutNewEvent(event, user);
+        } else {
+            // Для персональных событий создаем напоминания только для создателя
+            reminderCreationService.createDefaultReminders(event, user);
+        }
+    }
+    
+    /**
+     * Создает напоминания по умолчанию для всех членов семьи.
+     * 
+     * @param event семейное событие
+     */
+    private void createRemindersForFamilyMembers(@NonNull Event event) {
+        if (event.getFamily() == null || event.getFamily().getMembers() == null) {
+            log.warn("Невозможно создать напоминания: семья или её члены не найдены для события ID={}", event.getId());
+            return;
+        }
+        
+        event.getFamily().getMembers().forEach(member -> {
+            try {
+                reminderCreationService.createDefaultReminders(event, member);
+                log.debug("Напоминания созданы для члена семьи ID={} для события ID={}", member.getId(), event.getId());
+            } catch (Exception e) {
+                log.error("Ошибка создания напоминаний для члена семьи ID={} для события ID={}: {}", 
+                         member.getId(), event.getId(), e.getMessage(), e);
+            }
+        });
+    }
+    
+    /**
+     * Отправляет уведомления всем членам семьи о создании нового события.
+     * Уведомление не отправляется создателю события.
+     * 
+     * @param event созданное событие
+     * @param creator пользователь, создавший событие
+     */
+    private void notifyFamilyMembersAboutNewEvent(@NonNull Event event, @NonNull User creator) {
+        if (event.getFamily() == null || event.getFamily().getMembers() == null) {
+            log.warn("Невозможно отправить уведомления: семья или её члены не найдены для события ID={}", event.getId());
+            return;
+        }
+        
+        event.getFamily().getMembers().stream()
+            .filter(member -> !member.getId().equals(creator.getId())) // Не отправляем создателю
+            .forEach(member -> {
+                try {
+                    sendEventCreationNotification(event, member, creator);
+                } catch (Exception e) {
+                    log.error("Ошибка отправки уведомления о создании события ID={} члену семьи ID={}: {}", 
+                             event.getId(), member.getId(), e.getMessage(), e);
+                }
+            });
+    }
+    
+    /**
+     * Отправляет уведомление о создании события конкретному члену семьи.
+     * 
+     * @param event созданное событие
+     * @param member член семьи, которому отправляется уведомление
+     * @param creator создатель события
+     * @throws TelegramApiException если не удалось отправить уведомление
+     */
+    private void sendEventCreationNotification(@NonNull Event event, @NonNull User member, @NonNull User creator) 
+            throws TelegramApiException {
+        
+        if (member.getTelegramId() == null) {
+            log.warn("Невозможно отправить уведомление члену семьи ID={}: отсутствует Telegram ID", member.getId());
+            return;
+        }
+        
+        String messageText = buildEventCreationNotificationMessage(event, creator);
+        telegramMessageService.sendMessage(member.getTelegramId(), messageText);
+        
+        log.info("Уведомление о создании события ID={} отправлено члену семьи ID={}", event.getId(), member.getId());
+    }
+    
+    /**
+     * Формирует текст уведомления о создании нового события.
+     * 
+     * @param event созданное событие
+     * @param creator создатель события
+     * @return отформатированный текст уведомления
+     */
+    private String buildEventCreationNotificationMessage(@NonNull Event event, @NonNull User creator) {
+        String creatorName = creator.getFirstName() != null ? creator.getFirstName() : "Член семьи";
+        
+        return "🔔 Новое событие в семейном календаре\n\n" +
+               "Создатель: " + creatorName + "\n\n" +
+               botMessageFormattingService.buildEventMessage(event);
     }
     
     /**
