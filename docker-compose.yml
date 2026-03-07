@@ -67,8 +67,11 @@ services:
       SPRING_FLYWAY_ENABLED: "true"
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
     ports:
-      # В dev режиме пробрасываем порт для ngrok, в prod доступ через nginx
+      # В dev режиме пробрасываем порт для ngrok
+      # В prod режиме НЕ пробрасываем порт - доступ только через nginx
       - "${SERVER_PORT:-8080}:8080"
+    profiles:
+      - dev
     networks:
       - family-calendar-network
     healthcheck:
